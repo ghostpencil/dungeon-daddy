@@ -17,11 +17,11 @@ If you are here to **learn from the project**, start at [The Experiment](#the-ex
 
 **Design Mode** — LLM-assisted dungeon creation with loop pattern library
 
-![Design Mode](tools/screenshots/phase10_loops_tab_20260508_130134.png)
+![Design Mode](DesignModeScreenshot.png)
 
 **Play Mode** — Interactive map with live AI Dungeon Master chat
 
-![Play Mode](tools/screenshots/phase7_b5_test_drive_20260508_131935.png)
+![Play Mode](PlayModeScreenshot.png)
 
 ---
 
