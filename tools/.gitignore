@@ -1,4 +1,4 @@
-screenshots/
+screenshots/*
 !screenshots/phase10_loops_tab_20260508_130134.png
 !screenshots/phase7_b5_test_drive_20260508_131935.png
 .screenshot.pid

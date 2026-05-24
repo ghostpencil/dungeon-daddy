@@ -87,23 +87,14 @@ ST13-5  Run and verify end-to-end           DONE  ALL BEHAVIORS PASSED
 
 ---
 
-## Next Session
+## Published
 
-**Goal: Publish to GitHub as ghostpencil/dungeon-daddy**
+**https://github.com/ghostpencil/dungeon-daddy** — published 2026-05-24
 
-Pre-publish fixes already done (2026-05-24):
-- README rewritten to explain dual purpose (GM assistant + teaching experiment)
-- `.claude/settings.local.json` added to `.gitignore`
-- README screenshots un-ignored in `tools/.gitignore`
-- All URLs updated to `ghostpencil` account
-- Contributing section added (not accepting external PRs yet)
-
-Remaining steps:
-1. `git init` and make initial commit
-2. Create repo via `gh repo create ghostpencil/dungeon-daddy --public`
-3. Push to GitHub
-4. Verify CI badge is live and README renders correctly
-5. Share link with team
+- Initial commit: 198 files, 745 unit tests passing
+- CI badge live and green (771 passing in CI, 3 UI harness tests excluded — require OpenGL)
+- 14 GitHub topics set for discoverability
+- Presentation PDF included; PPTX excluded from repo
 
 ---
 
