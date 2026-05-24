@@ -160,6 +160,18 @@ pytest
 
 ---
 
+## AI Tooling
+
+This project was built with [Claude Code](https://claude.ai/code) using two external tools. They are not required to run the app or tests, but are needed to replicate the AI-driven development and smoke test workflow.
+
+**TDD skill** — guides Claude through a red-green-refactor loop before writing any new tests or features.
+Install from [mattpocock/skills](https://github.com/mattpocock/skills/blob/main/skills/engineering/tdd/SKILL.md).
+
+**computer-use-mcp** — MCP server that lets Claude take screenshots and interact with the running app during UI smoke tests (Strategy B).
+Install from [domdomegg/computer-use-mcp](https://github.com/domdomegg/computer-use-mcp).
+
+---
+
 ## Status
 
 Active development. Core design and play loops are complete through Phase 18. Windows-only; a Linux/WSL2 platform backend is planned.
