@@ -419,7 +419,7 @@ def test_load_dungeon_transient_sets_flag(make_play_view):
     assert view._is_test_drive is True
 
 
-def test_load_dungeon_transient_does_not_write_repo(make_play_view):
+def test_load_dungeon_transient_does_not_save_session(make_play_view):
     room = _room("r1", x=0, y=0)
     level = _level(rooms=[room], connections=[], level_id=1)
     dungeon = _dungeon([level])
@@ -439,7 +439,7 @@ def test_load_dungeon_transient_does_not_write_repo(make_play_view):
     view.save_memory_overlay()
 
     view._repo.save_session.assert_not_called()
-    view._repo.save_room_memory.assert_not_called()
+    view._repo.save_room_memory.assert_called_once()
 
 
 def test_load_dungeon_session_fresh_creates_state(make_play_view):

@@ -94,6 +94,25 @@ def test_open_dungeon_shows_error_on_unexpected_exception():
     assert len(errors) == 1
 
 
+def test_save_dungeon_stamps_save_name_on_dungeon():
+    dungeon = _make_dungeon()  # save_name starts as None
+    win = _make_window(dungeon)
+    with patch("dungeon_daddy.llm.context_docs.generate_all_context_docs"):
+        win.save_dungeon()
+    assert dungeon.meta.save_name == "Iron Crypts"
+
+
+def test_open_dungeon_backfills_save_name():
+    loaded = _make_dungeon()  # save_name is None in the loaded JSON
+    win = _make_window(_make_dungeon())
+    win._repo.load.return_value = loaded
+    win.switch_mode = MagicMock()
+
+    win.open_dungeon(_pick_fn=lambda: "iron-crypts")
+
+    assert loaded.meta.save_name == "iron-crypts"
+
+
 # ---------------------------------------------------------------------------
 # validate — TR-4
 # ---------------------------------------------------------------------------

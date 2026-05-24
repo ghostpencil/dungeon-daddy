@@ -343,8 +343,7 @@ class PlayView(arcade.View):
             return
         input_widget = getattr(self, "_overlay_input", None)
         content = input_widget.text if input_widget is not None else self._overlay_content
-        if not self._is_test_drive:
-            self._repo.save_room_memory(self._state.dungeon_id, self._overlay_level_id, content)
+        self._repo.save_room_memory(self._state.dungeon_id, self._overlay_level_id, content)
         self.close_memory_overlay()
 
     def close_memory_overlay(self) -> None:

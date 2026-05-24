@@ -177,6 +177,8 @@ class DungeonDaddyWindow(arcade.Window):
             return
         try:
             dungeon = self._repo.load(name)
+            if dungeon.meta.save_name is None:
+                dungeon.meta.save_name = name
             self._design_view.load_dungeon(dungeon)
             self._play_view.load_dungeon(dungeon)
             self.switch_mode("design")
@@ -251,6 +253,7 @@ class DungeonDaddyWindow(arcade.Window):
             _log.info("Save: no dungeon loaded")
             return
         name = dungeon.meta.effective_name
+        dungeon.meta.save_name = name
         try:
             self._repo.save(dungeon, name)
             if state is not None:
