@@ -1,0 +1,40 @@
+# Secrets — never commit real credentials
+.env
+
+# Claude Code local settings (machine-specific paths)
+.claude/settings.local.json
+
+# Local reference — not for publishing
+backup/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE — JetBrains
+.idea/
+*.iml
+
+# IDE — VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Presentation — PDF only, exclude source PPTX
+presentation/*.pptx
+
+# Logs
+*.log

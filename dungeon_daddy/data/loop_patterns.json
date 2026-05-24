@@ -1,0 +1,83 @@
+{
+  "lock_key": {
+    "key": "lock_key",
+    "name": "Lock & Key",
+    "blurb": "Players encounter a barrier, must find the key in a side area, then return to unlock it.",
+    "path_a_length": "short",
+    "path_b_length": "medium",
+    "beats": ["entry", "locked barrier", "key hunt", "unlock", "goal"],
+    "source": "Dormans"
+  },
+  "gambit": {
+    "key": "gambit",
+    "name": "Gambit",
+    "blurb": "A risky shortcut trades danger for speed; the safe route is longer but survivable.",
+    "path_a_length": "short",
+    "path_b_length": "long",
+    "beats": ["entry", "choice point", "risky path", "reward or cost", "goal"],
+    "source": "Dormans"
+  },
+  "foreshadow": {
+    "key": "foreshadow",
+    "name": "Foreshadowing",
+    "blurb": "Early clues hint at a later threat or secret, rewarding attentive players with preparation.",
+    "path_a_length": "long",
+    "path_b_length": "short",
+    "beats": ["entry", "foreshadowing clue", "mid-dungeon buildup", "revelation", "goal"],
+    "source": "Sersa Victory"
+  },
+  "fork_choice": {
+    "key": "fork_choice",
+    "name": "True Fork",
+    "blurb": "Two equally valid branches with different themes or obstacles; players choose one.",
+    "path_a_length": "medium",
+    "path_b_length": "medium",
+    "beats": ["entry", "fork", "branch A or branch B", "convergence", "goal"],
+    "source": "Dormans"
+  },
+  "pursuit": {
+    "key": "pursuit",
+    "name": "Pursuit",
+    "blurb": "Players are chased through the level, or hunt something that flees ahead of them.",
+    "path_a_length": "short",
+    "path_b_length": "long",
+    "beats": ["entry", "pursuit trigger", "chase sequence", "confrontation", "goal"],
+    "source": "Sersa Victory"
+  },
+  "secret_shortcut": {
+    "key": "secret_shortcut",
+    "name": "Secret Shortcut",
+    "blurb": "Exploration rewards players with a hidden passage that bypasses a long stretch.",
+    "path_a_length": "long",
+    "path_b_length": "short",
+    "beats": ["entry", "obvious route", "hidden door discovery", "shortcut", "goal"],
+    "source": "Alexandrian"
+  },
+  "hub_spoke": {
+    "key": "hub_spoke",
+    "name": "Hub & Spoke",
+    "blurb": "A central hub connects multiple branch areas; players clear spokes in any order.",
+    "path_a_length": "medium",
+    "path_b_length": "medium",
+    "beats": ["entry", "hub room", "spoke areas", "return to hub", "goal"],
+    "source": "Alexandrian"
+  },
+  "bottleneck": {
+    "key": "bottleneck",
+    "name": "Branch & Bottleneck",
+    "blurb": "Parallel branches converge at a chokepoint the players must pass through.",
+    "path_a_length": "short",
+    "path_b_length": "long",
+    "beats": ["entry", "branch", "parallel paths", "bottleneck convergence", "goal"],
+    "source": "Dormans"
+  },
+  "shortcut_back": {
+    "key": "shortcut_back",
+    "name": "Shortcut Back",
+    "blurb": "Deep in the dungeon players discover a hidden route back to an earlier area.",
+    "path_a_length": "long",
+    "path_b_length": "short",
+    "beats": ["entry", "forward progress", "deep area", "shortcut discovered", "return path", "goal"],
+    "source": "Alexandrian"
+  }
+}

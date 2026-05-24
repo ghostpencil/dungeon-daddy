@@ -1,0 +1,201 @@
+/* ─────────────────────────────────────────────────────────────
+   Dungeon Daddy — Cyber-arcane design tokens
+   ───────────────────────────────────────────────────────────── */
+:root {
+  /* Surfaces — obsidian with subtle violet shift */
+  --bg-0: oklch(0.13 0.015 285);
+  --bg-1: oklch(0.17 0.018 285);
+  --bg-2: oklch(0.21 0.020 285);
+  --bg-3: oklch(0.25 0.022 285);
+  --bg-hi: oklch(0.30 0.024 285);
+
+  /* Borders / dividers */
+  --line-dim: oklch(0.28 0.02 285 / 0.7);
+  --line: oklch(0.35 0.025 285);
+  --line-hi: oklch(0.45 0.03 285);
+
+  /* Text */
+  --ink-1: oklch(0.96 0.01 285);
+  --ink-2: oklch(0.82 0.015 285);
+  --ink-3: oklch(0.62 0.02 285);
+  --ink-4: oklch(0.48 0.025 285);
+
+  /* Arcane accents — shared chroma, varied hue */
+  --teal:      oklch(0.78 0.14 195);
+  --teal-dim:  oklch(0.55 0.09 195);
+  --teal-glow: oklch(0.78 0.14 195 / 0.35);
+
+  --violet:      oklch(0.68 0.18 305);
+  --violet-dim:  oklch(0.48 0.12 305);
+  --violet-glow: oklch(0.68 0.18 305 / 0.35);
+
+  --ember:       oklch(0.72 0.16 45);  /* for warnings / danger rooms */
+  --ember-glow:  oklch(0.72 0.16 45 / 0.35);
+
+  --gold:        oklch(0.82 0.12 85);  /* loot accent */
+
+  /* Type */
+  --f-sigil: "IM Fell English SC", "IM Fell English", Georgia, serif;
+  --f-serif: "IM Fell English", Georgia, serif;
+  --f-mono: "JetBrains Mono", ui-monospace, monospace;
+  --f-ui: "Inter", -apple-system, system-ui, sans-serif;
+
+  /* Radii */
+  --r-1: 3px;
+  --r-2: 6px;
+  --r-3: 10px;
+  --r-4: 14px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0;
+  background: #07070a;
+  color: var(--ink-1);
+  font-family: var(--f-ui);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* Subtle ambient noise / vignette for the desktop */
+body::before {
+  content: "";
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(1200px 800px at 20% 20%, oklch(0.22 0.04 305 / 0.35), transparent 60%),
+    radial-gradient(1000px 700px at 80% 90%, oklch(0.22 0.04 195 / 0.28), transparent 60%),
+    linear-gradient(180deg, #07070b 0%, #04040a 100%);
+  z-index: -1;
+}
+
+/* Thin arcane scrollbars */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--line-hi); }
+
+/* Focus ring */
+:focus-visible {
+  outline: 1px solid var(--teal);
+  outline-offset: 2px;
+}
+
+/* Small text utility */
+.kicker {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* Arcane grid backdrop texture (SVG) for content areas */
+.arcane-grid {
+  background-image:
+    linear-gradient(oklch(0.22 0.02 285 / 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.22 0.02 285 / 0.35) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -1px -1px;
+}
+
+/* Panels */
+.panel {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+}
+.panel-hi {
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  border: 1px solid var(--line-hi);
+  border-radius: var(--r-3);
+}
+
+/* Glow utilities */
+.glow-teal { box-shadow: 0 0 0 1px var(--teal-dim), 0 0 24px -6px var(--teal-glow); }
+.glow-violet { box-shadow: 0 0 0 1px var(--violet-dim), 0 0 24px -6px var(--violet-glow); }
+
+/* Sigil divider */
+.sigil-hr {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--ink-4);
+  font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.sigil-hr::before, .sigil-hr::after {
+  content: ""; flex: 1; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--line), transparent);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--r-2);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  color: var(--ink-1);
+  font-family: var(--f-ui); font-size: 13px; font-weight: 500;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.btn:hover { background: var(--bg-3); border-color: var(--line-hi); }
+.btn-primary {
+  background: linear-gradient(180deg, oklch(0.32 0.05 195), oklch(0.22 0.04 195));
+  border-color: var(--teal-dim);
+  color: var(--ink-1);
+  box-shadow: inset 0 1px 0 oklch(0.6 0.1 195 / 0.4), 0 0 20px -6px var(--teal-glow);
+}
+.btn-primary:hover {
+  background: linear-gradient(180deg, oklch(0.38 0.06 195), oklch(0.26 0.04 195));
+  box-shadow: inset 0 1px 0 oklch(0.6 0.1 195 / 0.5), 0 0 26px -4px var(--teal-glow);
+}
+.btn-violet {
+  background: linear-gradient(180deg, oklch(0.32 0.08 305), oklch(0.22 0.06 305));
+  border-color: var(--violet-dim);
+  box-shadow: inset 0 1px 0 oklch(0.6 0.14 305 / 0.4), 0 0 20px -6px var(--violet-glow);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--line-dim);
+  color: var(--ink-2);
+}
+
+/* Inputs */
+.input, .textarea {
+  width: 100%;
+  background: var(--bg-0);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  color: var(--ink-1);
+  font-family: var(--f-ui); font-size: 13px;
+  padding: 9px 12px;
+  transition: border-color 120ms;
+}
+.input:focus, .textarea:focus {
+  outline: none;
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px var(--teal-glow);
+}
+.textarea { resize: none; font-family: var(--f-ui); }
+
+/* Chips */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  font-family: var(--f-mono); font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.chip-teal { color: var(--teal); border-color: var(--teal-dim); background: oklch(0.22 0.04 195 / 0.4); }
+.chip-violet { color: var(--violet); border-color: var(--violet-dim); background: oklch(0.22 0.05 305 / 0.4); }
+.chip-ember { color: var(--ember); border-color: oklch(0.5 0.1 45); background: oklch(0.22 0.05 45 / 0.35); }
+.chip-gold  { color: var(--gold); border-color: oklch(0.5 0.08 85); background: oklch(0.22 0.04 85 / 0.3); }

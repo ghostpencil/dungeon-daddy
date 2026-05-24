@@ -1,0 +1,560 @@
+{
+  "meta": {
+    "schema_version": "1.0",
+    "title": "The Crucible",
+    "theme": "Mechanical monsters, tense and foreboding atmosphere",
+    "setting": "Located in the vast desert of Anauroch in the Forgotten Realms. The dungeon was once the domain of Dwarven artificers whose intelligent golem robots gained sentience and rebelled. The Dwarven masters were destroyed, and the golems disabled. Any reactivated golems are now insane and unpredictable.",
+    "party": "A classic 5-person party consisting of a human fighter, an elf ranger, a halfling thief, a half-elf cleric, and a human wizard, all at level 5, using D&D 5e rules.",
+    "quest": "The adventurers seek to recover the power core of the Dwarven hold. It's a religious relic for modern Dwarves, offering hope to restore their culture. The party aims to return it in exchange for healing their friend Arnor the Wise. They must resist the temptation to sell it for profit.",
+    "party_size": 4,
+    "party_level": 3,
+    "num_levels": 3,
+    "complexity": "Moderate",
+    "save_name": null
+  },
+  "levels": [
+    {
+      "id": 1,
+      "name": "The Crucible",
+      "summary": "The adventurers seek to recover the power core of the Dwarven hold located within a sand-covered citadel fraught with traps and scorpions.",
+      "ecology": "Two entrances in a sand-covered citadel with traps and scorpions.",
+      "loop": "lock_key",
+      "loops": [
+        {
+          "id": "L1",
+          "pattern": "lock_key",
+          "note": "The adventurers must find their way through traps with a possible bypass.",
+          "entry": "R1",
+          "goal": "R4",
+          "path_a": [
+            "R1",
+            "R2",
+            "R4"
+          ],
+          "path_b": [
+            "R1",
+            "R3",
+            "R2",
+            "R4"
+          ],
+          "type": "main",
+          "explanation": "Progression bypassing scorpions in the cargo bay.",
+          "rooms": [
+            "R1",
+            "R2",
+            "R3",
+            "R4"
+          ]
+        },
+        {
+          "id": "S1",
+          "pattern": "pursuit",
+          "note": "An alternate loop setting a chase through traps.",
+          "entry": "R5",
+          "goal": "R4",
+          "path_a": [
+            "R5",
+            "R2",
+            "R4"
+          ],
+          "path_b": [
+            "R5",
+            "R4"
+          ],
+          "type": "sub",
+          "explanation": "Traverse traps or confront scorpions.",
+          "rooms": [
+            "R4",
+            "R5"
+          ]
+        }
+      ],
+      "width": 50,
+      "height": 50,
+      "entries": [
+        {
+          "x": 1.5,
+          "y": 10.5,
+          "type": "stair_down",
+          "label": "Front Entrance"
+        },
+        {
+          "x": 9.5,
+          "y": 20.5,
+          "type": "stair_down",
+          "label": "Hidden Entrance"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "R1",
+          "num": 1,
+          "name": "Receiving Hall",
+          "x": 3,
+          "y": 13,
+          "w": 6,
+          "h": 4,
+          "type": "hall",
+          "note": "A large room with the presence of scorpions.",
+          "main_loop_role": "entry",
+          "sub_loop_roles": null
+        },
+        {
+          "id": "R2",
+          "num": 2,
+          "name": "Marketplace",
+          "x": 10,
+          "y": 13,
+          "w": 8,
+          "h": 6,
+          "type": "lair",
+          "note": "An open market area with scattered goods and lurking scorpions.",
+          "main_loop_role": "obstacle",
+          "sub_loop_roles": null
+        },
+        {
+          "id": "R3",
+          "num": 3,
+          "name": "Cargo Bay",
+          "x": 19,
+          "y": 13,
+          "w": 7,
+          "h": 5,
+          "type": "hall",
+          "note": "A hidden cargo bay providing safe passage.",
+          "main_loop_role": "bypass",
+          "sub_loop_roles": null
+        },
+        {
+          "id": "R4",
+          "num": 4,
+          "name": "Elevator Shaft",
+          "x": 5,
+          "y": 0,
+          "w": 6,
+          "h": 4,
+          "type": "stair",
+          "note": "A descending shaft that leads to the lower level.",
+          "main_loop_role": "goal",
+          "sub_loop_roles": [
+            {
+              "role": "goal"
+            }
+          ]
+        },
+        {
+          "id": "R5",
+          "num": 5,
+          "name": "Trap Room",
+          "x": 30,
+          "y": 16,
+          "w": 5,
+          "h": 3,
+          "type": "hall",
+          "note": "A room filled with mechanical traps.",
+          "main_loop_role": "clue",
+          "sub_loop_roles": [
+            {
+              "role": "obstacle"
+            }
+          ]
+        }
+      ],
+      "connections": [
+        {
+          "from": "R1",
+          "to": "R2",
+          "type": "arch",
+          "note": "Main path lined with traps."
+        },
+        {
+          "from": "R1",
+          "to": "R3",
+          "type": "door",
+          "note": "Hidden door opening into the cargo bay."
+        },
+        {
+          "from": "R2",
+          "to": "R4",
+          "type": "door",
+          "note": "Locked door requiring a key from the Marketplace."
+        },
+        {
+          "from": "R3",
+          "to": "R2",
+          "type": "hall",
+          "note": "Fallback route converting to a confrontation point."
+        },
+        {
+          "from": "R5",
+          "to": "R2",
+          "type": "hall",
+          "note": "Pursuit leads adventurers back to the Marketplace."
+        },
+        {
+          "from": "R5",
+          "to": "R4",
+          "type": "door",
+          "note": "Direct yet hazardous path to the Elevator Shaft."
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "The Crucible: Factory Floor",
+      "summary": "Explore the abandoned dwarven factory floor, overcoming hazardous machinery and dormant golems to power the elevator to Level 3.",
+      "ecology": "Abandoned Dwarven factory floor with dormant machinery and arcane energy.",
+      "loop": "hub_spoke",
+      "loops": [
+        {
+          "id": "loop1",
+          "pattern": "hub_spoke",
+          "note": "Central hub connects various processing and ancillary rooms.",
+          "entry": "r01",
+          "goal": "r02",
+          "path_a": [
+            "r01",
+            "r04",
+            "r02"
+          ],
+          "path_b": [
+            "r01",
+            "r03",
+            "r02"
+          ],
+          "type": "main",
+          "explanation": "Navigating critical rooms to power the elevator.",
+          "rooms": [
+            "r01",
+            "r02",
+            "r03",
+            "r04",
+            "r05",
+            "r06"
+          ]
+        }
+      ],
+      "width": 50,
+      "height": 50,
+      "entries": [
+        {
+          "x": 2.5,
+          "y": 2.5,
+          "type": "stair_up",
+          "label": "To Level 1"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "r01",
+          "num": 1,
+          "name": "Entry Chamber",
+          "x": 1,
+          "y": 1,
+          "w": 7,
+          "h": 7,
+          "type": "hall",
+          "note": "The entry point with flickering lights and signs of struggle.",
+          "main_loop_role": "entry",
+          "sub_loop_roles": null
+        },
+        {
+          "id": "r02",
+          "num": 2,
+          "name": "Central Hub",
+          "x": 15,
+          "y": 4,
+          "w": 9,
+          "h": 9,
+          "type": "hall",
+          "note": "Central junction with underlit stone and complex machinery.",
+          "main_loop_role": "goal",
+          "sub_loop_roles": null
+        },
+        {
+          "id": "r03",
+          "num": 3,
+          "name": "Conveyor Control",
+          "x": 30,
+          "y": 4,
+          "w": 8,
+          "h": 8,
+          "type": "study",
+          "note": "Controls for a long-defunct conveyor system, some machinery still sparks.",
+          "main_loop_role": "clue",
+          "sub_loop_roles": null
+        },
+        {
+          "id": "r04",
+          "num": 4,
+          "name": "Arcane Power Room",
+          "x": 8,
+          "y": 26,
+          "w": 10,
+          "h": 10,
+          "type": "shrine",
+          "note": "Old arcanist's lab filled with dormant golem parts and magical traps.",
+          "main_loop_role": "foreshadow",
+          "sub_loop_roles": null
+        },
+        {
+          "id": "r05",
+          "num": 5,
+          "name": "Molten Metal Pit",
+          "x": 22,
+          "y": 26,
+          "w": 9,
+          "h": 9,
+          "type": "lair",
+          "note": "A fiery pit where molten metal was once refined; hazardous with residual heat.",
+          "main_loop_role": "obstacle",
+          "sub_loop_roles": null
+        },
+        {
+          "id": "r06",
+          "num": 6,
+          "name": "Maintenance Tunnel",
+          "x": 37,
+          "y": 26,
+          "w": 8,
+          "h": 8,
+          "type": "hall",
+          "note": "A narrow tunnel barely lit, likely a shortcut or maintenance route.",
+          "main_loop_role": "bypass",
+          "sub_loop_roles": null
+        }
+      ],
+      "connections": [
+        {
+          "from": "r01",
+          "to": "r02",
+          "type": "hall",
+          "note": "A narrow corridor lined with defunct control panels."
+        },
+        {
+          "from": "r02",
+          "to": "r03",
+          "type": "arch",
+          "note": "An arched pathway with pipes overhead buzzing faintly."
+        },
+        {
+          "from": "r02",
+          "to": "r04",
+          "type": "door",
+          "note": "A heavy iron door painted with warning signs."
+        },
+        {
+          "from": "r02",
+          "to": "r05",
+          "type": "hall",
+          "note": "A chilling corridor with a heat distortion in the air."
+        },
+        {
+          "from": "r05",
+          "to": "r06",
+          "type": "hole",
+          "note": "A hidden doorway along a man-made chasm."
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "The Crucible",
+      "summary": "The final level of the Dwarven hold, a subterranean power complex with unstable arcane energy. The adventurers must navigate the industrial environment, control the energy conduits, and secure the Power Core.",
+      "ecology": "Subterranean power complex with unstable arcane energy.",
+      "loop": "secret_shortcut",
+      "loops": [
+        {
+          "id": "l1",
+          "pattern": "secret_shortcut",
+          "note": "A hidden passage bypasses some of the major rooms and leads directly to the Prime Golem Lair.",
+          "entry": "r1",
+          "goal": "r7",
+          "path_a": [
+            "r1",
+            "r2",
+            "r3",
+            "r4",
+            "r7"
+          ],
+          "path_b": [
+            "r1",
+            "r6",
+            "r7"
+          ],
+          "type": "main",
+          "explanation": "Finding the hidden passage lets the party avoid the more heavily guarded sections.",
+          "rooms": [
+            "r1",
+            "r2",
+            "r3",
+            "r4",
+            "r6",
+            "r7"
+          ]
+        }
+      ],
+      "width": 100,
+      "height": 100,
+      "entries": [
+        {
+          "x": 2.0,
+          "y": 7.0,
+          "type": "stair_up",
+          "label": "To Level 2"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "r1",
+          "num": 1,
+          "name": "Control Nexus",
+          "x": 2,
+          "y": 2,
+          "w": 10,
+          "h": 10,
+          "type": "study",
+          "note": "Central hub with levers and monitors controlling the power complex.",
+          "main_loop_role": "entry",
+          "sub_loop_roles": null
+        },
+        {
+          "id": "r2",
+          "num": 2,
+          "name": "Conduit Corridor",
+          "x": 15,
+          "y": 2,
+          "w": 8,
+          "h": 10,
+          "type": "hall",
+          "note": "A long corridor lined with pulsating energy conduits.",
+          "main_loop_role": "bypass",
+          "sub_loop_roles": null
+        },
+        {
+          "id": "r3",
+          "num": 3,
+          "name": "Crystal Array",
+          "x": 30,
+          "y": 2,
+          "w": 12,
+          "h": 12,
+          "type": "shrine",
+          "note": "Room filled with glowing crystals, the air hums with arcane power.",
+          "main_loop_role": "clue",
+          "sub_loop_roles": null
+        },
+        {
+          "id": "r4",
+          "num": 4,
+          "name": "Electrified Floor",
+          "x": 45,
+          "y": 2,
+          "w": 10,
+          "h": 10,
+          "type": "hall",
+          "note": "Floor occasionally surges with electrical energy.",
+          "main_loop_role": "obstacle",
+          "sub_loop_roles": null
+        },
+        {
+          "id": "r5",
+          "num": 5,
+          "name": "Vault of Opportunities",
+          "x": 60,
+          "y": 2,
+          "w": 10,
+          "h": 10,
+          "type": "vault",
+          "note": "Holds potential loot and allies; some items are protected by traps.",
+          "main_loop_role": null,
+          "sub_loop_roles": null
+        },
+        {
+          "id": "r6",
+          "num": 6,
+          "name": "Gravity Anomaly",
+          "x": 2,
+          "y": 20,
+          "w": 12,
+          "h": 10,
+          "type": "hall",
+          "note": "Gravity is unstable, causing floating debris and disorienting effects.",
+          "main_loop_role": "foreshadow",
+          "sub_loop_roles": null
+        },
+        {
+          "id": "r7",
+          "num": 7,
+          "name": "Prime Golem Lair",
+          "x": 20,
+          "y": 25,
+          "w": 15,
+          "h": 15,
+          "type": "lair",
+          "note": "The final guardian stands vigil over the Power Core Chamber.",
+          "main_loop_role": "goal",
+          "sub_loop_roles": null
+        },
+        {
+          "id": "r8",
+          "num": 8,
+          "name": "Power Core Chamber",
+          "x": 40,
+          "y": 20,
+          "w": 18,
+          "h": 18,
+          "type": "boss",
+          "note": "The Power Core of the Dwarven hold lies here, heavily guarded.",
+          "main_loop_role": null,
+          "sub_loop_roles": null
+        }
+      ],
+      "connections": [
+        {
+          "from": "r1",
+          "to": "r2",
+          "type": "door",
+          "note": "Reinforced metal door with runic patterns."
+        },
+        {
+          "from": "r2",
+          "to": "r3",
+          "type": "hall",
+          "note": "Arched passageway illuminated by the glow of the crystal array."
+        },
+        {
+          "from": "r3",
+          "to": "r4",
+          "type": "arch",
+          "note": "Open archway leading to the electrified section."
+        },
+        {
+          "from": "r4",
+          "to": "r5",
+          "type": "hole",
+          "note": "Secret passage hidden behind a false wall."
+        },
+        {
+          "from": "r5",
+          "to": "r6",
+          "type": "hall",
+          "note": "A wide corridor descending into the gravity anomaly area."
+        },
+        {
+          "from": "r6",
+          "to": "r7",
+          "type": "arch",
+          "note": "An archway leading directly into the lair of the Prime Golem."
+        },
+        {
+          "from": "r7",
+          "to": "r8",
+          "type": "door",
+          "note": "Massive vault door embossed with arcane symbols."
+        }
+      ]
+    }
+  ],
+  "loop_patterns": {}
+}
