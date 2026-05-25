@@ -11,7 +11,19 @@
 If you are here to **use the app**, start at [Installation](#installation).
 If you are here to **learn from the project**, start at [The Experiment](#the-experiment).
 
+## Demo
+
 ![Dungeon Daddy demo](demo/dungeon_daddy-demo.gif)
+
+---
+
+## Who this is for
+
+Dungeon Daddy may be useful if you are:
+
+- a tabletop game master interested in AI-assisted dungeon design
+- a Python developer interested in desktop applications with Arcade
+- an engineer exploring Claude Code, context engineering, TDD, UI smoke testing, and AI-assisted SDLC workflows
 
 ---
 
@@ -124,7 +136,7 @@ Each phase is small enough to complete in one context window. Each context windo
 
 ### Learning resources
 
-**Dev diary** — personal notes written throughout the build covering what broke, what worked, and why. Start with [the first entry](dev_diary/2026-05-01-project-beginnings.md) if you want the ground-level experience rather than the polished architecture.
+**Dev diary** — personal notes written throughout the build covering what broke, what worked, and why. Start with [the first entry](dev_diary/2026-05-01-project-beginnings.md) if you want the ground-level experience rather than the polished architecture. It is the closest thing in the repo to the raw field notes behind the workflow.
 
 **Presentation** — [Evolution of AI Coding](presentation/Evolution-of-AI-Coding.pdf) — the full slide deck on the patterns and workflow developed during this project.
 
@@ -156,13 +168,17 @@ Run the test suite:
 pytest
 ```
 
-745 unit tests. No real API calls in the test suite — all LLM providers are dependency-injected and mocked.
+The core pytest suite currently includes 745 tests. No real API calls are made during routine test runs — all LLM providers are dependency-injected and mocked.
+
+The project also includes end-to-end UI smoke tests in `tools/smoke_test_phase*.py`, supported by the reusable `tools/ui_harness.py` test harness.
 
 ---
 
 ## AI Tooling
 
 This project was built with [Claude Code](https://claude.ai/code) using two external tools. They are not required to run the app or tests, but are needed to replicate the AI-driven development and smoke test workflow.
+
+The repo also includes project-specific Claude command files in `.claude/commands/`. These were not generic skills added upfront; they were created or refined in response to real failure modes encountered during the build.
 
 **TDD skill** — guides Claude through a red-green-refactor loop before writing any new tests or features.
 Install from [mattpocock/skills](https://github.com/mattpocock/skills/blob/main/skills/engineering/tdd/SKILL.md).
