@@ -146,12 +146,13 @@ def test_zoom_in_adjusts_pan_offset() -> None:
     """Zooming in adjusts pan_offset so the viewport centre stays mapped to
     the same map coordinate (zoom-to-centre behaviour)."""
     panel, _, _, _ = _make_panel()
-    # Pan offset starts at (0, 0); map viewport centre is at (400, 300) in screen.
-    # We expect pan_offset to shift after zoom so that the same map point remains centred.
+    # panel: x=440, y=0, w=800, h=600; PAD_MD=12, _HEADER_H=38, zoom 1.0→1.25
+    # map_cx = 440 + (800-12)/2 = 834; map_cy = (600-38)/2 = 281
+    # _apply_zoom derives exact offsets: see map_panel.py:_apply_zoom
     panel.handle_key_press(arcade.key.NUM_ADD)
-    # Pan offset must not be zero after zoom if centre adjustment is applied
     px, py = panel.pan_offset
-    assert px != pytest.approx(0.0) or py != pytest.approx(0.0)
+    assert px == pytest.approx(-95.5)
+    assert py == pytest.approx(-67.25)
 
 
 # ---------------------------------------------------------------------------

@@ -168,7 +168,7 @@ Run the test suite:
 pytest
 ```
 
-The core pytest suite currently includes 745 tests. No real API calls are made during routine test runs — all LLM providers are dependency-injected and mocked.
+The core pytest suite currently includes 796 tests. No real API calls are made during routine test runs — all LLM providers are dependency-injected and mocked.
 
 The project also includes end-to-end UI smoke tests in `tools/smoke_test_phase*.py`, supported by the reusable `tools/ui_harness.py` test harness.
 
@@ -179,6 +179,9 @@ The project also includes end-to-end UI smoke tests in `tools/smoke_test_phase*.
 This project was built with [Claude Code](https://claude.ai/code) using two external tools. They are not required to run the app or tests, but are needed to replicate the AI-driven development and smoke test workflow.
 
 The repo also includes project-specific Claude command files in `.claude/commands/`. These were not generic skills added upfront; they were created or refined in response to real failure modes encountered during the build.
+
+- **`/ui-test`** — drives a focused UI behaviour test against the running app using `computer-use-mcp`. Verifies a single interaction path (button click, view transition, keyboard shortcut) and reports pass/fail with evidence. Created because smoke tests were too coarse to catch regressions in individual behaviours.
+- **`/assess-tests`** — audits the test suite against 7 quality signals derived from a post-build review: OR-branch assertions, mock-only coverage, missing error-path contracts, no-crash tests with no recovery assertion, fully-skippable parametrize groups, large files with thin outcome coverage, and threading guards tested only through mocks. Scopes to the full suite or a subdirectory. Created after a post-build audit found several categories of tests that passed while covering almost nothing.
 
 **TDD skill** — guides Claude through a red-green-refactor loop before writing any new tests or features.
 Install from [mattpocock/skills](https://github.com/mattpocock/skills/blob/main/skills/engineering/tdd/SKILL.md).
