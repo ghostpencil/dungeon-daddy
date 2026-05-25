@@ -38,3 +38,6 @@ presentation/*.pptx
 
 # Logs
 *.log
+
+# Local tools — not for publishing
+tools/video_to_gif_mcp.py

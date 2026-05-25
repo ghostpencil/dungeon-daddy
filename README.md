@@ -11,23 +11,16 @@
 If you are here to **use the app**, start at [Installation](#installation).
 If you are here to **learn from the project**, start at [The Experiment](#the-experiment).
 
----
-
-## Screenshots
-
-**Design Mode** — LLM-assisted dungeon creation with loop pattern library
-
-![Design Mode](DesignModeScreenshot.png)
-
-**Play Mode** — Interactive map with live AI Dungeon Master chat
-
-![Play Mode](PlayModeScreenshot.png)
+![Dungeon Daddy demo](demo/dungeon_daddy-demo.gif)
 
 ---
 
 ## Features
 
 ### Design Mode
+
+![Design Mode](demo/DesignModeScreenshot.png)
+
 - **AI dungeon wizard** — conversational setup collects theme, party, number of levels, and narrative goals
 - **Level-by-level generation** — each level is generated immediately and shown in the tree as the wizard progresses
 - **Loop pattern library** — 9 structural patterns from dungeon design theory (Lock & Key, Gambit, Foreshadowing, True Fork, Pursuit, Secret Shortcut, Hub & Spoke, Branch & Bottleneck, Shortcut Back)
@@ -37,6 +30,9 @@ If you are here to **learn from the project**, start at [The Experiment](#the-ex
 - **Save / Load / New** — dungeons persist as human-readable JSON
 
 ### Play Mode
+
+![Play Mode](demo/PlayModeScreenshot.png)
+
 - **Three map views** — Grid, Tiles, and Graph renderers; pannable viewport
 - **AI Dungeon Master** — live narration per room powered by GPT-4o, with full conversation history
 - **Room memory** — `/remember <event>` appends dated notes to per-level markdown files; the DM references them on revisit
@@ -114,8 +110,6 @@ tools/
 dev_diary/                 # Personal notes from the build — what broke, what worked, and why
 ```
 
-The dev diary is a good starting point if you want to understand the *experience* of building this project rather than just the architecture. It covers the things that surprised me: early AI drift, context collapse, why TDD became non-negotiable, and how UI automation changed the workflow.
-
 The `spec/` folder is not just documentation — it is the structured context that the AI coding agent reads before each task. The naming conventions, loading rules, and phase discipline are all deliberate design decisions you can adapt for your own projects.
 
 ### The workflow that worked
@@ -127,6 +121,12 @@ VALIDATE & PERSIST → run smoke test, update project state, clear session
 ```
 
 Each phase is small enough to complete in one context window. Each context window ends with state written to files, so the next session starts clean with full context.
+
+### Learning resources
+
+**Dev diary** — personal notes written throughout the build covering what broke, what worked, and why. Start with [the first entry](dev_diary/2026-05-01-project-beginnings.md) if you want the ground-level experience rather than the polished architecture.
+
+**Presentation** — [Evolution of AI Coding](presentation/Evolution-of-AI-Coding.pdf) — the full slide deck on the patterns and workflow developed during this project.
 
 ---
 
