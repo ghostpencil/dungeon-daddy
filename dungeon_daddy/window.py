@@ -123,6 +123,7 @@ class DungeonDaddyWindow(arcade.Window):
         self.show_view(self._design_view)
 
     def _build_menu(self) -> dict[str, list[MenuAction]]:
+        self._switch_to_play_action = MenuAction("Switch to Play", self._menu_launch_play)
         return {
             "File": [
                 MenuAction("New", self.new_dungeon),
@@ -139,7 +140,7 @@ class DungeonDaddyWindow(arcade.Window):
                 MenuAction("Generate Level", self._nyi, implemented=False),
             ],
             "Play": [
-                MenuAction("Switch to Play", lambda: self.switch_mode("play")),
+                self._switch_to_play_action,
                 MenuAction("Switch to Design", lambda: self.switch_mode("design")),
             ],
             "View": [
@@ -154,6 +155,11 @@ class DungeonDaddyWindow(arcade.Window):
                 MenuAction("About", self.about),
             ],
         }
+
+    def _menu_launch_play(self) -> None:
+        dungeon = self._design_view._dungeon
+        if dungeon and dungeon.levels and dungeon.meta.save_name:
+            self.launch_play_session(dungeon)
 
     # ------------------------------------------------------------------
     # Menu actions
@@ -355,6 +361,9 @@ class DungeonDaddyWindow(arcade.Window):
     def launch_play_session(self, dungeon: object) -> None:
         self._play_view.load_dungeon_session(dungeon)
         self.switch_to_play()
+
+    def set_switch_to_play_enabled(self, enabled: bool) -> None:
+        self._switch_to_play_action.enabled = enabled
 
     def switch_mode(self, mode: str) -> None:
         if mode == "design":

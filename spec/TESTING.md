@@ -45,10 +45,74 @@ Modules must be built following this dependency order. Complete one "Vertical Sl
 
 ---
 
+## Mock Policy — Use Real Objects Whenever Possible
+
+**Default: no mocks.** Only introduce a mock when a real component cannot run in the test environment. If you find yourself mocking an internal application class, stop and ask whether the real class can be used instead.
+
+### When mocking is mandatory
+
+| What | Why |
+| :--- | :--- |
+| Arcade rendering (`arcade.draw_*`, `arcade.Window.__init__`) | Requires a GPU/display context |
+| OS dialogs (Tkinter `filedialog`, `messagebox`) | Blocks the process waiting for user input |
+| External APIs (`OpenAIProvider`, `AnthropicProvider`) | Network calls; non-deterministic; costs money |
+| Win32 HWND operations (`ctypes.windll.*`) | Requires a real window handle |
+
+### When mocking is wrong
+
+If a real object can be constructed — even via `__new__` with manual attribute setup — **use it**. Mocking internal application components means your test only verifies that one object calls a method on a mock; it does not verify that the two real objects actually work together.
+
+**Concrete example** (the mistake this rule prevents):
+
+```python
+# WRONG — mocks the window; only proves design_view calls set_switch_to_play_enabled
+view.window = MagicMock()
+view._refresh_play_button_state()
+view.window.set_switch_to_play_enabled.assert_called_once_with(False)
+```
+
+```python
+# RIGHT — uses real window so the wiring is actually exercised
+win = DungeonDaddyWindow.__new__(DungeonDaddyWindow)
+win._menu = win._build_menu()          # real MenuAction created
+view.window = win
+view._refresh_play_button_state()
+assert win._switch_to_play_action.enabled is False   # real flag on real object
+```
+
+The first test would pass even if `window.set_switch_to_play_enabled` did nothing. The second test fails unless the full chain — `_refresh_play_button_state` → `set_switch_to_play_enabled` → `_switch_to_play_action.enabled` — is actually wired correctly.
+
+### Rule of thumb
+
+> If renaming or removing an internal method breaks your test but the user-visible behavior is unchanged, you are mocking too deep.
+
+### Constructing real objects without Arcade
+
+Most application objects can be tested without Arcade initialisation using `__new__` + manual attribute setup:
+
+```python
+win = DungeonDaddyWindow.__new__(DungeonDaddyWindow)
+win._repo = DungeonRepository(tmp_path)   # real repo
+win._menu = win._build_menu()             # real menu with real MenuActions
+win._design_view = MagicMock()            # mock only because DesignView needs Arcade UI
+win._play_view = MagicMock()
+
+view = DesignView.__new__(DesignView)
+view._repo = repo                         # real repo
+view._dungeon = dungeon                   # real model object
+view._inspector = MagicMock()             # mock only because InspectorPanel needs Arcade
+view.window = win                         # real window — not a mock
+```
+
+Only the Arcade rendering components (`_inspector`, `_chat`, `_tree`, `_map`) need to be mocked. Business logic objects (`Window`, `DesignView`, `PlayView`, `DungeonRepository`, all data models) should be real.
+
+---
+
 ## Integration Tests
 Written only after the unit-level "Tracer Bullets" for a phase are complete:
 * `tests/integration/test_dungeon_persistence.py`: Full disk I/O round-trip.
 * `tests/integration/test_llm_integration.py`: Real API calls (Requires `ANTHROPIC_API_KEY`).
+* `tests/integration/test_play_menu.py`: Menu wiring — real Window + real DesignView + real repo.
 
 ---
 
@@ -213,3 +277,4 @@ history, chat_log = _vision_drive_wizard(h, steps, label="b1")
 - [ ] Am I using only the public interface?
 - [ ] Is this the absolute minimal code to pass?
 - [ ] Did I run `pytest` to confirm the RED state before writing the implementation?
+- [ ] For every mock: is it mandatory? (GPU/network/OS dialog) If not, replace with the real object.

@@ -231,6 +231,7 @@ class DesignView(arcade.View):
                     for level in self._dungeon.levels  # type: ignore[union-attr]
                 )
         self._inspector.set_saved_state(is_saved, has_session)
+        self.window.set_switch_to_play_enabled(is_saved)
 
 
     # ------------------------------------------------------------------

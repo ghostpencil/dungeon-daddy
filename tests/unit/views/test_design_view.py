@@ -674,6 +674,7 @@ def _make_overlay_view() -> DesignView:
     view._overlay_input = None
     view._ui_built = False
     view._manager = MagicMock()
+    view.window = MagicMock()
     return view
 
 
@@ -978,6 +979,28 @@ def test_refresh_play_button_state_on_load():
     view.load_dungeon(dungeon)
 
     view._inspector.set_saved_state.assert_called()
+
+
+def test_refresh_play_button_state_syncs_menu_when_unsaved():
+    view = _make_overlay_view()
+    view._dungeon = _make_dungeon()  # save_name is None
+    view._repo.load_session.return_value = None
+
+    view._refresh_play_button_state()
+
+    view.window.set_switch_to_play_enabled.assert_called_once_with(False)
+
+
+def test_refresh_play_button_state_syncs_menu_when_saved():
+    view = _make_overlay_view()
+    dungeon = _make_dungeon()
+    dungeon.meta.save_name = "crypt"
+    view._dungeon = dungeon
+    view._repo.load_session.return_value = None
+
+    view._refresh_play_button_state()
+
+    view.window.set_switch_to_play_enabled.assert_called_once_with(True)
 
 
 # ---------------------------------------------------------------------------
