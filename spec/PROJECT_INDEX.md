@@ -2,34 +2,17 @@
 
 ## Phase
 
-Phase: Post-18 Stabilisation — Smoke Test Improvements
-Status: COMPLETE
+Phase: Post-18 Stabilisation
+Status: ONGOING — bug fixes and spec alignment only
 
-745 unit tests passing. SI-1 through SI-12 all done.
-Smoke test (phase 7) upgraded to vision-guided Strategy B with chat logging.
+754 unit tests + 42 integration tests = 796 passing (excl. UI harness).
 Full plan in `spec/TEST_SUITE_IMPROVEMENT.md`. Audit findings in `spec/TEST_SUITE_ASSESSMENT_20260523.md`.
 
 ---
 
-## Active Work — Test Suite Improvements
+## Completed — Test Suite Improvements (SI-1 through SI-12)
 
-Full detail in `spec/TEST_SUITE_IMPROVEMENT.md`. Audit report in `spec/TEST_SUITE_ASSESSMENT_20260523.md`.
-
-```
-SI-1   LLM error paths                  DONE  769t
-SI-2   Fix weak assertions              DONE
-SI-3   View state mutations             DONE
-SI-4   Memory file corruption recovery  DONE
-SI-5   Generator output conflicts       DONE
-SI-6   Routing edge cases               DONE
-SI-7   Thread lifecycle (PlayView)      DONE  769 tests passing
-
-SI-8   OR-branch assertions             DONE  test_generator_agent.py:431,439,463,464
-SI-9   No-crash contract assertions     DONE  test_design_view.py:548, test_level_stepper.py:100,103, test_map_panel_zoom.py:169
-SI-10  Unblock routing validation       DONE  tomb.json + crucible.json already in tests/fixtures/ — 102 tests run
-SI-11  DesignView real-thread guard     DONE  new test_design_view_threading.py (3 tests: wizard x2, edit x1)  772t
-SI-12  Tighten integration assertions   DONE  test_llm_integration.py:61,71,91
-```
+All 12 items done. Full history in `spec/TEST_SUITE_IMPROVEMENT.md` and `spec/TEST_SUITE_ASSESSMENT_20260523.md`.
 
 ---
 
@@ -58,32 +41,25 @@ _None._
 
 ## Session History
 
-**2026-05-24 — Smoke test improvements (phase 7)**
+**2026-05-24 — Switch to Play menu fix + mock policy**
 
-- `tools/smoke_test_phase7.py` rewritten from hardcoded pixel script to vision-guided Strategy B
-- `_wizard_next_step` now returns step name + DM response text in a single classifier call (JSON response format with regex fallback for malformed responses)
-- `error_detected` terminal step added — wizard stops immediately on ⚠ error in chat
-- `_vision_assert` replaces pixel color checks for DungeonTree level assertion
-- Structured chat log (`_ChatEntry`) written to `tools/screenshots/` after each run — turn-by-turn record of action, GM message sent, DM response, and screenshot filename
-- `design_view._handle_level_result` fixed to retry on parse errors (not just validation errors) up to 3 times — passes parse error message back to generator as a validation hint
-- Generator prompt updated: explicit uniqueness constraint on `main_loop_role` within a loop
-- 2 new unit tests added: `test_on_update_level_result_parse_error_retries_with_error`, `test_on_update_level_result_parse_error_exhausted_shows_error`
-- Chat log analysis revealed wizard asks room clarification questions — `send_clarification` step added, `send_nudge` message updated to preemptively answer common clarifications
-- 745 unit tests passing. Smoke test phase 7 passing end-to-end.
+- `window._build_menu`: stores `_switch_to_play_action` reference; handler changed from `switch_mode("play")` to `_menu_launch_play` which mirrors the Start Play button (calls `launch_play_session` for saved dungeons with levels, silent no-op otherwise).
+- `window.set_switch_to_play_enabled(enabled)`: new method mutates `_switch_to_play_action.enabled`.
+- `design_view._refresh_play_button_state`: now calls `self.window.set_switch_to_play_enabled(is_saved)` so the menu item tracks the same save-state rule as the inspector button.
+- `_make_overlay_view()` in `test_design_view.py`: added `view.window = MagicMock()` so existing overlay tests survive the new `window` call.
+- `tests/integration/test_play_menu.py` added — 4 integration tests using real `DungeonDaddyWindow._build_menu()` + real `DesignView._refresh_play_button_state()` + real `DungeonRepository(tmp_path)`: save-state enables action, unsaved disables, menu handler routes to `launch_play_session`, save-then-refresh cycle flips flag end-to-end.
+- `spec/TESTING.md`: new **Mock Policy** section — mandatory-mock table, wrong/right example, `__new__` recipe, rule of thumb. `test_play_menu.py` added to integration test index.
+- `CLAUDE.md`: TDD skill section now requires reading `spec/TESTING.md` before invoking; spec loading rules list TDD skill invocation as first trigger for `TESTING.md`.
+- 754 unit tests + 42 integration tests = 796 passing.
 
 ---
 
-## Completed Work — Smoke Test Phase 13 Strategy B Upgrade
+**2026-05-24 — Play-mode bug fixes + memory integration tests**
 
-`tools/smoke_test_phase13.py` upgraded to match phase 7 Strategy B improvements.
-
-```
-ST13-1  JSON classifier + regex fallback    DONE
-ST13-2  error_detected terminal step        DONE
-ST13-3  Chat log (_ChatEntry + writer)      DONE
-ST13-4  _vision_assert post-wizard check    DONE
-ST13-5  Run and verify end-to-end           DONE  ALL BEHAVIORS PASSED
-```
+- `play_view.save_memory_overlay`: removed `_is_test_drive` guard — saves were silently skipped in test-drive even though `_auto_remember` already writes to `__test_drive__/memory/` unconditionally; inconsistency caused edits to disappear after clicking Save. Test renamed and updated.
+- `window.save_dungeon`: stamp `dungeon.meta.save_name = name` before writing to disk so `save_name` persists in JSON. `window.open_dungeon`: back-fill `save_name` from folder name when loading older files. Without this, `_is_saved` was always False and "Start Play →" was permanently greyed out. Two new regression tests added.
+- `tests/integration/test_memory_integration.py` added — 9 integration tests using real `DungeonRepository(tmp_path)`: play-mode and test-drive save/reload cycles, namespace isolation, `append_room_event` vs `save_memory_overlay` consistency contract, `save_name` round-trip. These would have caught both bugs before they shipped.
+- 747 unit tests + 9 new integration tests = 780 passing (excl. UI harness).
 
 ---
 
@@ -98,36 +74,8 @@ ST13-5  Run and verify end-to-end           DONE  ALL BEHAVIORS PASSED
 
 ---
 
-## Spec Loading Guide
-
-Default: do not open specs.
-
-Open only if needed:
-
-- UI behavior or layout → `UI_SPEC.md`
-- Colors, fonts, drawing → `VISUAL_DESIGN.md`
-- State / threading / view ownership → `ARCHITECTURE.md`
-- Writing or modifying tests → `TESTING.md`
-- Expected feature behavior → `FEATURES.md`
-- Phase history / exit criteria → `IMPLEMENTATION_PHASES.md`
-
-Do not open:
-- `TECH_STACK.md` (only if adding/changing a library)
-
----
-
-## Skills
-
-- Use TDD skill before writing new test files or defining test strategy
-- Do not use for simple bug fixes without test changes
-- Use `/ui-test` skill to verify UI behavior against a live window after each step with visible output
-
----
-
 ## Notes
 
-- TDD required — write tests first
-- All LLM calls use dependency-injected providers (mockable)
-- No real API calls in unit tests — mock the provider
 - Provider is OpenAI (`gpt-4o`); `OPENAI_API_KEY` must be set in environment
 - `AnthropicProvider` still exists and is tested — not removed, just not the active provider
+- Spec loading rules and skills are in `CLAUDE.md` (canonical source)
