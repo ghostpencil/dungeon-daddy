@@ -28,4 +28,4 @@ jobs:
         run: python -m mypy dungeon_daddy
 
       - name: Test with coverage
-        run: python -m pytest --ignore=tests/integration/test_ui_harness.py --cov=dungeon_daddy --cov-report=term-missing --cov-fail-under=70
+        run: python -m pytest --ignore=tests/integration/test_ui_harness.py --ignore=tests/evals --cov=dungeon_daddy --cov-report=term-missing --cov-fail-under=70

@@ -6,6 +6,7 @@ Phase: Post-18 Stabilisation
 Status: ONGOING — bug fixes and spec alignment only
 
 819 unit/integration tests passing (excl. UI harness and 3 live-API tests).
+6 eval tests passing (run with `pytest -m eval` or `python tools/run_evals.py`).
 
 ---
 
@@ -23,7 +24,7 @@ Tracked in GitHub: https://github.com/ghostpencil/dungeon-daddy/issues/1 — che
 | IP-2 | LLM observability | DONE |
 | IP-8 | Consolidate requirements files into pyproject.toml | DONE |
 | IP-7 | Prompt versioning | DONE |
-| IP-6 | Minimal AI output evals | TODO |
+| IP-6 | Minimal AI output evals | DONE |
 | IP-9 | Fix mypy None-guard issues in 6 deferred files | TODO (next BUILD phase) |
 
 ---
@@ -99,6 +100,17 @@ _None._
 - Added `[tool.setuptools.package-data]` in `pyproject.toml` so `.txt` files are included in distributions.
 - 6 new tests in `tests/unit/llm/test_prompts.py` and `test_telemetry.py`.
 - 819 non-live tests passing.
+
+**2026-05-27 — IP-6: Minimal AI output evals**
+
+- Created `tests/evals/` with `conftest.py` (module-scoped `provider` fixture, skips without key).
+- Created `tests/evals/fixtures/dungeon_fixtures.py`: canonical briefs and room/level/dungeon objects.
+- Added `tests/evals/test_generator_evals.py`: 3 evals sharing one API call — level parseable, passes `validate_dungeon()`, has ≥2 rooms.
+- Added `tests/evals/test_dm_evals.py`: 3 evals — response references room name, uses injected memory, produces `[REMEMBER:` tag on action.
+- Added `tools/run_evals.py`: runs `pytest -m eval`, writes/compares `tests/evals/baseline_scores.json`.
+- Registered `eval` marker in `pyproject.toml`; added `--ignore=tests/evals` to CI pytest command.
+- 6/6 evals passing; baseline scores saved.
+- 819 non-live/non-eval tests still passing.
 
 _Full history in `spec/HISTORY.md`._
 

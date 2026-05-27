@@ -43,6 +43,7 @@ include = ["dungeon_daddy*"]
 testpaths = ["tests"]
 markers = [
     "live_api: requires a real API key; skipped in CI unless key is set",
+    "eval: AI output quality evals; require live API; run manually with pytest -m eval",
 ]
 
 [tool.mypy]
