@@ -83,7 +83,7 @@ copy .env.example .env
 python -m dungeon_daddy
 ```
 
-A sample dungeon (*Tomb of the Forgotten King*) loads automatically on first launch if no saved dungeons exist.
+A sample dungeon (*Tomb of the Forgotten King*) is included and can be loaded via **File → Demo Dungeon**.
 
 ---
 
