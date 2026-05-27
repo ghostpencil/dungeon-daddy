@@ -8,12 +8,10 @@ from dungeon_daddy.data.models import (
     Dungeon,
     DungeonMeta,
     Level,
-    Loop,
     Room,
     SessionState,
 )
 from dungeon_daddy.views.play_view import DMResult
-
 
 # ---------------------------------------------------------------------------
 # Factories (mirrors test_play_view.py)
@@ -54,7 +52,6 @@ def _state(room_id: str | None = None) -> SessionState:
 # ---------------------------------------------------------------------------
 
 def test_history_accumulates_across_turns(make_play_view):
-    from dungeon_daddy.llm.provider import LLMMessage
 
     room = _room("r1", name="Guard Post")
     level = _level(rooms=[room], connections=[])
@@ -129,9 +126,7 @@ def test_history_compacted_when_over_budget(make_play_view):
         view._on_chat_send("New message.")
 
     # Oldest pair (A) should have been dropped; newer pairs preserved.
-    roles = [m.role for m in view._dm_history]
     # The new user message is appended last; history must not start with pair A.
-    contents = [m.content for m in view._dm_history]
     # Pair A was: index 0 (user big) and index 1 (assistant big) from the original.
     # After compaction, the first two messages should be pair B or later.
     assert len(view._dm_history) <= 7  # at most 6 old + 1 new user msg (pair A dropped)

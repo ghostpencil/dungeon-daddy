@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "tools"))
 
 import pytest
-import ui_harness
 from ui_harness import UITestHarness, _monitor_for_rect
 
 # Synthetic two-monitor layout (side by side, 1920×1080 each)

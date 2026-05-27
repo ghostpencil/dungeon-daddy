@@ -10,7 +10,6 @@ from dungeon_daddy.data.models import (
 )
 from dungeon_daddy.views.play_view import DMResult
 
-
 # ---------------------------------------------------------------------------
 # Factories
 # ---------------------------------------------------------------------------

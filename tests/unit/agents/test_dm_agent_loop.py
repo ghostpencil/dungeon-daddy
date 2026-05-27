@@ -1,5 +1,4 @@
 """Tests for DungeonMasterAgent loop context injection (Phase 17 LV-1)."""
-import pytest
 
 
 # ---------------------------------------------------------------------------
@@ -35,7 +34,7 @@ def _make_rooms():
 
 
 def _make_level(current_room_id="1-B"):
-    from dungeon_daddy.data.models import Level, Connection
+    from dungeon_daddy.data.models import Connection, Level
     return Level(
         id=1, name="The Sunken Vestibule", summary="Flooded entry.",
         ecology="4 goblin archers", loop="lock_key",
@@ -156,8 +155,8 @@ def test_loop_context_includes_entry_and_goal():
 # ---------------------------------------------------------------------------
 
 def _respond_with_room_on(room_id, path_a, path_b):
-    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
     from dungeon_daddy.data.models import Room
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
     provider = _MockProvider()
     agent = DungeonMasterAgent(provider=provider)
     room = Room(id=room_id, num=1, name="Test Room", x=0, y=0, w=3, h=3, type="hall", note="")

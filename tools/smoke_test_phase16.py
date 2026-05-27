@@ -15,7 +15,6 @@ Usage:
 """
 from __future__ import annotations
 
-import ctypes
 import os
 import sys
 import time
@@ -46,18 +45,30 @@ def _load_dotenv() -> None:
 
 _load_dotenv()
 
+from smoke_helpers import (
+    BG_0,
+    CHROME_TITLE_H,
+    CHROME_TOTAL_H,
+    PAD_MD,
+    TEAL,
+    WINDOW_H,
+    WINDOW_W,
+    color_close,
+    dropdown_item_center_y,
+    fail,
+    menu_bar_center_y,
+    menu_slot_center_x,
+    menu_slot_x,
+    ok,
+    pixel_rgb,
+    room_center,
+)
 from ui_harness import UITestHarness
 from ui_input import (
     VK_CONTROL,
-    click_app, key_combo, type_text,
-)
-from smoke_helpers import (
-    WINDOW_W, WINDOW_H, CHROME_TOTAL_H, CHROME_TITLE_H, CHROME_MENU_H,
-    PAD_MD, PAD_SM, TEAL, BG_0,
-    ok, fail,
-    pixel_rgb, color_close,
-    menu_slot_center_x, menu_slot_x, menu_bar_center_y, dropdown_item_center_y,
-    room_center,
+    click_app,
+    key_combo,
+    type_text,
 )
 
 # ---------------------------------------------------------------------------

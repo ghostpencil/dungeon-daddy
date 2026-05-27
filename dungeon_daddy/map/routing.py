@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import math
 
-from dungeon_daddy.data.models import Room
+from dungeon_daddy.data.models import Room, Waypoint
 
 Rect = tuple[float, float, float, float]   # (left, bottom, right, top)
 Point = tuple[float, float]
@@ -114,8 +114,8 @@ def calculate_path_length(path: Path) -> float:
 
 
 def _room_center(room: Room) -> Point:
-    l, b, r, t = get_room_rect(room)
-    return (l + r) / 2, (b + t) / 2
+    left, b, r, t = get_room_rect(room)
+    return (left + r) / 2, (b + t) / 2
 
 
 def _escape_distance(path: Path, bounds: Rect) -> float:
@@ -196,7 +196,7 @@ def _find_blocking_room(path: Path, rooms: list[Room], source_id: str, target_id
     return None
 
 
-def route_waypoints(from_room: Room, to_room: Room, waypoints: list) -> Path:
+def route_waypoints(from_room: Room, to_room: Room, waypoints: list[Waypoint]) -> Path:
     """Return a path using manual waypoints between the two room ports."""
     fd, td = select_port_direction(from_room, to_room)
     from_port = get_room_port(from_room, fd)

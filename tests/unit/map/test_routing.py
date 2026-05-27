@@ -1,23 +1,21 @@
 """Tests for dungeon_daddy/map/routing.py — pure geometry helpers."""
 from __future__ import annotations
 
-import math
 import pytest
 
 from dungeon_daddy.data.models import Room, Waypoint
 from dungeon_daddy.map.routing import (
-    get_room_rect,
+    calculate_path_length,
     get_room_port,
+    get_room_rect,
+    is_route_problematic,
     line_intersects_rect,
     path_intersects_any_room,
-    calculate_path_length,
+    route_detour,
+    route_orthogonal,
+    route_waypoints,
     select_port_direction,
     straight_path_blocked,
-    route_orthogonal,
-    route_detour,
-    route_waypoints,
-    is_route_problematic,
-    CONNECTION_OBSTACLE_MARGIN,
 )
 
 

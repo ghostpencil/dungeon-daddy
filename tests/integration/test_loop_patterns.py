@@ -1,8 +1,6 @@
 """Integration tests — LoopPatternCatalog roundtrip and loop pattern cross-reference validation."""
 from __future__ import annotations
 
-import pytest
-
 from dungeon_daddy.data.models import (
     Connection,
     Dungeon,
@@ -14,7 +12,6 @@ from dungeon_daddy.data.models import (
     validate_dungeon,
 )
 from dungeon_daddy.data.repository import DungeonRepository
-
 
 # ---------------------------------------------------------------------------
 # Factories

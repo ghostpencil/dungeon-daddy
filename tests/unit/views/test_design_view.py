@@ -5,7 +5,6 @@ from dungeon_daddy.data.models import DesignMode, Dungeon, DungeonMeta, Level
 from dungeon_daddy.llm.agents.wizard_agent import DungeonBrief
 from dungeon_daddy.views.design_view import DesignView, LLMResult
 
-
 # ---------------------------------------------------------------------------
 # LLMResult dataclass
 # ---------------------------------------------------------------------------
@@ -714,7 +713,6 @@ def test_close_context_doc_overlay_does_not_save():
 
 
 def test_load_dungeon_pushes_word_counts_to_inspector():
-    from dungeon_daddy.ui.panels.inspector_panel import ContextDocStatus
     view = _make_overlay_view()
     level = _make_level(level_id=1)
     dungeon = Dungeon(
@@ -833,7 +831,7 @@ def test_start_generation_refreshes_context_doc_statuses():
 
 
 def test_handle_level_result_writes_level_design_doc_on_valid_level():
-    from dungeon_daddy.data.models import ValidationResult, ContextDocType
+    from dungeon_daddy.data.models import ContextDocType, ValidationResult
     view = _make_view()
     view._brief = _make_brief(num_levels=2)
     view._dungeon = _make_dungeon()

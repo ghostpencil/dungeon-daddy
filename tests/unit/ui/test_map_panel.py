@@ -8,7 +8,6 @@ import pytest
 from dungeon_daddy.data.models import SessionState
 from dungeon_daddy.ui.panels.map_panel import MapPanel
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

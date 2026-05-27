@@ -15,8 +15,6 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-import mss
-import mss.tools
 from mss import MSS
 
 # ---------------------------------------------------------------------------

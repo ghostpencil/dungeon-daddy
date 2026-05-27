@@ -53,7 +53,7 @@ PATH_BOTH    = INDIGO
 # Room type colors
 # ---------------------------------------------------------------------------
 
-ROOM_COLORS: dict[str, dict[str, tuple]] = {
+ROOM_COLORS: dict[str, dict[str, tuple[int, ...]]] = {
     "shrine": {"fill": (60,  36,  88), "stroke": VIOLET},
     "boss":   {"fill": (72,  38,  20), "stroke": EMBER},
     "vault":  {"fill": (60,  54,  18), "stroke": GOLD},
@@ -134,8 +134,8 @@ def draw_rounded_rect(
     width: float,
     height: float,
     radius: float,
-    color: tuple,
-    border_color: tuple | None = None,
+    color: tuple[int, ...],
+    border_color: tuple[int, ...] | None = None,
     border_width: float = 1,
 ) -> None:
     """
@@ -149,7 +149,7 @@ def draw_rounded_rect(
     """
     # Filled body (slightly inset to leave room for corner circles)
     arcade.draw_rect_filled(
-        arcade.XYWH(x, y, width, height), color
+        arcade.XYWH(x, y, width, height), color  # type: ignore[arg-type]
     )
     # Corner circles to approximate rounding
     half_w = width / 2 - radius
@@ -160,11 +160,11 @@ def draw_rounded_rect(
         (x - half_w, y + half_h),
         (x + half_w, y + half_h),
     ]:
-        arcade.draw_circle_filled(cx, cy, radius, color)
+        arcade.draw_circle_filled(cx, cy, radius, color)  # type: ignore[arg-type]
 
     if border_color:
         arcade.draw_rect_outline(
-            arcade.XYWH(x, y, width, height), border_color, border_width
+            arcade.XYWH(x, y, width, height), border_color, border_width  # type: ignore[arg-type]
         )
 
 

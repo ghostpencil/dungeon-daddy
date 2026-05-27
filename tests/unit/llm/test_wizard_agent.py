@@ -1,5 +1,4 @@
 """Tests for DungeonBrief, LevelBrief, and DungeonWizardAgent."""
-import pytest
 
 
 # ---------------------------------------------------------------------------
@@ -134,7 +133,7 @@ def test_wizard_chat_system_includes_loop_patterns():
 # ---------------------------------------------------------------------------
 
 def test_parse_brief_returns_brief_when_block_present():
-    from dungeon_daddy.llm.agents.wizard_agent import DungeonWizardAgent, DungeonBrief
+    from dungeon_daddy.llm.agents.wizard_agent import DungeonBrief, DungeonWizardAgent
 
     agent = DungeonWizardAgent(provider=_MockProvider(), loop_patterns={})
     brief = agent.parse_brief(BRIEF_RESPONSE)

@@ -1,8 +1,9 @@
 """Core LLM types: LLMMessage, LLMProvider Protocol, LLMError."""
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Iterator, Literal, Protocol
+from typing import Literal, Protocol
 
 
 @dataclass

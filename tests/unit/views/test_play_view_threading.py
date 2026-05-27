@@ -9,7 +9,6 @@ import time
 from unittest.mock import MagicMock
 
 from dungeon_daddy.data.models import (
-    Connection,
     Dungeon,
     DungeonMeta,
     Level,
@@ -19,7 +18,6 @@ from dungeon_daddy.data.models import (
 from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
 from dungeon_daddy.llm.provider import LLMMessage
 from dungeon_daddy.views.play_view import PlayView
-
 
 # ---------------------------------------------------------------------------
 # Stub providers

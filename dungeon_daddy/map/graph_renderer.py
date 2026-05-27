@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+
 import arcade
 
 from dungeon_daddy.data.models import Level, SessionState
@@ -51,8 +52,8 @@ class GraphRenderer(GridRenderer):
             fill = colors["fill"]
             stroke = TEAL if is_current else colors["stroke"]
 
-            arcade.draw_circle_filled(cx, cy, radius, fill)
-            arcade.draw_circle_outline(cx, cy, radius, stroke, 2 if is_current else 1)
+            arcade.draw_circle_filled(cx, cy, radius, fill)  # type: ignore[arg-type]
+            arcade.draw_circle_outline(cx, cy, radius, stroke, 2 if is_current else 1)  # type: ignore[arg-type]
 
             label_color = INK_1 if is_current else INK_2
             arcade.draw_text(

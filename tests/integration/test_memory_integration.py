@@ -10,8 +10,6 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock
 
-import pytest
-
 from dungeon_daddy.data.models import (
     Dungeon,
     DungeonMeta,
@@ -20,7 +18,6 @@ from dungeon_daddy.data.models import (
 )
 from dungeon_daddy.data.repository import DungeonRepository
 from dungeon_daddy.views.play_view import PlayView
-
 
 # ---------------------------------------------------------------------------
 # Factories

@@ -1,7 +1,6 @@
 """Tests for dungeon_daddy/llm/provider.py and anthropic_provider.py"""
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Shared mock provider used across this file
 # ---------------------------------------------------------------------------
@@ -16,8 +15,7 @@ class _MockProvider:
         return self._response
 
     def stream(self, messages, system="", max_tokens=1024):
-        for ch in self._response:
-            yield ch
+        yield from self._response
 
     @property
     def model_id(self):
@@ -65,8 +63,8 @@ def test_anthropic_provider_model_id(mocker):
 def test_anthropic_provider_default_model(mocker):
     mocker.patch("anthropic.Anthropic")
     from dungeon_daddy.llm.anthropic_provider import (
-        AnthropicProvider,
         DEFAULT_ANTHROPIC_MODEL,
+        AnthropicProvider,
     )
     p = AnthropicProvider(api_key="fake")
     assert p.model_id == DEFAULT_ANTHROPIC_MODEL
@@ -140,9 +138,10 @@ def test_anthropic_provider_does_not_leak_api_error(mocker):
     )
     mocker.patch("anthropic.Anthropic", return_value=mock_client)
 
+    import anthropic as _a
+
     from dungeon_daddy.llm.anthropic_provider import AnthropicProvider
     from dungeon_daddy.llm.provider import LLMMessage
-    import anthropic as _a
 
     p = AnthropicProvider(api_key="fake")
     with pytest.raises(Exception) as exc_info:
@@ -179,8 +178,6 @@ def test_anthropic_provider_stream_yields_chunks(mocker):
 # ---------------------------------------------------------------------------
 
 def test_mock_provider_satisfies_protocol():
-    from dungeon_daddy.llm.provider import LLMProvider
-    from typing import runtime_checkable, Protocol
     # We can't isinstance-check a non-runtime Protocol,
     # but we verify our mock has the required attributes.
     p = _MockProvider()

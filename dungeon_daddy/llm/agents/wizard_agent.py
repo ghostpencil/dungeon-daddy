@@ -127,7 +127,7 @@ class DungeonWizardAgent:
         else:
             system = self.PHASE1_SYSTEM_PROMPT
         if self._context_builder is not None and dungeon is not None:
-            context = self._context_builder.build_system_prompt(dungeon)
+            context = self._context_builder.build_system_prompt(dungeon)  # type: ignore[attr-defined]
             if context:
                 system = context + "\n\n" + system
         return self._provider.complete(
@@ -189,5 +189,5 @@ class DungeonWizardAgent:
             return "# Available Loop Patterns\n(none loaded)"
         lines = ["# Available Loop Patterns"]
         for i, (key, pattern) in enumerate(self._patterns.items(), start=1):
-            lines.append(f"{i}. {key} — {pattern.name}: {pattern.blurb}")
+            lines.append(f"{i}. {key} — {pattern.name}: {pattern.blurb}")  # type: ignore[attr-defined]
         return "\n".join(lines)

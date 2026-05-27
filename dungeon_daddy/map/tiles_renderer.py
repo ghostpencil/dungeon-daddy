@@ -50,11 +50,11 @@ class TilesRenderer(GridRenderer):
             if room.id == state.current_room_id:
                 stroke = TEAL
             elif is_seen:
-                stroke = colors["stroke"]
+                stroke = colors["stroke"]  # type: ignore[assignment]
             else:
                 stroke = ROOM_UNSEEN_STROKE
 
-            arcade.draw_rect_filled(rect, fill)
+            arcade.draw_rect_filled(rect, fill)  # type: ignore[arg-type]
             arcade.draw_rect_filled(rect, _TILE_SHADE)
             arcade.draw_rect_outline(rect, stroke, 2)
 

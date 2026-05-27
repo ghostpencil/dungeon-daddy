@@ -1,7 +1,7 @@
 """Tests for DungeonGeneratorAgent."""
 import json
-import pytest
 
+import pytest
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -129,8 +129,8 @@ def test_generate_level_uses_large_max_tokens():
 # ---------------------------------------------------------------------------
 
 def test_parse_level_returns_level_object():
-    from dungeon_daddy.llm.agents.generator_agent import DungeonGeneratorAgent
     from dungeon_daddy.data.models import Level
+    from dungeon_daddy.llm.agents.generator_agent import DungeonGeneratorAgent
 
     agent = DungeonGeneratorAgent(provider=_MockProvider())
     level = agent.parse_level(_make_valid_level_json())
@@ -494,6 +494,7 @@ def _make_level_json_missing_name() -> str:
 def test_parse_level_missing_required_field_raises_pydantic_validation_error():
     """JSON that parses fine but fails Level schema raises pydantic.ValidationError."""
     from pydantic import ValidationError
+
     from dungeon_daddy.llm.agents.generator_agent import DungeonGeneratorAgent
 
     agent = DungeonGeneratorAgent(provider=_MockProvider())

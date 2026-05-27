@@ -6,7 +6,6 @@ Run with: pytest tests/integration/test_ui_harness.py -v
 import pytest
 from ui_harness import UITestHarness
 
-
 # ---------------------------------------------------------------------------
 # Behavior 1: entering the context manager launches the app and exposes
 #             window_rect

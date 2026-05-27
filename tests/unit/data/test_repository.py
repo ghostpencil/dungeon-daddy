@@ -1,10 +1,10 @@
 """Tests for dungeon_daddy/data/repository.py — written before implementation."""
+
 import pytest
-from pathlib import Path
 
 
 def make_minimal_dungeon():
-    from dungeon_daddy.data.models import Dungeon, DungeonMeta, Level, Room, Connection
+    from dungeon_daddy.data.models import Connection, Dungeon, DungeonMeta, Level, Room
     return Dungeon(
         meta=DungeonMeta(
             title="Test Tomb", theme="Undead", setting="A cellar.",
@@ -101,8 +101,8 @@ def test_list_dungeons_excludes_dirs_without_dungeon_json(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_save_and_load_session(tmp_path):
+    from dungeon_daddy.data.models import ChatMessage, SessionState
     from dungeon_daddy.data.repository import DungeonRepository
-    from dungeon_daddy.data.models import SessionState, ChatMessage
     repo = DungeonRepository(dungeons_dir=tmp_path)
     state = SessionState(
         dungeon_id="tomb_one",
@@ -122,8 +122,8 @@ def test_load_session_returns_none_when_missing(tmp_path):
 
 
 def test_session_file_lives_in_dungeon_subfolder(tmp_path):
-    from dungeon_daddy.data.repository import DungeonRepository
     from dungeon_daddy.data.models import SessionState
+    from dungeon_daddy.data.repository import DungeonRepository
     repo = DungeonRepository(dungeons_dir=tmp_path)
     repo.save_session(SessionState(dungeon_id="my_dungeon"))
     assert (tmp_path / "my_dungeon" / "session.json").exists()
@@ -191,8 +191,8 @@ def test_save_and_load_room_memory_round_trip(tmp_path):
 
 
 def test_load_sample_returns_dungeon(tmp_path):
-    from dungeon_daddy.data.repository import DungeonRepository
     from dungeon_daddy.data.models import Dungeon
+    from dungeon_daddy.data.repository import DungeonRepository
     repo = DungeonRepository(dungeons_dir=tmp_path)
     dungeon = repo.load_sample()
     assert isinstance(dungeon, Dungeon)
@@ -204,8 +204,8 @@ def test_load_sample_returns_dungeon(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_save_and_load_context_doc_setting(tmp_path):
-    from dungeon_daddy.data.repository import DungeonRepository
     from dungeon_daddy.data.models import ContextDocType
+    from dungeon_daddy.data.repository import DungeonRepository
     repo = DungeonRepository(dungeons_dir=tmp_path)
     content = "# Setting\n\nA dark forest realm."
     repo.save_context_doc("my_dungeon", ContextDocType.SETTING, content)
@@ -213,8 +213,8 @@ def test_save_and_load_context_doc_setting(tmp_path):
 
 
 def test_save_and_load_context_doc_party(tmp_path):
-    from dungeon_daddy.data.repository import DungeonRepository
     from dungeon_daddy.data.models import ContextDocType
+    from dungeon_daddy.data.repository import DungeonRepository
     repo = DungeonRepository(dungeons_dir=tmp_path)
     content = "# Party\n\nFour adventurers of level 3."
     repo.save_context_doc("my_dungeon", ContextDocType.PARTY, content)
@@ -222,8 +222,8 @@ def test_save_and_load_context_doc_party(tmp_path):
 
 
 def test_save_and_load_context_doc_level_design(tmp_path):
-    from dungeon_daddy.data.repository import DungeonRepository
     from dungeon_daddy.data.models import ContextDocType
+    from dungeon_daddy.data.repository import DungeonRepository
     repo = DungeonRepository(dungeons_dir=tmp_path)
     content = "# Level 2 Design\n\nEcology: undead."
     repo.save_context_doc("my_dungeon", ContextDocType.LEVEL_DESIGN, content, level_id=2)
@@ -231,8 +231,8 @@ def test_save_and_load_context_doc_level_design(tmp_path):
 
 
 def test_load_context_doc_returns_empty_when_missing(tmp_path):
-    from dungeon_daddy.data.repository import DungeonRepository
     from dungeon_daddy.data.models import ContextDocType
+    from dungeon_daddy.data.repository import DungeonRepository
     repo = DungeonRepository(dungeons_dir=tmp_path)
     assert repo.load_context_doc("my_dungeon", ContextDocType.SETTING) == ""
     assert repo.load_context_doc("my_dungeon", ContextDocType.PARTY) == ""
@@ -240,8 +240,8 @@ def test_load_context_doc_returns_empty_when_missing(tmp_path):
 
 
 def test_save_context_doc_creates_subdirectory(tmp_path):
-    from dungeon_daddy.data.repository import DungeonRepository
     from dungeon_daddy.data.models import ContextDocType
+    from dungeon_daddy.data.repository import DungeonRepository
     repo = DungeonRepository(dungeons_dir=tmp_path)
     repo.save_context_doc("my_dungeon", ContextDocType.SETTING, "content")
     assert (tmp_path / "my_dungeon").is_dir()
@@ -249,16 +249,16 @@ def test_save_context_doc_creates_subdirectory(tmp_path):
 
 
 def test_save_context_doc_level_design_requires_level_id(tmp_path):
-    from dungeon_daddy.data.repository import DungeonRepository
     from dungeon_daddy.data.models import ContextDocType
+    from dungeon_daddy.data.repository import DungeonRepository
     repo = DungeonRepository(dungeons_dir=tmp_path)
     with pytest.raises(ValueError):
         repo.save_context_doc("my_dungeon", ContextDocType.LEVEL_DESIGN, "content")
 
 
 def test_load_context_doc_level_design_requires_level_id(tmp_path):
-    from dungeon_daddy.data.repository import DungeonRepository
     from dungeon_daddy.data.models import ContextDocType
+    from dungeon_daddy.data.repository import DungeonRepository
     repo = DungeonRepository(dungeons_dir=tmp_path)
     with pytest.raises(ValueError):
         repo.load_context_doc("my_dungeon", ContextDocType.LEVEL_DESIGN)
@@ -269,8 +269,9 @@ def test_load_context_doc_level_design_requires_level_id(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_migrate_moves_root_json_into_subfolder(tmp_path):
-    from dungeon_daddy.data.repository import DungeonRepository
     import json
+
+    from dungeon_daddy.data.repository import DungeonRepository
     dungeon = make_minimal_dungeon()
     # write legacy layout manually
     (tmp_path / "tomb_one.json").write_text(

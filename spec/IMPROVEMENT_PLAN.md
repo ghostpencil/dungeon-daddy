@@ -24,6 +24,7 @@ quality sprint.
 | IP-6 | Minimal AI output evals | Medium | Large |
 | IP-7 | Prompt versioning | Medium | Medium |
 | IP-8 | Consolidate requirements files into pyproject.toml | Low | Small |
+| IP-9 | Fix mypy None-guard issues in 6 deferred files | Medium | Small–Medium |
 
 ---
 
@@ -386,6 +387,56 @@ one file and forgotten in another.
 
 ---
 
+## IP-9 — Fix mypy None-guard and Structural Type Issues (6 Deferred Files)
+
+**Priority:** Medium (quality debt)
+**Effort:** Small–Medium (1–2 hours)
+**Phase:** Next BUILD phase or dedicated type-safety sprint
+
+### Background
+
+IP-1 left six files under `[[tool.mypy.overrides]] ignore_errors = true` in
+`pyproject.toml`. These files have real type issues — not just annotation
+style — that were too risky to fix during STABILIZATION.
+
+Tracked in GitHub issue #2.
+
+### Files and primary issues
+
+| File | Errors | Root cause |
+|---|---|---|
+| `views/design_view.py` | 43 | None deref on `Dungeon \| None`, agent `\| None` attrs |
+| `views/play_view.py` | 19 | None deref on `SessionState \| None`, bad assignments |
+| `data/repository.py` | 15 | `Path \| None` used without guard throughout |
+| `window.py` | 7 | Dict invariance, missing annotation |
+| `llm/agents/dm_agent.py` | 22 | All params typed `object`; attribute access fails |
+| `ui/panels/map_panel.py` | 7 | None deref on `Level \| None`, untyped callbacks |
+
+### Steps
+
+1. `repository.py` — add `assert self._dungeons_dir is not None` at the top
+   of each method that accesses `self._dungeons_dir`. Lowest risk.
+
+2. `dm_agent.py` — import `Room`, `Level`, `Dungeon`, `Loop` from
+   `dungeon_daddy.data.models` and replace `object` parameter types.
+
+3. `design_view.py` / `play_view.py` — add None guards before attribute
+   access (`if self._dungeon is None: return`).
+
+4. `window.py` — change `DungeonWizardAgent` param from `dict[str, object]`
+   to `Mapping[str, LoopPattern]`; add missing annotation to one function.
+
+5. `map_panel.py` — None guards + fix `on_click` redefinition pattern.
+
+6. Remove all 6 entries from `[[tool.mypy.overrides]]` in `pyproject.toml`.
+
+### Acceptance criteria
+
+- `mypy dungeon_daddy` passes with zero per-file overrides for these 6 files.
+- All tests still pass.
+
+---
+
 ## Implementation Order Recommendation
 
 For a STABILIZATION phase where only quality improvements are permitted, the
@@ -403,3 +454,6 @@ recommended order is:
 Items IP-1 through IP-5 are suitable for STABILIZATION. Items IP-6 and IP-7
 are best addressed in a dedicated quality sprint or at the start of the next
 BUILD phase.
+
+**IP-9** was discovered during IP-1 execution and is tracked separately — see
+GitHub issue #2. Deferred to the next BUILD phase.

@@ -1,7 +1,7 @@
 """Anthropic Claude provider — wraps the anthropic SDK."""
 from __future__ import annotations
 
-from typing import Iterator
+from collections.abc import Iterator
 
 import anthropic
 
@@ -39,9 +39,9 @@ class AnthropicProvider:
                 model=self._model,
                 max_tokens=max_tokens,
                 system=system,
-                messages=[{"role": m.role, "content": m.content} for m in messages],
+                messages=[{"role": m.role, "content": m.content} for m in messages],  # type: ignore[typeddict-item]
             )
-            return response.content[0].text
+            return response.content[0].text  # type: ignore[union-attr]
         except anthropic.APIError as e:
             raise LLMError(str(e)) from e
 
@@ -56,7 +56,7 @@ class AnthropicProvider:
                 model=self._model,
                 max_tokens=max_tokens,
                 system=system,
-                messages=[{"role": m.role, "content": m.content} for m in messages],
+                messages=[{"role": m.role, "content": m.content} for m in messages],  # type: ignore[typeddict-item]
             ) as stream:
                 yield from stream.text_stream
         except anthropic.APIError as e:

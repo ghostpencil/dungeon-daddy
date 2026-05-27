@@ -1,7 +1,6 @@
 """Tests for dungeon_daddy/config.py — written before implementation."""
-import pytest
-from pathlib import Path
 
+import pytest
 
 # ---------------------------------------------------------------------------
 # Behavior 1: AppConfig has correct default field values
@@ -29,8 +28,9 @@ def test_dungeons_dir_is_under_user_data_dir(tmp_path):
 
 
 def test_dungeons_dir_is_a_property_not_a_field(tmp_path):
-    from dungeon_daddy.config import AppConfig
     import dataclasses
+
+    from dungeon_daddy.config import AppConfig
     field_names = {f.name for f in dataclasses.fields(AppConfig)}
     assert "dungeons_dir" not in field_names
 

@@ -13,7 +13,6 @@ from dungeon_daddy.data.repository import DungeonRepository
 from dungeon_daddy.views.design_view import DesignView
 from dungeon_daddy.window import DungeonDaddyWindow
 
-
 # ---------------------------------------------------------------------------
 # Factories
 # ---------------------------------------------------------------------------

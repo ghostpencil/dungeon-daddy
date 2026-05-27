@@ -8,9 +8,9 @@ import tempfile
 from datetime import date
 from pathlib import Path
 
-_log = logging.getLogger(__name__)
-
 from dungeon_daddy.data.models import ContextDocType, Dungeon, SessionState
+
+_log = logging.getLogger(__name__)
 
 
 class DungeonRepository:

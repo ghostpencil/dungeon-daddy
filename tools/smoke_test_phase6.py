@@ -21,15 +21,27 @@ import time
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
+from smoke_helpers import (
+    BG_0,
+    BG_1,
+    CHROME_TOTAL_H,
+    PAD_MD,
+    PAD_SM,
+    WINDOW_H,
+    WINDOW_W,
+    color_close,
+    dropdown_item_center_y,
+    fail,
+    menu_bar_center_y,
+    menu_slot_center_x,
+    menu_slot_x,
+    ok,
+    pixel_rgb,
+    room_center,
+    scan_for_high_green,
+)
 from ui_harness import UITestHarness
 from ui_input import click_app
-from smoke_helpers import (
-    WINDOW_W, WINDOW_H, CHROME_TOTAL_H, PAD_MD, PAD_SM,
-    BG_0, BG_1,
-    ok, fail, color_close, pixel_rgb, scan_for_high_green,
-    menu_slot_center_x, menu_slot_x, menu_bar_center_y, dropdown_item_center_y,
-    room_center,
-)
 
 # ---------------------------------------------------------------------------
 # Play View layout constants — specific to play_view.py / theme.py

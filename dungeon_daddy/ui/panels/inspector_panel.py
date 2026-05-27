@@ -3,11 +3,38 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 import arcade
 import arcade.gui
 
 from dungeon_daddy.data.models import ContextDocType, Dungeon, LoopPatternCatalog
+from dungeon_daddy.ui.panels.loops_panel import LoopsPanel
+from dungeon_daddy.ui.theme import (
+    BG_1,
+    BG_2,
+    BG_3,
+    BG_HI,
+    FONT_MONO,
+    FONT_SERIF,
+    FONT_UI,
+    FONT_UI_MED,
+    INK_2,
+    INK_3,
+    INK_4,
+    LINE,
+    LINE_HI,
+    PAD_MD,
+    PAD_SM,
+    PAD_XS,
+    TEAL,
+    TEAL_DIM,
+    TEXT_LG,
+    TEXT_SM,
+    draw_chip,  # noqa: F401  # patched in tests
+    draw_kicker,
+    draw_rounded_rect,  # noqa: F401  # patched in tests
+)
 
 
 @dataclass
@@ -16,18 +43,7 @@ class ContextDocStatus:
     doc_type: ContextDocType
     level_id: int | None
     word_count: int | None  # None = pending/empty
-from dungeon_daddy.ui.panels.loops_panel import LoopsPanel
-from dungeon_daddy.ui.theme import (
-    BG_1, BG_2, BG_3, BG_HI,
-    LINE, LINE_HI,
-    INK_1, INK_2, INK_3, INK_4,
-    TEAL, TEAL_DIM, VIOLET, VIOLET_DIM,
-    FONT_UI, FONT_UI_MED, FONT_SERIF, FONT_MONO,
-    TEXT_XS, TEXT_SM, TEXT_BASE, TEXT_MD, TEXT_LG,
-    PAD_XS, PAD_SM, PAD_MD, PAD_XL,
-    RADIUS_SM, RADIUS_MD,
-    draw_kicker, draw_chip, draw_rounded_rect,
-)
+
 
 HEADER_H = 38
 FOOTER_H = 44
@@ -55,11 +71,11 @@ class InspectorPanel:
         self._start_play_rect: tuple[float, float, float, float] | None = None
         self._tab_rects: dict[str, tuple[float, float, float, float]] = {}
         self._loops_panel = LoopsPanel(on_activate_loop=on_activate_loop)
-        self._on_settings_change: Callable | None = None
+        self._on_settings_change: Callable[..., Any] | None = None
         self._complexity_seg_rects: list[tuple[float, float, float, float, str]] = []
         self._context_doc_statuses: list[ContextDocStatus] = []
         self._context_doc_rects: list[tuple[float, float, float, float, ContextDocStatus]] = []
-        self._on_context_doc_click: Callable | None = None
+        self._on_context_doc_click: Callable[..., Any] | None = None
         self._theme_scroll_offset: int = 0
         self._theme_max_scroll: int = 0
         self._theme_area_rect: tuple[float, float, float, float] | None = None
@@ -106,7 +122,7 @@ class InspectorPanel:
         else:
             self._loops_panel.set_level(None)
 
-    def set_on_settings_change(self, callback: Callable) -> None:
+    def set_on_settings_change(self, callback: Callable[..., Any]) -> None:
         self._on_settings_change = callback
 
     def on_settings_field_change(self, field: str, value: str) -> None:
@@ -127,7 +143,7 @@ class InspectorPanel:
     def set_context_doc_statuses(self, statuses: list[ContextDocStatus]) -> None:
         self._context_doc_statuses = statuses
 
-    def set_on_context_doc_click(self, callback: Callable) -> None:
+    def set_on_context_doc_click(self, callback: Callable[..., Any]) -> None:
         self._on_context_doc_click = callback
 
     def on_complexity_change(self, value: str) -> None:
@@ -159,8 +175,8 @@ class InspectorPanel:
     def on_mouse_scroll(self, x: float, y: float, scroll_y: int) -> bool:
         if not self._theme_area_rect:
             return False
-        l, b, r, t = self._theme_area_rect
-        if not (l <= x <= r and b <= y <= t):
+        left, b, r, t = self._theme_area_rect
+        if not (left <= x <= r and b <= y <= t):
             return False
         self._theme_scroll_offset = max(
             0, min(self._theme_max_scroll, self._theme_scroll_offset - scroll_y)
@@ -176,30 +192,30 @@ class InspectorPanel:
     def hit_test_drive(self, x: float, y: float) -> bool:
         if not self._test_drive_rect or not (self._dungeon and self._dungeon.levels):
             return False
-        l, b, r, t = self._test_drive_rect
-        return l <= x <= r and b <= y <= t
+        left, b, r, t = self._test_drive_rect
+        return left <= x <= r and b <= y <= t
 
     def hit_start_play(self, x: float, y: float) -> bool:
         if not self._is_saved:
             return False
         if not self._start_play_rect or not (self._dungeon and self._dungeon.levels):
             return False
-        l, b, r, t = self._start_play_rect
-        return l <= x <= r and b <= y <= t
+        left, b, r, t = self._start_play_rect
+        return left <= x <= r and b <= y <= t
 
     def on_mouse_press(self, x: float, y: float, modifiers: int = 0) -> bool:
         """Handle click; returns True if consumed."""
-        for tab_id, (l, b, r, t) in self._tab_rects.items():
-            if l <= x <= r and b <= y <= t:
+        for tab_id, (left, b, r, t) in self._tab_rects.items():
+            if left <= x <= r and b <= y <= t:
                 self._active_tab = tab_id
                 return True
         if self._active_tab == "settings":
-            for l, b, r, t, label in self._complexity_seg_rects:
-                if l <= x <= r and b <= y <= t:
+            for left, b, r, t, label in self._complexity_seg_rects:
+                if left <= x <= r and b <= y <= t:
                     self.on_complexity_change(label)
                     return True
-            for l, b, r, t, status in self._context_doc_rects:
-                if l <= x <= r and b <= y <= t:
+            for left, b, r, t, status in self._context_doc_rects:
+                if left <= x <= r and b <= y <= t:
                     if self._on_context_doc_click:
                         self._on_context_doc_click(status.doc_type, status.level_id)
                     return True

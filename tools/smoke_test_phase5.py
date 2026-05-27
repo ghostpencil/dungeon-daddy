@@ -16,12 +16,20 @@ from __future__ import annotations
 import sys
 
 import dpi
-from ui_harness import UITestHarness
 from smoke_helpers import (
-    WINDOW_W, WINDOW_H, CHROME_TOTAL_H,
-    BG_1, COLOR_TOLERANCE,
-    ok, fail, color_close, avg_color_region, check_no_error_dialog, os_titlebar_h,
+    BG_1,
+    CHROME_TOTAL_H,
+    COLOR_TOLERANCE,
+    WINDOW_H,
+    WINDOW_W,
+    avg_color_region,
+    check_no_error_dialog,
+    color_close,
+    fail,
+    ok,
+    os_titlebar_h,
 )
+from ui_harness import UITestHarness
 
 
 def run() -> int:

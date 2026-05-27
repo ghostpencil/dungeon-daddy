@@ -1,8 +1,6 @@
 """Integration tests — validate → auto_fix → save → load → validate cycle."""
 from __future__ import annotations
 
-import pytest
-
 from dungeon_daddy.data.models import (
     Connection,
     Dungeon,
@@ -10,11 +8,10 @@ from dungeon_daddy.data.models import (
     Level,
     Loop,
     Room,
-    validate_dungeon,
     auto_fix_dungeon,
+    validate_dungeon,
 )
 from dungeon_daddy.data.repository import DungeonRepository
-
 
 # ---------------------------------------------------------------------------
 # Factories

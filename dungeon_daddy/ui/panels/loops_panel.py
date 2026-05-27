@@ -1,20 +1,33 @@
 """LoopsPanel — interactive Loops tab for the Inspector Panel (Design Mode)."""
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 import arcade
 
 from dungeon_daddy.data.loop_assignment import auto_assign_loop_rooms
 from dungeon_daddy.data.models import Level, Loop, LoopPattern
 from dungeon_daddy.ui.theme import (
-    BG_1, BG_2, BG_HI,
-    LINE, INK_2, INK_3, INK_4,
-    TEAL, VIOLET,
-    FONT_UI, FONT_UI_MED, FONT_MONO,
-    TEXT_XS, TEXT_SM, TEXT_BASE,
-    PAD_XS, PAD_MD, PAD_SM,
-    RADIUS_SM, draw_chip, draw_rounded_rect,
+    BG_1,
+    BG_2,
+    BG_HI,
+    FONT_MONO,
+    FONT_UI,
+    FONT_UI_MED,
+    INK_2,
+    INK_3,
+    INK_4,
+    LINE,
+    PAD_MD,
+    PAD_SM,
+    PAD_XS,
+    RADIUS_SM,
+    TEAL,
+    TEXT_BASE,
+    TEXT_SM,
+    TEXT_XS,
+    VIOLET,
+    draw_rounded_rect,
 )
 
 SECTION_GAP = 12
@@ -38,11 +51,11 @@ class LoopsPanel:
         self._patterns: list[LoopPattern] = []
         self._x = self._y = self._w = self._h = 0.0
         self._levels: list[Level] = []
-        self._pattern_rects: dict[str, tuple] = {}
-        self._remove_rects: dict[str, tuple] = {}
-        self._level_rects: dict[int, tuple] = {}
-        self._add_rects: dict[str, tuple] = {}
-        self._loop_rects: dict[str, tuple] = {}
+        self._pattern_rects: dict[str, tuple[float, ...]] = {}
+        self._remove_rects: dict[str, tuple[float, ...]] = {}
+        self._level_rects: dict[int, tuple[float, ...]] = {}
+        self._add_rects: dict[str, tuple[float, ...]] = {}
+        self._loop_rects: dict[str, tuple[float, ...]] = {}
 
     # ------------------------------------------------------------------
     # Setup / resize

@@ -58,13 +58,17 @@ def _load_dotenv() -> None:
 
 _load_dotenv()
 
-from ui_harness import UITestHarness, SCREENSHOTS_DIR
-from ui_input import VK_CONTROL, click_app, key_combo, type_text
 from smoke_helpers import (
-    WINDOW_W, WINDOW_H, CHROME_TOTAL_H, PAD_SM,
-    ok, fail,
+    CHROME_TOTAL_H,
+    PAD_SM,
+    WINDOW_H,
+    WINDOW_W,
+    fail,
+    ok,
     pixel_rgb,
 )
+from ui_harness import SCREENSHOTS_DIR, UITestHarness
+from ui_input import VK_CONTROL, click_app, key_combo, type_text
 
 # ---------------------------------------------------------------------------
 # Layout constants
@@ -238,8 +242,9 @@ def _wizard_next_step(
     history: list[str],
 ) -> _StepClassification:
     """Send a screenshot to Claude; get back the next step name + last DM message text."""
-    import anthropic
     import re as _re
+
+    import anthropic
 
     client = anthropic.Anthropic()
     img_b64 = base64.standard_b64encode(screenshot_path.read_bytes()).decode()
@@ -487,7 +492,7 @@ def _run_session_a() -> tuple[int, pathlib.Path | None]:
 
         h.pin_window()
         win_left, win_top, _, _ = h.window_rect
-        print(f"  Window pinned to (0,0)\n")
+        print("  Window pinned to (0,0)\n")
 
         # Behavior 1 — Wizard mode launch
         print("Behavior 1 — Wizard mode launch: VIOLET DM greeting in chat")
@@ -570,7 +575,7 @@ def _run_session_b(setting_md: pathlib.Path) -> int:
 
         h.pin_window()
         win_left, win_top, _, _ = h.window_rect
-        print(f"  Window pinned to (0,0)\n")
+        print("  Window pinned to (0,0)\n")
 
         # Drive wizard — stop when "overwrite_detected" is reached so we can
         # check the sentinel before the overwrite is sent.

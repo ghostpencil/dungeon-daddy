@@ -27,14 +27,19 @@ _PROJECT_ROOT = pathlib.Path(__file__).parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+from smoke_helpers import (
+    CHROME_TOTAL_H,
+    WINDOW_H,
+    WINDOW_W,
+    dropdown_item_center_y,
+    fail,
+    menu_bar_center_y,
+    menu_slot_center_x,
+    ok,
+    pixel_rgb,
+)
 from ui_harness import UITestHarness
 from ui_input import click_app
-from smoke_helpers import (
-    WINDOW_W, WINDOW_H, CHROME_TOTAL_H,
-    ok, fail,
-    pixel_rgb,
-    menu_slot_center_x, menu_bar_center_y, dropdown_item_center_y,
-)
 
 # ---------------------------------------------------------------------------
 # Layout constants

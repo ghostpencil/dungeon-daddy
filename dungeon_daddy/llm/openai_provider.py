@@ -1,7 +1,7 @@
 """OpenAI ChatGPT provider — wraps the openai SDK."""
 from __future__ import annotations
 
-from typing import Iterator
+from collections.abc import Iterator
 
 import openai
 
@@ -38,9 +38,9 @@ class OpenAIProvider:
             response = self._client.chat.completions.create(
                 model=self._model,
                 max_tokens=max_tokens,
-                messages=self._build_messages(system, messages),
+                messages=self._build_messages(system, messages),  # type: ignore[arg-type]
             )
-            return response.choices[0].message.content
+            return response.choices[0].message.content or ""
         except openai.APIError as e:
             raise LLMError(str(e)) from e
 
@@ -54,11 +54,11 @@ class OpenAIProvider:
             chunks = self._client.chat.completions.create(
                 model=self._model,
                 max_tokens=max_tokens,
-                messages=self._build_messages(system, messages),
+                messages=self._build_messages(system, messages),  # type: ignore[arg-type]
                 stream=True,
             )
             for chunk in chunks:
-                delta = chunk.choices[0].delta.content
+                delta = chunk.choices[0].delta.content  # type: ignore[union-attr]
                 if delta is not None:
                     yield delta
         except openai.APIError as e:
@@ -68,8 +68,8 @@ class OpenAIProvider:
         self,
         system: str,
         messages: list[LLMMessage],
-    ) -> list[dict]:
-        payload = []
+    ) -> list[dict[str, str]]:
+        payload: list[dict[str, str]] = []
         if system:
             payload.append({"role": "system", "content": system})
         payload.extend({"role": m.role, "content": m.content} for m in messages)

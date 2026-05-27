@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from typing import Callable
+from collections.abc import Callable
 
 
 def _default_count_tokens(text: str) -> int:

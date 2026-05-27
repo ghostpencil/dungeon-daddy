@@ -15,27 +15,41 @@ from dataclasses import dataclass
 import arcade
 import arcade.gui
 
-from dungeon_daddy.data.models import ChatMessage, DesignMode, Dungeon, DungeonMeta, validate_dungeon
+from dungeon_daddy.data.models import (
+    DesignMode,
+    Dungeon,
+    DungeonMeta,
+    validate_dungeon,
+)
+from dungeon_daddy.data.repository import DungeonRepository
 from dungeon_daddy.llm.agents.design_agent import DesignAgent
 from dungeon_daddy.llm.agents.generator_agent import DungeonGeneratorAgent
 from dungeon_daddy.llm.agents.wizard_agent import DungeonWizardAgent
 from dungeon_daddy.llm.provider import LLMMessage
-from dungeon_daddy.data.repository import DungeonRepository
-from dungeon_daddy.ui.chrome import MenuBar, draw_menu_bar, draw_title_bar
+from dungeon_daddy.ui.chrome import MenuBar, draw_title_bar
 from dungeon_daddy.ui.panels.chat_panel import ChatPanel
 from dungeon_daddy.ui.panels.dungeon_tree_panel import DungeonTreePanel
 from dungeon_daddy.ui.panels.inspector_panel import InspectorPanel
 from dungeon_daddy.ui.theme import (
-    BG_0, BG_1, BG_2, BG_3, BG_HI,
-    LINE, LINE_HI,
-    INK_1, INK_2, INK_4,
-    TEAL,
-    FONT_UI_MED, FONT_MONO,
-    TEXT_SM, TEXT_BASE,
-    PAD_MD,
+    BG_0,
+    BG_1,
+    BG_2,
+    BG_3,
+    BG_HI,
     CHROME_TOTAL_HEIGHT,
-    PANEL_TREE_WIDTH,
+    FONT_MONO,
+    FONT_UI_MED,
+    INK_1,
+    INK_2,
+    INK_4,
+    LINE,
+    LINE_HI,
+    PAD_MD,
     PANEL_INSPECTOR_WIDTH,
+    PANEL_TREE_WIDTH,
+    TEAL,
+    TEXT_BASE,
+    TEXT_SM,
 )
 
 
@@ -551,7 +565,7 @@ class DesignView(arcade.View):
 
     def _write_setting_party_docs(self) -> None:
         from dungeon_daddy.data.models import ContextDocType
-        from dungeon_daddy.llm.context_docs import generate_setting_doc, generate_party_doc
+        from dungeon_daddy.llm.context_docs import generate_party_doc, generate_setting_doc
         name = self._dungeon.meta.effective_name
         self._repo.save_context_doc(name, ContextDocType.SETTING, generate_setting_doc(self._dungeon.meta))
         self._repo.save_context_doc(name, ContextDocType.PARTY, generate_party_doc(self._dungeon.meta))

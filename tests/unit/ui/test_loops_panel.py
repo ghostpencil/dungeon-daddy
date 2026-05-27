@@ -9,7 +9,6 @@ import pytest
 from dungeon_daddy.data.models import Dungeon, Level, LoopPattern
 from dungeon_daddy.ui.panels.loops_panel import LoopsPanel
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

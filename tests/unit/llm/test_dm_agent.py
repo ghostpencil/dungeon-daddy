@@ -1,7 +1,6 @@
 """Tests for DungeonMasterAgent."""
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
@@ -34,7 +33,7 @@ def _make_room():
 
 
 def _make_level():
-    from dungeon_daddy.data.models import Level, Room, Connection
+    from dungeon_daddy.data.models import Connection, Level, Room
     return Level(
         id=1, name="The Sunken Vestibule", summary="Flooded entry.",
         ecology="4 goblin archers, 1 ogre warlord",

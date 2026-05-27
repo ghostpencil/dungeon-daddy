@@ -8,14 +8,34 @@ import arcade.gui
 
 from dungeon_daddy.data.models import ChatMessage
 from dungeon_daddy.ui.theme import (
-    BG_0, BG_1, BG_2, BG_3,
-    LINE, LINE_HI,
-    INK_1, INK_2, INK_3, INK_4,
-    TEAL, TEAL_DIM, VIOLET,
-    FONT_UI, FONT_UI_MED, FONT_MONO, FONT_SERIF,
-    TEXT_XS, TEXT_SM, TEXT_BASE, TEXT_MD, TEXT_3XL,
-    PAD_XS, PAD_SM, PAD_MD, PAD_XL,
-    draw_kicker, draw_chip,
+    BG_0,
+    BG_1,
+    BG_2,
+    BG_3,
+    FONT_MONO,
+    FONT_SERIF,
+    FONT_UI,
+    FONT_UI_MED,
+    INK_1,
+    INK_2,
+    INK_3,
+    INK_4,
+    LINE,
+    LINE_HI,
+    PAD_MD,
+    PAD_SM,
+    PAD_XL,
+    PAD_XS,
+    TEAL,
+    TEAL_DIM,
+    TEXT_3XL,
+    TEXT_BASE,
+    TEXT_MD,
+    TEXT_SM,
+    TEXT_XS,
+    VIOLET,
+    draw_chip,
+    draw_kicker,
 )
 
 HEADER_H = 38
@@ -123,7 +143,7 @@ class ChatPanel:
             font_size=TEXT_MD,
             text_color=(*INK_1, 255),
             multiline=True,
-            border_color=(*LINE, 255),
+            border_color=(*LINE, 255),  # type: ignore[arg-type]
             border_width=1,
             style={
                 "normal":   _input_style_normal,

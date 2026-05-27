@@ -1,14 +1,11 @@
 """Integration tests — generate_all_context_docs → save → load → compact → system prompt."""
 from __future__ import annotations
 
-import pytest
-
 from dungeon_daddy.data.models import Dungeon, DungeonMeta, Level
 from dungeon_daddy.data.repository import DungeonRepository
 from dungeon_daddy.llm.context_builder import ContextBuilder
 from dungeon_daddy.llm.context_compactor import ContextCompactor
 from dungeon_daddy.llm.context_docs import generate_all_context_docs
-
 
 # ---------------------------------------------------------------------------
 # Factories

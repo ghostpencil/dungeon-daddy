@@ -2,19 +2,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class ContextDocType(str, Enum):
+class ContextDocType(StrEnum):
     SETTING = "setting"
     PARTY = "party"
     LEVEL_DESIGN = "level_design"
 
 
-class DesignMode(str, Enum):
+class DesignMode(StrEnum):
     WIZARD = "wizard"
     LEVEL_WIZARD = "level_wizard"
     GENERATION = "generation"
@@ -200,7 +200,7 @@ class LoopPatternCatalog(BaseModel):
     patterns: dict[str, LoopPattern]
 
     @classmethod
-    def load_bundled(cls) -> "LoopPatternCatalog":
+    def load_bundled(cls) -> LoopPatternCatalog:
         import importlib.resources
         import json
         pkg_files = importlib.resources.files("dungeon_daddy.data")
@@ -234,7 +234,7 @@ def validate_dungeon(dungeon: Dungeon) -> ValidationResult:
     return ValidationResult(is_valid=len(errors) == 0, errors=errors)
 
 
-def auto_fix_dungeon(dungeon: "Dungeon") -> list[str]:
+def auto_fix_dungeon(dungeon: Dungeon) -> list[str]:
     """Apply automatic fixes for common validation errors. Returns descriptions of each fix applied."""
     fixes: list[str] = []
     for level in dungeon.levels:
@@ -426,7 +426,7 @@ def _check_connection_type(level: Level, errors: list[str]) -> None:
 
 
 def _check_level_loop_pattern_exists(
-    level: Level, loop_patterns: dict[str, "LoopPattern"], errors: list[str]
+    level: Level, loop_patterns: dict[str, LoopPattern], errors: list[str]
 ) -> None:
     if level.loop not in loop_patterns:
         errors.append(

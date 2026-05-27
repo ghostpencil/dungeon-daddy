@@ -2,10 +2,18 @@
 from __future__ import annotations
 
 import math
+
 import arcade
 
 from dungeon_daddy.data.models import Connection, Level, Room, SessionState
-from dungeon_daddy.map.routing import get_room_port, is_route_problematic, route_detour, route_waypoints, select_port_direction, straight_path_blocked
+from dungeon_daddy.map.routing import (
+    get_room_port,
+    is_route_problematic,
+    route_detour,
+    route_waypoints,
+    select_port_direction,
+    straight_path_blocked,
+)
 from dungeon_daddy.ui.theme import (
     EMBER,
     FONT_UI,
@@ -147,8 +155,8 @@ class GridRenderer:
             fill = colors["fill"]
             stroke = TEAL if is_current else colors["stroke"]
 
-            arcade.draw_rect_filled(rect, fill)
-            arcade.draw_rect_outline(rect, stroke, 2 if is_current else 1)
+            arcade.draw_rect_filled(rect, fill)  # type: ignore[arg-type]
+            arcade.draw_rect_outline(rect, stroke, 2 if is_current else 1)  # type: ignore[arg-type]
 
             label_color = INK_1 if is_current else INK_2
             arcade.draw_text(

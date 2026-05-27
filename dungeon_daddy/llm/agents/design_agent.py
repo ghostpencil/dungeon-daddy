@@ -34,7 +34,7 @@ class DesignAgent:
         )
 
     def _build_context(self, dungeon: object) -> str:
-        meta = dungeon.meta
+        meta = dungeon.meta  # type: ignore[attr-defined]
         lines = [
             "# Dungeon",
             f"Title: {meta.title}",
@@ -45,7 +45,7 @@ class DesignAgent:
             "",
             "# Levels",
         ]
-        for level in dungeon.levels:
+        for level in dungeon.levels:  # type: ignore[attr-defined]
             room_count = len(level.rooms)
             lines.append(
                 f"Level {level.id} — {level.name}: "

@@ -7,11 +7,22 @@ import arcade
 import arcade.gui
 
 from dungeon_daddy.ui.theme import (
-    BG_2, BG_3, INK_1, INK_2, INK_3, INK_4,
-    LINE, LINE_HI, TEAL, TEAL_DIM,
-    FONT_UI, FONT_UI_MED, FONT_MONO, FONT_SERIF,
-    TEXT_SM, TEXT_BASE,
+    BG_2,
+    BG_3,
+    FONT_MONO,
+    FONT_SERIF,
+    FONT_UI_MED,
+    INK_1,
+    INK_2,
+    INK_3,
+    INK_4,
+    LINE,
+    LINE_HI,
     PAD_SM,
+    TEAL,
+    TEAL_DIM,
+    TEXT_BASE,
+    TEXT_SM,
 )
 
 _BTN_H = 28
@@ -108,7 +119,7 @@ class LevelStepper:
             style=btn_style,
         )
 
-        @self._down_btn.event
+        @self._down_btn.event  # type: ignore[no-redef]
         def on_click(event: arcade.gui.UIOnClickEvent) -> None:  # noqa: F811
             self._on_level_change(+1)
 

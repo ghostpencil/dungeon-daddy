@@ -21,5 +21,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
-      - name: Run tests
-        run: pytest --ignore=tests/integration/test_ui_harness.py
+      - name: Lint
+        run: ruff check .
+
+      - name: Type-check
+        run: mypy dungeon_daddy
+
+      - name: Test with coverage
+        run: pytest --ignore=tests/integration/test_ui_harness.py --cov=dungeon_daddy --cov-report=term-missing --cov-fail-under=70

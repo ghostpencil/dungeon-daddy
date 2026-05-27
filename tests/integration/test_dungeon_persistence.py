@@ -1,8 +1,6 @@
 """Integration tests — dungeon and session persistence via real filesystem."""
 from __future__ import annotations
 
-import pytest
-
 from dungeon_daddy.data.models import (
     Connection,
     Dungeon,
@@ -12,7 +10,6 @@ from dungeon_daddy.data.models import (
     SessionState,
 )
 from dungeon_daddy.data.repository import DungeonRepository
-
 
 # ---------------------------------------------------------------------------
 # Factories

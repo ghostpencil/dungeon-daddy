@@ -50,16 +50,24 @@ def _load_dotenv() -> None:
 
 _load_dotenv()
 
-from ui_harness import UITestHarness
-from ui_input import click_app
 from smoke_helpers import (
-    WINDOW_W, WINDOW_H, CHROME_TOTAL_H,
-    PAD_MD, TEAL,
-    ok, fail,
-    pixel_rgb, color_close,
-    menu_slot_center_x, menu_slot_x, menu_bar_center_y, dropdown_item_center_y,
+    CHROME_TOTAL_H,
+    PAD_MD,
+    TEAL,
+    WINDOW_H,
+    WINDOW_W,
+    color_close,
+    dropdown_item_center_y,
+    fail,
+    menu_bar_center_y,
+    menu_slot_center_x,
+    menu_slot_x,
+    ok,
+    pixel_rgb,
     room_center,
 )
+from ui_harness import UITestHarness
+from ui_input import click_app
 
 # ---------------------------------------------------------------------------
 # Layout constants (Arcade coordinate system: y=0 at bottom of content area)
@@ -276,7 +284,7 @@ def run() -> int:
         violet_after = _count_violet_on_map(pixels, shot_w, win_left, win_top)
         print(f"  Violet pixel count after deactivate: {violet_after} (baseline: {violet_baseline})")
         if violet_after <= violet_baseline + 5:
-            ok(f"Violet count back to baseline — loop overlay cleared")
+            ok("Violet count back to baseline — loop overlay cleared")
         else:
             failures += fail(f"Violet count still elevated ({violet_after} vs baseline {violet_baseline}) — overlay not cleared")
 

@@ -30,7 +30,7 @@ class ChatBubble:
         x: float,
         y: float,
         text: str,
-        color: tuple,
+        color: tuple[int, ...],
         max_width: float,
     ) -> None:
         pad = PAD_SM

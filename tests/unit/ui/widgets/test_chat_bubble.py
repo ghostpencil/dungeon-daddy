@@ -7,8 +7,8 @@ import arcade
 import pytest
 
 import dungeon_daddy.ui.widgets.chat_bubble as _mod
-from dungeon_daddy.ui.widgets.chat_bubble import ChatBubble, _LINE_H
 from dungeon_daddy.ui.theme import BG_2, FONT_UI, INK_1, PAD_SM, RADIUS_MD, TEXT_BASE
+from dungeon_daddy.ui.widgets.chat_bubble import _LINE_H, ChatBubble
 
 _COLOR = (100, 200, 255, 255)
 _MAX_W = 200.0

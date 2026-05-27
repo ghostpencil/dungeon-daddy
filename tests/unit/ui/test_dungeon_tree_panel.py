@@ -1,15 +1,20 @@
 """Tests for DungeonTreePanel validation header display and loop path colouring."""
 from __future__ import annotations
 
-from unittest.mock import call, patch
+from unittest.mock import patch
 
 import pytest
 
 from dungeon_daddy.data.models import (
-    Dungeon, DungeonMeta, Level, Loop, Room, Connection, Entry, ValidationResult,
+    Dungeon,
+    DungeonMeta,
+    Level,
+    Loop,
+    Room,
+    ValidationResult,
 )
 from dungeon_daddy.ui.panels.dungeon_tree_panel import DungeonTreePanel
-from dungeon_daddy.ui.theme import AMBER, INDIGO, TEAL, VIOLET, INK_3
+from dungeon_daddy.ui.theme import AMBER, INDIGO, INK_3, TEAL, VIOLET
 
 
 @pytest.fixture()

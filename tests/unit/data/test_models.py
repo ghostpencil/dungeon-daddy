@@ -2,7 +2,6 @@
 import pytest
 from pydantic import ValidationError
 
-
 # ---------------------------------------------------------------------------
 # DesignMode enum
 # ---------------------------------------------------------------------------
@@ -23,8 +22,11 @@ def test_design_mode_values():
 def make_minimal_dungeon():
     """Build the smallest valid Dungeon for round-trip testing."""
     from dungeon_daddy.data.models import (
-        Dungeon, DungeonMeta, Level, Room, Connection, Entry,
-        Loop, LoopPattern,
+        Connection,
+        Dungeon,
+        DungeonMeta,
+        Level,
+        Room,
     )
     return Dungeon(
         meta=DungeonMeta(
@@ -138,7 +140,7 @@ def test_session_state_defaults():
 def test_session_state_rejects_empty_string_room_id():
     from dungeon_daddy.data.models import SessionState
     # Empty string is explicitly invalid per spec
-    state = SessionState(dungeon_id="test", current_room_id="")
+    _ = SessionState(dungeon_id="test", current_room_id="")
     # Pydantic allows the string, so we validate the contract at the
     # application layer — confirm the field accepts None and valid IDs
     assert SessionState(dungeon_id="test", current_room_id=None).current_room_id is None
@@ -150,7 +152,7 @@ def test_session_state_rejects_empty_string_room_id():
 # ---------------------------------------------------------------------------
 
 def make_valid_level():
-    from dungeon_daddy.data.models import Level, Room, Connection
+    from dungeon_daddy.data.models import Connection, Level, Room
     return Level(
         id=1, name="L1", summary="", ecology="", loop="",
         width=10, height=8, entries=[],
@@ -182,7 +184,7 @@ def test_validate_dungeon_passes_valid():
 
 
 def test_validate_dungeon_catches_duplicate_room_ids():
-    from dungeon_daddy.data.models import validate_dungeon, Level, Room, Connection
+    from dungeon_daddy.data.models import Connection, Level, Room, validate_dungeon
     level = Level(
         id=1, name="L1", summary="", ecology="", loop="",
         width=10, height=8, entries=[],
@@ -198,7 +200,7 @@ def test_validate_dungeon_catches_duplicate_room_ids():
 
 
 def test_validate_dungeon_catches_orphan_room():
-    from dungeon_daddy.data.models import validate_dungeon, Level, Room
+    from dungeon_daddy.data.models import Level, Room, validate_dungeon
     level = Level(
         id=1, name="L1", summary="", ecology="", loop="",
         width=10, height=8, entries=[],
@@ -214,7 +216,7 @@ def test_validate_dungeon_catches_orphan_room():
 
 
 def test_validate_dungeon_catches_bad_loop_room_ref():
-    from dungeon_daddy.data.models import validate_dungeon, Loop
+    from dungeon_daddy.data.models import Loop, validate_dungeon
     level = make_valid_level()
     level.loops = [Loop(
         id="L1", pattern="lock_key", note="", entry="1-A", goal="1-B",
@@ -226,7 +228,7 @@ def test_validate_dungeon_catches_bad_loop_room_ref():
 
 
 def test_validate_dungeon_catches_missing_entry_goal():
-    from dungeon_daddy.data.models import validate_dungeon, Loop
+    from dungeon_daddy.data.models import Loop, validate_dungeon
     level = make_valid_level()
     level.loops = [Loop(
         id="L1", pattern="lock_key", note="", entry="NOWHERE", goal="1-B",
@@ -238,7 +240,7 @@ def test_validate_dungeon_catches_missing_entry_goal():
 
 
 def test_validate_dungeon_catches_self_connection():
-    from dungeon_daddy.data.models import validate_dungeon, Connection
+    from dungeon_daddy.data.models import Connection, validate_dungeon
     level = make_valid_level()
     level.connections.append(Connection(from_room="1-A", to_room="1-A", type="door"))
     result = validate_dungeon(make_dungeon_with_level(level))
@@ -247,7 +249,7 @@ def test_validate_dungeon_catches_self_connection():
 
 
 def test_validate_dungeon_catches_out_of_bounds_room():
-    from dungeon_daddy.data.models import validate_dungeon, Room, Connection
+    from dungeon_daddy.data.models import Connection, Room, validate_dungeon
     level = make_valid_level()
     # Room that extends past the grid width (10)
     level.rooms.append(
@@ -260,7 +262,7 @@ def test_validate_dungeon_catches_out_of_bounds_room():
 
 
 def test_validate_dungeon_catches_overlapping_rooms():
-    from dungeon_daddy.data.models import validate_dungeon, Level, Room, Connection
+    from dungeon_daddy.data.models import Connection, Level, Room, validate_dungeon
     # 1-A at (0,0) w=5 h=5 — 1-B at (3,3) w=3 h=3 — they overlap
     level = Level(
         id=1, name="L1", summary="", ecology="", loop="",
@@ -278,7 +280,7 @@ def test_validate_dungeon_catches_overlapping_rooms():
 
 
 def test_validate_dungeon_catches_touching_rooms():
-    from dungeon_daddy.data.models import validate_dungeon, Level, Room, Connection
+    from dungeon_daddy.data.models import Connection, Level, Room, validate_dungeon
     # 1-A at (0,0) w=5 h=5 — 1-B at (5,0) w=3 h=3 — exactly touching (gap=0), too close
     level = Level(
         id=1, name="L1", summary="", ecology="", loop="",
@@ -307,7 +309,7 @@ def test_validate_dungeon_allows_rooms_with_one_cell_gap():
 # ---------------------------------------------------------------------------
 
 def test_validate_dungeon_catches_empty_connection_type():
-    from dungeon_daddy.data.models import validate_dungeon, Connection
+    from dungeon_daddy.data.models import Connection, validate_dungeon
     level = make_valid_level()
     level.connections[0] = Connection(from_room="1-A", to_room="1-B", type="")
     result = validate_dungeon(make_dungeon_with_level(level))
@@ -402,7 +404,7 @@ def test_validate_dungeon_allows_loop_with_empty_rooms_list():
 
 def make_level_with_loop_and_rooms(main_loop_role=None, sub_loop_roles=None):
     """Level with two rooms: 1-A in a main loop, 1-B in a sub loop."""
-    from dungeon_daddy.data.models import Level, Room, Connection
+    from dungeon_daddy.data.models import Connection, Level, Room
     return Level(
         id=1, name="L1", summary="", ecology="", loop="",
         width=20, height=20, entries=[],

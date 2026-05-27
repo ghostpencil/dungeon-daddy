@@ -1,10 +1,10 @@
 """Unit tests for ChatPanel.on_mouse_press chip click handling and handle_key_press."""
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock
 
 import arcade
+import pytest
 
 from dungeon_daddy.ui.panels.chat_panel import ChatPanel
 

@@ -1,16 +1,15 @@
 """Tests for GraphRenderer — abstract node graph style map renderer."""
 from __future__ import annotations
 
+import math
 from unittest.mock import patch
 
-import math
 import pytest
 
 from dungeon_daddy.data.models import Connection, Level, Room, SessionState
+from dungeon_daddy.map.graph_renderer import _NODE_RADIUS_CELLS, GraphRenderer
 from dungeon_daddy.map.grid_renderer import GridRenderer
-from dungeon_daddy.map.graph_renderer import GraphRenderer, _NODE_RADIUS_CELLS
 from dungeon_daddy.ui.theme import INK_1, INK_2
-
 
 # ---------------------------------------------------------------------------
 # Factories

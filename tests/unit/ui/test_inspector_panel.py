@@ -5,8 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from dungeon_daddy.data.models import Dungeon, DungeonMeta, Level, Room, Connection, Entry, Loop
-
+from dungeon_daddy.data.models import Dungeon, DungeonMeta, Level
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -297,6 +296,7 @@ def test_on_mouse_scroll_no_area_rect_returns_false():
 # ---------------------------------------------------------------------------
 
 from unittest.mock import patch
+
 from dungeon_daddy.data.models import LoopPattern, LoopPatternCatalog
 
 

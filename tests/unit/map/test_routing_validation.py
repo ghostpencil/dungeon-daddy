@@ -35,8 +35,8 @@ _FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 # ---------------------------------------------------------------------------
 
 def _room_center(room: Room) -> tuple[float, float]:
-    l, b, r, t = get_room_rect(room)
-    return (l + r) / 2, (b + t) / 2
+    left, b, r, t = get_room_rect(room)
+    return (left + r) / 2, (b + t) / 2
 
 
 def _direct_distance(a: Room, b: Room) -> float:

@@ -1,13 +1,12 @@
 """Tests for TilesRenderer — shaded tile style map renderer."""
 from __future__ import annotations
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-from dungeon_daddy.data.models import Connection, Level, Room, SessionState
+from dungeon_daddy.data.models import Level, Room, SessionState
 from dungeon_daddy.map.grid_renderer import GridRenderer
-from dungeon_daddy.map.tiles_renderer import TilesRenderer, _TILE_SHADE
+from dungeon_daddy.map.tiles_renderer import _TILE_SHADE, TilesRenderer
 from dungeon_daddy.ui.theme import ROOM_COLORS, ROOM_UNSEEN_FILL, ROOM_UNSEEN_STROKE, TEAL
-
 
 # ---------------------------------------------------------------------------
 # Factories

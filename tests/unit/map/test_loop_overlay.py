@@ -3,10 +3,9 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from dungeon_daddy.data.models import Connection, Entry, Level, Loop, Room, SessionState
+from dungeon_daddy.data.models import Level, Loop, Room, SessionState
 from dungeon_daddy.map.grid_renderer import GridRenderer
 from dungeon_daddy.ui.theme import PATH_A_COLOR, PATH_B_COLOR
-
 
 # ---------------------------------------------------------------------------
 # Factories
@@ -87,6 +86,7 @@ def test_draws_path_b_in_violet() -> None:
 def test_zoom_scales_path_line_positions() -> None:
     """draw() at zoom=2.0 doubles the screen coordinates of path lines."""
     import pytest
+
     from dungeon_daddy.map.loop_overlay import LoopOverlay
 
     r1 = _room("r1", x=0, y=0)

@@ -5,13 +5,23 @@ import arcade
 
 from dungeon_daddy.data.models import Dungeon, Loop, ValidationResult
 from dungeon_daddy.ui.theme import (
-    BG_1, BG_2, BG_HI,
+    AMBER,
+    BG_1,
+    BG_2,
+    BG_HI,
+    FONT_MONO,
+    FONT_UI,
+    INDIGO,
+    INK_1,
+    INK_3,
+    INK_4,
     LINE,
-    INK_1, INK_3, INK_4,
-    TEAL, VIOLET, INDIGO, AMBER,
-    FONT_UI, FONT_MONO,
-    TEXT_SM, TEXT_BASE,
-    PAD_XS, PAD_SM, PAD_MD,
+    PAD_MD,
+    PAD_SM,
+    TEAL,
+    TEXT_BASE,
+    TEXT_SM,
+    VIOLET,
     draw_kicker,
 )
 

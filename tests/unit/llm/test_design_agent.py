@@ -1,5 +1,4 @@
 """Tests for DesignAgent."""
-import pytest
 
 
 # ---------------------------------------------------------------------------
@@ -24,7 +23,11 @@ class _MockProvider:
 
 def _make_dungeon():
     from dungeon_daddy.data.models import (
-        Dungeon, DungeonMeta, Level, Room, Connection,
+        Connection,
+        Dungeon,
+        DungeonMeta,
+        Level,
+        Room,
     )
     return Dungeon(
         meta=DungeonMeta(

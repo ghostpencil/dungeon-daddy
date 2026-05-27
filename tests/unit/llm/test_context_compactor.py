@@ -1,8 +1,6 @@
 """Tests for ContextCompactor."""
 from __future__ import annotations
 
-import pytest
-
 from dungeon_daddy.llm.context_compactor import ContextCompactor
 
 

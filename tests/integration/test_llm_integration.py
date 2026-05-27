@@ -6,8 +6,8 @@ import os
 import pytest
 
 from dungeon_daddy.data.models import (
-    DungeonMeta,
     Dungeon,
+    DungeonMeta,
     Level,
     LoopPatternCatalog,
     Room,

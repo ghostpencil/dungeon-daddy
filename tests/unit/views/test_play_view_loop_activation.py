@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from dungeon_daddy.data.models import (
-    Connection,
     Dungeon,
     DungeonMeta,
     Level,
@@ -10,7 +9,6 @@ from dungeon_daddy.data.models import (
     Room,
     SessionState,
 )
-
 
 # ---------------------------------------------------------------------------
 # Factories

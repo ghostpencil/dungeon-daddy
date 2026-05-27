@@ -10,16 +10,29 @@ from dungeon_daddy.data.models import Level, SessionState
 from dungeon_daddy.map.grid_renderer import GridRenderer
 from dungeon_daddy.map.loop_overlay import LoopOverlay
 from dungeon_daddy.ui.theme import (
-    BG_0, BG_1, BG_2, BG_3, BG_HI,
-    LINE, LINE_HI,
-    INK_1, INK_2, INK_3, INK_4,
-    TEAL, TEAL_DIM, GOLD,
-    FONT_UI, FONT_UI_MED, FONT_MONO, FONT_SERIF,
-    TEXT_XS, TEXT_SM, TEXT_BASE, TEXT_4XL,
-    PAD_SM, PAD_MD,
-    CHROME_TOTAL_HEIGHT,
+    BG_0,
+    BG_1,
+    BG_2,
+    BG_3,
+    BG_HI,
+    FONT_MONO,
+    FONT_SERIF,
+    FONT_UI,
+    FONT_UI_MED,
+    INK_1,
+    INK_3,
+    INK_4,
+    LINE,
+    LINE_HI,
+    PAD_MD,
     PANEL_STEPPER_WIDTH,
-    draw_kicker, draw_chip,
+    TEAL,
+    TEXT_4XL,
+    TEXT_BASE,
+    TEXT_SM,
+    TEXT_XS,
+    draw_chip,
+    draw_kicker,
 )
 
 _HEADER_H = 38   # map panel header bar

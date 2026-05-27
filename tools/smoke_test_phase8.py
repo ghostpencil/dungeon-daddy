@@ -52,15 +52,22 @@ def _load_dotenv() -> None:
 
 _load_dotenv()
 
-from ui_harness import UITestHarness
-from ui_input import click_app, key_combo, type_text
 from smoke_helpers import (
-    WINDOW_W, WINDOW_H, CHROME_TOTAL_H, PAD_MD,
-    ok, fail,
-    pixel_rgb, scan_for_high_green,
-    menu_slot_center_x, menu_slot_x, menu_bar_center_y, dropdown_item_center_y,
+    CHROME_TOTAL_H,
+    PAD_MD,
+    WINDOW_H,
+    dropdown_item_center_y,
+    fail,
+    menu_bar_center_y,
+    menu_slot_center_x,
+    menu_slot_x,
+    ok,
+    pixel_rgb,
     room_center,
+    scan_for_high_green,
 )
+from ui_harness import UITestHarness
+from ui_input import click_app, type_text
 
 # ---------------------------------------------------------------------------
 # Play View layout constants
@@ -197,7 +204,7 @@ def run() -> int:
 
             h.pin_window()
             win_left, win_top, _, _ = h.window_rect
-            print(f"  Window pinned to (0,0)\n")
+            print("  Window pinned to (0,0)\n")
 
             # ------------------------------------------------------------------
             # Setup: load sample dungeon → switch to Play View

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from typing import Any
 
 from dungeon_daddy.data.models import Dungeon, Level
 from dungeon_daddy.llm.agents.wizard_agent import DungeonBrief, LevelBrief
@@ -13,7 +14,7 @@ _JSON_RE = re.compile(r"```json\s*(.*?)\s*```", re.DOTALL)
 _log = logging.getLogger(__name__)
 
 
-def _coerce_sub_loop_roles(data: dict) -> None:
+def _coerce_sub_loop_roles(data: dict[str, Any]) -> None:
     """For rooms in a sub-loop with sub_loop_roles=null, derive role from loop entry/goal."""
     room_by_id = {r["id"]: r for r in data.get("rooms", [])}
     for lp in data.get("loops", []):

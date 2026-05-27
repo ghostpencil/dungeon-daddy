@@ -21,9 +21,8 @@ import time
 from pathlib import Path
 
 import mss
-from mss.tools import to_png
-
 import platform_host as _ph
+from mss.tools import to_png
 
 WINDOW_TITLE = "Dungeon Daddy"
 SCREENSHOTS_DIR = Path(__file__).parent / "screenshots"

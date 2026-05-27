@@ -1,23 +1,17 @@
 """Integration tests — window open-dungeon and view-transition seams."""
 from __future__ import annotations
 
-import json
 from unittest.mock import MagicMock
 
-import pytest
-
 from dungeon_daddy.data.models import (
-    Connection,
     Dungeon,
     DungeonMeta,
     Level,
     Room,
-    SessionState,
 )
 from dungeon_daddy.data.repository import DungeonRepository
 from dungeon_daddy.views.play_view import PlayView
 from dungeon_daddy.window import DungeonDaddyWindow
-
 
 # ---------------------------------------------------------------------------
 # Factories

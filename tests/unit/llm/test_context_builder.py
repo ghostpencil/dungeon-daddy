@@ -1,8 +1,6 @@
 """Tests for ContextBuilder — assembles compacted context docs into a system prompt."""
 from __future__ import annotations
 
-import pytest
-
 from dungeon_daddy.data.models import ContextDocType, Dungeon, DungeonMeta, Level
 from dungeon_daddy.data.repository import DungeonRepository
 from dungeon_daddy.llm.context_compactor import ContextCompactor

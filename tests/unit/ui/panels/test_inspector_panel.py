@@ -3,9 +3,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from dungeon_daddy.data.models import Dungeon, DungeonMeta, Level, Room, Connection
+from dungeon_daddy.data.models import Dungeon, DungeonMeta, Level, Room
 from dungeon_daddy.ui.panels.inspector_panel import InspectorPanel
-
 
 # ---------------------------------------------------------------------------
 # Factories
@@ -110,7 +109,7 @@ def test_label_is_start_play_when_no_session():
 # on_mouse_press — tab-switch logic
 # ---------------------------------------------------------------------------
 
-def _panel_with_tab_rects() -> "InspectorPanel":
+def _panel_with_tab_rects() -> InspectorPanel:
     """Panel with _tab_rects pre-populated at known coordinates."""
     panel = _make_panel()
     panel._tab_rects = {

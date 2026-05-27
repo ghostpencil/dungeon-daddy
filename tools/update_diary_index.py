@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Regenerates the entry table in dev_diary/README.md from diary files."""
 
-from pathlib import Path
 import re
 from datetime import datetime
+from pathlib import Path
 
 DIARY_DIR = Path(__file__).parent.parent / "dev_diary"
 README = DIARY_DIR / "README.md"

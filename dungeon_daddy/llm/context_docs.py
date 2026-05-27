@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from dungeon_daddy.data.repository import DungeonRepository
 
 
-def generate_setting_doc(meta: "DungeonMeta") -> str:
+def generate_setting_doc(meta: DungeonMeta) -> str:
     return (
         f"# {meta.title}\n\n"
         f"## Theme\n{meta.theme}\n\n"
@@ -17,7 +17,7 @@ def generate_setting_doc(meta: "DungeonMeta") -> str:
     )
 
 
-def generate_party_doc(meta: "DungeonMeta") -> str:
+def generate_party_doc(meta: DungeonMeta) -> str:
     return (
         f"# Party\n\n"
         f"{meta.party}\n\n"
@@ -27,7 +27,7 @@ def generate_party_doc(meta: "DungeonMeta") -> str:
     )
 
 
-def generate_level_design_doc(level: "Level") -> str:
+def generate_level_design_doc(level: Level) -> str:
     return (
         f"# Level {level.id}: {level.name}\n\n"
         f"## Ecology\n{level.ecology}\n\n"
@@ -36,9 +36,9 @@ def generate_level_design_doc(level: "Level") -> str:
 
 
 def generate_all_context_docs(
-    dungeon: "Dungeon",
+    dungeon: Dungeon,
     dungeon_name: str,
-    repo: "DungeonRepository",
+    repo: DungeonRepository,
     skip_existing: bool = True,
 ) -> None:
     from dungeon_daddy.data.models import ContextDocType

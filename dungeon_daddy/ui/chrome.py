@@ -7,19 +7,30 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import arcade
 
 from dungeon_daddy.ui.theme import (
-    BG_0, BG_1, BG_2, BG_HI,
-    LINE, LINE_HI,
-    INK_1, INK_2, INK_3, INK_4,
-    TEAL, VIOLET,
-    CHROME_MENUBAR_HEIGHT, CHROME_TITLEBAR_HEIGHT,
-    FONT_UI, FONT_UI_MED, FONT_SIGIL,
-    TEXT_SM, TEXT_BASE, TEXT_MD,
-    PAD_SM, PAD_MD,
+    BG_0,
+    BG_1,
+    BG_2,
+    CHROME_MENUBAR_HEIGHT,
+    CHROME_TITLEBAR_HEIGHT,
+    FONT_SIGIL,
+    FONT_UI,
+    FONT_UI_MED,
+    INK_1,
+    INK_2,
+    INK_4,
+    LINE,
+    PAD_MD,
+    PAD_SM,
+    TEAL,
+    TEXT_BASE,
+    TEXT_MD,
+    TEXT_SM,
+    VIOLET,
 )
 
 _log = logging.getLogger(__name__)
@@ -51,8 +62,8 @@ def draw_menu_bar(window: object) -> None:
     Draw the application menu bar across the top of the window.
     window must have .width and .height attributes.
     """
-    w: int = window.width
-    h: int = window.height
+    w: int = window.width  # type: ignore[attr-defined]
+    h: int = window.height  # type: ignore[attr-defined]
     bar_y = h - CHROME_MENUBAR_HEIGHT / 2
 
     # Background strip
@@ -107,8 +118,8 @@ def draw_title_bar(
     on_mode: called with "design" or "play" when the toggle is clicked.
     (Click handling is done by UIManager widgets — this function only draws.)
     """
-    w: int = window.width
-    h: int = window.height
+    w: int = window.width  # type: ignore[attr-defined]
+    h: int = window.height  # type: ignore[attr-defined]
     bar_top = h - CHROME_MENUBAR_HEIGHT
     bar_mid = bar_top - CHROME_TITLEBAR_HEIGHT / 2
 

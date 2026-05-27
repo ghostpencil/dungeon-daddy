@@ -1,7 +1,5 @@
 """Tests for dungeon_daddy/ui/theme.py — written before implementation."""
 import inspect
-import pytest
-
 
 # ---------------------------------------------------------------------------
 # Behavior 1: All named color constants are valid RGB/RGBA tuples (0–255)

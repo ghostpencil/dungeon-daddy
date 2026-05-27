@@ -14,19 +14,32 @@ from dungeon_daddy.data.models import Dungeon, SessionState
 from dungeon_daddy.data.repository import DungeonRepository
 from dungeon_daddy.llm.provider import LLMMessage
 from dungeon_daddy.map.grid_renderer import GridRenderer
-from dungeon_daddy.ui.chrome import MenuBar, draw_menu_bar, draw_title_bar
+from dungeon_daddy.ui.chrome import MenuBar, draw_title_bar
 from dungeon_daddy.ui.panels.chat_panel import ChatPanel
 from dungeon_daddy.ui.panels.map_panel import MapPanel
 from dungeon_daddy.ui.theme import (
-    BG_0, BG_1, BG_2, BG_3, BG_HI,
-    LINE, LINE_HI,
-    INK_1, INK_2, INK_3, INK_4,
-    TEAL,
-    FONT_UI, FONT_UI_MED, FONT_MONO,
-    TEXT_SM, TEXT_BASE,
-    CHROME_TOTAL_HEIGHT, CHROME_TITLEBAR_HEIGHT,
-    PANEL_CHAT_WIDTH, PANEL_STEPPER_WIDTH,
+    BG_0,
+    BG_1,
+    BG_2,
+    BG_3,
+    BG_HI,
+    CHROME_TITLEBAR_HEIGHT,
+    CHROME_TOTAL_HEIGHT,
+    FONT_MONO,
+    FONT_UI,
+    FONT_UI_MED,
+    INK_1,
+    INK_2,
+    INK_3,
+    INK_4,
+    LINE,
+    LINE_HI,
     PAD_MD,
+    PANEL_CHAT_WIDTH,
+    PANEL_STEPPER_WIDTH,
+    TEAL,
+    TEXT_BASE,
+    TEXT_SM,
 )
 
 

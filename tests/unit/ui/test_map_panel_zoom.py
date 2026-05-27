@@ -1,17 +1,17 @@
 """Tests for MapPanel zoom and variant-tab behaviour — no display required."""
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import arcade
 import pytest
-from unittest.mock import MagicMock, patch
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 def _make_panel(on_variant_change=None):
-    from dungeon_daddy.ui.panels.map_panel import MapPanel, _ZOOM_MIN, _ZOOM_MAX, _ZOOM_DEFAULT
+    from dungeon_daddy.ui.panels.map_panel import _ZOOM_DEFAULT, _ZOOM_MAX, _ZOOM_MIN, MapPanel
 
     renderer = MagicMock()
     renderer.cell_px = 48

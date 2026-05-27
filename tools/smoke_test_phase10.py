@@ -14,9 +14,9 @@ Usage:
 """
 from __future__ import annotations
 
+import pathlib
 import sys
 import time
-import pathlib
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -25,14 +25,19 @@ _PROJECT_ROOT = pathlib.Path(__file__).parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+from smoke_helpers import (
+    CHROME_TOTAL_H,
+    WINDOW_H,
+    WINDOW_W,
+    dropdown_item_center_y,
+    fail,
+    menu_bar_center_y,
+    menu_slot_center_x,
+    ok,
+    pixel_rgb,
+)
 from ui_harness import UITestHarness
 from ui_input import click_app
-from smoke_helpers import (
-    WINDOW_W, WINDOW_H, CHROME_TOTAL_H, PAD_MD, PAD_SM,
-    ok, fail,
-    pixel_rgb,
-    menu_slot_center_x, menu_bar_center_y, dropdown_item_center_y,
-)
 
 # ---------------------------------------------------------------------------
 # Inspector panel layout — derived from theme.py + inspector_panel.py
@@ -140,7 +145,7 @@ def run() -> int:
 
         h.pin_window()
         win_left, win_top, _, _ = h.window_rect
-        print(f"  Window pinned to (0,0)\n")
+        print("  Window pinned to (0,0)\n")
 
         # ------------------------------------------------------------------
         # Setup: load sample dungeon

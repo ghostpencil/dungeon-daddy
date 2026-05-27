@@ -13,9 +13,7 @@ from unittest.mock import MagicMock, patch
 from dungeon_daddy.data.models import DesignMode, Dungeon, DungeonMeta
 from dungeon_daddy.llm.agents.design_agent import DesignAgent
 from dungeon_daddy.llm.agents.wizard_agent import DungeonWizardAgent
-from dungeon_daddy.llm.provider import LLMMessage
 from dungeon_daddy.views.design_view import DesignView
-
 
 # ---------------------------------------------------------------------------
 # Stub providers

@@ -1,14 +1,12 @@
 """Tests for GridRenderer — patch arcade.draw_* so no display is needed."""
 from __future__ import annotations
 
-import pytest
 from unittest.mock import patch
 
-import arcade
+import pytest
 
-from dungeon_daddy.data.models import Connection, Entry, Level, Room, SessionState
-from dungeon_daddy.ui.theme import BG_2, ROOM_COLORS, TEAL, ROOM_UNSEEN_FILL
-
+from dungeon_daddy.data.models import Connection, Level, Room, SessionState
+from dungeon_daddy.ui.theme import ROOM_COLORS, TEAL
 
 # ---------------------------------------------------------------------------
 # Factories
@@ -291,7 +289,6 @@ def test_draws_connection_line_diagonal_rooms_uses_port_midpoints() -> None:
 def test_draws_orthogonal_route_when_straight_path_blocked() -> None:
     """When straight path is blocked, draw() draws 2 line segments via route_orthogonal."""
     from dungeon_daddy.map.grid_renderer import GridRenderer
-    from dungeon_daddy.ui.theme import LINE
 
     # A east port (2,1) → C west port (6,5); blocker B at rect(2,2,4,6) blocks V-first
     # route_orthogonal returns H-first: (2,1)→(6,1)→(6,5)

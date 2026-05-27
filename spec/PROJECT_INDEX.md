@@ -5,7 +5,7 @@
 Phase: Post-18 Stabilisation
 Status: ONGOING — bug fixes and spec alignment only
 
-788 unit/integration tests passing (excl. UI harness and 3 live-API tests).
+791 unit/integration tests passing (excl. UI harness and 3 live-API tests).
 
 ---
 
@@ -17,13 +17,14 @@ Tracked in GitHub: https://github.com/ghostpencil/dungeon-daddy/issues/1 — che
 | ID | Title | Status |
 |---|---|---|
 | IP-5 | Formal skip markers for API-gated integration tests | DONE |
-| IP-1 | CI: add lint, type-check, coverage | TODO |
+| IP-1 | CI: add lint, type-check, coverage | DONE |
 | IP-3 | Structured output for generator agent | TODO |
 | IP-4 | Model configurable via environment variable | TODO |
 | IP-2 | LLM observability | TODO |
 | IP-8 | Consolidate requirements files into pyproject.toml | TODO |
 | IP-7 | Prompt versioning | TODO |
 | IP-6 | Minimal AI output evals | TODO |
+| IP-9 | Fix mypy None-guard issues in 6 deferred files | TODO (next BUILD phase) |
 
 ---
 
@@ -34,6 +35,16 @@ _None._
 ---
 
 ## Recent Session
+
+**2026-05-27 — IP-1: CI lint, type-check, and coverage gate**
+
+- Added `ruff check .`, `mypy dungeon_daddy`, and `pytest --cov` steps to `.github/workflows/test.yml`.
+- Added `pytest-cov>=5.0` to `requirements-dev.txt` and `pyproject.toml [project.optional-dependencies]`.
+- Fixed all ruff violations across source and tests (227 auto-fixed, 51 manual).
+- Fixed all mypy errors: mechanical type-arg fixes, targeted `# type: ignore` for SDK/duck-typing,
+  and per-file `ignore_errors` overrides for 6 complex files needing architectural None-guard work.
+- Coverage gate at 70%: currently at 74%.
+- 791 non-live tests passing.
 
 **2026-05-27 — IP-5: Formal skip markers for API-gated integration tests**
 

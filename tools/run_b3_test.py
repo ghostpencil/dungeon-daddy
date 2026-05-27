@@ -4,17 +4,29 @@ Run standalone: python tools/run_b3_test.py
 Leaves the app open so a screenshot can be taken afterwards.
 """
 from __future__ import annotations
-import sys, pathlib, subprocess, ctypes, ctypes.wintypes, time
+
+import ctypes
+import ctypes.wintypes
+import pathlib
+import subprocess
+import sys
+import time
 
 ROOT = pathlib.Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools"))
 
 from ui_input import (
-    VK_CONTROL, VK_O, VK_SHIFT,
-    MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
-    WM_KEYDOWN, WM_KEYUP,
-    click_app, key_combo, app_to_screen,
+    MOUSEEVENTF_LEFTDOWN,
+    MOUSEEVENTF_LEFTUP,
+    VK_CONTROL,
+    VK_O,
+    VK_SHIFT,
+    WM_KEYDOWN,
+    WM_KEYUP,
+    app_to_screen,
+    click_app,
+    key_combo,
 )
 
 TITLE = "Dungeon Daddy"

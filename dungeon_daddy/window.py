@@ -8,12 +8,16 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import tkinter as tk
 
 import arcade
 
 from dungeon_daddy.config import AppConfig
 from dungeon_daddy.data.repository import DungeonRepository
-from dungeon_daddy.ui.chrome import MenuAction, MenuBar, draw_menu_bar, draw_title_bar
+from dungeon_daddy.ui.chrome import MenuAction, MenuBar
 
 _log = logging.getLogger(__name__)
 
@@ -197,7 +201,7 @@ class DungeonDaddyWindow(arcade.Window):
             _log.error("Failed to open dungeon '%s': %s", name, exc)
             _error_fn(msg)
 
-    def _make_tk_root(self) -> "tk.Tk":
+    def _make_tk_root(self) -> tk.Tk:
         """Create a hidden Tk root owned by the Arcade window so dialogs stay in front of it."""
         import ctypes
         import tkinter as tk

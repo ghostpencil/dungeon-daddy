@@ -1,7 +1,6 @@
 """Tests for dungeon_daddy/llm/openai_provider.py"""
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Behavior 1: model_id returns the configured model string
 # ---------------------------------------------------------------------------
@@ -15,7 +14,7 @@ def test_openai_provider_model_id(mocker):
 
 def test_openai_provider_default_model(mocker):
     mocker.patch("openai.OpenAI")
-    from dungeon_daddy.llm.openai_provider import OpenAIProvider, DEFAULT_OPENAI_MODEL
+    from dungeon_daddy.llm.openai_provider import DEFAULT_OPENAI_MODEL, OpenAIProvider
     p = OpenAIProvider(api_key="fake")
     assert p.model_id == DEFAULT_OPENAI_MODEL
 

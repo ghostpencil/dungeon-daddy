@@ -9,7 +9,6 @@ import pytest
 from dungeon_daddy.data.loop_assignment import auto_assign_loop_rooms
 from dungeon_daddy.data.models import Connection, Dungeon, Level, Room
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
