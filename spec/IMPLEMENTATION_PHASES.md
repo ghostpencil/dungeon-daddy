@@ -1060,7 +1060,7 @@ ignore = ["E501"]
 
 ## Post-Phase 18 — IP-9: mypy None-Guard Fixes (6 Deferred Files)
 
-**Status: In Progress**
+**Status: Complete** — 824 unit tests passing.
 
 Fix all six files that were placed under `ignore_errors = true` in
 `pyproject.toml` during IP-1. No new features. No runtime behaviour changes.
@@ -1068,23 +1068,25 @@ Fix all six files that were placed under `ignore_errors = true` in
 **Spec:** `spec/FEATURE_IP9_MYPY_NONE_GUARDS.md`
 **GitHub:** https://github.com/ghostpencil/dungeon-daddy/issues/2
 
-### Files in scope (smallest-to-largest risk order)
+### Files fixed
 
-| Step | File | Errors | Root cause |
-|---|---|---|---|
-| 1 | `data/repository.py` | 15 | `Path \| None` without guard |
-| 2 | `llm/agents/dm_agent.py` | 22 | Params typed `object` |
-| 3 | `views/design_view.py` | 43 | None deref, agent `\| None` attrs |
-| 4 | `views/play_view.py` | 19 | `SessionState \| None` deref |
-| 5 | `window.py` | 7 | Dict invariance, missing annotation |
-| 6 | `ui/panels/map_panel.py` | 7 | `Level \| None` deref, untyped callbacks |
-| 7 | `pyproject.toml` | — | Remove all 6 `ignore_errors` overrides |
+| Step | File | Status |
+|---|---|---|
+| 1 | `data/repository.py` | DONE |
+| 2 | `llm/agents/dm_agent.py` | DONE |
+| 3 | `views/design_view.py` | DONE |
+| 4 | `views/play_view.py` | DONE |
+| 5 | `window.py` | DONE |
+| 6 | `ui/panels/map_panel.py` | DONE |
+| 7 | `pyproject.toml` — remove all 6 `ignore_errors` overrides | DONE |
+
+Also fixed as part of step 6: `llm/telemetry.py` (`ObservingProvider.last_usage` property added) and `llm/agents/wizard_agent.py` (`Mapping[str, LoopPattern]` replaces `dict[str, object]`).
 
 ### Exit Criteria
 
-- [ ] `mypy dungeon_daddy` passes with zero per-file overrides for these 6 files
-- [ ] `pytest tests/unit/` fully green (819+ tests)
-- [ ] CI mypy step passes without the overrides
+- [x] `mypy dungeon_daddy` passes with zero per-file overrides for these 6 files
+- [x] `pytest tests/unit/` fully green (824 tests)
+- [x] CI mypy step passes without the overrides
 
 ---
 

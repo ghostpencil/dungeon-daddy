@@ -4,10 +4,15 @@ from __future__ import annotations
 import json
 import random
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from dungeon_daddy.llm.prompts import load_prompt
 from dungeon_daddy.llm.provider import LLMMessage, LLMProvider
+
+if TYPE_CHECKING:
+    from dungeon_daddy.data.models import LoopPattern
 
 _BRIEF_RE = re.compile(r"```brief\s*(.*?)\s*```", re.DOTALL)
 _LEVEL_BRIEF_RE = re.compile(r"```level_brief\s*(.*?)\s*```", re.DOTALL)
@@ -114,7 +119,7 @@ class DungeonWizardAgent:
     def __init__(
         self,
         provider: LLMProvider,
-        loop_patterns: dict[str, object],
+        loop_patterns: Mapping[str, LoopPattern],
         context_builder: object | None = None,
     ) -> None:
         self._provider = provider
@@ -192,5 +197,5 @@ class DungeonWizardAgent:
             return "# Available Loop Patterns\n(none loaded)"
         lines = ["# Available Loop Patterns"]
         for i, (key, pattern) in enumerate(self._patterns.items(), start=1):
-            lines.append(f"{i}. {key} — {pattern.name}: {pattern.blurb}")  # type: ignore[attr-defined]
+            lines.append(f"{i}. {key} — {pattern.name}: {pattern.blurb}")
         return "\n".join(lines)

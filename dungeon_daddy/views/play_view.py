@@ -10,7 +10,8 @@ from dataclasses import dataclass
 import arcade
 import arcade.gui
 
-from dungeon_daddy.data.models import Dungeon, SessionState
+from dungeon_daddy.data.models import Dungeon, Level, Room, SessionState
+from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
 from dungeon_daddy.data.repository import DungeonRepository
 from dungeon_daddy.llm.provider import LLMMessage
 from dungeon_daddy.map.grid_renderer import GridRenderer
@@ -56,7 +57,7 @@ _BTN_EDIT_W = 100
 _BTN_EDIT_H = 24
 
 
-def _overlay_btn_style(variant: str) -> dict:
+def _overlay_btn_style(variant: str) -> dict[str, arcade.gui.UIFlatButton.UIStyle]:
     if variant == "teal":
         fg = (*TEAL, 255)
         border = (*TEAL, 255)
@@ -95,7 +96,7 @@ class PlayView(arcade.View):
     Mouse clicks on the map highlight rooms and track visited state.
     """
 
-    def __init__(self, repo: DungeonRepository, menu_bar: MenuBar, dm_agent: object = None) -> None:
+    def __init__(self, repo: DungeonRepository, menu_bar: MenuBar, dm_agent: DungeonMasterAgent | None = None) -> None:
         super().__init__()
         self._repo = repo
         self._menu_bar = menu_bar
@@ -114,13 +115,15 @@ class PlayView(arcade.View):
         self._ui_built = False
         self._result_queue: queue.Queue[DMResult] = queue.Queue()
         self._llm_busy = False
-        self._active_thread = None
+        self._active_thread: threading.Thread | None = None
         self._dm_history: list[LLMMessage] = []
         # Edit Memory button and overlay state
         self._has_memory: bool = False
         self._overlay_open: bool = False
-        self._overlay_widgets: list = []
+        self._overlay_widgets: list[arcade.gui.UIWidget] = []
         self._overlay_input: arcade.gui.UIInputText | None = None
+        self._overlay_level_id: int | None = None
+        self._overlay_content: str | None = None
         self._edit_memory_rect: tuple[float, float, float, float] | None = None
         self._is_test_drive: bool = False
 
@@ -133,7 +136,7 @@ class PlayView(arcade.View):
         self._manager.enable()
         # Sync UIManager camera to current window size — it may have changed
         # while this view was inactive (e.g. window maximised in Design mode).
-        self._manager.on_resize(self.window.width, self.window.height)
+        self._manager.on_resize(self.window.width, self.window.height)  # type: ignore[no-untyped-call]
         if not self._ui_built:
             self._build_ui()
             self._ui_built = True
@@ -151,7 +154,7 @@ class PlayView(arcade.View):
         draw_title_bar(
             self.window,
             mode="play",
-            on_mode=lambda m: self.window.switch_mode(m),  # type: ignore[attr-defined]
+            on_mode=lambda m: self.window.switch_mode(m),
         )
         self._chat.draw()
         self._map.draw()
@@ -290,7 +293,7 @@ class PlayView(arcade.View):
     def load_dungeon_session(self, dungeon: Dungeon) -> None:
         self._is_test_drive = False
         self._dungeon = dungeon
-        save_name = dungeon.meta.save_name
+        save_name = dungeon.meta.effective_name
         existing = self._repo.load_session(save_name)
         if existing is not None:
             self._state = existing
@@ -328,7 +331,7 @@ class PlayView(arcade.View):
     # Map variant switching
     # ------------------------------------------------------------------
 
-    def set_map_renderer(self, renderer: object) -> None:
+    def set_map_renderer(self, renderer: GridRenderer) -> None:
         self._renderer = renderer
         self._map.set_renderer(renderer)
 
@@ -352,10 +355,12 @@ class PlayView(arcade.View):
         self._open_overlay_ui(content, level.id)
 
     def save_memory_overlay(self) -> None:
-        if not hasattr(self, "_overlay_level_id") or self._overlay_level_id is None:
+        if self._overlay_level_id is None:
             return
-        input_widget = getattr(self, "_overlay_input", None)
-        content = input_widget.text if input_widget is not None else self._overlay_content
+        if self._state is None:
+            return
+        input_widget = self._overlay_input
+        content = input_widget.text if input_widget is not None else (self._overlay_content or "")
         self._repo.save_room_memory(self._state.dungeon_id, self._overlay_level_id, content)
         self.close_memory_overlay()
 
@@ -368,23 +373,27 @@ class PlayView(arcade.View):
     # DM threading
     # ------------------------------------------------------------------
 
-    def _spawn_dm_thread(self, room: object, level: object) -> None:
+    def _spawn_dm_thread(self, room: Room, level: Level) -> None:
         if self._llm_busy:
             return
         if self._dm_agent is None:
             self._result_queue.put(DMResult(content="", error="DM agent unavailable — OPENAI_API_KEY not set."))
             return
+        assert self._state is not None
+        assert self._dungeon is not None
         memory = self._repo.load_room_memory(self._state.dungeon_id, level.id)
         self._llm_busy = True
         _history = list(self._dm_history)
+        _agent = self._dm_agent
+        _dungeon = self._dungeon
 
         def _run() -> None:
             try:
-                response = self._dm_agent.respond(
+                response = _agent.respond(
                     history=_history,
                     room=room,
                     level=level,
-                    dungeon=self._dungeon,
+                    dungeon=_dungeon,
                     room_memory=memory,
                 )
                 self._result_queue.put(DMResult(content=response))
@@ -555,7 +564,7 @@ class PlayView(arcade.View):
         def on_click(event: arcade.gui.UIOnClickEvent) -> None:
             self.save_memory_overlay()
 
-        @cancel_btn.event
+        @cancel_btn.event  # type: ignore[no-redef]
         def on_click(event: arcade.gui.UIOnClickEvent) -> None:  # noqa: F811
             self.close_memory_overlay()
 
@@ -582,6 +591,7 @@ class PlayView(arcade.View):
     # ------------------------------------------------------------------
 
     def _draw_edit_memory_btn(self) -> None:
+        assert self._edit_memory_rect is not None
         x, y, w, h = self._edit_memory_rect
         cx, cy = x + w / 2, y + h / 2
         arcade.draw_rect_filled(arcade.XYWH(cx, cy, w, h), BG_2)
@@ -623,9 +633,9 @@ class PlayView(arcade.View):
         )
 
     @staticmethod
-    def _point_in_rect(x: float, y: float, rect: tuple) -> bool:
+    def _point_in_rect(x: float, y: float, rect: tuple[float, float, float, float]) -> bool:
         rx, ry, rw, rh = rect
-        return rx <= x < rx + rw and ry <= y < ry + rh
+        return bool(rx <= x < rx + rw and ry <= y < ry + rh)
 
     # ------------------------------------------------------------------
     # Layout helpers

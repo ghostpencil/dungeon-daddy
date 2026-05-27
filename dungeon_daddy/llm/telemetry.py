@@ -57,6 +57,10 @@ class ObservingProvider:
     def model_id(self) -> str:
         return self._inner.model_id
 
+    @property
+    def last_usage(self) -> tuple[int, int] | None:
+        return self._inner.last_usage
+
     def complete(
         self,
         messages: list[LLMMessage],

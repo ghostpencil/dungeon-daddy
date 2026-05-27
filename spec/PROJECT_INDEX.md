@@ -5,7 +5,7 @@
 Phase: Post-18 Stabilisation
 Status: ONGOING — bug fixes and spec alignment only
 
-819 unit/integration tests passing (excl. UI harness and 3 live-API tests).
+824 unit/integration tests passing (excl. UI harness and 3 live-API tests).
 6 eval tests passing (run with `pytest -m eval` or `python tools/run_evals.py`).
 
 ---
@@ -25,7 +25,7 @@ Tracked in GitHub: https://github.com/ghostpencil/dungeon-daddy/issues/1 — che
 | IP-8 | Consolidate requirements files into pyproject.toml | DONE |
 | IP-7 | Prompt versioning | DONE |
 | IP-6 | Minimal AI output evals | DONE |
-| IP-9 | Fix mypy None-guard issues in 6 deferred files | IN PROGRESS |
+| IP-9 | Fix mypy None-guard issues in 6 deferred files | DONE |
 
 ---
 
@@ -100,6 +100,16 @@ _None._
 - Added `[tool.setuptools.package-data]` in `pyproject.toml` so `.txt` files are included in distributions.
 - 6 new tests in `tests/unit/llm/test_prompts.py` and `test_telemetry.py`.
 - 819 non-live tests passing.
+
+**2026-05-27 — IP-9: Fix mypy None-guard issues (all 7 steps)**
+
+- Steps 1–4 (prior session): `repository.py`, `dm_agent.py`, `design_view.py`, `play_view.py`.
+- Step 5 — `window.py`: added `DungeonMasterAgent | None` return type to `_build_dm_agent`; proper typed tuple return for `_build_agents`; added TYPE_CHECKING imports for agent/model types; typed `open_dungeon` params as `Callable`; typed `launch_test_drive`/`launch_play_session` params as `Dungeon`.
+- Step 6 — `ui/panels/map_panel.py`: added type args to `_tab_style` return; added `assert lvl is not None` in `_draw_level_overlay`; added `# type: ignore[no-untyped-call]` for arcade `trigger_render()`; moved `# type: ignore[no-redef]` to decorator line for second `on_click`.
+- Step 6 (also) — `llm/telemetry.py`: added `last_usage` property to `ObservingProvider` to satisfy `LLMProvider` protocol.
+- Step 6 (also) — `llm/agents/wizard_agent.py`: changed `loop_patterns` param from `dict[str, object]` to `Mapping[str, LoopPattern]`; removed stale `# type: ignore[attr-defined]`.
+- Step 7 — Removed final 2 entries from `[[tool.mypy.overrides]]`; `mypy dungeon_daddy` clean across all 47 files with zero overrides.
+- 824 unit/integration tests still passing.
 
 **2026-05-27 — IP-6: Minimal AI output evals**
 

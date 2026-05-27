@@ -115,21 +115,46 @@ Run `mypy dungeon_daddy` — must be zero errors for these 6 files.
 
 ## Acceptance Criteria
 
-- [ ] `mypy dungeon_daddy` passes with zero per-file overrides for these 6 files
-- [ ] `pytest tests/unit/` fully green (819+ tests)
-- [ ] No new features or runtime behaviour introduced
-- [ ] CI `mypy` step passes without the overrides
+- [x] `mypy dungeon_daddy` passes with zero per-file overrides for these 6 files
+- [x] `pytest tests/unit/` fully green (824 tests passing)
+- [x] No new features or runtime behaviour introduced
+- [x] CI `mypy` step passes without the overrides
 
 ---
 
-## Status
+## Status — COMPLETE (2026-05-27)
 
 | Step | File | Status |
 |---|---|---|
-| 1 | `data/repository.py` | TODO |
-| 2 | `llm/agents/dm_agent.py` | TODO |
-| 3 | `views/design_view.py` | TODO |
-| 4 | `views/play_view.py` | TODO |
-| 5 | `window.py` | TODO |
-| 6 | `ui/panels/map_panel.py` | TODO |
-| 7 | Remove pyproject.toml overrides | TODO |
+| 1 | `data/repository.py` | DONE |
+| 2 | `llm/agents/dm_agent.py` | DONE |
+| 3 | `views/design_view.py` | DONE |
+| 4 | `views/play_view.py` | DONE |
+| 5 | `window.py` | DONE |
+| 6 | `ui/panels/map_panel.py` | DONE |
+| 7 | Remove pyproject.toml overrides | DONE |
+
+### What was done (Step 5 — `window.py`)
+- Added `DungeonMasterAgent | None` return type to `_build_dm_agent`
+- Added proper typed tuple return for `_build_agents`
+- Added TYPE_CHECKING imports for all agent and model types
+- Typed `open_dungeon` params as `Callable[[], str | None] | None` and `Callable[[str], None] | None`
+- Typed `launch_test_drive` / `launch_play_session` params as `Dungeon`
+
+### What was done (Step 6 — `ui/panels/map_panel.py`)
+- Added type args to `_tab_style` return (`dict[str, UIFlatButton.UIStyle]`)
+- Added `assert lvl is not None` in `_draw_level_overlay`
+- Added `# type: ignore[no-untyped-call]` for arcade `trigger_render()` calls
+- Moved `# type: ignore[no-redef]` to decorator line for second `on_click`
+
+### What was done (Step 6 — also `llm/telemetry.py`)
+- Added `last_usage` property to `ObservingProvider` delegating to `self._inner.last_usage`
+- This satisfies the `LLMProvider` protocol so all four agent factory calls typecheck
+
+### What was done (Step 6 — also `llm/agents/wizard_agent.py`)
+- Changed `loop_patterns: dict[str, object]` to `Mapping[str, LoopPattern]` (covariant, fixes dict invariance)
+- Removed stale `# type: ignore[attr-defined]` on pattern attribute access
+
+### What was done (Step 7)
+- Removed the entire `[[tool.mypy.overrides]]` block from `pyproject.toml`
+- `mypy dungeon_daddy` now clean across all 47 files with zero overrides

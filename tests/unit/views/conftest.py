@@ -34,6 +34,10 @@ def make_play_view():
         view._has_memory = False
         view._edit_memory_rect = None
         view._overlay_open = False
+        view._overlay_widgets = []
+        view._overlay_input = None
+        view._overlay_level_id = None
+        view._overlay_content = None
         view._is_test_drive = False
         return view
     return _factory

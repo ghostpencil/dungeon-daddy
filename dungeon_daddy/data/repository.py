@@ -28,6 +28,7 @@ class DungeonRepository:
 
     def list_dungeons(self) -> list[str]:
         """Return names of all dungeon subdirectories that contain dungeon.json."""
+        assert self._dir is not None
         return sorted(
             p.name
             for p in self._dir.iterdir()
@@ -36,6 +37,7 @@ class DungeonRepository:
 
     def load(self, name: str) -> Dungeon:
         """Load and validate dungeon by name. Raises FileNotFoundError."""
+        assert self._dir is not None
         path = self._dir / name / "dungeon.json"
         if not path.exists():
             raise FileNotFoundError(f"Dungeon not found: {path}")
@@ -43,6 +45,7 @@ class DungeonRepository:
 
     def save(self, dungeon: Dungeon, name: str) -> None:
         """Serialise and write dungeon to <dungeons_dir>/<name>/dungeon.json atomically."""
+        assert self._dir is not None
         dungeon_dir = self._dir / name
         dungeon_dir.mkdir(parents=True, exist_ok=True)
         path = dungeon_dir / "dungeon.json"
@@ -59,6 +62,7 @@ class DungeonRepository:
 
     def load_session(self, name: str) -> SessionState | None:
         """Load session state if it exists, else return None. Returns None on corrupt data."""
+        assert self._dir is not None
         path = self._dir / name / "session.json"
         if not path.exists():
             return None
@@ -72,6 +76,7 @@ class DungeonRepository:
 
     def save_session(self, state: SessionState) -> None:
         """Write session state to <dungeons_dir>/<dungeon_id>/session.json."""
+        assert self._dir is not None
         dungeon_dir = self._dir / state.dungeon_id
         dungeon_dir.mkdir(parents=True, exist_ok=True)
         path = dungeon_dir / "session.json"
@@ -95,6 +100,7 @@ class DungeonRepository:
     # ------------------------------------------------------------------
 
     def _memory_path(self, name: str, level_id: int) -> Path:
+        assert self._dir is not None
         return self._dir / name / "memory" / f"level_{level_id}.md"
 
     def load_room_memory(self, name: str, level_id: int) -> str:
@@ -115,6 +121,7 @@ class DungeonRepository:
     # ------------------------------------------------------------------
 
     def _context_doc_path(self, dungeon_name: str, doc_type: ContextDocType, level_id: int | None) -> Path:
+        assert self._dir is not None
         if doc_type is ContextDocType.LEVEL_DESIGN:
             if level_id is None:
                 raise ValueError("level_id required for LEVEL_DESIGN context doc")
@@ -138,6 +145,7 @@ class DungeonRepository:
 
     def migrate_legacy_layout(self) -> None:
         """Move legacy root-level files into per-dungeon subdirectories."""
+        assert self._dir is not None
         import shutil
         for json_file in list(self._dir.glob("*.json")):
             stem = json_file.stem

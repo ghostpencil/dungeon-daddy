@@ -1,6 +1,8 @@
 """DungeonMasterAgent — Play Mode narration and chat."""
 from __future__ import annotations
 
+from dungeon_daddy.data.models import Dungeon, Level, Loop, Room
+from dungeon_daddy.llm.context_builder import ContextBuilder
 from dungeon_daddy.llm.prompts import load_prompt
 from dungeon_daddy.llm.provider import LLMMessage, LLMProvider
 
@@ -30,7 +32,7 @@ class DungeonMasterAgent:
         "Omit it only for pure questions or atmospheric descriptions with no party action."
     )
 
-    def __init__(self, provider: LLMProvider, context_builder: object | None = None) -> None:
+    def __init__(self, provider: LLMProvider, context_builder: ContextBuilder | None = None) -> None:
         self._provider = provider
         self._context_builder = context_builder
         self._system_prompt = load_prompt("dm_system")
@@ -38,12 +40,12 @@ class DungeonMasterAgent:
     def respond(
         self,
         history: list[LLMMessage],
-        room: object,
-        level: object,
-        dungeon: object,
+        room: Room,
+        level: Level,
+        dungeon: Dungeon,
         room_memory: str = "",
         level_id: int | None = None,
-        active_loop: object | None = None,
+        active_loop: Loop | None = None,
     ) -> str:
         context = self._build_context(room, level, dungeon, room_memory)
         system = self._system_prompt + "\n\n" + context
@@ -61,9 +63,9 @@ class DungeonMasterAgent:
 
     def _build_context(
         self,
-        room: object,
-        level: object,
-        dungeon: object,
+        room: Room,
+        level: Level,
+        dungeon: Dungeon,
         room_memory: str,
     ) -> str:
         lines = [
@@ -90,7 +92,7 @@ class DungeonMasterAgent:
 
         return "\n".join(lines)
 
-    def _build_loop_context(self, loop: object, room: object, level: object) -> str:
+    def _build_loop_context(self, loop: Loop, room: Room, level: Level) -> str:
         room_names = {r.id: r.name for r in level.rooms}
         entry_name = room_names.get(loop.entry, loop.entry)
         goal_name = room_names.get(loop.goal, loop.goal)

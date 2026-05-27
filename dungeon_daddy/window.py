@@ -8,11 +8,18 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import tkinter as tk
+
+    from dungeon_daddy.data.models import Dungeon
+    from dungeon_daddy.llm.agents.design_agent import DesignAgent
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    from dungeon_daddy.llm.agents.generator_agent import DungeonGeneratorAgent
+    from dungeon_daddy.llm.agents.wizard_agent import DungeonWizardAgent
 
 import arcade
 
@@ -57,7 +64,7 @@ def _get_model_id() -> str:
 # LLM agent factory
 # ---------------------------------------------------------------------------
 
-def _build_dm_agent(log_path: Path) -> object:
+def _build_dm_agent(log_path: Path) -> DungeonMasterAgent | None:
     """Create the DM agent with OpenAI provider. Returns None on failure."""
     api_key = os.environ.get("OPENAI_API_KEY", "")
     _log.info("OPENAI_API_KEY present: %s (length=%d)", bool(api_key), len(api_key))
@@ -80,7 +87,9 @@ def _build_dm_agent(log_path: Path) -> object:
         return None
 
 
-def _build_agents(log_path: Path) -> tuple:
+def _build_agents(
+    log_path: Path,
+) -> tuple[DungeonWizardAgent | None, DungeonGeneratorAgent | None, DesignAgent | None]:
     """Create OpenAI provider + the three design agents. Returns (wizard, generator, design)."""
     try:
         from dungeon_daddy.data.models import LoopPatternCatalog
@@ -215,7 +224,11 @@ class DungeonDaddyWindow(arcade.Window):
         self._design_view.reset_to_wizard()
         self.switch_mode("design")
 
-    def open_dungeon(self, _pick_fn=None, _error_fn=None) -> None:
+    def open_dungeon(
+        self,
+        _pick_fn: Callable[[], str | None] | None = None,
+        _error_fn: Callable[[str], None] | None = None,
+    ) -> None:
         """Open a saved dungeon chosen via file dialog (or injectable picker for tests)."""
         if _pick_fn is None:
             _pick_fn = self._pick_dungeon_via_dialog
@@ -397,11 +410,11 @@ class DungeonDaddyWindow(arcade.Window):
         elif key == arcade.key.N and modifiers & arcade.key.MOD_CTRL:
             self.new_dungeon()
 
-    def launch_test_drive(self, dungeon: object) -> None:
+    def launch_test_drive(self, dungeon: Dungeon) -> None:
         self._play_view.load_dungeon(dungeon)
         self.switch_to_play()
 
-    def launch_play_session(self, dungeon: object) -> None:
+    def launch_play_session(self, dungeon: Dungeon) -> None:
         self._play_view.load_dungeon_session(dungeon)
         self.switch_to_play()
 

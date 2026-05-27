@@ -51,19 +51,6 @@ python_version = "3.12"
 strict = true
 exclude = ["tests/", "tools/", "prototype/"]
 
-# These files have legitimate type issues requiring architectural fixes (None guards,
-# dict invariance, object duck-typing) — tracked for the next BUILD phase.
-[[tool.mypy.overrides]]
-module = [
-    "dungeon_daddy.views.design_view",
-    "dungeon_daddy.views.play_view",
-    "dungeon_daddy.data.repository",
-    "dungeon_daddy.window",
-    "dungeon_daddy.llm.agents.dm_agent",
-    "dungeon_daddy.ui.panels.map_panel",
-]
-ignore_errors = true
-
 [tool.ruff]
 target-version = "py312"
 line-length = 100

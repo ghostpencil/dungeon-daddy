@@ -16,15 +16,17 @@ import arcade
 import arcade.gui
 
 from dungeon_daddy.data.models import (
+    ContextDocType,
     DesignMode,
     Dungeon,
     DungeonMeta,
+    Level,
     validate_dungeon,
 )
 from dungeon_daddy.data.repository import DungeonRepository
 from dungeon_daddy.llm.agents.design_agent import DesignAgent
 from dungeon_daddy.llm.agents.generator_agent import DungeonGeneratorAgent
-from dungeon_daddy.llm.agents.wizard_agent import DungeonWizardAgent
+from dungeon_daddy.llm.agents.wizard_agent import DungeonBrief, DungeonWizardAgent, LevelBrief
 from dungeon_daddy.llm.provider import LLMMessage
 from dungeon_daddy.ui.chrome import MenuBar, draw_title_bar
 from dungeon_daddy.ui.panels.chat_panel import ChatPanel
@@ -53,7 +55,7 @@ from dungeon_daddy.ui.theme import (
 )
 
 
-def _overlay_btn_style(variant: str) -> dict:
+def _overlay_btn_style(variant: str) -> dict[str, object]:
     if variant == "teal":
         fg = (*TEAL, 255)
         border = (*TEAL, 255)
@@ -135,20 +137,20 @@ class DesignView(arcade.View):
         self._wizard_agent = wizard_agent
         self._generator_agent = generator_agent
         self._design_agent = design_agent
-        self._brief = None
-        self._current_level_brief = None
+        self._brief: DungeonBrief | None = None
+        self._current_level_brief: LevelBrief | None = None
         self._current_level = 1
         self._generation_retries = 0
         self._wizard_history: list[LLMMessage] = []
         self._design_history: list[LLMMessage] = []
         # Context doc overlay state
         self._overlay_open: bool = False
-        self._overlay_doc_type: object = None
+        self._overlay_doc_type: ContextDocType | None = None
         self._overlay_dungeon_name: str | None = None
         self._overlay_level_id: int | None = None
         self._overlay_content: str | None = None
-        self._overlay_widgets: list = []
-        self._overlay_input = None
+        self._overlay_widgets: list[arcade.gui.UIWidget] = []
+        self._overlay_input: arcade.gui.UIInputText | None = None
         # CD-5: overwrite-or-rename prompt state
         self._context_overwrite_confirmed: bool = False
         self._awaiting_name_choice: bool = False
@@ -162,7 +164,7 @@ class DesignView(arcade.View):
         self._manager.enable()
         # Sync UIManager camera to current window size — it may have changed
         # while this view was inactive (e.g. window resized in Play mode).
-        self._manager.on_resize(self.window.width, self.window.height)
+        self._manager.on_resize(self.window.width, self.window.height)  # type: ignore[no-untyped-call]
         if not self._ui_built:
             self._build_ui()
             self._ui_built = True
@@ -180,7 +182,7 @@ class DesignView(arcade.View):
         draw_title_bar(
             self.window,
             mode="design",
-            on_mode=lambda m: self.window.switch_mode(m),  # type: ignore[attr-defined]
+            on_mode=lambda m: self.window.switch_mode(m),
         )
         self._tree.draw()
         self._chat.draw()
@@ -226,23 +228,25 @@ class DesignView(arcade.View):
 
     def _launch_test_drive(self) -> None:
         if self._dungeon and self._dungeon.levels:
-            self.window.launch_test_drive(self._dungeon)  # type: ignore[attr-defined]
+            self.window.launch_test_drive(self._dungeon)
 
     def _launch_start_play(self) -> None:
         if self._dungeon and self._dungeon.levels and self._dungeon.meta.save_name:
-            self.window.launch_play_session(self._dungeon)  # type: ignore[attr-defined]
+            self.window.launch_play_session(self._dungeon)
 
     def _refresh_play_button_state(self) -> None:
         is_saved = bool(self._dungeon and self._dungeon.meta.save_name)
         has_session = False
         if is_saved:
-            save_name = self._dungeon.meta.save_name  # type: ignore[union-attr]
+            assert self._dungeon is not None
+            save_name = self._dungeon.meta.save_name
+            assert save_name is not None
             if self._repo.load_session(save_name) is not None:
                 has_session = True
-            elif self._dungeon and self._dungeon.levels:  # type: ignore[union-attr]
+            elif self._dungeon.levels:
                 has_session = any(
                     bool(self._repo.load_room_memory(save_name, level.id))
-                    for level in self._dungeon.levels  # type: ignore[union-attr]
+                    for level in self._dungeon.levels
                 )
         self._inspector.set_saved_state(is_saved, has_session)
         self.window.set_switch_to_play_enabled(is_saved)
@@ -281,7 +285,7 @@ class DesignView(arcade.View):
     # Context doc overlay
     # ------------------------------------------------------------------
 
-    def _on_context_doc_click(self, doc_type: object, level_id: int | None) -> None:
+    def _on_context_doc_click(self, doc_type: ContextDocType, level_id: int | None) -> None:
         if self._dungeon is None:
             return
         dungeon_name = self._dungeon.meta.title
@@ -290,7 +294,7 @@ class DesignView(arcade.View):
 
     def open_context_doc_overlay(
         self,
-        doc_type: object,
+        doc_type: ContextDocType,
         dungeon_name: str,
         level_id: int | None,
         content: str,
@@ -305,6 +309,8 @@ class DesignView(arcade.View):
     def save_context_doc_overlay(self) -> None:
         input_widget = self._overlay_input
         content = input_widget.text if input_widget is not None else (self._overlay_content or "")
+        assert self._overlay_dungeon_name is not None
+        assert self._overlay_doc_type is not None
         self._repo.save_context_doc(
             self._overlay_dungeon_name,
             self._overlay_doc_type,
@@ -369,7 +375,7 @@ class DesignView(arcade.View):
         def on_click(event: arcade.gui.UIOnClickEvent) -> None:
             self.save_context_doc_overlay()
 
-        @cancel_btn.event
+        @cancel_btn.event  # type: ignore[no-redef]
         def on_click(event: arcade.gui.UIOnClickEvent) -> None:  # noqa: F811
             self.close_context_doc_overlay()
 
@@ -404,7 +410,6 @@ class DesignView(arcade.View):
         self._overlay_open = False
 
     def _refresh_context_doc_statuses(self) -> None:
-        from dungeon_daddy.data.models import ContextDocType
         from dungeon_daddy.ui.panels.inspector_panel import ContextDocStatus
         if self._dungeon is None:
             return
@@ -451,6 +456,7 @@ class DesignView(arcade.View):
             if text.strip().lower() == "overwrite":
                 self._context_overwrite_confirmed = True
             else:
+                assert self._dungeon is not None
                 self._dungeon.meta.save_name = text.strip()
             self._continue_to_generation()
             return
@@ -511,6 +517,8 @@ class DesignView(arcade.View):
             return
         self._chat.add_message("dm", result.content)
         self._wizard_history.append(LLMMessage(role="assistant", content=result.content))
+        if self._wizard_agent is None:
+            return
         brief = self._wizard_agent.parse_brief(result.content)
         if brief is not None:
             self._start_generation(brief)
@@ -522,8 +530,7 @@ class DesignView(arcade.View):
             self._generation_retries = 0
             self._launch_generation(level_brief, errors=None)
 
-    def _start_generation(self, brief: object) -> None:
-        from dungeon_daddy.data.models import ContextDocType
+    def _start_generation(self, brief: DungeonBrief) -> None:
         self._brief = brief
         self._dungeon = Dungeon(
             meta=DungeonMeta(
@@ -564,15 +571,16 @@ class DesignView(arcade.View):
         self._active_thread.start()
 
     def _write_setting_party_docs(self) -> None:
-        from dungeon_daddy.data.models import ContextDocType
+        if self._dungeon is None:
+            return
         from dungeon_daddy.llm.context_docs import generate_party_doc, generate_setting_doc
         name = self._dungeon.meta.effective_name
         self._repo.save_context_doc(name, ContextDocType.SETTING, generate_setting_doc(self._dungeon.meta))
         self._repo.save_context_doc(name, ContextDocType.PARTY, generate_party_doc(self._dungeon.meta))
         self._refresh_context_doc_statuses()
 
-    def _write_level_design_doc(self, level: object) -> None:
-        from dungeon_daddy.data.models import ContextDocType
+    def _write_level_design_doc(self, level: Level) -> None:
+        assert self._dungeon is not None
         from dungeon_daddy.llm.context_docs import generate_level_design_doc
         name = self._dungeon.meta.effective_name
         self._repo.save_context_doc(name, ContextDocType.LEVEL_DESIGN, generate_level_design_doc(level), level_id=level.id)
@@ -580,7 +588,7 @@ class DesignView(arcade.View):
 
     def _launch_generation(
         self,
-        level_brief: object,
+        level_brief: LevelBrief,
         errors: list[str] | None,
     ) -> None:
         self._llm_busy = True
@@ -599,10 +607,12 @@ class DesignView(arcade.View):
                 "dm", f"⚠ Level {self._current_level}: {result.error}"
             )
             return
+        if self._generator_agent is None or self._dungeon is None or self._brief is None:
+            return
         try:
             level = self._generator_agent.parse_level(result.content)
         except Exception as exc:
-            if self._generation_retries < 3:
+            if self._generation_retries < 3 and self._current_level_brief is not None:
                 self._generation_retries += 1
                 self._chat.add_message("dm", f"Revising level {self._current_level}…")
                 self._launch_generation(self._current_level_brief, [str(exc)])
@@ -615,7 +625,7 @@ class DesignView(arcade.View):
         validation = validate_dungeon(temp)
         self._tree.set_validation(validation)
         if not validation.is_valid:
-            if self._generation_retries < 3:
+            if self._generation_retries < 3 and self._current_level_brief is not None:
                 self._generation_retries += 1
                 self._chat.add_message("dm", f"Revising level {self._current_level}…")
                 self._launch_generation(self._current_level_brief, validation.errors)
@@ -648,6 +658,9 @@ class DesignView(arcade.View):
     # ------------------------------------------------------------------
 
     def _run_llm(self, history: list[LLMMessage], phase: int = 1) -> None:
+        if self._wizard_agent is None:
+            self._llm_busy = False
+            return
         try:
             response = self._wizard_agent.chat(history, phase=phase)
             self._result_queue.put(LLMResult(content=response, result_type="wizard"))
@@ -658,9 +671,12 @@ class DesignView(arcade.View):
 
     def _run_generation(
         self,
-        level_brief: object,
+        level_brief: LevelBrief,
         errors: list[str] | None = None,
     ) -> None:
+        if self._generator_agent is None or self._brief is None or self._dungeon is None:
+            self._llm_busy = False
+            return
         try:
             response = self._generator_agent.generate_level(
                 self._brief, level_brief, self._dungeon, errors
@@ -672,6 +688,9 @@ class DesignView(arcade.View):
             self._llm_busy = False
 
     def _run_design_chat(self, history: list[LLMMessage], dungeon: Dungeon) -> None:
+        if self._design_agent is None:
+            self._llm_busy = False
+            return
         try:
             response = self._design_agent.chat(history, dungeon)
             self._result_queue.put(LLMResult(content=response, result_type="chat"))

@@ -48,7 +48,7 @@ _ZOOM_SCROLL_FACTOR = 1.1   # multiplier per scroll notch
 _ZOOM_KEY_STEP = 0.25        # additive step per key press
 
 
-def _tab_style(active: bool) -> dict:
+def _tab_style(active: bool) -> dict[str, arcade.gui.UIFlatButton.UIStyle]:
     return {
         "normal": arcade.gui.UIFlatButton.UIStyle(
             font_size=TEXT_SM, font_name=FONT_UI_MED,
@@ -338,6 +338,7 @@ class MapPanel:
     def _draw_level_overlay(self, x: float, y: float, map_w: float, map_h: float) -> None:
         """Top-left canvas overlay: level number, name, grid dimensions."""
         lvl = self._level
+        assert lvl is not None
         idx = (self._state.current_level_idx + 1) if self._state else 1
         ox = x + PAD_MD
         # Level number chip (teal mono)
@@ -393,10 +394,10 @@ class MapPanel:
         for i, label in enumerate(_VARIANT_TABS):
             is_active = label == self._active_variant and self._active_tool == "select"
             self._variant_btns[i].style = _tab_style(is_active)
-            self._variant_btns[i].trigger_render()
+            self._variant_btns[i].trigger_render()  # type: ignore[no-untyped-call]
         pan_btn = self._variant_btns[-1]
         pan_btn.style = _tab_style(self._active_tool == "pan")
-        pan_btn.trigger_render()
+        pan_btn.trigger_render()  # type: ignore[no-untyped-call]
 
     def _setup_tabs(self, manager: arcade.gui.UIManager) -> None:
         x, y, w, h = self._x, self._y, self._w, self._h
@@ -438,7 +439,7 @@ class MapPanel:
             style=_tab_style(self._active_tool == "pan"),
         )
 
-        @pan_btn.event
+        @pan_btn.event  # type: ignore[no-redef]
         def on_click(event: arcade.gui.UIOnClickEvent) -> None:  # noqa: F811
             self._active_tool = "pan"
             self._refresh_tab_styles()
