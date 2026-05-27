@@ -168,7 +168,7 @@ Run the test suite:
 pytest
 ```
 
-The core pytest suite currently includes 796 tests. No real API calls are made during routine test runs — all LLM providers are dependency-injected and mocked.
+The core pytest suite currently includes 819 tests. No real API calls are made during routine test runs — all LLM providers are dependency-injected and mocked.
 
 The project also includes end-to-end UI smoke tests in `tools/smoke_test_phase*.py`, supported by the reusable `tools/ui_harness.py` test harness.
 
@@ -193,7 +193,7 @@ Install from [domdomegg/computer-use-mcp](https://github.com/domdomegg/computer-
 
 ## Status
 
-Active development. Core design and play loops are complete through Phase 18. Windows-only; a Linux/WSL2 platform backend is planned.
+Active development. Core design and play loops are complete through Phase 18. Post-phase stabilisation added CI (lint, type-check, coverage gate), structured LLM output, prompt versioning, LLM call telemetry, and an AI output eval suite. Windows-only; a Linux/WSL2 platform backend is planned.
 
 ---
 
