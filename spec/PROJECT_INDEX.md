@@ -5,7 +5,7 @@
 Phase: Post-18 Stabilisation
 Status: ONGOING — bug fixes and spec alignment only
 
-799 unit/integration tests passing (excl. UI harness and 3 live-API tests).
+819 unit/integration tests passing (excl. UI harness and 3 live-API tests).
 
 ---
 
