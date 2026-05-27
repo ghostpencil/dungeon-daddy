@@ -22,10 +22,10 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Lint
-        run: ruff check .
+        run: python -m ruff check .
 
       - name: Type-check
-        run: mypy dungeon_daddy
+        run: python -m mypy dungeon_daddy
 
       - name: Test with coverage
-        run: pytest --ignore=tests/integration/test_ui_harness.py --cov=dungeon_daddy --cov-report=term-missing --cov-fail-under=70
+        run: python -m pytest --ignore=tests/integration/test_ui_harness.py --cov=dungeon_daddy --cov-report=term-missing --cov-fail-under=70
