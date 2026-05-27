@@ -5,7 +5,7 @@
 Phase: Post-18 Stabilisation
 Status: ONGOING — bug fixes and spec alignment only
 
-754 unit tests + 42 integration tests = 796 passing (excl. UI harness).
+788 unit/integration tests passing (excl. UI harness and 3 live-API tests).
 
 ---
 
@@ -16,7 +16,7 @@ Tracked in GitHub: https://github.com/ghostpencil/dungeon-daddy/issues/1 — che
 
 | ID | Title | Status |
 |---|---|---|
-| IP-5 | Formal skip markers for API-gated integration tests | TODO |
+| IP-5 | Formal skip markers for API-gated integration tests | DONE |
 | IP-1 | CI: add lint, type-check, coverage | TODO |
 | IP-3 | Structured output for generator agent | TODO |
 | IP-4 | Model configurable via environment variable | TODO |
@@ -35,12 +35,12 @@ _None._
 
 ## Recent Session
 
-**2026-05-24 — Switch to Play menu fix + mock policy**
+**2026-05-27 — IP-5: Formal skip markers for API-gated integration tests**
 
-- Menu item now wired correctly; `set_switch_to_play_enabled` added to window.
-- `spec/TESTING.md`: new Mock Policy section with mandatory-mock table, `__new__` recipe, right/wrong example.
-- `tests/integration/test_play_menu.py` added (4 tests).
-- 754 unit tests + 42 integration tests = 796 passing.
+- Registered `live_api` marker in `pyproject.toml` `[tool.pytest.ini_options]`.
+- Added `@pytest.mark.live_api` to all 3 tests in `tests/integration/test_llm_integration.py`.
+- CI log now shows skip reason explicitly when `OPENAI_API_KEY` is not set.
+- 788 non-live tests passing.
 
 _Full history in `spec/HISTORY.md`._
 

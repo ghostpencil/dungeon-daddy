@@ -32,6 +32,9 @@ dungeon-daddy = "dungeon_daddy.__main__:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "live_api: requires a real API key; skipped in CI unless key is set",
+]
 
 [tool.mypy]
 python_version = "3.12"

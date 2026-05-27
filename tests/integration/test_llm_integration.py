@@ -47,6 +47,7 @@ def _minimal_dungeon() -> Dungeon:
     )
 
 
+@pytest.mark.live_api
 @_NEEDS_KEY
 def test_dm_agent_responds():
     agent = DungeonMasterAgent(provider=_provider())
@@ -63,6 +64,7 @@ def test_dm_agent_responds():
     assert any(len(w) > 2 for w in result.split())
 
 
+@pytest.mark.live_api
 @_NEEDS_KEY
 def test_wizard_agent_responds():
     catalog = LoopPatternCatalog.load_bundled()
@@ -75,6 +77,7 @@ def test_wizard_agent_responds():
     assert any(len(w) > 2 for w in result.split())
 
 
+@pytest.mark.live_api
 @_NEEDS_KEY
 def test_generator_agent_responds():
     agent = DungeonGeneratorAgent(provider=_provider())
