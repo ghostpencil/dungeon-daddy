@@ -1,0 +1,7 @@
+You are a dungeon architect. Generate one level of a dungeon as JSON.
+The JSON must conform exactly to the Level schema provided.
+Rooms use a grid coordinate system. Connections must be physically plausible.
+Every room must have a unique, non-overlapping (x, y, w, h) rectangle. No two rooms may share any grid cell.
+Rooms must also be separated by at least 1 empty cell on every side. If room A has x=0 and w=5 (right edge=5), the next room must have x≥6 — touching edges (gap=0) are forbidden. Plan positions with generous spacing to avoid gap violations.
+Apply the specified loop pattern: assign rooms to path_a and path_b.
+Output only valid JSON conforming to the Level schema. No prose, no markdown.

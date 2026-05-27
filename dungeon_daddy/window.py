@@ -64,9 +64,14 @@ def _build_dm_agent(log_path: Path) -> object:
     try:
         from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
         from dungeon_daddy.llm.openai_provider import OpenAIProvider
+        from dungeon_daddy.llm.prompts import load_prompt, prompt_hash
         from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
         inner = OpenAIProvider(model=_get_model_id())
-        provider = ObservingProvider(inner, agent="dm", writer=TelemetryWriter(log_path))
+        ptext = load_prompt("dm_system")
+        provider = ObservingProvider(
+            inner, agent="dm", writer=TelemetryWriter(log_path),
+            prompt_name="dm_system", prompt_hash=prompt_hash(ptext),
+        )
         agent = DungeonMasterAgent(provider)
         _log.info("DM agent built successfully")
         return agent
@@ -83,19 +88,34 @@ def _build_agents(log_path: Path) -> tuple:
         from dungeon_daddy.llm.agents.generator_agent import DungeonGeneratorAgent
         from dungeon_daddy.llm.agents.wizard_agent import DungeonWizardAgent
         from dungeon_daddy.llm.openai_provider import OpenAIProvider
+        from dungeon_daddy.llm.prompts import load_prompt, prompt_hash
         from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
 
         inner = OpenAIProvider(model=_get_model_id())
         writer = TelemetryWriter(log_path)
         catalog = LoopPatternCatalog.load_bundled()
+
+        wiz_text = load_prompt("wizard_phase1_system")
         wizard = DungeonWizardAgent(
-            ObservingProvider(inner, agent="wizard", writer=writer), catalog.patterns
+            ObservingProvider(
+                inner, agent="wizard", writer=writer,
+                prompt_name="wizard_phase1_system", prompt_hash=prompt_hash(wiz_text),
+            ),
+            catalog.patterns,
         )
+        gen_text = load_prompt("generator_system")
         generator = DungeonGeneratorAgent(
-            ObservingProvider(inner, agent="generator", writer=writer)
+            ObservingProvider(
+                inner, agent="generator", writer=writer,
+                prompt_name="generator_system", prompt_hash=prompt_hash(gen_text),
+            )
         )
+        des_text = load_prompt("design_system")
         design = DesignAgent(
-            ObservingProvider(inner, agent="design", writer=writer)
+            ObservingProvider(
+                inner, agent="design", writer=writer,
+                prompt_name="design_system", prompt_hash=prompt_hash(des_text),
+            )
         )
         return wizard, generator, design
     except Exception:

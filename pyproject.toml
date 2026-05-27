@@ -33,6 +33,9 @@ dev = [
 [project.scripts]
 dungeon-daddy = "dungeon_daddy.__main__:main"
 
+[tool.setuptools.package-data]
+"dungeon_daddy.prompts" = ["*.txt"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [

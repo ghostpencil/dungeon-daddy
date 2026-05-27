@@ -1,8 +1,8 @@
 """Tests for dungeon_daddy/llm/telemetry.py"""
 from __future__ import annotations
 
-import json
 import dataclasses
+import json
 
 # ---------------------------------------------------------------------------
 # Cycle 1: LLMCallRecord dataclass
@@ -79,7 +79,7 @@ def test_telemetry_writer_appends_multiple_records(tmp_path):
 
     lines = log_file.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 3
-    agents = [json.loads(l)["agent"] for l in lines]
+    agents = [json.loads(line)["agent"] for line in lines]
     assert agents == ["dm", "wizard", "generator"]
 
 
@@ -96,8 +96,8 @@ def _make_mock_provider(mocker, *, text="response text", last_usage=(10, 5)):
 
 
 def test_observing_provider_complete_returns_inner_result(mocker, tmp_path):
-    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
     from dungeon_daddy.llm.provider import LLMMessage
+    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
 
     inner = _make_mock_provider(mocker, text="A dark room.")
     writer = TelemetryWriter(tmp_path / "llm_calls.jsonl")
@@ -108,8 +108,8 @@ def test_observing_provider_complete_returns_inner_result(mocker, tmp_path):
 
 
 def test_observing_provider_complete_delegates_args(mocker, tmp_path):
-    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
     from dungeon_daddy.llm.provider import LLMMessage
+    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
 
     inner = _make_mock_provider(mocker)
     writer = TelemetryWriter(tmp_path / "llm_calls.jsonl")
@@ -121,8 +121,8 @@ def test_observing_provider_complete_delegates_args(mocker, tmp_path):
 
 
 def test_observing_provider_complete_writes_one_record(mocker, tmp_path):
-    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
     from dungeon_daddy.llm.provider import LLMMessage
+    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
 
     inner = _make_mock_provider(mocker, last_usage=(100, 40))
     log_file = tmp_path / "llm_calls.jsonl"
@@ -185,8 +185,8 @@ def test_openai_provider_last_usage_returns_token_counts_after_complete(mocker):
 # ---------------------------------------------------------------------------
 
 def test_observing_provider_stream_yields_chunks(mocker, tmp_path):
-    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
     from dungeon_daddy.llm.provider import LLMMessage
+    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
 
     inner = _make_mock_provider(mocker)
     inner.stream.return_value = iter(["Hello", ", ", "world"])
@@ -197,8 +197,8 @@ def test_observing_provider_stream_yields_chunks(mocker, tmp_path):
 
 
 def test_observing_provider_stream_writes_one_record(mocker, tmp_path):
-    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
     from dungeon_daddy.llm.provider import LLMMessage
+    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
 
     inner = _make_mock_provider(mocker, last_usage=(30, 15))
     inner.stream.return_value = iter(["chunk"])
@@ -216,16 +216,61 @@ def test_observing_provider_stream_writes_one_record(mocker, tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Cycle 7: window.py factory wiring
+# Cycle 7 (IP-7): prompt_name and prompt_hash in LLMCallRecord
+# ---------------------------------------------------------------------------
+
+def test_llm_call_record_prompt_fields_default_to_empty():
+    from dungeon_daddy.llm.telemetry import LLMCallRecord
+    r = LLMCallRecord(
+        agent="dm", model_id="gpt-4o",
+        prompt_tokens=1, completion_tokens=1,
+        duration_ms=1.0, timestamp="2026-01-01T00:00:00",
+    )
+    assert r.prompt_name == ""
+    assert r.prompt_hash == ""
+
+
+def test_llm_call_record_prompt_fields_roundtrip_json():
+    from dungeon_daddy.llm.telemetry import LLMCallRecord
+    r = LLMCallRecord(
+        agent="dm", model_id="gpt-4o",
+        prompt_tokens=1, completion_tokens=1,
+        duration_ms=1.0, timestamp="2026-01-01T00:00:00",
+        prompt_name="dm_system", prompt_hash="abc12345",
+    )
+    data = json.loads(json.dumps(dataclasses.asdict(r)))
+    assert data["prompt_name"] == "dm_system"
+    assert data["prompt_hash"] == "abc12345"
+
+
+def test_observing_provider_record_includes_prompt_info(mocker, tmp_path):
+    from dungeon_daddy.llm.provider import LLMMessage
+    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
+
+    inner = _make_mock_provider(mocker, last_usage=(5, 3))
+    log_file = tmp_path / "llm_calls.jsonl"
+    op = ObservingProvider(
+        inner, agent="dm", writer=TelemetryWriter(log_file),
+        prompt_name="dm_system", prompt_hash="abc12345",
+    )
+    op.complete([LLMMessage(role="user", content="hi")])
+
+    rec = json.loads(log_file.read_text(encoding="utf-8").strip())
+    assert rec["prompt_name"] == "dm_system"
+    assert rec["prompt_hash"] == "abc12345"
+
+
+# ---------------------------------------------------------------------------
+# Cycle 9: window.py factory wiring
 # ---------------------------------------------------------------------------
 
 def test_build_dm_agent_wraps_provider_with_observing_provider(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     log_file = tmp_path / "llm_calls.jsonl"
 
-    from unittest.mock import patch, MagicMock
-    with patch("dungeon_daddy.llm.openai_provider.OpenAIProvider") as MockProvider, \
-         patch("dungeon_daddy.llm.agents.dm_agent.DungeonMasterAgent") as MockAgent, \
+    from unittest.mock import MagicMock, patch
+    with patch("dungeon_daddy.llm.openai_provider.OpenAIProvider"), \
+         patch("dungeon_daddy.llm.agents.dm_agent.DungeonMasterAgent"), \
          patch("dungeon_daddy.llm.telemetry.ObservingProvider") as MockObserving:
         MockObserving.return_value = MagicMock()
         from dungeon_daddy.window import _build_dm_agent
@@ -240,7 +285,7 @@ def test_build_agents_wraps_each_agent_with_observing_provider(monkeypatch, tmp_
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     log_file = tmp_path / "llm_calls.jsonl"
 
-    from unittest.mock import patch, MagicMock, call
+    from unittest.mock import MagicMock, patch
     with patch("dungeon_daddy.llm.openai_provider.OpenAIProvider"), \
          patch("dungeon_daddy.llm.agents.wizard_agent.DungeonWizardAgent"), \
          patch("dungeon_daddy.llm.agents.generator_agent.DungeonGeneratorAgent"), \

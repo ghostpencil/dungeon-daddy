@@ -1,6 +1,7 @@
 """DesignAgent — post-generation dungeon refinement chat."""
 from __future__ import annotations
 
+from dungeon_daddy.llm.prompts import load_prompt
 from dungeon_daddy.llm.provider import LLMMessage, LLMProvider
 
 
@@ -20,6 +21,7 @@ class DesignAgent:
 
     def __init__(self, provider: LLMProvider) -> None:
         self._provider = provider
+        self._system_prompt = load_prompt("design_system")
 
     def chat(
         self,
@@ -29,7 +31,7 @@ class DesignAgent:
         context = self._build_context(dungeon)
         return self._provider.complete(
             messages=history,
-            system=self.SYSTEM_PROMPT + "\n\n" + context,
+            system=self._system_prompt + "\n\n" + context,
             max_tokens=1024,
         )
 

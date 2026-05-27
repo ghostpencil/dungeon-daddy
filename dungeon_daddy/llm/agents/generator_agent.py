@@ -8,6 +8,7 @@ from typing import Any
 
 from dungeon_daddy.data.models import Dungeon, Level
 from dungeon_daddy.llm.agents.wizard_agent import DungeonBrief, LevelBrief
+from dungeon_daddy.llm.prompts import load_prompt
 from dungeon_daddy.llm.provider import LLMProvider
 
 _JSON_RE = re.compile(r"```json\s*(.*?)\s*```", re.DOTALL)
@@ -77,6 +78,7 @@ class DungeonGeneratorAgent:
 
     def __init__(self, provider: LLMProvider) -> None:
         self._provider = provider
+        self._system_prompt = load_prompt("generator_system")
 
     def generate_level(
         self,
@@ -88,7 +90,7 @@ class DungeonGeneratorAgent:
         context = self._build_context(brief, level_brief, dungeon_so_far, validation_errors)
         response = self._provider.complete(
             messages=[],
-            system=self.SYSTEM_PROMPT + "\n\n" + context,
+            system=self._system_prompt + "\n\n" + context,
             max_tokens=4096,
             response_format={"type": "json_object"},
         )

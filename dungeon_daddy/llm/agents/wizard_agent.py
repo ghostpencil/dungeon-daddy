@@ -6,6 +6,7 @@ import random
 import re
 from dataclasses import dataclass
 
+from dungeon_daddy.llm.prompts import load_prompt
 from dungeon_daddy.llm.provider import LLMMessage, LLMProvider
 
 _BRIEF_RE = re.compile(r"```brief\s*(.*?)\s*```", re.DOTALL)
@@ -119,13 +120,15 @@ class DungeonWizardAgent:
         self._provider = provider
         self._patterns = loop_patterns
         self._context_builder = context_builder
+        self._phase1_prompt = load_prompt("wizard_phase1_system")
+        self._phase2_prompt = load_prompt("wizard_phase2_system")
 
     def chat(self, history: list[LLMMessage], phase: int = 1, dungeon: object | None = None) -> str:
         """Continue the wizard Q&A. phase=1 for global collection, phase=2 for per-level design."""
         if phase == 2:
-            system = self.PHASE2_SYSTEM_PROMPT + "\n\n" + self._build_pattern_list()
+            system = self._phase2_prompt + "\n\n" + self._build_pattern_list()
         else:
-            system = self.PHASE1_SYSTEM_PROMPT
+            system = self._phase1_prompt
         if self._context_builder is not None and dungeon is not None:
             context = self._context_builder.build_system_prompt(dungeon)  # type: ignore[attr-defined]
             if context:

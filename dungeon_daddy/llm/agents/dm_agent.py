@@ -1,6 +1,7 @@
 """DungeonMasterAgent — Play Mode narration and chat."""
 from __future__ import annotations
 
+from dungeon_daddy.llm.prompts import load_prompt
 from dungeon_daddy.llm.provider import LLMMessage, LLMProvider
 
 
@@ -32,6 +33,7 @@ class DungeonMasterAgent:
     def __init__(self, provider: LLMProvider, context_builder: object | None = None) -> None:
         self._provider = provider
         self._context_builder = context_builder
+        self._system_prompt = load_prompt("dm_system")
 
     def respond(
         self,
@@ -44,7 +46,7 @@ class DungeonMasterAgent:
         active_loop: object | None = None,
     ) -> str:
         context = self._build_context(room, level, dungeon, room_memory)
-        system = self.SYSTEM_PROMPT + "\n\n" + context
+        system = self._system_prompt + "\n\n" + context
         if active_loop is not None:
             system += "\n\n" + self._build_loop_context(active_loop, room, level)
         if self._context_builder is not None:

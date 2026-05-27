@@ -22,7 +22,7 @@ Tracked in GitHub: https://github.com/ghostpencil/dungeon-daddy/issues/1 — che
 | IP-4 | Model configurable via environment variable | DONE |
 | IP-2 | LLM observability | DONE |
 | IP-8 | Consolidate requirements files into pyproject.toml | DONE |
-| IP-7 | Prompt versioning | TODO |
+| IP-7 | Prompt versioning | DONE |
 | IP-6 | Minimal AI output evals | TODO |
 | IP-9 | Fix mypy None-guard issues in 6 deferred files | TODO (next BUILD phase) |
 
@@ -87,6 +87,18 @@ _None._
 - Wired `ObservingProvider` in `window.py`: `_build_dm_agent()` and `_build_agents()` now wrap their providers with agent names "dm", "wizard", "generator", "design".
 - Added `tools/llm_cost_report.py`: reads `llm_calls.jsonl`, prints per-agent token and cost breakdown. Cost table configurable via `LLM_COST_INPUT`/`LLM_COST_OUTPUT` env vars.
 - 813 non-live tests passing (14 new in `tests/unit/llm/test_telemetry.py`).
+
+**2026-05-27 — IP-7: Prompt versioning**
+
+- Created `dungeon_daddy/prompts/` package with 5 `.txt` files: `dm_system`, `wizard_phase1_system`, `wizard_phase2_system`, `generator_system`, `design_system`.
+- Added `dungeon_daddy/llm/prompts.py`: `load_prompt(name)` (uses `importlib.resources`) and `prompt_hash(text)` (SHA-256 first 8 hex chars).
+- Updated all four agents to call `load_prompt()` at `__init__` and use `self._system_prompt` / `self._phase1_prompt` / `self._phase2_prompt` in their methods.
+- Added `prompt_name: str = ""` and `prompt_hash: str = ""` fields to `LLMCallRecord`.
+- Extended `ObservingProvider.__init__` to accept `prompt_name`/`prompt_hash`; includes them in every written record.
+- Updated `window.py` `_build_dm_agent()` and `_build_agents()` to load the primary prompt, hash it, and pass both to `ObservingProvider`.
+- Added `[tool.setuptools.package-data]` in `pyproject.toml` so `.txt` files are included in distributions.
+- 6 new tests in `tests/unit/llm/test_prompts.py` and `test_telemetry.py`.
+- 819 non-live tests passing.
 
 _Full history in `spec/HISTORY.md`._
 

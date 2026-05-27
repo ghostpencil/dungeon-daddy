@@ -8,6 +8,7 @@ import time
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+
 from dungeon_daddy.llm.provider import LLMMessage, LLMProvider
 
 
@@ -19,6 +20,8 @@ class LLMCallRecord:
     completion_tokens: int
     duration_ms: float
     timestamp: str
+    prompt_name: str = ""
+    prompt_hash: str = ""
 
 
 class TelemetryWriter:
@@ -35,10 +38,20 @@ class TelemetryWriter:
 class ObservingProvider:
     """Wraps any LLMProvider to record timing and token usage after each call."""
 
-    def __init__(self, inner: LLMProvider, *, agent: str, writer: TelemetryWriter) -> None:
+    def __init__(
+        self,
+        inner: LLMProvider,
+        *,
+        agent: str,
+        writer: TelemetryWriter,
+        prompt_name: str = "",
+        prompt_hash: str = "",
+    ) -> None:
         self._inner = inner
         self._agent = agent
         self._writer = writer
+        self._prompt_name = prompt_name
+        self._prompt_hash = prompt_hash
 
     @property
     def model_id(self) -> str:
@@ -80,4 +93,6 @@ class ObservingProvider:
             completion_tokens=completion_tokens,
             duration_ms=round(duration_ms, 1),
             timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
+            prompt_name=self._prompt_name,
+            prompt_hash=self._prompt_hash,
         ))
