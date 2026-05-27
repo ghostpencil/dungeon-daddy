@@ -23,10 +23,15 @@ class OpenAIProvider:
     ) -> None:
         self._client = openai.OpenAI(api_key=api_key)
         self._model = model
+        self._last_usage: tuple[int, int] | None = None
 
     @property
     def model_id(self) -> str:
         return self._model
+
+    @property
+    def last_usage(self) -> tuple[int, int] | None:
+        return self._last_usage
 
     def complete(
         self,
@@ -50,6 +55,8 @@ class OpenAIProvider:
                     max_tokens=max_tokens,
                     messages=built,  # type: ignore[arg-type]
                 )
+            if response.usage is not None:
+                self._last_usage = (response.usage.prompt_tokens, response.usage.completion_tokens)
             return response.choices[0].message.content or ""
         except openai.APIError as e:
             raise LLMError(str(e)) from e

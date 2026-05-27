@@ -242,11 +242,12 @@ def test_get_model_id_reads_dungeon_daddy_model_env(monkeypatch):
     assert _get_model_id() == "gpt-4o-mini"
 
 
-def test_build_dm_agent_passes_model_id_to_provider(monkeypatch):
+def test_build_dm_agent_passes_model_id_to_provider(monkeypatch, tmp_path):
     monkeypatch.setenv("DUNGEON_DADDY_MODEL", "gpt-4o-mini")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     with patch("dungeon_daddy.llm.openai_provider.OpenAIProvider") as MockProvider, \
-         patch("dungeon_daddy.llm.agents.dm_agent.DungeonMasterAgent"):
+         patch("dungeon_daddy.llm.agents.dm_agent.DungeonMasterAgent"), \
+         patch("dungeon_daddy.llm.telemetry.ObservingProvider"):
         from dungeon_daddy.window import _build_dm_agent
-        _build_dm_agent()
+        _build_dm_agent(tmp_path / "llm_calls.jsonl")
     MockProvider.assert_called_once_with(model="gpt-4o-mini")

@@ -20,7 +20,7 @@ Tracked in GitHub: https://github.com/ghostpencil/dungeon-daddy/issues/1 — che
 | IP-1 | CI: add lint, type-check, coverage | DONE |
 | IP-3 | Structured output for generator agent | DONE |
 | IP-4 | Model configurable via environment variable | DONE |
-| IP-2 | LLM observability | TODO |
+| IP-2 | LLM observability | DONE |
 | IP-8 | Consolidate requirements files into pyproject.toml | TODO |
 | IP-7 | Prompt versioning | TODO |
 | IP-6 | Minimal AI output evals | TODO |
@@ -70,6 +70,15 @@ _None._
 - Added `@pytest.mark.live_api` to all 3 tests in `tests/integration/test_llm_integration.py`.
 - CI log now shows skip reason explicitly when `OPENAI_API_KEY` is not set.
 - 788 non-live tests passing.
+
+**2026-05-27 — IP-2: LLM observability**
+
+- Added `LLMCallRecord` dataclass and `TelemetryWriter` to `dungeon_daddy/llm/telemetry.py`.
+- Added `ObservingProvider` wrapper: times each `complete()`/`stream()` call, reads `last_usage` from the inner provider, appends one JSON line to `llm_calls.jsonl` in `AppConfig.user_data_dir`.
+- Added `last_usage: tuple[int, int] | None` property to `OpenAIProvider` (and `LLMProvider` Protocol): populated from response token counts after each `complete()` call.
+- Wired `ObservingProvider` in `window.py`: `_build_dm_agent()` and `_build_agents()` now wrap their providers with agent names "dm", "wizard", "generator", "design".
+- Added `tools/llm_cost_report.py`: reads `llm_calls.jsonl`, prints per-agent token and cost breakdown. Cost table configurable via `LLM_COST_INPUT`/`LLM_COST_OUTPUT` env vars.
+- 813 non-live tests passing (14 new in `tests/unit/llm/test_telemetry.py`).
 
 _Full history in `spec/HISTORY.md`._
 

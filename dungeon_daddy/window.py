@@ -57,14 +57,17 @@ def _get_model_id() -> str:
 # LLM agent factory
 # ---------------------------------------------------------------------------
 
-def _build_dm_agent() -> object:
+def _build_dm_agent(log_path: Path) -> object:
     """Create the DM agent with OpenAI provider. Returns None on failure."""
     api_key = os.environ.get("OPENAI_API_KEY", "")
     _log.info("OPENAI_API_KEY present: %s (length=%d)", bool(api_key), len(api_key))
     try:
         from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
         from dungeon_daddy.llm.openai_provider import OpenAIProvider
-        agent = DungeonMasterAgent(OpenAIProvider(model=_get_model_id()))
+        from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
+        inner = OpenAIProvider(model=_get_model_id())
+        provider = ObservingProvider(inner, agent="dm", writer=TelemetryWriter(log_path))
+        agent = DungeonMasterAgent(provider)
         _log.info("DM agent built successfully")
         return agent
     except Exception:
@@ -72,7 +75,7 @@ def _build_dm_agent() -> object:
         return None
 
 
-def _build_agents() -> tuple:
+def _build_agents(log_path: Path) -> tuple:
     """Create OpenAI provider + the three design agents. Returns (wizard, generator, design)."""
     try:
         from dungeon_daddy.data.models import LoopPatternCatalog
@@ -80,12 +83,20 @@ def _build_agents() -> tuple:
         from dungeon_daddy.llm.agents.generator_agent import DungeonGeneratorAgent
         from dungeon_daddy.llm.agents.wizard_agent import DungeonWizardAgent
         from dungeon_daddy.llm.openai_provider import OpenAIProvider
+        from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
 
-        provider = OpenAIProvider(model=_get_model_id())
+        inner = OpenAIProvider(model=_get_model_id())
+        writer = TelemetryWriter(log_path)
         catalog = LoopPatternCatalog.load_bundled()
-        wizard = DungeonWizardAgent(provider, catalog.patterns)
-        generator = DungeonGeneratorAgent(provider)
-        design = DesignAgent(provider)
+        wizard = DungeonWizardAgent(
+            ObservingProvider(inner, agent="wizard", writer=writer), catalog.patterns
+        )
+        generator = DungeonGeneratorAgent(
+            ObservingProvider(inner, agent="generator", writer=writer)
+        )
+        design = DesignAgent(
+            ObservingProvider(inner, agent="design", writer=writer)
+        )
         return wizard, generator, design
     except Exception:
         _log.exception("Failed to build LLM agents — AI features disabled")
@@ -122,8 +133,9 @@ class DungeonDaddyWindow(arcade.Window):
         self._menu: dict[str, list[MenuAction]] = self._build_menu()
         self._menu_bar = MenuBar(self._menu)
 
-        wizard_agent, generator_agent, design_agent = _build_agents()
-        dm_agent = _build_dm_agent()
+        _llm_log = config.user_data_dir / "llm_calls.jsonl"
+        wizard_agent, generator_agent, design_agent = _build_agents(_llm_log)
+        dm_agent = _build_dm_agent(_llm_log)
         self._design_view = DesignView(
             self._repo, self._menu_bar,
             wizard_agent=wizard_agent,

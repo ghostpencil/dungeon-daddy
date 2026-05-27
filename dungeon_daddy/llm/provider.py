@@ -42,3 +42,6 @@ class LLMProvider(Protocol):
 
     @property
     def model_id(self) -> str: ...
+
+    @property
+    def last_usage(self) -> tuple[int, int] | None: ...
