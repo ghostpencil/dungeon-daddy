@@ -1058,6 +1058,36 @@ ignore = ["E501"]
 
 ---
 
+## Post-Phase 18 — IP-9: mypy None-Guard Fixes (6 Deferred Files)
+
+**Status: In Progress**
+
+Fix all six files that were placed under `ignore_errors = true` in
+`pyproject.toml` during IP-1. No new features. No runtime behaviour changes.
+
+**Spec:** `spec/FEATURE_IP9_MYPY_NONE_GUARDS.md`
+**GitHub:** https://github.com/ghostpencil/dungeon-daddy/issues/2
+
+### Files in scope (smallest-to-largest risk order)
+
+| Step | File | Errors | Root cause |
+|---|---|---|---|
+| 1 | `data/repository.py` | 15 | `Path \| None` without guard |
+| 2 | `llm/agents/dm_agent.py` | 22 | Params typed `object` |
+| 3 | `views/design_view.py` | 43 | None deref, agent `\| None` attrs |
+| 4 | `views/play_view.py` | 19 | `SessionState \| None` deref |
+| 5 | `window.py` | 7 | Dict invariance, missing annotation |
+| 6 | `ui/panels/map_panel.py` | 7 | `Level \| None` deref, untyped callbacks |
+| 7 | `pyproject.toml` | — | Remove all 6 `ignore_errors` overrides |
+
+### Exit Criteria
+
+- [ ] `mypy dungeon_daddy` passes with zero per-file overrides for these 6 files
+- [ ] `pytest tests/unit/` fully green (819+ tests)
+- [ ] CI mypy step passes without the overrides
+
+---
+
 ## Notes for the Implementing Agent
 
 - **Do not advance to the next phase until all exit criteria for the current phase are met.**

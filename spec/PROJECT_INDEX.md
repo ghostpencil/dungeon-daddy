@@ -25,7 +25,7 @@ Tracked in GitHub: https://github.com/ghostpencil/dungeon-daddy/issues/1 — che
 | IP-8 | Consolidate requirements files into pyproject.toml | DONE |
 | IP-7 | Prompt versioning | DONE |
 | IP-6 | Minimal AI output evals | DONE |
-| IP-9 | Fix mypy None-guard issues in 6 deferred files | TODO (next BUILD phase) |
+| IP-9 | Fix mypy None-guard issues in 6 deferred files | IN PROGRESS |
 
 ---
 

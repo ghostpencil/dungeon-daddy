@@ -24,7 +24,7 @@ quality sprint.
 | IP-6 | Minimal AI output evals | Medium | Large |
 | IP-7 | Prompt versioning | Medium | Medium |
 | IP-8 | Consolidate requirements files into pyproject.toml | Low | Small |
-| IP-9 | Fix mypy None-guard issues in 6 deferred files | Medium | Small–Medium |
+| IP-9 | Fix mypy None-guard issues in 6 deferred files | Medium | Small–Medium | **IN PROGRESS** |
 
 ---
 
@@ -391,7 +391,8 @@ one file and forgotten in another.
 
 **Priority:** Medium (quality debt)
 **Effort:** Small–Medium (1–2 hours)
-**Phase:** Next BUILD phase or dedicated type-safety sprint
+**Phase:** Post-18 Stabilisation — IN PROGRESS
+**Spec:** `spec/FEATURE_IP9_MYPY_NONE_GUARDS.md` (step-by-step tracking)
 
 ### Background
 
