@@ -21,7 +21,7 @@ Tracked in GitHub: https://github.com/ghostpencil/dungeon-daddy/issues/1 — che
 | IP-3 | Structured output for generator agent | DONE |
 | IP-4 | Model configurable via environment variable | DONE |
 | IP-2 | LLM observability | DONE |
-| IP-8 | Consolidate requirements files into pyproject.toml | TODO |
+| IP-8 | Consolidate requirements files into pyproject.toml | DONE |
 | IP-7 | Prompt versioning | TODO |
 | IP-6 | Minimal AI output evals | TODO |
 | IP-9 | Fix mypy None-guard issues in 6 deferred files | TODO (next BUILD phase) |
@@ -70,6 +70,14 @@ _None._
 - Added `@pytest.mark.live_api` to all 3 tests in `tests/integration/test_llm_integration.py`.
 - CI log now shows skip reason explicitly when `OPENAI_API_KEY` is not set.
 - 788 non-live tests passing.
+
+**2026-05-27 — IP-8: Consolidate requirements files into pyproject.toml**
+
+- Deleted `requirements.txt` and `requirements-dev.txt` — all deps were already in `pyproject.toml`.
+- Updated CI install step: `pip install -r requirements-dev.txt` → `pip install -e ".[dev]"`.
+- Updated `cache-dependency-path` in CI from `requirements-dev.txt` to `pyproject.toml`.
+- Updated README: installation uses `pip install -e .`; dev setup uses `pip install -e ".[dev]"`.
+- 813 non-live tests still passing.
 
 **2026-05-27 — IP-2: LLM observability**
 
