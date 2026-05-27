@@ -7,7 +7,7 @@ name = "dungeon-daddy"
 version = "0.1.0"
 description = "AI-powered dungeon design and play tool for tabletop game masters"
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "MIT"
 requires-python = ">=3.12"
 authors = [
     { name = "Lawrence Fanizza" }
@@ -32,6 +32,9 @@ dev = [
 
 [project.scripts]
 dungeon-daddy = "dungeon_daddy.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["dungeon_daddy*"]
 
 [tool.setuptools.package-data]
 "dungeon_daddy.prompts" = ["*.txt"]
