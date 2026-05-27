@@ -12,10 +12,12 @@ class _MockProvider:
         self._response = response
         self.last_system = ""
         self.last_messages = []
+        self.last_response_format: dict | None = None
 
-    def complete(self, messages, system="", max_tokens=1024):
+    def complete(self, messages, system="", max_tokens=1024, response_format=None):
         self.last_system = system
         self.last_messages = messages
+        self.last_response_format = response_format
         return self._response
 
     @property
@@ -82,6 +84,31 @@ def _make_valid_level_json() -> str:
     return f"```json\n{json.dumps(level, indent=2)}\n```"
 
 
+def _make_minimal_level_json_raw() -> str:
+    """Same level dict as _make_valid_level_json but returned as raw JSON (no markdown fence)."""
+    level = {
+        "id": 1,
+        "name": "The Sunken Vestibule",
+        "summary": "A flooded entry hall.",
+        "ecology": "4 goblin archers",
+        "loop": "lock_key",
+        "width": 12,
+        "height": 10,
+        "entries": [],
+        "rooms": [
+            {"id": "1-A", "num": 1, "name": "Entry Hall",
+             "x": 0, "y": 0, "w": 3, "h": 3, "type": "hall", "note": ""},
+            {"id": "1-B", "num": 2, "name": "Guard Room",
+             "x": 5, "y": 0, "w": 3, "h": 3, "type": "hall", "note": ""},
+        ],
+        "connections": [
+            {"from": "1-A", "to": "1-B", "type": "door", "note": ""},
+        ],
+        "loops": [],
+    }
+    return json.dumps(level)
+
+
 # ---------------------------------------------------------------------------
 # Behavior 1: generate_level() calls provider.complete() and returns response
 # ---------------------------------------------------------------------------
@@ -111,7 +138,7 @@ def test_generate_level_uses_large_max_tokens():
     calls = []
 
     class _TrackingProvider:
-        def complete(self, messages, system="", max_tokens=1024):
+        def complete(self, messages, system="", max_tokens=1024, response_format=None):
             calls.append(max_tokens)
             return _make_valid_level_json()
 
@@ -552,3 +579,31 @@ def test_parse_level_duplicate_main_loop_role_in_same_loop_raises():
     agent = DungeonGeneratorAgent(provider=_MockProvider())
     with pytest.raises(ValueError, match="duplicate.*main_loop_role|main_loop_role.*duplicate"):
         agent.parse_level(_make_level_json_duplicate_main_loop_role())
+
+
+# ---------------------------------------------------------------------------
+# Behavior: generate_level calls provider with response_format=json_object
+# ---------------------------------------------------------------------------
+
+def test_generate_level_passes_json_object_response_format():
+    from dungeon_daddy.llm.agents.generator_agent import DungeonGeneratorAgent
+
+    provider = _MockProvider(response=_make_minimal_level_json_raw())
+    agent = DungeonGeneratorAgent(provider=provider)
+    agent.generate_level(_make_brief(), _make_level_brief(), _make_empty_dungeon())
+
+    assert provider.last_response_format == {"type": "json_object"}
+
+
+# ---------------------------------------------------------------------------
+# Behavior: parse_level() handles raw JSON (no markdown fence)
+# ---------------------------------------------------------------------------
+
+def test_parse_level_handles_raw_json_without_markdown_fence():
+    from dungeon_daddy.llm.agents.generator_agent import DungeonGeneratorAgent
+
+    agent = DungeonGeneratorAgent(provider=_MockProvider())
+    level = agent.parse_level(_make_minimal_level_json_raw())
+
+    assert level.id == 1
+    assert level.name == "The Sunken Vestibule"

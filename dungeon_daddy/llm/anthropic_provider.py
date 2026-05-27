@@ -33,6 +33,7 @@ class AnthropicProvider:
         messages: list[LLMMessage],
         system: str = "",
         max_tokens: int = 1024,
+        response_format: dict[str, str] | None = None,  # noqa: ARG002 — Anthropic doesn't support this
     ) -> str:
         try:
             response = self._client.messages.create(

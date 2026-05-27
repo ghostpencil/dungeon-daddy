@@ -165,3 +165,44 @@ def test_openai_provider_stream_skips_none_deltas(mocker):
     p = OpenAIProvider(api_key="fake")
     chunks = list(p.stream([LLMMessage(role="user", content="hi")]))
     assert "".join(chunks) == "Hi!"
+
+
+# ---------------------------------------------------------------------------
+# Behavior 6: complete() forwards response_format to the API when provided
+# ---------------------------------------------------------------------------
+
+def test_openai_provider_complete_passes_response_format(mocker):
+    mock_client = mocker.MagicMock()
+    mock_client.chat.completions.create.return_value.choices = [
+        mocker.MagicMock(message=mocker.MagicMock(content="{}"))
+    ]
+    mocker.patch("openai.OpenAI", return_value=mock_client)
+
+    from dungeon_daddy.llm.openai_provider import OpenAIProvider
+    from dungeon_daddy.llm.provider import LLMMessage
+
+    p = OpenAIProvider(api_key="fake")
+    p.complete(
+        [LLMMessage(role="user", content="hi")],
+        response_format={"type": "json_object"},
+    )
+
+    _, kwargs = mock_client.chat.completions.create.call_args
+    assert kwargs["response_format"] == {"type": "json_object"}
+
+
+def test_openai_provider_complete_omits_response_format_when_none(mocker):
+    mock_client = mocker.MagicMock()
+    mock_client.chat.completions.create.return_value.choices = [
+        mocker.MagicMock(message=mocker.MagicMock(content="ok"))
+    ]
+    mocker.patch("openai.OpenAI", return_value=mock_client)
+
+    from dungeon_daddy.llm.openai_provider import OpenAIProvider
+    from dungeon_daddy.llm.provider import LLMMessage
+
+    p = OpenAIProvider(api_key="fake")
+    p.complete([LLMMessage(role="user", content="hi")])
+
+    _, kwargs = mock_client.chat.completions.create.call_args
+    assert "response_format" not in kwargs

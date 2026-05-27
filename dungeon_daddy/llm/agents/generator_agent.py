@@ -72,7 +72,7 @@ class DungeonGeneratorAgent:
         "touching edges (gap=0) are forbidden. "
         "Plan positions with generous spacing to avoid gap violations.\n"
         "Apply the specified loop pattern: assign rooms to path_a and path_b.\n"
-        "Output only a single ```json``` block containing the Level object. No prose."
+        "Output only valid JSON conforming to the Level schema. No prose, no markdown."
     )
 
     def __init__(self, provider: LLMProvider) -> None:
@@ -90,23 +90,29 @@ class DungeonGeneratorAgent:
             messages=[],
             system=self.SYSTEM_PROMPT + "\n\n" + context,
             max_tokens=4096,
+            response_format={"type": "json_object"},
         )
         _log.debug("Generator raw response (level %s):\n%s", level_brief.level_number, response)
         return response
 
     def parse_level(self, response: str) -> Level:
         """
-        Extract and parse the Level JSON from a ```json``` block.
-        Raises ValueError if no valid block is found.
+        Extract and parse the Level JSON.
+        Accepts raw JSON or a ```json``` fenced block.
+        Raises ValueError if neither form is parseable.
         Raises pydantic.ValidationError if the JSON doesn't match the Level schema.
         """
         match = _JSON_RE.search(response)
-        if not match:
-            raise ValueError(
-                "No ```json``` block found in generator response. "
-                f"Response was: {response[:200]!r}"
-            )
-        data = json.loads(match.group(1))
+        if match:
+            data = json.loads(match.group(1))
+        else:
+            try:
+                data = json.loads(response)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    "Generator response is not valid JSON and contains no ```json``` block. "
+                    f"Response was: {response[:200]!r}"
+                ) from exc
         _coerce_sub_loop_roles(data)
         level = Level.model_validate(data)
         _check_no_duplicate_main_loop_roles(level)

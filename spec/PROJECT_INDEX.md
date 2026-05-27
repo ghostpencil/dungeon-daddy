@@ -18,7 +18,7 @@ Tracked in GitHub: https://github.com/ghostpencil/dungeon-daddy/issues/1 — che
 |---|---|---|
 | IP-5 | Formal skip markers for API-gated integration tests | DONE |
 | IP-1 | CI: add lint, type-check, coverage | DONE |
-| IP-3 | Structured output for generator agent | TODO |
+| IP-3 | Structured output for generator agent | DONE |
 | IP-4 | Model configurable via environment variable | TODO |
 | IP-2 | LLM observability | TODO |
 | IP-8 | Consolidate requirements files into pyproject.toml | TODO |
@@ -45,6 +45,16 @@ _None._
   and per-file `ignore_errors` overrides for 6 complex files needing architectural None-guard work.
 - Coverage gate at 70%: currently at 74%.
 - 791 non-live tests passing.
+
+**2026-05-27 — IP-3: Structured output for generator agent**
+
+- Added `response_format: dict[str, str] | None = None` to `LLMProvider` Protocol, `OpenAIProvider.complete()`, and `AnthropicProvider.complete()`.
+- `OpenAIProvider` forwards the param to the SDK when set (conditional branch to preserve existing `arg-type` ignore).
+- `AnthropicProvider` accepts but ignores it (Anthropic doesn't support this param).
+- `DungeonGeneratorAgent.generate_level()` passes `response_format={"type": "json_object"}`.
+- Updated system prompt: removed markdown fence instruction; now says "Output only valid JSON. No prose, no markdown."
+- `parse_level()` now accepts raw JSON (no ``` fence) as well as the old fenced form.
+- 796 non-live tests passing.
 
 **2026-05-27 — IP-5: Formal skip markers for API-gated integration tests**
 

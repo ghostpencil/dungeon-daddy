@@ -184,3 +184,25 @@ def test_mock_provider_satisfies_protocol():
     assert callable(p.complete)
     assert callable(p.stream)
     assert isinstance(p.model_id, str)
+
+
+# ---------------------------------------------------------------------------
+# Behavior 8: AnthropicProvider.complete() accepts response_format and ignores it
+# ---------------------------------------------------------------------------
+
+def test_anthropic_provider_accepts_response_format_without_error(mocker):
+    mock_client = mocker.MagicMock()
+    mock_client.messages.create.return_value.content = [mocker.MagicMock(text="ok")]
+    mocker.patch("anthropic.Anthropic", return_value=mock_client)
+
+    from dungeon_daddy.llm.anthropic_provider import AnthropicProvider
+    from dungeon_daddy.llm.provider import LLMMessage
+
+    p = AnthropicProvider(api_key="fake")
+    result = p.complete(
+        [LLMMessage(role="user", content="hi")],
+        response_format={"type": "json_object"},
+    )
+    assert result == "ok"
+    _, kwargs = mock_client.messages.create.call_args
+    assert "response_format" not in kwargs

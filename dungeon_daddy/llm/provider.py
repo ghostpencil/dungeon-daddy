@@ -30,6 +30,7 @@ class LLMProvider(Protocol):
         messages: list[LLMMessage],
         system: str = "",
         max_tokens: int = 1024,
+        response_format: dict[str, str] | None = None,
     ) -> str: ...
 
     def stream(

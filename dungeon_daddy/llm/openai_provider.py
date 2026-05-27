@@ -33,13 +33,23 @@ class OpenAIProvider:
         messages: list[LLMMessage],
         system: str = "",
         max_tokens: int = 1024,
+        response_format: dict[str, str] | None = None,
     ) -> str:
         try:
-            response = self._client.chat.completions.create(
-                model=self._model,
-                max_tokens=max_tokens,
-                messages=self._build_messages(system, messages),  # type: ignore[arg-type]
-            )
+            built = self._build_messages(system, messages)
+            if response_format is not None:
+                response = self._client.chat.completions.create(  # type: ignore[call-overload]
+                    model=self._model,
+                    max_tokens=max_tokens,
+                    messages=built,
+                    response_format=response_format,
+                )
+            else:
+                response = self._client.chat.completions.create(
+                    model=self._model,
+                    max_tokens=max_tokens,
+                    messages=built,  # type: ignore[arg-type]
+                )
             return response.choices[0].message.content or ""
         except openai.APIError as e:
             raise LLMError(str(e)) from e
