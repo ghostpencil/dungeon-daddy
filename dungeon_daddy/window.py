@@ -7,6 +7,7 @@ Fonts are loaded once here before any view is shown.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -45,19 +46,25 @@ def _load_fonts() -> None:
             _log.warning("Font file not found (will use fallback): %s", path)
 
 
+_DEFAULT_OPENAI_MODEL = "gpt-4o"
+
+
+def _get_model_id() -> str:
+    return os.environ.get("DUNGEON_DADDY_MODEL", _DEFAULT_OPENAI_MODEL)
+
+
 # ---------------------------------------------------------------------------
 # LLM agent factory
 # ---------------------------------------------------------------------------
 
 def _build_dm_agent() -> object:
     """Create the DM agent with OpenAI provider. Returns None on failure."""
-    import os
     api_key = os.environ.get("OPENAI_API_KEY", "")
     _log.info("OPENAI_API_KEY present: %s (length=%d)", bool(api_key), len(api_key))
     try:
         from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
         from dungeon_daddy.llm.openai_provider import OpenAIProvider
-        agent = DungeonMasterAgent(OpenAIProvider())
+        agent = DungeonMasterAgent(OpenAIProvider(model=_get_model_id()))
         _log.info("DM agent built successfully")
         return agent
     except Exception:
@@ -74,7 +81,7 @@ def _build_agents() -> tuple:
         from dungeon_daddy.llm.agents.wizard_agent import DungeonWizardAgent
         from dungeon_daddy.llm.openai_provider import OpenAIProvider
 
-        provider = OpenAIProvider()
+        provider = OpenAIProvider(model=_get_model_id())
         catalog = LoopPatternCatalog.load_bundled()
         wizard = DungeonWizardAgent(provider, catalog.patterns)
         generator = DungeonGeneratorAgent(provider)

@@ -224,3 +224,29 @@ def test_validate_no_fixable_errors_shows_errors_without_prompting():
 
     assert len(ask_calls) == 0
     assert any("error(s) found" in m for m in infos)
+
+
+# ---------------------------------------------------------------------------
+# IP-4: model configurable via environment variable
+# ---------------------------------------------------------------------------
+
+def test_get_model_id_returns_default_when_env_not_set(monkeypatch):
+    monkeypatch.delenv("DUNGEON_DADDY_MODEL", raising=False)
+    from dungeon_daddy.window import _get_model_id
+    assert _get_model_id() == "gpt-4o"
+
+
+def test_get_model_id_reads_dungeon_daddy_model_env(monkeypatch):
+    monkeypatch.setenv("DUNGEON_DADDY_MODEL", "gpt-4o-mini")
+    from dungeon_daddy.window import _get_model_id
+    assert _get_model_id() == "gpt-4o-mini"
+
+
+def test_build_dm_agent_passes_model_id_to_provider(monkeypatch):
+    monkeypatch.setenv("DUNGEON_DADDY_MODEL", "gpt-4o-mini")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    with patch("dungeon_daddy.llm.openai_provider.OpenAIProvider") as MockProvider, \
+         patch("dungeon_daddy.llm.agents.dm_agent.DungeonMasterAgent"):
+        from dungeon_daddy.window import _build_dm_agent
+        _build_dm_agent()
+    MockProvider.assert_called_once_with(model="gpt-4o-mini")

@@ -5,7 +5,7 @@
 Phase: Post-18 Stabilisation
 Status: ONGOING — bug fixes and spec alignment only
 
-791 unit/integration tests passing (excl. UI harness and 3 live-API tests).
+799 unit/integration tests passing (excl. UI harness and 3 live-API tests).
 
 ---
 
@@ -19,7 +19,7 @@ Tracked in GitHub: https://github.com/ghostpencil/dungeon-daddy/issues/1 — che
 | IP-5 | Formal skip markers for API-gated integration tests | DONE |
 | IP-1 | CI: add lint, type-check, coverage | DONE |
 | IP-3 | Structured output for generator agent | DONE |
-| IP-4 | Model configurable via environment variable | TODO |
+| IP-4 | Model configurable via environment variable | DONE |
 | IP-2 | LLM observability | TODO |
 | IP-8 | Consolidate requirements files into pyproject.toml | TODO |
 | IP-7 | Prompt versioning | TODO |
@@ -55,6 +55,14 @@ _None._
 - Updated system prompt: removed markdown fence instruction; now says "Output only valid JSON. No prose, no markdown."
 - `parse_level()` now accepts raw JSON (no ``` fence) as well as the old fenced form.
 - 796 non-live tests passing.
+
+**2026-05-27 — IP-4: Model configurable via environment variable**
+
+- Added `_get_model_id()` to `window.py`: reads `DUNGEON_DADDY_MODEL` env var, falls back to `"gpt-4o"`.
+- Both `_build_dm_agent()` and `_build_agents()` now pass `model=_get_model_id()` to `OpenAIProvider`.
+- Added `DUNGEON_DADDY_MODEL=gpt-4o` to `.env.example`.
+- 3 new unit tests: default fallback, env override, factory passes model to provider.
+- 799 non-live tests passing.
 
 **2026-05-27 — IP-5: Formal skip markers for API-gated integration tests**
 
