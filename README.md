@@ -69,7 +69,7 @@ git clone https://github.com/ghostpencil/dungeon-daddy.git
 cd dungeon-daddy
 python -m venv .venv
 .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -e .
 ```
 
 Copy the environment template and add your API key:
@@ -159,7 +159,7 @@ Each phase is small enough to complete in one context window. Each context windo
 Install dev dependencies:
 
 ```bash
-pip install -r requirements-dev.txt
+pip install -e ".[dev]"
 ```
 
 Run the test suite:
