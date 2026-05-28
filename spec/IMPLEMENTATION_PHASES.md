@@ -947,7 +947,7 @@ Smoke test fixes (found during `smoke_test_phase17.py`):
 
 ## Phase 18 — Python Code Quality Stabilisation
 
-**Status: Not Started**
+**Status: Complete**
 
 Address the type-safety, error-handling, and maintainability gaps identified in
 the Python Pro assessment (2026-05-18). No new features. No new runtime behaviour.
@@ -1087,6 +1087,27 @@ Also fixed as part of step 6: `llm/telemetry.py` (`ObservingProvider.last_usage`
 - [x] `mypy dungeon_daddy` passes with zero per-file overrides for these 6 files
 - [x] `pytest tests/unit/` fully green (824 tests)
 - [x] CI mypy step passes without the overrides
+
+---
+
+## Post-Phase 18 — Improvement Plan (IP-1 through IP-9, MC-1)
+
+**Status: Complete** — 849 unit/integration tests passing. Stable release declared 2026-05-27.
+
+All quality, tooling, and observability improvements from `spec/IMPROVEMENT_PLAN.md` are complete.
+
+| ID | Title | Result |
+|---|---|---|
+| IP-1 | CI: lint, type-check, coverage gate | `ruff`, `mypy`, `pytest --cov` in CI; 74% coverage; 70% gate |
+| IP-2 | LLM observability | `ObservingProvider` + `llm_calls.jsonl` + `tools/llm_cost_report.py` |
+| IP-3 | Structured output for generator agent | `response_format={"type": "json_object"}` via `OpenAIProvider` |
+| IP-4 | Model configurable via environment variable | `DUNGEON_DADDY_MODEL` env var; falls back to `gpt-4o` |
+| IP-5 | Formal skip markers for API-gated integration tests | `@pytest.mark.live_api`; skip reason visible in CI |
+| IP-6 | Minimal AI output evals | `tests/evals/`; 6 evals passing; `tools/run_evals.py` |
+| IP-7 | Prompt versioning | `dungeon_daddy/prompts/*.txt`; `load_prompt()`; hash in telemetry |
+| IP-8 | Consolidate requirements into pyproject.toml | `requirements.txt` / `requirements-dev.txt` deleted |
+| IP-9 | Fix mypy None-guard issues (6 deferred files) | `mypy dungeon_daddy` clean; zero per-file overrides |
+| MC-1 | Markdown rendering in chat panels | `MarkdownLabel` + `md_to_html()`; bold, italic, code, headings, bullets |
 
 ---
 
