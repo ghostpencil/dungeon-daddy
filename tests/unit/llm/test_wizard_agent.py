@@ -170,6 +170,29 @@ def test_parse_brief_returns_none_on_empty_string():
     assert agent.parse_brief("") is None
 
 
+def test_parse_brief_tolerates_num_levels_as_string_with_extra_text():
+    """LLM sometimes returns '3 levels of moderate complexity' instead of 3."""
+    from dungeon_daddy.llm.agents.wizard_agent import DungeonWizardAgent
+
+    agent = DungeonWizardAgent(provider=_MockProvider(), loop_patterns={})
+    response = """
+```brief
+{
+  "title": "Tomb",
+  "theme": "Undead",
+  "setting": "A crypt.",
+  "party": "4 players",
+  "quest": "Defeat the lich.",
+  "num_levels": "3 levels of moderate complexity",
+  "gm_notes": ""
+}
+```
+"""
+    brief = agent.parse_brief(response)
+    assert brief is not None
+    assert brief.num_levels == 3
+
+
 # ---------------------------------------------------------------------------
 # Behavior 5: _build_pattern_list() formats patterns for the system prompt
 # ---------------------------------------------------------------------------

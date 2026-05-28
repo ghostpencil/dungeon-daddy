@@ -27,6 +27,14 @@ def _str(val: object) -> str:
     return str(val)
 
 
+def _int(val: object) -> int:
+    """Extract the first integer from val; handles '3 levels of moderate complexity' → 3."""
+    if isinstance(val, int):
+        return val
+    m = re.search(r"\d+", str(val))
+    return int(m.group()) if m else 1
+
+
 @dataclass
 class LevelBrief:
     """Loop pattern, ecology, and GM notes for one dungeon level. Collected per-level in wizard phase 2."""
@@ -160,7 +168,7 @@ class DungeonWizardAgent:
                 setting=_str(data["setting"]),
                 party=_str(data["party"]),
                 quest=_str(data["quest"]),
-                num_levels=int(data["num_levels"]),
+                num_levels=_int(data["num_levels"]),
                 gm_notes=_str(data.get("gm_notes", "")),
             )
         except (json.JSONDecodeError, KeyError):

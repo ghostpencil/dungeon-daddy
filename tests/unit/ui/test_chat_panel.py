@@ -1,11 +1,12 @@
 """Unit tests for ChatPanel.on_mouse_press chip click handling and handle_key_press."""
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import arcade
 import pytest
 
+from dungeon_daddy.data.models import ChatMessage
 from dungeon_daddy.ui.panels.chat_panel import ChatPanel
 
 
@@ -125,3 +126,108 @@ def test_set_context_loaded_false_clears(panel):
     panel.set_context_loaded(True)
     panel.set_context_loaded(False)
     assert panel._context_loaded is False
+
+
+# ---------------------------------------------------------------------------
+# MC-1 Step 4 — label cache
+# ---------------------------------------------------------------------------
+
+def _mock_pyglet_html_label():
+    mock_inner = MagicMock()
+    mock_inner.content_height = 50
+    return mock_inner
+
+
+def test_label_cache_starts_empty(panel):
+    assert panel._label_cache == {}
+
+
+def test_get_or_build_label_creates_on_miss(panel):
+    msg = ChatMessage(role="dm", content="hello")
+    with patch("pyglet.text.HTMLLabel", return_value=_mock_pyglet_html_label()):
+        label = panel._get_or_build_label(0, msg, 300.0)
+    assert label is not None
+    assert 0 in panel._label_cache
+
+
+def test_get_or_build_label_returns_same_on_hit(panel):
+    msg = ChatMessage(role="dm", content="hello")
+    mock_inner = _mock_pyglet_html_label()
+    with patch("pyglet.text.HTMLLabel", return_value=mock_inner):
+        label1 = panel._get_or_build_label(0, msg, 300.0)
+        label2 = panel._get_or_build_label(0, msg, 300.0)
+    assert label1 is label2
+
+
+def test_resize_clears_label_cache(panel):
+    msg = ChatMessage(role="dm", content="hello")
+    with patch("pyglet.text.HTMLLabel", return_value=_mock_pyglet_html_label()):
+        panel._get_or_build_label(0, msg, 300.0)
+    assert 0 in panel._label_cache
+    panel.resize(0.0, 0.0, 400.0, 600.0)
+    assert panel._label_cache == {}
+
+
+def test_teardown_clears_label_cache(panel):
+    msg = ChatMessage(role="dm", content="hello")
+    with patch("pyglet.text.HTMLLabel", return_value=_mock_pyglet_html_label()):
+        panel._get_or_build_label(0, msg, 300.0)
+    assert 0 in panel._label_cache
+    panel.teardown(MagicMock())
+    assert panel._label_cache == {}
+
+
+# ---------------------------------------------------------------------------
+# MC-1 Step 5 — _bubble_height uses label content_height
+# ---------------------------------------------------------------------------
+
+
+def test_bubble_height_uses_label_content_height(panel):
+    msg = ChatMessage(role="dm", content="hello")
+    mock_inner = _mock_pyglet_html_label()
+    mock_inner.content_height = 80
+    with patch("pyglet.text.HTMLLabel", return_value=mock_inner):
+        h = panel._bubble_height(0, msg, 300.0)
+    assert h == 116  # max(40, 80 + 8*2 + 20)
+
+
+def test_bubble_height_clamps_to_minimum_40(panel):
+    msg = ChatMessage(role="dm", content="")
+    mock_inner = _mock_pyglet_html_label()
+    mock_inner.content_height = 0
+    with patch("pyglet.text.HTMLLabel", return_value=mock_inner):
+        h = panel._bubble_height(0, msg, 300.0)
+    assert h == 40
+
+
+def test_compute_heights_uses_label_content_height(panel):
+    panel._messages = [
+        ChatMessage(role="dm", content="hello"),
+        ChatMessage(role="gm", content="world"),
+    ]
+    mock_inner = _mock_pyglet_html_label()
+    mock_inner.content_height = 60
+    with patch("pyglet.text.HTMLLabel", return_value=mock_inner):
+        heights = panel._compute_heights(300.0)
+    assert len(heights) == 2
+    assert all(h == 96 for h in heights)  # max(40, 60 + 16 + 20)
+
+
+# ---------------------------------------------------------------------------
+# MC-1 Step 6 — _draw_messages_inner uses label.draw()
+# ---------------------------------------------------------------------------
+
+
+def test_draw_messages_inner_calls_label_draw(panel):
+    msg = ChatMessage(role="dm", content="hello")
+    panel._messages = [msg]
+    mock_label = MagicMock()
+    panel._label_cache[0] = mock_label
+    with patch("dungeon_daddy.ui.panels.chat_panel.arcade"):
+        panel._draw_messages_inner(
+            bx=10.0, y_bot=0.0, y_top=600.0,
+            bubble_w=300.0, pad=8.0,
+            heights=[80], n=1, off=0.0,
+        )
+    mock_label.update_position.assert_called_once()
+    mock_label.draw.assert_called_once()

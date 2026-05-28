@@ -5,15 +5,12 @@
 Phase: Post-18 Stabilisation
 Status: ONGOING — bug fixes and spec alignment only
 
-824 unit/integration tests passing (excl. UI harness and 3 live-API tests).
+849 unit/integration tests passing (excl. UI harness and 3 live-API tests).
 6 eval tests passing (run with `pytest -m eval` or `python tools/run_evals.py`).
 
 ---
 
 ## Current Work
-
-Working through `spec/IMPROVEMENT_PLAN.md` in recommended order.
-Tracked in GitHub: https://github.com/ghostpencil/dungeon-daddy/issues/1 — check off each item as it lands.
 
 | ID | Title | Status |
 |---|---|---|
@@ -26,6 +23,7 @@ Tracked in GitHub: https://github.com/ghostpencil/dungeon-daddy/issues/1 — che
 | IP-7 | Prompt versioning | DONE |
 | IP-6 | Minimal AI output evals | DONE |
 | IP-9 | Fix mypy None-guard issues in 6 deferred files | DONE |
+| MC-1 | Markdown rendering in chat panels (Design + Play) | DONE |
 
 ---
 
@@ -100,6 +98,28 @@ _None._
 - Added `[tool.setuptools.package-data]` in `pyproject.toml` so `.txt` files are included in distributions.
 - 6 new tests in `tests/unit/llm/test_prompts.py` and `test_telemetry.py`.
 - 819 non-live tests passing.
+
+**2026-05-27 — MC-1: Markdown rendering — Steps 5–6 + wizard parse_brief bug fix**
+
+- Step 5 — `_bubble_height(index, msg, bubble_w)`: replaced character-count heuristic with `label.content_height + PAD_SM*2 + _LABEL_H`; bubbles now resize to fit formatted content exactly.
+- `_compute_heights` updated to pass the message index to `_bubble_height`.
+- Step 6 — `_draw_messages_inner`: removed `text_w` parameter; replaced `arcade.draw_text(msg.content, …)` with `label.update_position(…); label.draw()` — bold, italic, code, headings, and bullets all render via pyglet HTMLLabel.
+- Removed dead constants `_CHARS_PER_PX` and `_LINE_H`; removed unused `text_color` local.
+- Bug fix — `wizard_agent.parse_brief`: `int(data["num_levels"])` crashed when LLM returned `"3 levels of moderate complexity"`; added `_int()` helper that extracts the first digit from any value.
+- 5 new tests (Steps 5–6) + 1 new regression test for the parse_brief bug.
+- smoke_test_phase7.py: all 5 behaviors PASS — full wizard → generation → play flow confirmed.
+- 849 unit/integration tests passing.
+
+**2026-05-27 — MC-1: Markdown rendering — Steps 1–4 (md_to_html + MarkdownLabel + label cache)**
+
+- Created `dungeon_daddy/ui/widgets/markdown_label.py` with `_rgb_to_hex()`, `md_to_html()`, and `MarkdownLabel`.
+- `md_to_html()` applies 6 rules in order: headings (h1/h2/h3 with teal color + size), bold, italic, inline code (JetBrains Mono), bullets (`-`/`*` → `•`), `\n` → `<br>`.
+- `MarkdownLabel` wraps `pyglet.text.HTMLLabel` with `content_height`, `draw()`, and `update_position()`.
+- Added `_label_cache: dict[int, MarkdownLabel]` to `ChatPanel.__init__`.
+- Added `_get_or_build_label(index, msg, bubble_w)` — lazy cache; builds `MarkdownLabel` on first access per index.
+- `resize()` and `teardown()` both call `_label_cache.clear()`.
+- 5 new tests in `tests/unit/ui/test_chat_panel.py` — all passing.
+- 844 unit/integration tests passing.
 
 **2026-05-27 — IP-9: Fix mypy None-guard issues (all 7 steps)**
 

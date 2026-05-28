@@ -37,6 +37,7 @@ from dungeon_daddy.ui.theme import (
     draw_chip,
     draw_kicker,
 )
+from dungeon_daddy.ui.widgets.markdown_label import MarkdownLabel
 
 HEADER_H = 38
 ROOM_BANNER_H = 80   # play mode only: CURRENT ROOM banner below header
@@ -46,8 +47,6 @@ _INPUT_Y_OFF = 8     # distance from panel bottom to input box bottom
 _CHIP_CY_OFF = 86    # distance from panel bottom to chip row centre
 _LABEL_H = 20  # height reserved at top of each bubble for the role label
 _SCROLL_SPEED = 30  # pixels per mouse wheel click
-_CHARS_PER_PX = 7   # approximate character width for line-count estimation
-_LINE_H = 22        # approximate rendered line height for TEXT_BASE (12pt Inter + leading)
 _CHIPS_DESIGN = [
     "Validate level",
     "Add a secret door",
@@ -97,6 +96,7 @@ class ChatPanel:
         self._scroll_offset: float = 0.0
         self._chip_rects: list[tuple[float, float, float, float, str]] = []
         self._context_loaded: bool = False
+        self._label_cache: dict[int, MarkdownLabel] = {}
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -214,10 +214,12 @@ class ChatPanel:
         if self._send_btn is not None:
             manager.remove(self._send_btn)
             self._send_btn = None
+        self._label_cache.clear()
 
     def resize(self, x: float, y: float, w: float, h: float) -> None:
         """Reposition widgets after a window resize."""
         self._x, self._y, self._w, self._h = x, y, w, h
+        self._label_cache.clear()
         input_w = w - PAD_SM - 4 - 76 - PAD_SM
         if self._input is not None:
             self._input.rect = arcade.LRBT(
@@ -368,7 +370,6 @@ class ChatPanel:
         pad = PAD_SM
         bubble_w = w - PAD_XL * 2
         bx = x + PAD_XL
-        text_w = int(bubble_w - PAD_SM * 2)
         y_top = y_bot + area_h
 
         heights = self._compute_heights(bubble_w)
@@ -387,7 +388,7 @@ class ChatPanel:
         ctx.scissor = (int(x), int(y_bot), int(w), int(area_h))
         try:
             self._draw_messages_inner(
-                bx, y_bot, y_top, bubble_w, text_w, pad, heights, n, off
+                bx, y_bot, y_top, bubble_w, pad, heights, n, off
             )
         finally:
             ctx.scissor = old_scissor
@@ -395,7 +396,7 @@ class ChatPanel:
     def _draw_messages_inner(
         self,
         bx: float, y_bot: float, y_top: float,
-        bubble_w: float, text_w: int, pad: float,
+        bubble_w: float, pad: float,
         heights: list[int], n: int, off: float,
     ) -> None:
         # When messages fit in the area, top-anchor the stack so the first
@@ -440,7 +441,6 @@ class ChatPanel:
                 is_gm = msg.role == "gm"
                 fill = (20, 50, 55) if is_gm else BG_2
                 stroke = TEAL if is_gm else VIOLET
-                text_color = INK_2 if is_gm else INK_1
 
                 arcade.draw_rect_filled(
                     arcade.XYWH(bx + bubble_w / 2, draw_y + b_h / 2, bubble_w, b_h), fill
@@ -454,11 +454,9 @@ class ChatPanel:
                     bx + PAD_SM, draw_y + b_h - PAD_XS,
                     label_color, font_size=TEXT_XS, font_name=FONT_MONO, anchor_y="top",
                 )
-                arcade.draw_text(
-                    msg.content, bx + PAD_SM, draw_y + b_h - _LABEL_H,
-                    text_color, font_size=TEXT_BASE, font_name=FONT_UI,
-                    anchor_y="top", width=text_w, multiline=True,
-                )
+                label = self._get_or_build_label(n - 1 - i, msg, bubble_w)
+                label.update_position(bx + PAD_SM, draw_y + b_h - _LABEL_H)
+                label.draw()
 
             pos += b_h + pad
 
@@ -466,25 +464,26 @@ class ChatPanel:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _bubble_height(self, content: str, bubble_w: float) -> int:
-        """Estimate rendered bubble height from content.
+    def _get_or_build_label(self, index: int, msg: ChatMessage, bubble_w: float) -> MarkdownLabel:
+        if index not in self._label_cache:
+            text_w = int(bubble_w - PAD_SM * 2)
+            color = INK_2 if msg.role == "gm" else INK_1
+            self._label_cache[index] = MarkdownLabel(
+                msg.content,
+                x=0, y=0,
+                width=text_w,
+                color=color,
+                font_name=FONT_UI,
+                font_size=TEXT_BASE,
+            )
+        return self._label_cache[index]
 
-        Splits on newlines so that explicit line breaks (numbered lists,
-        blank separator lines) are counted individually before applying
-        word-wrap estimation within each paragraph.
-        """
-        chars_per_line = max(1, int((bubble_w - PAD_SM * 2) / _CHARS_PER_PX))
-        total_lines = 0
-        for para in content.split("\n"):
-            if para:
-                total_lines += max(1, (len(para) + chars_per_line - 1) // chars_per_line)
-            else:
-                total_lines += 1  # blank separator line
-        total_lines = max(1, total_lines) + 2  # +2 buffer for rounding / font metrics
-        return max(40, total_lines * _LINE_H + PAD_SM * 2 + _LABEL_H)
+    def _bubble_height(self, index: int, msg: ChatMessage, bubble_w: float) -> int:
+        label = self._get_or_build_label(index, msg, bubble_w)
+        return max(40, label.content_height + int(PAD_SM) * 2 + _LABEL_H)
 
     def _compute_heights(self, bubble_w: float) -> list[int]:
-        return [self._bubble_height(msg.content, bubble_w) for msg in self._messages]
+        return [self._bubble_height(i, msg, bubble_w) for i, msg in enumerate(self._messages)]
 
     def _total_stack_height(self, bubble_w: float) -> float:
         pad = PAD_SM
