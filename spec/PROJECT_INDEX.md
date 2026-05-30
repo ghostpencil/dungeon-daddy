@@ -28,7 +28,7 @@ labels placed collision-aware, camera auto-fits on load.
 
 | Step | Task | Status |
 |---|---|---|
-| 1 | Geometry models | Not Started |
+| 1 | Geometry models | **Done** — `dungeon_layout/models.py`, 21 tests |
 | 2 | Room role classification + template selection | Not Started |
 | 3 | Critical-path-first seed layout | Not Started |
 | 4 | Port generation | Not Started |
@@ -37,6 +37,19 @@ labels placed collision-aware, camera auto-fits on load.
 | 7 | Camera auto-fit | Not Started |
 | 8 | Validation tests + feedback reports | Not Started |
 | 9 | Debug overlay | Not Started |
+
+## Next Session
+
+Start **Step 2**: room role classification + template selection.
+
+- New module: `dungeon_daddy/map/dungeon_layout/semantics.py`
+- Test file: `tests/unit/map/layout/test_semantics.py`
+- Read `spec/TESTING.md` then invoke TDD skill before writing tests
+- Roles: `entrance`, `exit`, `hub`, `boss`, `objective`, `key_room`, `lock_room`, `treasure`, `hazard`, `secret`, `utility`, `corridor`, `side_room`, `transition`, `unknown`
+- Templates: `linear`, `hub_spoke`, `branch_merge`, `lock_key`, `boss_endcap`, `loop`, `freeform`
+- Explicit JSON metadata wins over inference; inference uses name/tag keywords + graph degree
+- Branch: `phase-19-vector-map-layout`
+- Test count at session start: 849
 
 ---
 
