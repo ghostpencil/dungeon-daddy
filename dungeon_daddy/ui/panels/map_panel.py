@@ -7,7 +7,9 @@ import arcade
 import arcade.gui
 
 from dungeon_daddy.data.models import Level, SessionState
+from dungeon_daddy.map.dungeon_layout import LayoutResult, run_layout_pipeline
 from dungeon_daddy.map.grid_renderer import GridRenderer
+from dungeon_daddy.map.layout_renderer import LayoutRenderer
 from dungeon_daddy.map.loop_overlay import LoopOverlay
 from dungeon_daddy.ui.theme import (
     BG_0,
@@ -46,6 +48,22 @@ _ZOOM_MAX = 3.0
 _ZOOM_DEFAULT = 1.0
 _ZOOM_SCROLL_FACTOR = 1.1   # multiplier per scroll notch
 _ZOOM_KEY_STEP = 0.25        # additive step per key press
+_EDGE_TOL = 8.0              # layout-space click tolerance for edge hit-testing
+
+
+def _point_near_segment(
+    px: float, py: float,
+    x1: float, y1: float, x2: float, y2: float,
+    tol: float,
+) -> bool:
+    dx, dy = x2 - x1, y2 - y1
+    len_sq = dx * dx + dy * dy
+    if len_sq == 0.0:
+        return (px - x1) ** 2 + (py - y1) ** 2 <= tol * tol
+    t = max(0.0, min(1.0, ((px - x1) * dx + (py - y1) * dy) / len_sq))
+    cx = x1 + t * dx
+    cy = y1 + t * dy
+    return (px - cx) ** 2 + (py - cy) ** 2 <= tol * tol
 
 
 def _tab_style(active: bool) -> dict[str, arcade.gui.UIFlatButton.UIStyle]:
@@ -92,12 +110,16 @@ class MapPanel:
         overlay: LoopOverlay | None = None,
         on_variant_change: Callable[[str], None] | None = None,
         on_activate_loop: Callable[[str | None], None] | None = None,
+        on_room_select: Callable[[str], None] | None = None,
+        on_connection_select: Callable[[str, str], None] | None = None,
     ) -> None:
         self._on_level_change = on_level_change
         self._renderer = renderer or GridRenderer()
         self._overlay = overlay or LoopOverlay()
         self._on_variant_change = on_variant_change
         self._on_activate_loop = on_activate_loop
+        self._on_room_select = on_room_select
+        self._on_connection_select = on_connection_select
         self._variant_btns: list[arcade.gui.UIFlatButton] = []
         self._active_variant = "Grid"
         self._active_tool: str = "select"   # "select" | "pan"
@@ -111,6 +133,9 @@ class MapPanel:
         self._dungeon_title: str = ""
         self._loop_strip_rects: dict[str, tuple[float, float, float, float]] = {}
         self._active_loop_id: str | None = None
+        self._layout_result: LayoutResult | None = None
+        self._layout_renderer = LayoutRenderer()
+        self._selected_room_id: str | None = None
 
         from dungeon_daddy.ui.widgets.level_stepper import LevelStepper
         self._stepper = LevelStepper(on_level_change)
@@ -147,8 +172,13 @@ class MapPanel:
         self._stepper.set_label(f"L{idx}")
         self._stepper.set_up_enabled(idx > 1)
         self._stepper.set_down_enabled(idx < total_levels)
+        self._layout_result = run_layout_pipeline(level)
+        self._selected_room_id = None
         self._zoom_level = _ZOOM_DEFAULT
-        self._center_level()
+        if self._active_variant == "Graph":
+            self._fit_layout_camera()
+        else:
+            self._center_level()
         self._active_loop_id = state.active_loop_id
         self._build_loop_strip_rects(level)
 
@@ -176,6 +206,24 @@ class MapPanel:
         grid_cy = (min_gy + max_gy) / 2
         self._pan_offset_x = map_w / 2 - PAD_MD - grid_cx * effective
         self._pan_offset_y = map_h / 2 - PAD_MD - grid_cy * effective
+
+    def _fit_layout_camera(self) -> None:
+        """Set zoom + pan so the layout bounds fill the Graph viewport."""
+        if not self._layout_result or self._w <= 0 or self._h <= 0:
+            return
+        b = self._layout_result.bounds
+        map_w = self._w - PANEL_STEPPER_WIDTH
+        map_h = self._h - _HEADER_H
+        if b.width > 0 and b.height > 0:
+            fit_zoom = min(
+                (map_w - 2 * PAD_MD) / b.width,
+                (map_h - 2 * PAD_MD) / b.height,
+            )
+            self._zoom_level = max(_ZOOM_MIN, min(_ZOOM_MAX, fit_zoom))
+        layout_cx = (b.min_x + b.max_x) / 2
+        layout_cy = (b.min_y + b.max_y) / 2
+        self._pan_offset_x = map_w / 2 - layout_cx * self._zoom_level
+        self._pan_offset_y = map_h / 2 - layout_cy * self._zoom_level
 
     def set_renderer(self, renderer: GridRenderer) -> None:
         self._renderer = renderer
@@ -237,6 +285,8 @@ class MapPanel:
             self._apply_zoom(self._zoom_level - _ZOOM_KEY_STEP, map_cx, map_cy)
         elif key == arcade.key.KEY_0:
             self._apply_zoom(_ZOOM_DEFAULT, map_cx, map_cy)
+        elif key == arcade.key.D and self._layout_result is not None:
+            self._layout_result.debug_overlay.enabled = not self._layout_result.debug_overlay.enabled
 
     # ------------------------------------------------------------------
     # Mouse interaction (delegated from PlayView)
@@ -252,6 +302,39 @@ class MapPanel:
                     if self._on_activate_loop is not None:
                         self._on_activate_loop(new_id)
                     return True
+        if (
+            button == arcade.MOUSE_BUTTON_LEFT
+            and self._active_variant == "Graph"
+            and self._active_tool == "select"
+            and self._layout_result is not None
+            and self._in_map_viewport(x, y)
+        ):
+            origin_x = self._x + PAD_MD + self._pan_offset_x
+            origin_y = self._y + PAD_MD + self._pan_offset_y
+            lx = (x - origin_x) / self._zoom_level
+            ly = (y - origin_y) / self._zoom_level
+            hit: str | None = None
+            for room_id, rect in self._layout_result.rooms.items():
+                if rect.x <= lx <= rect.x + rect.w and rect.y <= ly <= rect.y + rect.h:
+                    hit = room_id
+                    break
+            if hit is not None:
+                self._selected_room_id = None if hit == self._selected_room_id else hit
+                if self._on_room_select is not None:
+                    self._on_room_select(hit)
+                return True
+            for edge in self._layout_result.edges:
+                pts = edge.points
+                for i in range(len(pts) - 1):
+                    x1, y1 = pts[i]
+                    x2, y2 = pts[i + 1]
+                    if _point_near_segment(lx, ly, x1, y1, x2, y2, _EDGE_TOL):
+                        if self._on_connection_select is not None:
+                            parts = edge.connection_id.split("→")
+                            if len(parts) == 2:
+                                self._on_connection_select(parts[0], parts[1])
+                        return True
+
         if self._active_tool == "pan" and button == arcade.MOUSE_BUTTON_LEFT:
             if self._in_map_viewport(x, y):
                 self._is_panning = True
@@ -287,8 +370,14 @@ class MapPanel:
             if self._level is not None and self._state is not None:
                 origin_x = x + PAD_MD + self._pan_offset_x
                 origin_y = y + PAD_MD + self._pan_offset_y
-                self._renderer.draw(self._level, self._state, origin_x, origin_y, self._zoom_level)
-                self._overlay.draw(self._level, self._state, self._renderer, origin_x, origin_y, self._zoom_level)
+                if self._active_variant == "Graph" and self._layout_result is not None:
+                    self._layout_renderer.draw(
+                        self._layout_result, origin_x, origin_y, self._zoom_level,
+                        selected_room_id=self._selected_room_id,
+                    )
+                else:
+                    self._renderer.draw(self._level, self._state, origin_x, origin_y, self._zoom_level)
+                    self._overlay.draw(self._level, self._state, self._renderer, origin_x, origin_y, self._zoom_level)
             else:
                 arcade.draw_text(
                     "Load a dungeon to view the map",
@@ -386,6 +475,8 @@ class MapPanel:
     def _handle_variant_click(self, label: str) -> None:
         self._active_variant = label
         self._active_tool = "select"
+        if label == "Graph":
+            self._fit_layout_camera()
         self._refresh_tab_styles()
         if self._on_variant_change is not None:
             self._on_variant_change(label.lower())

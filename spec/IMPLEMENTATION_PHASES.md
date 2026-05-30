@@ -1111,6 +1111,67 @@ All quality, tooling, and observability improvements from `spec/IMPROVEMENT_PLAN
 
 ---
 
+## Phase 19 — Vector Map Layout Phase 1
+
+**Status: Complete** — 337 map unit tests passing. mypy zero errors. Closed 2026-05-30.
+
+Spec: `spec/MAP_LAYOUT_PHASE_NEXT.md`
+
+Improve the dungeon map renderer from a generic node graph into a semantically-aware, visually authored dungeon schematic. Rooms are placed by role, connections are routed orthogonally, labels are placed collision-aware, and the camera auto-fits on load.
+
+### Modules
+
+| Module | Test File |
+|---|---|
+| `dungeon_daddy/map/dungeon_layout/models.py` (new) | `tests/unit/map/layout/test_models.py` |
+| `dungeon_daddy/map/dungeon_layout/semantics.py` (new) | `tests/unit/map/layout/test_semantics.py` |
+| `dungeon_daddy/map/dungeon_layout/seed_layout.py` (new) | `tests/unit/map/layout/test_seed_layout.py` |
+| `dungeon_daddy/map/dungeon_layout/ports.py` (new) | `tests/unit/map/layout/test_ports.py` |
+| `dungeon_daddy/map/dungeon_layout/route_orthogonal.py` (new) | `tests/unit/map/layout/test_routing.py` |
+| `dungeon_daddy/map/dungeon_layout/labels.py` (new) | `tests/unit/map/layout/test_labels.py` |
+| `dungeon_daddy/map/dungeon_layout/camera_fit.py` (new) | `tests/unit/map/layout/test_camera_fit.py` |
+| `dungeon_daddy/map/dungeon_layout/render_cache.py` (new) | (covered by integration) |
+| `dungeon_daddy/map/dungeon_layout/validation.py` (new) | `tests/unit/map/layout/test_layout_invariants.py` |
+| `dungeon_daddy/map/graph_renderer.py` (update) | `tests/unit/map/test_graph_renderer.py` |
+
+### Implementation Steps
+
+| Step | Task | Status |
+|---|---|---|
+| 1 | Geometry models | **Done** — `dungeon_layout/models.py`, 21 tests |
+| 2 | Room role classification + template selection | **Done** — `dungeon_layout/semantics.py`, 39 tests |
+| 3 | Critical-path-first seed layout | **Done** — `dungeon_layout/seed_layout.py`, 4 tests |
+| 4 | Port generation | **Done** — `dungeon_layout/ports.py`, 7 tests |
+| 5 | Obstacle-aware orthogonal routing | **Done** — `dungeon_layout/route_orthogonal.py`, 7 tests |
+| 6 | Label placement | **Done** — `dungeon_layout/labels.py`, 6 tests |
+| 7 | Camera auto-fit | **Done** — `dungeon_layout/camera_fit.py`, 6 tests |
+| 8 | Validation tests + JSON/Markdown feedback reports | **Done** — `dungeon_layout/validation.py`, 17 unit + 13 integration tests |
+| 9 | Debug overlay | **Done** — `dungeon_layout/debug_overlay.py` + `layout_debug_renderer.py`, 9 tests |
+| W | Pipeline wiring into map panel | **Done** — `dungeon_layout/__init__.py`, `layout_renderer.py`, `map_panel.py`, 19 tests |
+| 10 | Room name labels in Graph view | **Done** — 1 test |
+| 11 | Room click + selection highlight | **Done** — 6 tests |
+| B | Post-close bug fixes (labels, room/connection → chat) | **Done** — 5 tests |
+
+### Exit Criteria
+
+- [x] At least three real dungeon floor fixtures render using the new pipeline
+- [x] Room roles read from metadata or inferred consistently
+- [x] At least four layout templates supported: `linear`, `hub_spoke`, `branch_merge`, `boss_endcap` or `lock_key`
+- [x] Normal connections use port-based orthogonal routing
+- [x] Normal connections do not pass through unrelated rooms
+- [x] Excessive rectangular detours are penalized and avoided where a better route exists
+- [x] Connection labels placed after routing and avoid obvious collisions
+- [x] Camera auto-fit frames the full map on level load
+- [x] Debug overlay shows rooms, inflated obstacles, ports, routes, labels, and camera bounds
+- [x] Automated tests validate core layout invariants
+- [x] Fixture tests generate JSON feedback reports (`test_outputs/layout_feedback/`)
+- [x] Fixture tests generate Markdown feedback summary with warnings, metrics, and human review checklists
+- [x] Map viewer still uses vector/geometric rendering (not tiles)
+- [x] Existing pan/zoom functionality continues to work
+- [x] `pytest tests/unit/` green (337 map tests)
+
+---
+
 ## Notes for the Implementing Agent
 
 - **Do not advance to the next phase until all exit criteria for the current phase are met.**
