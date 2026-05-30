@@ -3,7 +3,7 @@
 ## Phase
 
 Phase: Phase 20 — Vector Map Layout Phase 2: Visual Hierarchy & Semantic Presentation
-Status: **IN PROGRESS** — Steps 1–7 done, Step 8 next
+Status: **DONE** — All 10 steps complete. Phase 21 TBD.
 
 Spec: `spec/MAP_LAYOUT_PHASE_2.md`
 

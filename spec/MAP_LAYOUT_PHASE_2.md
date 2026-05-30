@@ -1,5 +1,9 @@
 # Dungeon Daddy Graph Mode — Phase 2 Map Visual Hierarchy & Semantic Presentation
 
+> **Phase 20 closed — 2026-05-30.**
+> All 10 steps complete. 1,097 tests passing. mypy zero errors.
+> Artifacts in `artifacts/layout/phase2/`. See `spec/PROJECT_INDEX.md` for session log.
+
 ## Purpose
 
 Phase 1 successfully moved the Dungeon Daddy map renderer away from fragile geometric output and toward clean, collision-free graph layouts. The current Graph Mode now produces readable room placement, clean routed connections, useful layout metrics, and generated feedback artifacts.
