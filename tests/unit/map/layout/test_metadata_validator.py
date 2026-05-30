@@ -1,9 +1,7 @@
 """Tests for dungeon_layout.metadata_validator — semantic metadata validation."""
-import pytest
 
 from dungeon_daddy.data.models import Connection, LayoutMetadata, Level, Room
 from dungeon_daddy.map.dungeon_layout.metadata_validator import validate_metadata
-
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -11,7 +11,11 @@ from dungeon_daddy.map.dungeon_layout.models import LabelBox, LayoutBounds, Room
 from dungeon_daddy.map.dungeon_layout.ports import generate_ports
 from dungeon_daddy.map.dungeon_layout.route_orthogonal import route_connections
 from dungeon_daddy.map.dungeon_layout.seed_layout import compute_critical_path, compute_seed_layout
-from dungeon_daddy.map.dungeon_layout.semantics import RoomRole, classify_all_roles, classify_template
+from dungeon_daddy.map.dungeon_layout.semantics import (
+    RoomRole,
+    classify_all_roles,
+    classify_template,
+)
 
 
 @dataclass

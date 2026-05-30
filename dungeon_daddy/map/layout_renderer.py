@@ -9,8 +9,8 @@ from dungeon_daddy.map.dungeon_layout.connection_style import (
     GraphConnectionStyleResolver,
 )
 from dungeon_daddy.map.dungeon_layout.critical_path_style import (
-    CriticalPathPresenter,
     CriticalPathPresentationResult,
+    CriticalPathPresenter,
 )
 from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyle, GraphRoomStyleResolver
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_config import VisualHierarchyConfig

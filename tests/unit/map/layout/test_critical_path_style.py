@@ -1,9 +1,7 @@
 """Tests for dungeon_layout.critical_path_style — CriticalPathPresenter."""
 from dungeon_daddy.map.dungeon_layout.critical_path_style import (
     CriticalPathPresenter,
-    CriticalPathPresentationResult,
 )
-
 
 # ---------------------------------------------------------------------------
 # Cycle 1 — config disabled → empty sets, not visually distinguished

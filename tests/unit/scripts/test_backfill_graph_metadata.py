@@ -3,12 +3,9 @@ import json
 import sys
 from pathlib import Path
 
-import pytest
-
 # Make the script importable as a module
 sys.path.insert(0, str(Path(__file__).parents[3] / "scripts"))
 import backfill_graph_metadata as bgm
-
 
 # ---------------------------------------------------------------------------
 # Behavior 1: apply_level_patch adds layout_metadata to a level dict

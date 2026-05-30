@@ -8,29 +8,21 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from dungeon_daddy.map.dungeon_layout.metadata_quality_feedback import MetadataQualityFeedback
 
 from pydantic import BaseModel, Field
 
 from dungeon_daddy.map.dungeon_layout.models import (
     LabelBox,
     LayoutBounds,
+    LayoutWarning,
     RoomRect,
     RoutedEdge,
 )
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_feedback import VisualHierarchyFeedbackReport
-
-# ---------------------------------------------------------------------------
-# Warning model
-# ---------------------------------------------------------------------------
-
-class LayoutWarning(BaseModel):
-    category: str
-    severity: str = "medium"
-    message: str
-    connection_id: str | None = None
-    data: dict[str, Any] = Field(default_factory=dict)
-
 
 # ---------------------------------------------------------------------------
 # Sub-report models
@@ -160,7 +152,7 @@ def write_feedback_report(report: LayoutFeedbackReport, output_dir: Path) -> Pat
 def write_summary(
     reports: list[LayoutFeedbackReport],
     output_dir: Path,
-    visual_reports: dict[str, "VisualHierarchyFeedbackReport"] | None = None,
+    visual_reports: dict[str, VisualHierarchyFeedbackReport] | None = None,
 ) -> Path:
     """Write a Markdown summary of all *reports* to *output_dir*/layout_feedback_summary.md."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -605,7 +597,7 @@ def _polylines_cross(
 
 def _human_review_checklist(
     report: LayoutFeedbackReport,
-    visual_report: "VisualHierarchyFeedbackReport | None" = None,
+    visual_report: VisualHierarchyFeedbackReport | None = None,
 ) -> list[str]:
     name = report.fixture_name
     lines = [
@@ -637,7 +629,9 @@ def _human_review_checklist(
 # The deferred import breaks the circular dependency:
 #   validation → metadata_quality_feedback → metadata_validator → validation (LayoutWarning)
 def _rebuild() -> None:
-    from dungeon_daddy.map.dungeon_layout.metadata_quality_feedback import MetadataQualityFeedback  # noqa: F401
+    from dungeon_daddy.map.dungeon_layout.metadata_quality_feedback import (
+        MetadataQualityFeedback,  # noqa: F401
+    )
     LayoutFeedbackReport.model_rebuild()
 
 _rebuild()

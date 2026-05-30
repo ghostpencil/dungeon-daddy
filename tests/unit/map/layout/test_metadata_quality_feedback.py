@@ -2,10 +2,9 @@
 from dungeon_daddy.data.models import Connection, LayoutMetadata, Level, Room
 from dungeon_daddy.map.dungeon_layout.metadata_quality_feedback import (
     MetadataQualityFeedback,
-    generate_metadata_quality_feedback,
     format_summary_row,
+    generate_metadata_quality_feedback,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

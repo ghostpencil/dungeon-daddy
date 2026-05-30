@@ -15,6 +15,9 @@ from dungeon_daddy.map.dungeon_layout.camera_fit import compute_layout_bounds
 from dungeon_daddy.map.dungeon_layout.critical_path_style import CriticalPathPresenter
 from dungeon_daddy.map.dungeon_layout.endpoint_emphasis import EndpointEmphasisDetector
 from dungeon_daddy.map.dungeon_layout.labels import place_labels
+from dungeon_daddy.map.dungeon_layout.metadata_quality_feedback import (
+    generate_metadata_quality_feedback,
+)
 from dungeon_daddy.map.dungeon_layout.ports import generate_ports
 from dungeon_daddy.map.dungeon_layout.route_orthogonal import route_connections
 from dungeon_daddy.map.dungeon_layout.seed_layout import (
@@ -27,10 +30,6 @@ from dungeon_daddy.map.dungeon_layout.validation import (
     validate_layout,
     write_feedback_report,
     write_summary,
-)
-from dungeon_daddy.map.dungeon_layout.metadata_quality_feedback import (
-    MetadataQualityFeedback,
-    generate_metadata_quality_feedback,
 )
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_config import VisualHierarchyConfig
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_feedback import (

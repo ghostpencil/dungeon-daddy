@@ -1,11 +1,11 @@
 # Layout Feedback Summary
 
-| Fixture | Template | Geometry Score | Semantic Score | Metadata Score | Unknown Roles | Explicit Entrance | Explicit Endpoint | Explicit Critical Path | Visual Warnings | Metadata Warnings | Status |
-|---|---|---:|---:|---:|---:|---|---|---|---:|---:|---|
-| crucible_l1 | freeform | 100.0 | 78.0 | 85.0 | 0 | Yes | Yes | Yes | 1 | 0 | PASS |
-| crucible_l2 | hub_spoke | 100.0 | 82.2 | 85.0 | 0 | Yes | Yes | Yes | 1 | 0 | PASS |
-| crucible_l3 | linear | 100.0 | 82.8 | 85.0 | 0 | Yes | Yes | Yes | 0 | 0 | PASS |
-| tomb_l1 | freeform | 100.0 | 81.0 | 85.0 | 0 | Yes | Yes | Yes | 0 | 0 | PASS |
+| Fixture | Template | Critical Path | Semantic Score | Geometry Score | Visual Warnings | Status |
+|---|---|---|---:|---:|---|---|
+| crucible_l1 | freeform | R1 → R2 → R4 | 78.0 | 100.0 | 0 | PASS |
+| crucible_l2 | hub_spoke | r01 → r02 → r05 → r06 | 82.2 | 100.0 | 0 | PASS |
+| crucible_l3 | linear | r1 → r2 → r3 → r4 → r5 → r6 → r7 → r8 | 82.8 | 100.0 | 0 | PASS |
+| tomb_l1 | freeform | 1-A → 1-B → 1-D → 1-E | 81.0 | 100.0 | 0 | PASS |
 
 
 ### Human Review: crucible_l1

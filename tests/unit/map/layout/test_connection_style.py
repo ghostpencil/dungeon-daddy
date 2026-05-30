@@ -1,10 +1,8 @@
 """Tests for dungeon_layout.connection_style — GraphConnectionStyle and GraphConnectionStyleResolver."""
 from dungeon_daddy.data.models import Connection
 from dungeon_daddy.map.dungeon_layout.connection_style import (
-    GraphConnectionStyle,
     GraphConnectionStyleResolver,
 )
-
 
 # ---------------------------------------------------------------------------
 # Cycle 1 — unknown/normal label resolves to default solid style
@@ -34,6 +32,7 @@ def test_locked_connection_is_thicker_and_higher_priority():
 # ---------------------------------------------------------------------------
 
 import pytest
+
 
 @pytest.mark.parametrize("label", ["secret", "shortcut"])
 def test_secret_and_shortcut_are_dashed_and_faint(label: str):

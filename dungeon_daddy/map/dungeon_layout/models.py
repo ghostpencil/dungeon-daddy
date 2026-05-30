@@ -6,9 +6,20 @@ No Arcade dependency — pure Python / Pydantic.
 from __future__ import annotations
 
 import math
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, computed_field
+
+# ---------------------------------------------------------------------------
+# LayoutWarning — shared warning model used by validation and metadata modules
+# ---------------------------------------------------------------------------
+
+class LayoutWarning(BaseModel):
+    category: str
+    severity: str = "medium"
+    message: str
+    connection_id: str | None = None
+    data: dict[str, Any] = Field(default_factory=dict)
 
 # ---------------------------------------------------------------------------
 # RoomRect

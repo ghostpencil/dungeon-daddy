@@ -20,7 +20,7 @@ from dungeon_daddy.data.models import Dungeon, Level
 from dungeon_daddy.map.dungeon_layout import run_layout_pipeline
 from dungeon_daddy.map.dungeon_layout.connection_style import GraphConnectionStyleResolver
 from dungeon_daddy.map.dungeon_layout.critical_path_style import CriticalPathPresenter
-from dungeon_daddy.map.dungeon_layout.models import LayoutBounds, RoutedEdge
+from dungeon_daddy.map.dungeon_layout.models import LayoutBounds
 from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyleResolver
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_config import VisualHierarchyConfig
 
@@ -104,7 +104,7 @@ def _load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     for name in ("arial.ttf", "DejaVuSans.ttf"):
         try:
             return ImageFont.truetype(name, size)
-        except (OSError, IOError):
+        except OSError:
             continue
     return ImageFont.load_default()
 

@@ -1,10 +1,10 @@
 """Tests for dungeon_layout.visual_hierarchy_feedback — VisualHierarchyFeedbackReport."""
-from dungeon_daddy.map.dungeon_layout.endpoint_emphasis import EndpointEmphasisResult
 from dungeon_daddy.map.dungeon_layout.critical_path_style import CriticalPathPresentationResult
+from dungeon_daddy.map.dungeon_layout.endpoint_emphasis import EndpointEmphasisResult
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_config import VisualHierarchyConfig
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_feedback import (
-    generate_visual_hierarchy_feedback,
     VisualHierarchyFeedbackReport,
+    generate_visual_hierarchy_feedback,
 )
 
 # ---------------------------------------------------------------------------

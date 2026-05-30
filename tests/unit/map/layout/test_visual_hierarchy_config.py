@@ -1,7 +1,6 @@
 """Tests for dungeon_layout.visual_hierarchy_config — VisualHierarchyConfig."""
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_config import VisualHierarchyConfig
 
-
 # ---------------------------------------------------------------------------
 # Cycle 1 — default construction produces correct boolean values
 # ---------------------------------------------------------------------------

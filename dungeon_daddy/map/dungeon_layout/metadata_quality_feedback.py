@@ -12,7 +12,6 @@ from dungeon_daddy.data.models import Level
 from dungeon_daddy.map.dungeon_layout.metadata_validator import validate_metadata
 from dungeon_daddy.map.dungeon_layout.semantics import classify_all_roles
 
-
 # ---------------------------------------------------------------------------
 # Model
 # ---------------------------------------------------------------------------

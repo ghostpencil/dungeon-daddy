@@ -7,7 +7,7 @@ No Arcade dependency — pure Python / Pydantic.
 from __future__ import annotations
 
 from dungeon_daddy.data.models import Level
-from dungeon_daddy.map.dungeon_layout.validation import LayoutWarning
+from dungeon_daddy.map.dungeon_layout.models import LayoutWarning
 
 # ---------------------------------------------------------------------------
 # Valid value sets

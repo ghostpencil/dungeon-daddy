@@ -1,6 +1,5 @@
 """Tests for dungeon_layout.room_style — GraphRoomStyle and GraphRoomStyleResolver."""
-from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyle, GraphRoomStyleResolver
-
+from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyleResolver
 
 # ---------------------------------------------------------------------------
 # Cycle 1 — unknown role resolves to default style
@@ -41,6 +40,7 @@ def test_secret_room_is_muted():
 # ---------------------------------------------------------------------------
 
 import pytest
+
 
 @pytest.mark.parametrize("role", ["exit", "descent", "elevator", "stairs"])
 def test_exit_family_gets_threshold_style(role: str):

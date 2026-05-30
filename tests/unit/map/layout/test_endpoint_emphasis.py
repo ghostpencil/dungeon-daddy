@@ -1,10 +1,8 @@
 """Tests for dungeon_layout.endpoint_emphasis — EndpointEmphasisDetector."""
 from dungeon_daddy.map.dungeon_layout.endpoint_emphasis import (
     EndpointEmphasisDetector,
-    EndpointEmphasisResult,
 )
 from dungeon_daddy.map.dungeon_layout.models import RoomRect
-
 
 # ---------------------------------------------------------------------------
 # Cycle 1 — empty roles/rooms → no endpoint, AMBIGUOUS_ENDPOINT_ROLE warning
@@ -59,6 +57,7 @@ def test_objective_room_detected_as_endpoint():
 # ---------------------------------------------------------------------------
 
 import pytest
+
 
 @pytest.mark.parametrize("role", ["exit", "descent", "elevator", "stairs"])
 def test_exit_family_detected_as_endpoint(role: str):

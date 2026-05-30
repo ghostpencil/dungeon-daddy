@@ -115,10 +115,10 @@ def _edge_color(dashed: bool, alpha: int) -> tuple[int, int, int, int]:
 def _load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     try:
         return ImageFont.truetype("arial.ttf", size)
-    except (OSError, IOError):
+    except OSError:
         try:
             return ImageFont.truetype("DejaVuSans.ttf", size)
-        except (OSError, IOError):
+        except OSError:
             return ImageFont.load_default()
 
 
