@@ -94,6 +94,18 @@ _ALIASES: dict[str, str] = {
 
 
 class GraphConnectionStyleResolver:
-    def resolve(self, label: str) -> GraphConnectionStyle:
+    def resolve(
+        self,
+        label: str,
+        *,
+        connection_style: str | None = None,
+        layout_connection_role: str | None = None,
+    ) -> GraphConnectionStyle:
+        for override in (connection_style, layout_connection_role):
+            if override:
+                canonical = _ALIASES.get(override, override)
+                style = _STYLES.get(canonical)
+                if style:
+                    return style
         canonical = _ALIASES.get(label, label)
         return _STYLES.get(canonical, _DEFAULT)

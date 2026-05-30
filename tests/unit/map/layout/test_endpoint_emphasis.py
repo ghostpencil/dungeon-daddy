@@ -153,3 +153,24 @@ def test_boss_wins_over_objective_when_both_present():
     )
     assert result.endpoint_role == "boss"
     assert result.endpoint_room_id == "R2"
+
+
+# ---------------------------------------------------------------------------
+# Cycle 9 — explicit endpoint_room_id overrides role-priority detection
+# ---------------------------------------------------------------------------
+
+def test_explicit_endpoint_room_id_overrides_boss_priority():
+    # R1 has "boss" role — normally wins. R2 is "objective".
+    # Explicit endpoint_room_id="R2" must override the role-priority list.
+    rooms = {
+        "R1": RoomRect(room_id="R1", x=0, y=0, w=120, h=80),
+        "R2": RoomRect(room_id="R2", x=200, y=0, w=120, h=80),
+    }
+    result = EndpointEmphasisDetector().detect(
+        roles={"R1": "boss", "R2": "objective"},
+        rooms=rooms,
+        connections=[],
+        endpoint_room_id="R2",
+    )
+    assert result.endpoint_room_id == "R2"
+    assert result.endpoint_role == "objective"

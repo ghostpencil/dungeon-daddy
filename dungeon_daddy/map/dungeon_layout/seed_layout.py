@@ -23,7 +23,14 @@ _TERMINAL_ROLES = frozenset({"boss", "objective", "exit"})
 # ---------------------------------------------------------------------------
 
 def compute_critical_path(level: Level, roles: dict[str, RoomRole]) -> list[str]:
-    """Return the ordered critical-path room IDs for *level* (public wrapper)."""
+    """Return the ordered critical-path room IDs for *level* (public wrapper).
+
+    Resolution order:
+    1. explicit layout_metadata.critical_path
+    2. inferred via BFS from entrance to terminal role
+    """
+    if level.layout_metadata and level.layout_metadata.critical_path:
+        return list(level.layout_metadata.critical_path)
     return _critical_path(level, roles)
 
 

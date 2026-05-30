@@ -1,4 +1,5 @@
 """Tests for dungeon_layout.connection_style — GraphConnectionStyle and GraphConnectionStyleResolver."""
+from dungeon_daddy.data.models import Connection
 from dungeon_daddy.map.dungeon_layout.connection_style import (
     GraphConnectionStyle,
     GraphConnectionStyleResolver,
@@ -95,3 +96,66 @@ def test_pursuit_resolves_to_non_standard_style():
     normal = GraphConnectionStyleResolver().resolve("normal")
     # pursuit must be distinguishable from a plain corridor
     assert style != normal
+
+
+# ---------------------------------------------------------------------------
+# Cycle 8 — explicit connection_style overrides label/type alias
+# ---------------------------------------------------------------------------
+
+def test_explicit_connection_style_overrides_label():
+    # label "door" would resolve to normal, but connection_style="secret" wins
+    style = GraphConnectionStyleResolver().resolve("door", connection_style="secret")
+    assert style.key == "secret"
+    assert style.dashed is True
+
+
+# ---------------------------------------------------------------------------
+# Cycle 9 — explicit layout_connection_role overrides label when no connection_style
+# ---------------------------------------------------------------------------
+
+def test_explicit_layout_connection_role_overrides_label():
+    style = GraphConnectionStyleResolver().resolve("door", layout_connection_role="locked")
+    assert style.key == "locked"
+    assert style.priority == "high"
+
+
+# ---------------------------------------------------------------------------
+# Cycle 10 — connection_style takes priority over layout_connection_role
+# ---------------------------------------------------------------------------
+
+def test_connection_style_takes_priority_over_layout_connection_role():
+    style = GraphConnectionStyleResolver().resolve(
+        "door",
+        connection_style="secret",
+        layout_connection_role="locked",
+    )
+    assert style.key == "secret"
+
+
+# ---------------------------------------------------------------------------
+# Cycle 11 — Connection model carries explicit style fields
+# ---------------------------------------------------------------------------
+
+def test_connection_model_accepts_explicit_style_fields():
+    conn = Connection(**{
+        "from": "R1",
+        "to": "R2",
+        "type": "door",
+        "connection_style": "secret",
+        "layout_connection_role": "optional",
+    })
+    assert conn.connection_style == "secret"
+    assert conn.layout_connection_role == "optional"
+    resolver = GraphConnectionStyleResolver()
+    style = resolver.resolve(
+        conn.type,
+        connection_style=conn.connection_style,
+        layout_connection_role=conn.layout_connection_role,
+    )
+    assert style.key == "secret"
+
+
+def test_connection_model_style_fields_default_to_none():
+    conn = Connection(**{"from": "R1", "to": "R2", "type": "door"})
+    assert conn.connection_style is None
+    assert conn.layout_connection_role is None

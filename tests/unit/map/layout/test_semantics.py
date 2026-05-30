@@ -1,7 +1,7 @@
 """Tests for dungeon_layout.semantics — room role classification and template selection."""
 import pytest
 
-from dungeon_daddy.data.models import Connection, Level, Room
+from dungeon_daddy.data.models import Connection, LayoutMetadata, Level, Room
 from dungeon_daddy.map.dungeon_layout.semantics import (
     classify_all_roles,
     classify_room_role,
@@ -28,7 +28,12 @@ def _room(**kwargs: object) -> Room:
     return Room(**defaults)  # type: ignore[arg-type]
 
 
-def _level(rooms: list[Room], connections: list[Connection] | None = None, **kwargs: object) -> Level:
+def _level(
+    rooms: list[Room],
+    connections: list[Connection] | None = None,
+    layout_metadata: LayoutMetadata | None = None,
+    **kwargs: object,
+) -> Level:
     defaults: dict[str, object] = {
         "id": 1,
         "name": "Test Level",
@@ -39,6 +44,7 @@ def _level(rooms: list[Room], connections: list[Connection] | None = None, **kwa
         "height": 800,
         "entries": [],
         "connections": connections or [],
+        "layout_metadata": layout_metadata,
     }
     defaults.update(kwargs)
     return Level(rooms=rooms, **defaults)  # type: ignore[arg-type]
@@ -385,3 +391,64 @@ def test_freeform_fallback_for_empty_level() -> None:
     level = _level([])
     roles = classify_all_roles(level)
     assert classify_template(level, roles) == "freeform"
+
+
+# ---------------------------------------------------------------------------
+# Slice 13 — floor-level entrance_room_id overrides name inference
+# ---------------------------------------------------------------------------
+
+def test_floor_entrance_room_id_overrides_name_inference() -> None:
+    # "Boss Chamber" would infer "boss" — floor metadata wins
+    rooms = [_room(id="r1", name="Boss Chamber")]
+    metadata = LayoutMetadata(entrance_room_id="r1")
+    level = _level(rooms, layout_metadata=metadata)
+    roles = classify_all_roles(level)
+    assert roles["r1"] == "entrance"
+
+
+def test_explicit_layout_role_beats_floor_entrance_room_id() -> None:
+    # Room has explicit layout_role="hub" — floor entrance_room_id must not override it
+    rooms = [_room(id="r1", name="Storage Room", layout_role="hub")]
+    metadata = LayoutMetadata(entrance_room_id="r1")
+    level = _level(rooms, layout_metadata=metadata)
+    roles = classify_all_roles(level)
+    assert roles["r1"] == "hub"
+
+
+def test_floor_entrance_room_id_marks_unknown_room_as_entrance() -> None:
+    # "Storage Room" has no entrance keywords — would be unknown without metadata
+    rooms = [
+        _room(id="r1", name="Storage Room"),
+        _room(id="r2", name="Guard Post"),
+    ]
+    metadata = LayoutMetadata(entrance_room_id="r1")
+    level = _level(rooms, layout_metadata=metadata)
+    roles = classify_all_roles(level)
+    assert roles["r1"] == "entrance"
+    assert roles["r2"] == "unknown"
+
+
+# ---------------------------------------------------------------------------
+# Slice 15 — floor-level objective_room_ids overrides name inference
+# ---------------------------------------------------------------------------
+
+def test_floor_objective_room_ids_marks_rooms_as_objective() -> None:
+    rooms = [
+        _room(id="r1", name="Conveyor Control"),  # would infer key_room
+        _room(id="r2", name="Power Room"),        # would be unknown
+        _room(id="r3", name="Guard Post"),
+    ]
+    metadata = LayoutMetadata(objective_room_ids=["r1", "r2"])
+    level = _level(rooms, layout_metadata=metadata)
+    roles = classify_all_roles(level)
+    assert roles["r1"] == "objective"
+    assert roles["r2"] == "objective"
+    assert roles["r3"] == "unknown"
+
+
+def test_explicit_layout_role_beats_floor_objective_room_ids() -> None:
+    rooms = [_room(id="r1", name="Power Room", layout_role="utility")]
+    metadata = LayoutMetadata(objective_room_ids=["r1"])
+    level = _level(rooms, layout_metadata=metadata)
+    roles = classify_all_roles(level)
+    assert roles["r1"] == "utility"

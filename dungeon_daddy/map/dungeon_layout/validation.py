@@ -100,6 +100,7 @@ class LayoutFeedbackReport(BaseModel):
     warnings: list[LayoutWarning] = Field(default_factory=list)
     human_review_notes: list[str] = Field(default_factory=list)
     visual_hierarchy_feedback: VisualHierarchyFeedbackReport | None = None
+    metadata_quality_feedback: MetadataQualityFeedback | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -630,3 +631,13 @@ def _human_review_checklist(
             "- [ ] Does Graph Mode remain cleaner and more useful than Grid Mode for overview reading?",
         ]
     return lines
+
+
+# Resolve MetadataQualityFeedback forward reference after this module is fully loaded.
+# The deferred import breaks the circular dependency:
+#   validation → metadata_quality_feedback → metadata_validator → validation (LayoutWarning)
+def _rebuild() -> None:
+    from dungeon_daddy.map.dungeon_layout.metadata_quality_feedback import MetadataQualityFeedback  # noqa: F401
+    LayoutFeedbackReport.model_rebuild()
+
+_rebuild()
