@@ -3,9 +3,9 @@
 ## Phase
 
 Phase: Phase 19 — Vector Map Layout Phase 1
-Status: IN PROGRESS
+Status: **COMPLETE** (2026-05-30)
 
-849 unit/integration tests passing at phase start (excl. UI harness and 3 live-API tests).
+929 unit tests passing at phase end (excl. UI harness and 3 live-API tests). mypy zero errors.
 6 eval tests passing (run with `pytest -m eval` or `python tools/run_evals.py`).
 
 ---

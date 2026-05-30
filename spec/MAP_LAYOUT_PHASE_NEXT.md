@@ -1,5 +1,9 @@
 # Dungeon Daddy Map Layout Improvement Phase
 
+> **Status: IMPLEMENTED** — Phase 19 complete (2026-05-30). All 9 steps done.
+> All acceptance criteria met. 929 unit tests passing. mypy zero errors.
+> Next: wire the layout pipeline into the Arcade map panel, or begin Phase 20.
+
 ## Phase Title
 
 **Vector Map Layout Phase 1: Semantic Placement, Orthogonal Routing, Labels, and Camera Framing**
