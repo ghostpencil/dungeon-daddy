@@ -1174,58 +1174,112 @@ Improve the dungeon map renderer from a generic node graph into a semantically-a
 
 ## Phase 20 — Vector Map Layout Phase 2: Visual Hierarchy & Semantic Presentation
 
-**Status: Not Started**
+**Status: Complete** — 1097 unit+integration tests passing. Closed 2026-05-30.
 
 Spec: `spec/MAP_LAYOUT_PHASE_2.md`
 
-Build on Phase 19's collision-free graph layout to add semantic visual hierarchy:
+Built on Phase 19's collision-free graph layout to add semantic visual hierarchy:
 room role styling, connection type language, endpoint emphasis, critical path
 presentation, and visual hierarchy feedback output. Graph Mode only — Grid Mode
-stays untouched.
+untouched.
+
+### Modules Added / Updated
+
+| Module | Notes |
+|---|---|
+| `dungeon_daddy/map/dungeon_layout/room_style.py` | `GraphRoomStyle` + `GraphRoomStyleResolver` |
+| `dungeon_daddy/map/dungeon_layout/connection_style.py` | `GraphConnectionStyle` + `GraphConnectionStyleResolver` |
+| `dungeon_daddy/map/dungeon_layout/endpoint_emphasis.py` | `EndpointEmphasisDetector` + `EndpointEmphasisResult` |
+| `dungeon_daddy/map/dungeon_layout/critical_path_style.py` | `CriticalPathPresenter` + `CriticalPathPresentationResult` |
+| `dungeon_daddy/map/dungeon_layout/visual_hierarchy_config.py` | `VisualHierarchyConfig` |
+| `dungeon_daddy/map/dungeon_layout/visual_hierarchy_feedback.py` | `VisualHierarchyFeedbackReport` + `generate_visual_hierarchy_feedback` |
+| `dungeon_daddy/map/dungeon_layout/semantics.py` | Expanded role vocabulary (65 tests) |
+| `dungeon_daddy/map/layout_renderer.py` | Styles wired into rendering |
+| `tools/generate_layout_screenshots.py` | PIL renderer for PNG artifacts |
+
+### Exit Criteria
+
+- [x] Graph Mode remains collision-free and readable (Phase 1 geometry tests still pass)
+- [x] Grid Mode remains untouched
+- [x] Room roles produce visible styling differences
+- [x] Boss / objective / exit / entrance / hub rooms visually distinct
+- [x] Secret / shortcut / vertical connections visually distinct from normal
+- [x] Critical path emphasis exists and can be toggled via `VisualHierarchyConfig`
+- [x] Generated JSON feedback includes `visual_hierarchy_feedback` section
+- [x] Generated Markdown summary includes semantic score and visual warnings
+- [x] Screenshot artifacts produced under `artifacts/layout/phase2/`
+- [x] `pytest tests/unit/` green (1097 tests)
+
+---
+
+## Phase 21 — Graph Mode Phase 2.5: Semantic Metadata Backfill and Validation
+
+**Status: Complete** — 1184 unit+integration tests passing. Closed 2026-05-30.
+
+Spec: `spec/MAP_LAYOUT_PHASE2.5.md`
+
+Improved the semantic layer quality by backfilling explicit metadata into existing
+dungeon fixtures and local dungeon files. Reduced `unknown` roles from 9 to 0,
+fixed ambiguous endpoints (Crucible L2 Maintenance Tunnel, Crucible L3 Power Core
+Chamber), and added explicit critical paths for all target floors. Graph Mode only
+— Grid Mode untouched.
 
 ### Modules
 
 | Module | Test File |
 |---|---|
-| `dungeon_daddy/map/dungeon_layout/visual_style.py` (new) | `tests/unit/map/layout/test_visual_style.py` |
 | `dungeon_daddy/map/dungeon_layout/semantics.py` (update) | `tests/unit/map/layout/test_semantics.py` |
-| `dungeon_daddy/map/dungeon_layout/models.py` (update) | `tests/unit/map/layout/test_models.py` |
+| `dungeon_daddy/map/dungeon_layout/metadata_validator.py` (new) | `tests/unit/map/layout/test_metadata_validator.py` |
+| `dungeon_daddy/map/dungeon_layout/metadata_quality_feedback.py` (new) | `tests/unit/map/layout/test_metadata_quality_feedback.py` |
 | `dungeon_daddy/map/dungeon_layout/validation.py` (update) | `tests/unit/map/layout/test_validation.py` |
-| `dungeon_daddy/map/dungeon_layout/route_orthogonal.py` (update) | `tests/unit/map/layout/test_route_orthogonal.py` |
-| `dungeon_daddy/map/layout_renderer.py` (update) | `tests/unit/map/test_layout_renderer.py` |
+| `dungeon_daddy/data/models.py` (update) | `LayoutMetadata` dataclass added |
+| `dungeon_daddy/map/dungeon_layout/endpoint_emphasis.py` (update) | explicit `endpoint_room_id` override |
+| `dungeon_daddy/map/dungeon_layout/seed_layout.py` (update) | explicit critical path override |
+| `dungeon_daddy/map/dungeon_layout/connection_style.py` (update) | explicit style / role override |
+| `scripts/backfill_graph_metadata.py` (new) | dry-run + write modes, timestamped backups |
+| `scripts/generate_layout_screenshots_phase25.py` (new) | Phase 2.5 PNG artifact generator |
+| `tests/fixtures/crucible.json` (update) | backfill metadata — all 3 levels |
+| `tests/fixtures/tomb.json` (update) | backfill metadata — all 3 levels |
 
 ### Implementation Steps
 
 | Step | Task | Status |
 |---|---|---|
-| 1 | Expand room role vocabulary + name inference rules | Not Started |
-| 2 | `GraphRoomStyle` dataclass + `GraphRoomStyleResolver` | Not Started |
-| 3 | `GraphConnectionStyle` dataclass + `GraphConnectionStyleResolver` | Not Started |
-| 4 | Endpoint emphasis detection + spacing check | Not Started |
-| 5 | Critical path presentation flags + config toggle | Not Started |
-| 6 | `VisualHierarchyConfig` constants object | Not Started |
-| 7 | `visual_hierarchy_feedback` JSON section + new warning categories | Not Started |
-| 8 | Markdown summary update (semantic score, visual warnings) | Not Started |
-| 9 | Wire styles into `LayoutRenderer` drawing (border weight, fill, markers) | Not Started |
-| 10 | Artifact generation: screenshots + `implementation_summary.md` | Not Started |
+| 1 | Update semantic role resolution pipeline (explicit → floor-level → inference) | **Done** |
+| 2 | Endpoint detection: explicit `endpoint_room_id` overrides role-priority detection | **Done** |
+| 3 | Critical path: explicit `layout_metadata.critical_path` overrides inferred path | **Done** |
+| 4 | Connection style: explicit `connection_style` / `layout_connection_role` override | **Done** |
+| 5 | Metadata validator (`metadata_validator.py`) with warning output | **Done** |
+| 6 | `metadata_quality_feedback` JSON section + updated summary report columns | **Done** |
+| 7 | `scripts/backfill_graph_metadata.py` (dry-run / write / backup) | **Done** |
+| 8 | Backfill `tests/fixtures/crucible.json` (L1, L2, L3) | **Done** |
+| 9 | Backfill `tests/fixtures/tomb.json` (L1 + additional floors) | **Done** |
+| 10 | Backfill local dungeon files (if directory exists) | **Done** |
+| 11 | Unit + integration tests | **Done** |
+| 12 | Artifact generation: screenshots, feedback JSON, reports | **Done** |
 
 ### Exit Criteria
 
-- [ ] Graph Mode remains collision-free and readable (Phase 1 geometry tests still pass)
-- [ ] Grid Mode remains untouched (smoke test + regression tests pass)
-- [ ] Room roles produce visible styling differences (boss ≠ entrance ≠ unknown)
-- [ ] Boss / objective / exit rooms are visually emphasized
-- [ ] Entrance rooms read more clearly as starting points
-- [ ] Hub rooms read as organizing centers
-- [ ] Secret / shortcut / vertical connections are visually distinct from normal corridors
-- [ ] Critical path emphasis exists and can be enabled / disabled via config
-- [ ] Generated JSON feedback includes `visual_hierarchy_feedback` section
-- [ ] Generated Markdown summary includes visual hierarchy review prompts and semantic score
-- [ ] Screenshot artifacts produced for each fixture under `artifacts/layout/phase2/`
-- [ ] Role inference tests pass (name-based + metadata-based)
-- [ ] Room styling tests pass (style key resolved per role)
-- [ ] Connection styling tests pass (label → style key mapping)
-- [ ] `pytest tests/unit/` green
+- [x] Graph Mode still renders all target fixtures
+- [x] Grid Mode remains untouched
+- [x] Geometry score does not regress for target fixtures (100.0 for all)
+- [x] Explicit entrance metadata for all known entrances in target fixtures
+- [x] Explicit endpoint metadata for all known endpoints in target fixtures
+- [x] Explicit critical path for target fixtures where design intent is known
+- [x] `Maintenance Tunnel` (Crucible L2) no longer an unknown endpoint
+- [x] `Power Core Chamber` (Crucible L3) is endpoint when explicit metadata says so
+- [x] `Descent Chamber` (Tomb L1) explicitly treated as descent/endpoint
+- [x] Semantic scores improve or stay the same for all target fixtures
+- [x] Unknown role count decreases for target fixtures (9 → 0)
+- [x] `metadata_quality_feedback` appears in JSON reports
+- [x] Summary report includes metadata quality columns
+- [x] Backfill script runs in dry-run mode
+- [x] Backfill script creates timestamped backups before writing local files
+- [x] Absent local dungeon directory: local dir was present and patched; report includes skipped files
+- [x] Unit tests pass
+- [x] Integration tests pass
+- [x] mypy passes
+- [x] Artifacts present under `artifacts/layout/phase2_5/`
 
 ---
 

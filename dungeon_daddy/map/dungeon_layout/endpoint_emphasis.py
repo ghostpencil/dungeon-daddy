@@ -50,8 +50,9 @@ class EndpointEmphasisDetector:
         rooms: dict[str, RoomRect],
         connections: list[Connection],
         critical_path: list[str] | None = None,
+        endpoint_room_id: str | None = None,
     ) -> EndpointEmphasisResult:
-        endpoint_id = self._find_endpoint(roles, critical_path)
+        endpoint_id = self._find_endpoint(roles, critical_path, endpoint_room_id)
 
         warnings: list[str] = []
         if endpoint_id is None:
@@ -84,7 +85,10 @@ class EndpointEmphasisDetector:
         self,
         roles: dict[str, RoomRole],
         critical_path: list[str] | None,
+        endpoint_room_id: str | None = None,
     ) -> str | None:
+        if endpoint_room_id is not None and endpoint_room_id in roles:
+            return endpoint_room_id
         for role_key in _ENDPOINT_PRIORITY:
             for room_id, role in roles.items():
                 if role == role_key:

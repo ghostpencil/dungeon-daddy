@@ -1,8 +1,8 @@
 """Tests for dungeon_daddy.map.dungeon_layout.seed_layout."""
 from __future__ import annotations
 
-from dungeon_daddy.data.models import Connection, Level, Room
-from dungeon_daddy.map.dungeon_layout.seed_layout import compute_seed_layout
+from dungeon_daddy.data.models import Connection, LayoutMetadata, Level, Room
+from dungeon_daddy.map.dungeon_layout.seed_layout import compute_critical_path, compute_seed_layout
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -101,6 +101,29 @@ def test_linear_no_overlaps() -> None:
 # ---------------------------------------------------------------------------
 # Cycle 4 — hub-spoke: hub room is nearest to origin
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Cycle 5 — critical path: explicit layout_metadata.critical_path beats inference
+# ---------------------------------------------------------------------------
+
+def test_explicit_critical_path_beats_inferred() -> None:
+    # BFS would produce ["r1", "r2", "r3"] through the chain.
+    # Explicit metadata says skip r2 — must be honoured.
+    rooms = [_make_room("r1"), _make_room("r2"), _make_room("r3")]
+    conns = [_make_conn("r1", "r2"), _make_conn("r2", "r3")]
+    metadata = LayoutMetadata(critical_path=["r1", "r3"])
+    level = Level(
+        id=1, name="Test", summary="", ecology="", loop="",
+        width=100, height=100, entries=[],
+        rooms=rooms, connections=conns,
+        layout_metadata=metadata,
+    )
+    roles: dict[str, str] = {"r1": "entrance", "r2": "unknown", "r3": "exit"}
+
+    result = compute_critical_path(level, roles)  # type: ignore[arg-type]
+
+    assert result == ["r1", "r3"]
+
 
 def test_hub_spoke_hub_is_central() -> None:
     rooms = [

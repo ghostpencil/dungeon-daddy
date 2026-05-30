@@ -28,6 +28,10 @@ from dungeon_daddy.map.dungeon_layout.validation import (
     write_feedback_report,
     write_summary,
 )
+from dungeon_daddy.map.dungeon_layout.metadata_quality_feedback import (
+    MetadataQualityFeedback,
+    generate_metadata_quality_feedback,
+)
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_config import VisualHierarchyConfig
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_feedback import (
     VisualHierarchyFeedbackReport,
@@ -80,11 +84,17 @@ def _run_pipeline(level: Level, fixture_name: str, seed: int = 42) -> LayoutFeed
     )
 
     config = VisualHierarchyConfig()
+    explicit_endpoint_id = (
+        level.layout_metadata.endpoint_room_id
+        if level.layout_metadata is not None
+        else None
+    )
     endpoint_result = EndpointEmphasisDetector().detect(
         roles=roles,
         rooms=rooms,
         connections=connections,
         critical_path=critical_path or None,
+        endpoint_room_id=explicit_endpoint_id,
     )
     cp_result = CriticalPathPresenter().present(
         critical_path=critical_path or None,
@@ -100,6 +110,7 @@ def _run_pipeline(level: Level, fixture_name: str, seed: int = 42) -> LayoutFeed
         critical_path_result=cp_result,
         config=config,
     )
+    report.metadata_quality_feedback = generate_metadata_quality_feedback(level)
     return report
 
 
@@ -272,3 +283,132 @@ def test_feedback_reports_written_to_disk_for_all_fixtures() -> None:
     # Mirror summary to phase2 dir
     phase2_summary = _PHASE2_DIR / "layout_feedback_summary.md"
     phase2_summary.write_text(summary.read_text(encoding="utf-8"), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Phase 2.5 — Semantic Metadata Backfill integration tests
+# ---------------------------------------------------------------------------
+
+_PHASE25_DIR = Path(__file__).parent.parent.parent / "artifacts" / "layout" / "phase2_5"
+
+
+def test_pipeline_report_carries_metadata_quality_feedback() -> None:
+    dungeon = _load_dungeon("crucible")
+    level = dungeon.levels[0]
+    report = _run_pipeline(level, fixture_name="crucible_l1")
+    assert report.metadata_quality_feedback is not None
+
+
+def test_crucible_l2_endpoint_is_maintenance_tunnel_via_explicit_metadata() -> None:
+    dungeon = _load_dungeon("crucible")
+    level = dungeon.levels[1]
+    report = _run_pipeline(level, fixture_name="crucible_l2")
+    mqf = report.metadata_quality_feedback
+    assert mqf is not None
+    assert mqf.explicit_endpoint is True
+    # The visual hierarchy endpoint should match the explicit endpoint_room_id (r06)
+    vhf = report.visual_hierarchy_feedback
+    assert vhf is not None
+    endpoint_data = vhf.endpoint_feedback
+    assert endpoint_data.endpoint_room_id == "r06"
+
+
+def test_crucible_l3_endpoint_is_power_core_not_prime_golem() -> None:
+    dungeon = _load_dungeon("crucible")
+    level = dungeon.levels[2]
+    report = _run_pipeline(level, fixture_name="crucible_l3")
+    vhf = report.visual_hierarchy_feedback
+    assert vhf is not None
+    endpoint_data = vhf.endpoint_feedback
+    assert endpoint_data.endpoint_room_id == "r8", (
+        f"Expected r8 (Power Core Chamber) but got {endpoint_data.endpoint_room_id}"
+    )
+    assert endpoint_data.endpoint_room_id != "r7", "r7 (Prime Golem Lair) must not be endpoint"
+
+
+def test_all_target_fixtures_have_explicit_entrance_and_endpoint() -> None:
+    crucible = _load_dungeon("crucible")
+    tomb = _load_dungeon("tomb")
+    fixture_specs = [
+        (crucible.levels[0], "crucible_l1"),
+        (crucible.levels[1], "crucible_l2"),
+        (crucible.levels[2], "crucible_l3"),
+        (tomb.levels[0],     "tomb_l1"),
+    ]
+    for level, name in fixture_specs:
+        report = _run_pipeline(level, fixture_name=name)
+        mqf = report.metadata_quality_feedback
+        assert mqf is not None, f"{name}: metadata_quality_feedback is None"
+        assert mqf.explicit_entrance is True, f"{name}: explicit_entrance is False"
+        assert mqf.explicit_endpoint is True, f"{name}: explicit_endpoint is False"
+        assert mqf.explicit_critical_path is True, f"{name}: explicit_critical_path is False"
+
+
+def test_all_target_fixtures_geometry_score_does_not_regress() -> None:
+    crucible = _load_dungeon("crucible")
+    tomb = _load_dungeon("tomb")
+    fixture_specs = [
+        (crucible.levels[0], "crucible_l1"),
+        (crucible.levels[1], "crucible_l2"),
+        (crucible.levels[2], "crucible_l3"),
+        (tomb.levels[0],     "tomb_l1"),
+    ]
+    for level, name in fixture_specs:
+        report = _run_pipeline(level, fixture_name=name)
+        score = report.layout_metrics.layout_score
+        assert score == 100.0, f"{name}: geometry score regressed to {score}"
+
+
+def test_all_target_fixtures_visual_hierarchy_feedback_still_present() -> None:
+    crucible = _load_dungeon("crucible")
+    tomb = _load_dungeon("tomb")
+    fixture_specs = [
+        (crucible.levels[0], "crucible_l1"),
+        (crucible.levels[1], "crucible_l2"),
+        (crucible.levels[2], "crucible_l3"),
+        (tomb.levels[0],     "tomb_l1"),
+    ]
+    for level, name in fixture_specs:
+        report = _run_pipeline(level, fixture_name=name)
+        assert report.visual_hierarchy_feedback is not None, (
+            f"{name}: visual_hierarchy_feedback is None after metadata backfill"
+        )
+
+
+def test_metadata_quality_feedback_in_written_json_report() -> None:
+    dungeon = _load_dungeon("crucible")
+    level = dungeon.levels[0]
+    report = _run_pipeline(level, fixture_name="crucible_l1")
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        out = write_feedback_report(report, Path(tmp))
+        data = json.loads(out.read_text(encoding="utf-8"))
+    assert "metadata_quality_feedback" in data
+    mqf = data["metadata_quality_feedback"]
+    assert "metadata_score" in mqf
+    assert "explicit_entrance" in mqf
+    assert "explicit_endpoint" in mqf
+
+
+def test_phase25_feedback_reports_written_to_artifacts() -> None:
+    crucible = _load_dungeon("crucible")
+    tomb = _load_dungeon("tomb")
+    fixture_specs = [
+        (crucible.levels[0], "crucible_l1"),
+        (crucible.levels[1], "crucible_l2"),
+        (crucible.levels[2], "crucible_l3"),
+        (tomb.levels[0],     "tomb_l1"),
+    ]
+    reports: list[LayoutFeedbackReport] = []
+    visual_reports: dict[str, VisualHierarchyFeedbackReport] = {}
+    for level, name in fixture_specs:
+        report = _run_pipeline(level, fixture_name=name)
+        reports.append(report)
+        if report.visual_hierarchy_feedback is not None:
+            visual_reports[name] = report.visual_hierarchy_feedback
+        out_file = write_feedback_report(report, _PHASE25_DIR)
+        assert out_file.exists()
+        data = json.loads(out_file.read_text(encoding="utf-8"))
+        assert "metadata_quality_feedback" in data
+    summary = write_summary(reports, _PHASE25_DIR, visual_reports=visual_reports)
+    assert summary.exists()

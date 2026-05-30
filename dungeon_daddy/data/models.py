@@ -93,6 +93,8 @@ class Connection(BaseModel):
     type: str
     note: str = ""
     waypoints: list[Waypoint] | None = None
+    connection_style: str | None = None
+    layout_connection_role: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -104,6 +106,20 @@ class Entry(BaseModel):
     y: float
     type: str
     label: str
+
+
+# ---------------------------------------------------------------------------
+# Floor-level layout metadata (Phase 2.5 semantic backfill)
+# ---------------------------------------------------------------------------
+
+class LayoutMetadata(BaseModel):
+    graph_template: str | None = None
+    entrance_room_id: str | None = None
+    endpoint_room_id: str | None = None
+    objective_room_ids: list[str] = Field(default_factory=list)
+    critical_path: list[str] = Field(default_factory=list)
+    optional_branches: list[list[str]] = Field(default_factory=list)
+    notes: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +139,7 @@ class Level(BaseModel):
     rooms: list[Room]
     connections: list[Connection]
     floor_tags: list[str] = Field(default_factory=list)
+    layout_metadata: LayoutMetadata | None = None
 
 
 # ---------------------------------------------------------------------------

@@ -109,16 +109,41 @@ def classify_room_role(room: Room, degree: int) -> RoomRole:
 
 
 def classify_all_roles(level: Level) -> dict[str, RoomRole]:
-    """Return ``{room_id: role}`` for every room in *level*."""
+    """Return ``{room_id: role}`` for every room in *level*.
+
+    Resolution order per room:
+    1. explicit ``room.layout_role``
+    2. floor-level ``layout_metadata`` references (entrance, objective)
+    3. name/tag/degree inference
+    4. ``unknown``
+    """
     degrees: dict[str, int] = {r.id: 0 for r in level.rooms}
     for conn in level.connections:
         degrees[conn.from_room] = degrees.get(conn.from_room, 0) + 1
         degrees[conn.to_room] = degrees.get(conn.to_room, 0) + 1
 
-    return {
+    roles: dict[str, RoomRole] = {
         room.id: classify_room_role(room, degrees.get(room.id, 0))
         for room in level.rooms
     }
+
+    meta = level.layout_metadata
+    if meta is None:
+        return roles
+
+    room_by_id = {room.id: room for room in level.rooms}
+
+    if meta.entrance_room_id and meta.entrance_room_id in roles:
+        room = room_by_id[meta.entrance_room_id]
+        if room.layout_role is None:
+            roles[meta.entrance_room_id] = "entrance"
+
+    for obj_id in meta.objective_room_ids:
+        room = room_by_id.get(obj_id)
+        if room is not None and room.layout_role is None:
+            roles[obj_id] = "objective"
+
+    return roles
 
 
 def classify_template(level: Level, roles: dict[str, RoomRole]) -> LayoutTemplate:

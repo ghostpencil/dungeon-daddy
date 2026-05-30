@@ -2,26 +2,27 @@
 
 ## Phase
 
-Phase: Phase 20 — Vector Map Layout Phase 2: Visual Hierarchy & Semantic Presentation
-Status: **DONE** — All 10 steps complete. Phase 21 TBD.
+Phase: —
+Status: **No active phase** — Phase 21 complete. Next phase TBD.
 
-Spec: `spec/MAP_LAYOUT_PHASE_2.md`
+---
 
-337 unit tests passing at Phase 19 close (excl. UI harness and live-API tests). mypy zero errors.
-6 eval tests passing (run with `pytest -m eval` or `python tools/run_evals.py`).
+## Next Steps
 
-Phase 20 session 1 (2026-05-30): Step 1 complete — 144 layout unit tests passing, 65 semantics tests (was 39).
-Phase 20 session 2 (2026-05-30): Step 2 complete — `GraphRoomStyle` + `GraphRoomStyleResolver` in `dungeon_layout/room_style.py`, 11 new tests, 997 unit tests passing.
-Phase 20 session 3 (2026-05-30): Step 3 complete — `GraphConnectionStyle` + `GraphConnectionStyleResolver` in `dungeon_layout/connection_style.py`, 11 new tests, 166 layout unit tests passing.
-Phase 20 session 4 (2026-05-30): Step 4 complete — `EndpointEmphasisDetector` + `EndpointEmphasisResult` in `dungeon_layout/endpoint_emphasis.py`, 11 new tests, 1013 unit tests passing.
-Phase 20 session 5 (2026-05-30): Step 5 complete — `CriticalPathPresenter` + `CriticalPathPresentationResult` in `dungeon_daddy/map/dungeon_layout/critical_path_style.py`, 5 new tests, 1024 unit tests passing.
-Phase 20 session 6 (2026-05-30): Step 6 complete — `VisualHierarchyConfig` in `dungeon_daddy/map/dungeon_layout/visual_hierarchy_config.py`, 4 new tests, 186 layout unit tests passing.
-Phase 20 session 7 (2026-05-30): Step 7 complete — `VisualHierarchyFeedbackReport` + `generate_visual_hierarchy_feedback` in `dungeon_layout/visual_hierarchy_feedback.py`, 10 new tests, 1032 unit tests passing, mypy zero errors.
-Phase 20 session 8 (2026-05-30): Step 8 complete — `write_summary()` extended with `visual_reports` param, new table columns (Semantic Score, Geometry Score, Visual Warnings), `_human_review_checklist()` extended with 9 Phase 2 questions, 7 new tests, 1045 unit tests passing, mypy zero errors.
-Phase 20 session 9 (2026-05-30): Step 9 complete — `LayoutResult` extended with `room_roles`, `edge_labels`, `critical_path` fields; `run_layout_pipeline` populates them; `LayoutRenderer` wires `GraphRoomStyleResolver`, `GraphConnectionStyleResolver`, `CriticalPathPresenter`, `VisualHierarchyConfig` — border weight, fill alpha, markers, and connection alpha now driven by semantic style, 7 new tests, 1109 unit tests passing, mypy zero errors.
-Phase 20 session 10 (2026-05-30): Step 10 complete — `LayoutFeedbackReport.visual_hierarchy_feedback` field added; integration test generates and embeds visual hierarchy feedback + writes artifacts to `artifacts/layout/phase2/`; `tools/generate_layout_screenshots.py` (PIL renderer) produces 4 PNG screenshots; `implementation_summary.md` written; 2 new tests, 1097 unit+integration tests passing, mypy zero errors.
-
-**Phase 20 complete — all 10 steps done.**
+| Step | Task |
+|---|---|
+| ~~1~~ | ~~Update semantic role resolution pipeline~~ — **Done** (`LayoutMetadata` model added; `classify_all_roles` uses floor-level entrance/objective overrides; 4 new tests; 1116 passing) |
+| ~~2~~ | ~~Endpoint detection override~~ — **Done** (`detect()` accepts `endpoint_room_id`; `_find_endpoint()` checks it before role-priority list; 1 new test; 1117 passing) |
+| ~~3~~ | ~~Critical path override~~ — **Done** (`compute_critical_path` checks `layout_metadata.critical_path` first; 1 new test; 1118 passing) |
+| ~~4~~ | ~~Connection style override~~ — **Done** (`Connection` model gets `connection_style`/`layout_connection_role` fields; `resolve()` checks them before label aliases; 5 new tests; 1117 passing) |
+| ~~5~~ | ~~`metadata_validator.py` — warns on invalid roles, missing referenced room IDs, path ordering violations~~ — **Done** (`validate_metadata` implemented; 24 new tests; 1147 passing) |
+| ~~6~~ | ~~`metadata_quality_feedback` JSON section + updated Markdown summary columns~~ — **Done** (`MetadataQualityFeedback` model + `generate_metadata_quality_feedback()` + `format_summary_row()` in `metadata_quality_feedback.py`; 23 new tests; 1170 passing) |
+| ~~7~~ | ~~`scripts/backfill_graph_metadata.py` — dry-run / write / timestamped-backup support~~ — **Done** (`apply_level_patch`, `apply_room_patch`, `backup_file`, `run_backfill`; patch definitions for all Crucible + Tomb floors; CLI with `--target-fixtures`/`--local-dungeon-dir`/`--dry-run`/`--write`; 6 new tests; 1176 passing) |
+| ~~8~~ | ~~Backfill `tests/fixtures/crucible.json` (L1, L2, L3)~~ — **Done** (`layout_metadata` + room fields applied to all 3 levels; 1176 passing) |
+| ~~9~~ | ~~Backfill `tests/fixtures/tomb.json` (L1 + additional floors)~~ — **Done** (`layout_metadata` + room fields applied to all 3 levels; 1176 passing) |
+| ~~10~~ | ~~Backfill local dungeon files at `C:\Users\ljfan\AppData\Local\DungeonDaddy\dungeons`~~ — **Done** (Crucible + Tomb patched; directory also contains Irongate Depths, Tomb of the Lich King, __test_drive__ — no patches defined for those) |
+| ~~11~~ | ~~Unit + integration tests for all new behaviour~~ — **Done** (`metadata_quality_feedback` wired into `LayoutFeedbackReport`; `_run_pipeline` populates it + uses explicit `endpoint_room_id`; 8 new integration tests (endpoint overrides, geometry non-regression, metadata fields, JSON output); 1184 passing) |
+| ~~12~~ | ~~Artifact generation: screenshots, feedback JSON, migration report, summary~~ — **Done** (`crucible_l{1,2,3}_graph.png`, `tomb_l1_graph.png`, `metadata_migration_report.md`, `implementation_summary.md`, `before_after_summary.md` written; `layout_feedback_summary.md` updated with metadata columns; 1184 passing) |
 
 ---
 
@@ -31,75 +32,16 @@ _None._
 
 ---
 
-## Phase 20 — Vector Map Layout Phase 2
+## Previous Phases
 
-Spec: `spec/MAP_LAYOUT_PHASE_2.md`
-
-Add semantic visual hierarchy to Graph Mode: room role styling, connection type
-language, endpoint emphasis, critical path presentation, and visual hierarchy
-feedback artifacts. Phase 19 geometry and Grid Mode stay untouched.
-
-### Progress
-
-| Step | Task | Status |
+| Phase | Status | Tests |
 |---|---|---|
-| 1 | Expand room role vocabulary + name inference rules | **Done** — `dungeon_layout/semantics.py`, 65 tests (was 39) |
-| 2 | `GraphRoomStyle` + `GraphRoomStyleResolver` | **Done** — `dungeon_layout/room_style.py`, 11 tests |
-| 3 | `GraphConnectionStyle` + `GraphConnectionStyleResolver` | **Done** — `dungeon_layout/connection_style.py`, 11 tests |
-| 4 | Endpoint emphasis detection + spacing check | **Done** — `dungeon_layout/endpoint_emphasis.py`, 11 tests |
-| 5 | Critical path presentation flags + config toggle | **Done** — `dungeon_layout/critical_path_style.py`, 5 tests |
-| 6 | `VisualHierarchyConfig` constants object | **Done** — `dungeon_layout/visual_hierarchy_config.py`, 4 tests |
-| 7 | `visual_hierarchy_feedback` JSON section + new warning categories | **Done** — `dungeon_layout/visual_hierarchy_feedback.py`, 10 tests |
-| 8 | Markdown summary update (semantic score, visual warnings) | **Done** — `dungeon_layout/validation.py`, 7 new tests |
-| 9 | Wire styles into `LayoutRenderer` (border weight, fill, markers) | **Done** — `map/layout_renderer.py` + `dungeon_layout/__init__.py`, 7 tests |
-| 10 | Artifact generation: screenshots + `implementation_summary.md` | **Done** — `artifacts/layout/phase2/`, `tools/generate_layout_screenshots.py`, 2 new tests |
-
----
-
-## Phase 19 — Vector Map Layout Phase 1
-
-Spec: `spec/MAP_LAYOUT_PHASE_NEXT.md`
-
-Improving the dungeon map renderer from a generic node graph to a semantically-aware,
-visually authored dungeon schematic. Rooms placed by role, connections routed orthogonally,
-labels placed collision-aware, camera auto-fits on load.
-
-### Progress
-
-| Step | Task | Status |
-|---|---|---|
-| 1 | Geometry models | **Done** — `dungeon_layout/models.py`, 21 tests |
-| 2 | Room role classification + template selection | **Done** — `dungeon_layout/semantics.py`, 39 tests |
-| 3 | Critical-path-first seed layout | **Done** — `dungeon_layout/seed_layout.py`, 4 tests |
-| 4 | Port generation | **Done** — `dungeon_layout/ports.py`, 7 tests |
-| 5 | Obstacle-aware orthogonal routing | **Done** — `dungeon_layout/route_orthogonal.py`, 7 tests |
-| 6 | Label placement | **Done** — `dungeon_layout/labels.py`, 6 tests |
-| 7 | Camera auto-fit | **Done** — `dungeon_layout/camera_fit.py`, 6 tests |
-| 8 | Validation tests + feedback reports | **Done** — `dungeon_layout/validation.py`, 17 unit tests + 13 integration tests |
-| 9 | Debug overlay | **Done** — `dungeon_layout/debug_overlay.py` + `map/layout_debug_renderer.py`, 9 tests |
-| W | Pipeline wiring into map panel | **Done** — `dungeon_layout/__init__.py`, `map/layout_renderer.py`, `map_panel.py`, 19 tests |
-| 10 | Room name labels in Graph view | **Done** — `layout_renderer.py` + `room_names` on `LayoutResult`, 1 test |
-| 11 | Room click + selection highlight | **Done** — `map_panel.py` hit-test + `LayoutRenderer` teal outline, 6 tests |
-| B1 | Room label two-line fix | **Done** — `layout_renderer.py`: name + room ID on separate centred lines |
-| B2 | Room click → Dungeon Chat | **Done** — `on_room_select` callback + `play_view._on_graph_room_select` |
-| B3 | Connection click → Dungeon Chat | **Done** — edge hit-test + `on_connection_select` callback + `play_view._on_graph_connection_select` |
-
-### Phase 19 closed (2026-05-30)
-
-All 11 steps + wiring milestone + 3 post-close bug fixes done. 337 unit tests passing. mypy zero errors.
-
-- Room labels: name on line 1, room ID on line 2, both centre-aligned (`multiline=True`)
-- Room click/selection: teal outline + fires `on_room_select` → triggers DM describe in Dungeon Chat
-- Connection click: polyline hit-test (8-unit tolerance) → fires `on_connection_select` → chat message
-- `_point_near_segment` helper + `_EDGE_TOL` constant in `map_panel.py`
-
----
-
-## Previous Milestone — Stable Release (2026-05-27)
-
-All 10 improvement plan items (IP-1 through IP-9, MC-1) complete. Codebase is
-lint-clean (`ruff`), fully type-checked (`mypy` zero errors, zero overrides),
-and at 74% test coverage with a 70% CI gate.
+| Phase 21 — Graph Mode Phase 2.5: Semantic Metadata Backfill | **Complete** (2026-05-30) | 1184 passing |
+| Phase 20 — Map Layout Visual Hierarchy (Phase 2) | **Complete** (2026-05-30) | 1097 passing |
+| Phase 19 — Map Layout Phase 1 | **Complete** (2026-05-30) | 337 map tests |
+| Post-Phase 18 — IP-1 through IP-9, MC-1 | **Complete** (2026-05-27) | 849 passing |
+| Phase 18 — Python Code Quality Stabilisation | **Complete** | 664 passing |
+| Phases 1–17 | **Complete** | — |
 
 _Full session history in `spec/HISTORY.md`._
 
@@ -111,4 +53,3 @@ _Full session history in `spec/HISTORY.md`._
 - `AnthropicProvider` still exists and is tested — not removed, just not the active provider.
 - Spec loading rules and skills are in `CLAUDE.md` (canonical source).
 - Published: https://github.com/ghostpencil/dungeon-daddy (2026-05-24).
-- Improvement plan: `spec/IMPROVEMENT_PLAN.md`.
