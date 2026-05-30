@@ -35,9 +35,11 @@ def run_layout_pipeline(level: Level) -> LayoutResult:
     roles = classify_all_roles(level)
     template = classify_template(level, roles)
     rooms = compute_seed_layout(level, roles, template)
-    ports = generate_ports(rooms, level.connections)
-    edges = route_connections(rooms, ports, level.connections)
-    label_map = {f"{c.from_room}→{c.to_room}": c.type for c in level.connections}
+    room_ids = set(rooms)
+    intra_conns = [c for c in level.connections if c.from_room in room_ids and c.to_room in room_ids]
+    ports = generate_ports(rooms, intra_conns)
+    edges = route_connections(rooms, ports, intra_conns)
+    label_map = {f"{c.from_room}→{c.to_room}": c.type for c in intra_conns}
     labels = place_labels(edges, rooms, label_map)
 
     room_list = list(rooms.values())

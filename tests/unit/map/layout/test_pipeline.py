@@ -93,3 +93,22 @@ def test_pipeline_empty_level_returns_empty_result() -> None:
     assert result.rooms == {}
     assert result.edges == []
     assert result.labels == []
+
+
+# ---------------------------------------------------------------------------
+# Cycle 6 — cross-level connections (stairs) are silently skipped
+# ---------------------------------------------------------------------------
+
+def test_pipeline_skips_cross_level_connections() -> None:
+    """A connection to a room not in this level must not crash the pipeline."""
+    level = _level(
+        rooms=[_room("1-A"), _room("1-B")],
+        connections=[
+            _conn("1-A", "1-B"),          # intra-level — routed
+            _conn("1-B", "2-A"),          # cross-level — must be skipped silently
+        ],
+    )
+    result = run_layout_pipeline(level)
+    # Only the intra-level connection should produce a routed edge
+    assert len(result.edges) == 1
+    assert result.edges[0].connection_id == "1-A→1-B"
