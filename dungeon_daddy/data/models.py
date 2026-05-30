@@ -72,6 +72,8 @@ class Room(BaseModel):
     note: str
     main_loop_role: str | None = None
     sub_loop_roles: list[SubLoopRole] | None = None
+    layout_role: str | None = None
+    tags: list[str] = Field(default_factory=list)
 
 
 class Waypoint(BaseModel):
@@ -120,6 +122,7 @@ class Level(BaseModel):
     entries: list[Entry]
     rooms: list[Room]
     connections: list[Connection]
+    floor_tags: list[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

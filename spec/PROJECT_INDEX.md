@@ -29,27 +29,23 @@ labels placed collision-aware, camera auto-fits on load.
 | Step | Task | Status |
 |---|---|---|
 | 1 | Geometry models | **Done** — `dungeon_layout/models.py`, 21 tests |
-| 2 | Room role classification + template selection | Not Started |
-| 3 | Critical-path-first seed layout | Not Started |
-| 4 | Port generation | Not Started |
-| 5 | Obstacle-aware orthogonal routing | Not Started |
-| 6 | Label placement | Not Started |
-| 7 | Camera auto-fit | Not Started |
-| 8 | Validation tests + feedback reports | Not Started |
+| 2 | Room role classification + template selection | **Done** — `dungeon_layout/semantics.py`, 39 tests |
+| 3 | Critical-path-first seed layout | **Done** — `dungeon_layout/seed_layout.py`, 4 tests |
+| 4 | Port generation | **Done** — `dungeon_layout/ports.py`, 7 tests |
+| 5 | Obstacle-aware orthogonal routing | **Done** — `dungeon_layout/route_orthogonal.py`, 7 tests |
+| 6 | Label placement | **Done** — `dungeon_layout/labels.py`, 6 tests |
+| 7 | Camera auto-fit | **Done** — `dungeon_layout/camera_fit.py`, 6 tests |
+| 8 | Validation tests + feedback reports | **Done** — `dungeon_layout/validation.py`, 17 tests |
 | 9 | Debug overlay | Not Started |
 
 ## Next Session
 
-Start **Step 2**: room role classification + template selection.
+Start **Step 9**: debug overlay.
 
-- New module: `dungeon_daddy/map/dungeon_layout/semantics.py`
-- Test file: `tests/unit/map/layout/test_semantics.py`
+- Spec: `spec/MAP_LAYOUT_PHASE_NEXT.md` (read Debug Overlay Requirements section)
 - Read `spec/TESTING.md` then invoke TDD skill before writing tests
-- Roles: `entrance`, `exit`, `hub`, `boss`, `objective`, `key_room`, `lock_room`, `treasure`, `hazard`, `secret`, `utility`, `corridor`, `side_room`, `transition`, `unknown`
-- Templates: `linear`, `hub_spoke`, `branch_merge`, `lock_key`, `boss_endcap`, `loop`, `freeform`
-- Explicit JSON metadata wins over inference; inference uses name/tag keywords + graph degree
 - Branch: `phase-19-vector-map-layout`
-- Test count at session start: 849
+- Test count at session start: 962
 
 ---
 
