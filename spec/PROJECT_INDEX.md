@@ -5,7 +5,7 @@
 Phase: Phase 19 — Vector Map Layout Phase 1
 Status: **COMPLETE**
 
-332 unit tests passing (excl. UI harness and live-API tests). mypy zero errors.
+337 unit tests passing (excl. UI harness and live-API tests). mypy zero errors.
 6 eval tests passing (run with `pytest -m eval` or `python tools/run_evals.py`).
 
 ---
@@ -40,13 +40,18 @@ labels placed collision-aware, camera auto-fits on load.
 | W | Pipeline wiring into map panel | **Done** — `dungeon_layout/__init__.py`, `map/layout_renderer.py`, `map_panel.py`, 19 tests |
 | 10 | Room name labels in Graph view | **Done** — `layout_renderer.py` + `room_names` on `LayoutResult`, 1 test |
 | 11 | Room click + selection highlight | **Done** — `map_panel.py` hit-test + `LayoutRenderer` teal outline, 6 tests |
+| B1 | Room label two-line fix | **Done** — `layout_renderer.py`: name + room ID on separate centred lines |
+| B2 | Room click → Dungeon Chat | **Done** — `on_room_select` callback + `play_view._on_graph_room_select` |
+| B3 | Connection click → Dungeon Chat | **Done** — edge hit-test + `on_connection_select` callback + `play_view._on_graph_connection_select` |
 
-### Phase 19 complete (2026-05-30)
+### Phase 19 closed (2026-05-30)
 
-All 11 steps + wiring milestone done. 332 unit tests passing. mypy zero errors.
+All 11 steps + wiring milestone + 3 post-close bug fixes done. 337 unit tests passing. mypy zero errors.
 
-- Room name labels centred inside each rect (`room_names` on `LayoutResult`)
-- Room click/selection: hit-test in layout space, teal 2px outline on selected room, resets on `load()`
+- Room labels: name on line 1, room ID on line 2, both centre-aligned (`multiline=True`)
+- Room click/selection: teal outline + fires `on_room_select` → triggers DM describe in Dungeon Chat
+- Connection click: polyline hit-test (8-unit tolerance) → fires `on_connection_select` → chat message
+- `_point_near_segment` helper + `_EDGE_TOL` constant in `map_panel.py`
 
 ---
 

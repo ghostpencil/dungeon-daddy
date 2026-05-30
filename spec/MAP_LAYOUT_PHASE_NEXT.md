@@ -1,6 +1,6 @@
 # Dungeon Daddy Map Layout Improvement Phase
 
-> **Status: COMPLETE** — All steps done (2026-05-30). 332 unit tests passing. mypy zero errors.
+> **Status: CLOSED** — All steps + post-close bug fixes done (2026-05-30). 337 unit tests passing. mypy zero errors.
 
 ## Phase Title
 
@@ -1154,6 +1154,23 @@ Connect the layout pipeline to the Arcade map panel (Graph tab).
 - `_selected_room_id: str | None` on `MapPanel`; reset to `None` on `load()`.
 - `MapPanel.handle_mouse_press()` hit-tests layout-space rects when Graph/select mode active; toggles selection on same-room click.
 - `LayoutRenderer.draw()` accepts `selected_room_id`; draws teal 2px outline over the selected room.
+
+### Post-Close Bug Fixes — **Done (2026-05-30)**
+
+**B1 — Room label two-line display**
+- `LayoutRenderer._draw_rooms()` now draws `"{name}\n{room_id}"` with `multiline=True`, both lines centred inside the room rect.
+- Rooms without a name fall back to the ID only.
+
+**B2 — Room click → Dungeon Chat**
+- `MapPanel.__init__()` gains `on_room_select: Callable[[str], None] | None`.
+- `handle_mouse_press()` calls `on_room_select(room_id)` on every room hit (alongside toggling the teal outline).
+- `play_view._on_graph_room_select(room_id)` looks up the full `Room`, sets `current_room_id`, adds to `visited_rooms`, calls `set_current_room`, and spawns the DM thread — same behaviour as Grid view clicks.
+
+**B3 — Connection click → Dungeon Chat**
+- `MapPanel.__init__()` gains `on_connection_select: Callable[[str, str], None] | None` (from_room, to_room).
+- `_point_near_segment` module helper + `_EDGE_TOL = 8.0` constant added to `map_panel.py`.
+- After a room miss, `handle_mouse_press()` walks each edge polyline; on hit fires `on_connection_select` and returns `True`.
+- `play_view._on_graph_connection_select(from_room, to_room)` looks up the `Connection`, formats a type/note/loops message, and posts it to Dungeon Chat.
 
 ---
 
