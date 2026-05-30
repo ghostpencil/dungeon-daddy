@@ -44,7 +44,35 @@ All 9 steps done. 929 unit tests passing (+ integration tests).
 
 ## Next Session
 
-Phase 19 is complete. Decide next phase or wire the layout pipeline into the Arcade map panel.
+**Goal: Wire the dungeon_layout pipeline into the Arcade map panel (Graph view).**
+
+The layout pipeline (Steps 1–9) is fully built and tested but not connected to the running app.
+Everything lives in `dungeon_daddy/map/dungeon_layout/`. The map panel lives in
+`dungeon_daddy/ui/panels/map_panel.py` and currently uses `GridRenderer` and `LoopOverlay`.
+
+### What needs to happen
+
+1. **Run the pipeline on level load** — when the Graph tab is active and a level loads,
+   call the pipeline: `semantics → seed_layout → ports → route_orthogonal → labels → camera_fit`
+   to produce `rooms`, `edges`, `labels`, `bounds`. Cache the result; don't recalculate every frame.
+
+2. **Render the layout** — add a `LayoutRenderer` (new) that draws the pipeline output
+   (room rects, routed polylines, label text) using Arcade, replacing or augmenting the
+   current `GraphRenderer` when the Graph tab is active.
+
+3. **Apply the camera fit** — use `LayoutBounds` from `camera_fit.py` to set the initial
+   pan/zoom when a level loads in Graph view. Respect manual pan/zoom after that.
+
+4. **Wire the debug overlay toggle** — add a keyboard shortcut (e.g. `D`) or button that
+   sets `DebugOverlay.enabled` and calls `LayoutDebugRenderer.draw()` after the normal render.
+
+### Key files to read at session start
+- `dungeon_daddy/ui/panels/map_panel.py` — where rendering hooks go
+- `dungeon_daddy/map/dungeon_layout/__init__.py` — pipeline entry point (currently empty)
+- `dungeon_daddy/map/dungeon_layout/seed_layout.py` — main layout entry
+- `dungeon_daddy/map/layout_debug_renderer.py` — debug overlay renderer (already built)
+- `spec/ARCHITECTURE.md` — before adding new modules or changing state ownership
+- `spec/TESTING.md` — before writing any new tests
 
 ---
 
