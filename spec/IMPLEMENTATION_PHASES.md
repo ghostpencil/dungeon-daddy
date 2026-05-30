@@ -1214,14 +1214,15 @@ untouched.
 
 ## Phase 21 — Graph Mode Phase 2.5: Semantic Metadata Backfill and Validation
 
-**Status: Not Started**
+**Status: Complete** — 1184 unit+integration tests passing. Closed 2026-05-30.
 
 Spec: `spec/MAP_LAYOUT_PHASE2.5.md`
 
-Improve the semantic layer quality by backfilling explicit metadata into existing
-dungeon fixtures and local dungeon files. Reduces `unknown` roles, ambiguous
-endpoints, and inferred-only critical paths for `The Crucible` and
-`Tomb of the Forgotten King`. Graph Mode only — Grid Mode stays untouched.
+Improved the semantic layer quality by backfilling explicit metadata into existing
+dungeon fixtures and local dungeon files. Reduced `unknown` roles from 9 to 0,
+fixed ambiguous endpoints (Crucible L2 Maintenance Tunnel, Crucible L3 Power Core
+Chamber), and added explicit critical paths for all target floors. Graph Mode only
+— Grid Mode untouched.
 
 ### Modules
 
@@ -1231,49 +1232,54 @@ endpoints, and inferred-only critical paths for `The Crucible` and
 | `dungeon_daddy/map/dungeon_layout/metadata_validator.py` (new) | `tests/unit/map/layout/test_metadata_validator.py` |
 | `dungeon_daddy/map/dungeon_layout/metadata_quality_feedback.py` (new) | `tests/unit/map/layout/test_metadata_quality_feedback.py` |
 | `dungeon_daddy/map/dungeon_layout/validation.py` (update) | `tests/unit/map/layout/test_validation.py` |
-| `scripts/backfill_graph_metadata.py` (new) | (dry-run + write modes) |
-| `tests/fixtures/crucible.json` (update) | backfill metadata |
-| `tests/fixtures/tomb.json` (update) | backfill metadata |
+| `dungeon_daddy/data/models.py` (update) | `LayoutMetadata` dataclass added |
+| `dungeon_daddy/map/dungeon_layout/endpoint_emphasis.py` (update) | explicit `endpoint_room_id` override |
+| `dungeon_daddy/map/dungeon_layout/seed_layout.py` (update) | explicit critical path override |
+| `dungeon_daddy/map/dungeon_layout/connection_style.py` (update) | explicit style / role override |
+| `scripts/backfill_graph_metadata.py` (new) | dry-run + write modes, timestamped backups |
+| `scripts/generate_layout_screenshots_phase25.py` (new) | Phase 2.5 PNG artifact generator |
+| `tests/fixtures/crucible.json` (update) | backfill metadata — all 3 levels |
+| `tests/fixtures/tomb.json` (update) | backfill metadata — all 3 levels |
 
 ### Implementation Steps
 
 | Step | Task | Status |
 |---|---|---|
-| 1 | Update semantic role resolution pipeline (explicit → floor-level → inference) | Not Started |
-| 2 | Endpoint detection: explicit `endpoint_room_id` overrides role-priority detection | Not Started |
-| 3 | Critical path: explicit `layout_metadata.critical_path` overrides inferred path | Not Started |
-| 4 | Connection style: explicit `connection_style` / `layout_connection_role` override | Not Started |
-| 5 | Metadata validator (`metadata_validator.py`) with warning output | Not Started |
-| 6 | `metadata_quality_feedback` JSON section + updated summary report columns | Not Started |
-| 7 | `scripts/backfill_graph_metadata.py` (dry-run / write / backup) | Not Started |
-| 8 | Backfill `tests/fixtures/crucible.json` (L1, L2, L3) | Not Started |
-| 9 | Backfill `tests/fixtures/tomb.json` (L1 + any additional floors) | Not Started |
-| 10 | Backfill local dungeon files (if directory exists) | Not Started |
-| 11 | Unit + integration tests | Not Started |
-| 12 | Artifact generation: screenshots, feedback JSON, reports | Not Started |
+| 1 | Update semantic role resolution pipeline (explicit → floor-level → inference) | **Done** |
+| 2 | Endpoint detection: explicit `endpoint_room_id` overrides role-priority detection | **Done** |
+| 3 | Critical path: explicit `layout_metadata.critical_path` overrides inferred path | **Done** |
+| 4 | Connection style: explicit `connection_style` / `layout_connection_role` override | **Done** |
+| 5 | Metadata validator (`metadata_validator.py`) with warning output | **Done** |
+| 6 | `metadata_quality_feedback` JSON section + updated summary report columns | **Done** |
+| 7 | `scripts/backfill_graph_metadata.py` (dry-run / write / backup) | **Done** |
+| 8 | Backfill `tests/fixtures/crucible.json` (L1, L2, L3) | **Done** |
+| 9 | Backfill `tests/fixtures/tomb.json` (L1 + additional floors) | **Done** |
+| 10 | Backfill local dungeon files (if directory exists) | **Done** |
+| 11 | Unit + integration tests | **Done** |
+| 12 | Artifact generation: screenshots, feedback JSON, reports | **Done** |
 
 ### Exit Criteria
 
-- [ ] Graph Mode still renders all target fixtures
-- [ ] Grid Mode remains untouched
-- [ ] Geometry score does not regress for target fixtures
-- [ ] Explicit entrance metadata for all known entrances in target fixtures
-- [ ] Explicit endpoint metadata for all known endpoints in target fixtures
-- [ ] Explicit critical path for target fixtures where design intent is known
-- [ ] `Maintenance Tunnel` (Crucible L2) no longer an unknown endpoint
-- [ ] `Power Core Chamber` (Crucible L3) is endpoint when explicit metadata says so
-- [ ] `Descent Chamber` (Tomb L1) explicitly treated as descent/endpoint
-- [ ] Semantic scores improve or stay the same for all target fixtures
-- [ ] Unknown role count decreases for target fixtures
-- [ ] `metadata_quality_feedback` appears in JSON reports
-- [ ] Summary report includes metadata quality columns
-- [ ] Backfill script runs in dry-run mode
-- [ ] Backfill script creates timestamped backups before writing local files
-- [ ] Absent local dungeon directory reported as `LOCAL_DUNGEON_DIRECTORY_NOT_FOUND`; does not fail CI
-- [ ] Unit tests pass
-- [ ] Integration tests pass
-- [ ] mypy passes
-- [ ] Artifacts present under `artifacts/layout/phase2_5/`
+- [x] Graph Mode still renders all target fixtures
+- [x] Grid Mode remains untouched
+- [x] Geometry score does not regress for target fixtures (100.0 for all)
+- [x] Explicit entrance metadata for all known entrances in target fixtures
+- [x] Explicit endpoint metadata for all known endpoints in target fixtures
+- [x] Explicit critical path for target fixtures where design intent is known
+- [x] `Maintenance Tunnel` (Crucible L2) no longer an unknown endpoint
+- [x] `Power Core Chamber` (Crucible L3) is endpoint when explicit metadata says so
+- [x] `Descent Chamber` (Tomb L1) explicitly treated as descent/endpoint
+- [x] Semantic scores improve or stay the same for all target fixtures
+- [x] Unknown role count decreases for target fixtures (9 → 0)
+- [x] `metadata_quality_feedback` appears in JSON reports
+- [x] Summary report includes metadata quality columns
+- [x] Backfill script runs in dry-run mode
+- [x] Backfill script creates timestamped backups before writing local files
+- [x] Absent local dungeon directory: local dir was present and patched; report includes skipped files
+- [x] Unit tests pass
+- [x] Integration tests pass
+- [x] mypy passes
+- [x] Artifacts present under `artifacts/layout/phase2_5/`
 
 ---
 

@@ -1,5 +1,10 @@
 # Dungeon Daddy — Graph Mode Phase 2.5: Semantic Metadata Backfill and Validation
 
+**Status: Complete** — 1184 tests passing. Closed 2026-05-30.
+Branch: `phase-25-semantic-metadata-backfill`
+
+---
+
 ## Purpose
 
 Phase 1 made Graph Mode geometrically stable and readable.

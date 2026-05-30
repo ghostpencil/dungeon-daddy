@@ -2,11 +2,8 @@
 
 ## Phase
 
-Phase: Phase 21 — Graph Mode Phase 2.5: Semantic Metadata Backfill and Validation
-Status: **COMPLETE** (All 12 steps done)
-
-Spec: `spec/MAP_LAYOUT_PHASE2.5.md`
-Branch: `phase-25-semantic-metadata-backfill`
+Phase: —
+Status: **No active phase** — Phase 21 complete. Next phase TBD.
 
 ---
 
@@ -39,6 +36,7 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 21 — Graph Mode Phase 2.5: Semantic Metadata Backfill | **Complete** (2026-05-30) | 1184 passing |
 | Phase 20 — Map Layout Visual Hierarchy (Phase 2) | **Complete** (2026-05-30) | 1097 passing |
 | Phase 19 — Map Layout Phase 1 | **Complete** (2026-05-30) | 337 map tests |
 | Post-Phase 18 — IP-1 through IP-9, MC-1 | **Complete** (2026-05-27) | 849 passing |
