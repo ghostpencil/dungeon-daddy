@@ -5,7 +5,6 @@ from dungeon_daddy.data.models import Connection
 from dungeon_daddy.map.dungeon_layout.models import Port, RoomRect
 from dungeon_daddy.map.dungeon_layout.route_orthogonal import route_connections
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

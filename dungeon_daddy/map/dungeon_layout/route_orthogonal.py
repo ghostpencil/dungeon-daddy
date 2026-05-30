@@ -8,7 +8,7 @@ from __future__ import annotations
 import math
 
 from dungeon_daddy.data.models import Connection
-from dungeon_daddy.map.dungeon_layout.models import Port, RoutedEdge, RoomRect
+from dungeon_daddy.map.dungeon_layout.models import Port, RoomRect, RoutedEdge
 
 # ---------------------------------------------------------------------------
 # Public API

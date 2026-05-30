@@ -13,7 +13,6 @@ from dungeon_daddy.map.dungeon_layout.models import (
 )
 from dungeon_daddy.map.layout_renderer import LayoutRenderer
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -38,16 +37,25 @@ def _result(
     edges: list[RoutedEdge] | None = None,
     labels: list[LabelBox] | None = None,
     room_names: dict[str, str] | None = None,
+    room_roles: dict[str, str] | None = None,
+    edge_labels: dict[str, str] | None = None,
+    critical_path: list[str] | None = None,
 ) -> LayoutResult:
     r = rooms or {}
     e = edges or []
     lb = labels or []
     rn = room_names or {}
+    rr = room_roles or {}
+    el = edge_labels or {}
+    cp = critical_path or []
     bounds = LayoutBounds(min_x=0.0, min_y=0.0, max_x=500.0, max_y=400.0)
     return LayoutResult(
         rooms=r, edges=e, labels=lb, bounds=bounds,
         debug_overlay=DebugOverlay(enabled=False, bounds=bounds),
         room_names=rn,
+        room_roles=rr,  # type: ignore[arg-type]
+        edge_labels=el,
+        critical_path=cp,
     )
 
 
@@ -168,6 +176,155 @@ def test_selected_room_gets_teal_outline() -> None:
 
 # ---------------------------------------------------------------------------
 # Cycle 8 — room label draws room_id alongside the name (two-line display)
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Cycle 9 — boss room gets heavy border (border_width from style)
+# ---------------------------------------------------------------------------
+
+def test_boss_room_uses_heavy_border() -> None:
+    rooms = {"boss1": _room("boss1")}
+    result = _result(rooms=rooms, room_roles={"boss1": "boss"})
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, 0.0, 0.0, 1.0)
+        # boss border_width=3.0; default unknown=1.0
+        widths = [call.args[2] for call in mock_arcade.draw_rect_outline.call_args_list]
+        assert 3.0 in widths
+
+
+def test_unknown_room_uses_default_border() -> None:
+    rooms = {"r1": _room("r1")}
+    result = _result(rooms=rooms, room_roles={"r1": "unknown"})
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, 0.0, 0.0, 1.0)
+        widths = [call.args[2] for call in mock_arcade.draw_rect_outline.call_args_list]
+        assert 3.0 not in widths
+
+
+# ---------------------------------------------------------------------------
+# Cycle 10 — room fill alpha varies by role
+# ---------------------------------------------------------------------------
+
+def test_boss_room_has_higher_fill_alpha_than_unknown() -> None:
+    boss_room = {"b": _room("b")}
+    unknown_room = {"u": _room("u")}
+
+    alpha_boss: int | None = None
+    alpha_unknown: int | None = None
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer = LayoutRenderer()
+        renderer.draw(_result(rooms=boss_room, room_roles={"b": "boss"}), 0.0, 0.0, 1.0)
+        color = mock_arcade.draw_rect_filled.call_args_list[0].args[1]
+        alpha_boss = color[3] if len(color) == 4 else None
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer = LayoutRenderer()
+        renderer.draw(_result(rooms=unknown_room, room_roles={"u": "unknown"}), 0.0, 0.0, 1.0)
+        color = mock_arcade.draw_rect_filled.call_args_list[0].args[1]
+        alpha_unknown = color[3] if len(color) == 4 else None
+
+    assert alpha_boss is not None and alpha_unknown is not None
+    assert alpha_boss > alpha_unknown
+
+
+# ---------------------------------------------------------------------------
+# Cycle 11 — marked rooms draw marker text (e.g. "BOSS", "IN", "!")
+# ---------------------------------------------------------------------------
+
+def test_marked_room_draws_marker_text() -> None:
+    rooms = {"b": _room("b")}
+    result = _result(rooms=rooms, room_roles={"b": "boss"})
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, 0.0, 0.0, 1.0)
+        all_text = " ".join(str(c) for c in mock_arcade.draw_text.call_args_list)
+        assert "BOSS" in all_text
+
+
+def test_unmarked_room_omits_marker_text() -> None:
+    rooms = {"u": _room("u")}
+    result = _result(rooms=rooms, room_roles={"u": "unknown"})
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, 0.0, 0.0, 1.0)
+        all_text = " ".join(str(c) for c in mock_arcade.draw_text.call_args_list)
+        # unknown role has show_marker=False → no marker keyword
+        assert "BOSS" not in all_text and "IN" not in all_text
+
+
+# ---------------------------------------------------------------------------
+# Cycle 12 — secret connection uses lower alpha than normal
+# ---------------------------------------------------------------------------
+
+def test_secret_connection_uses_lower_alpha() -> None:
+    edge = _edge("a→b", [(0.0, 0.0), (100.0, 0.0)])
+    result = _result(edges=[edge], edge_labels={"a→b": "secret_shortcut"})
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, 0.0, 0.0, 1.0)
+        # draw_line(x1, y1, x2, y2, color, width) — color is arg[4]
+        colors = [call.args[4] for call in mock_arcade.draw_line.call_args_list]
+        assert any(len(c) == 4 and c[3] < 150 for c in colors)
+
+
+def test_normal_connection_uses_standard_alpha() -> None:
+    edge = _edge("a→b", [(0.0, 0.0), (100.0, 0.0)])
+    result = _result(edges=[edge], edge_labels={"a→b": "door"})
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, 0.0, 0.0, 1.0)
+        colors = [call.args[4] for call in mock_arcade.draw_line.call_args_list]
+        assert any(len(c) == 4 and c[3] >= 180 for c in colors)
+
+
+# ---------------------------------------------------------------------------
+# Cycle 13 — critical path rooms get an extra outline
+# ---------------------------------------------------------------------------
+
+def test_critical_path_rooms_get_extra_outline() -> None:
+    rooms = {"r1": _room("r1"), "r2": _room("r2", 200.0, 0.0)}
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer = LayoutRenderer()
+        renderer.draw(_result(rooms=rooms, critical_path=[]), 0.0, 0.0, 1.0)
+        count_no_crit = mock_arcade.draw_rect_outline.call_count
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer = LayoutRenderer()
+        renderer.draw(_result(rooms=rooms, critical_path=["r1", "r2"]), 0.0, 0.0, 1.0)
+        count_with_crit = mock_arcade.draw_rect_outline.call_count
+
+    assert count_with_crit > count_no_crit
+
+
+# ---------------------------------------------------------------------------
+# Cycle 14 — style_room_roles=False disables role-based border weight
+# ---------------------------------------------------------------------------
+
+def test_style_disabled_gives_default_border_for_boss() -> None:
+    from dungeon_daddy.map.dungeon_layout.visual_hierarchy_config import VisualHierarchyConfig
+    rooms = {"b": _room("b")}
+    result = _result(rooms=rooms, room_roles={"b": "boss"})
+    config = VisualHierarchyConfig(style_room_roles=False)
+    renderer = LayoutRenderer(config=config)
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, 0.0, 0.0, 1.0)
+        widths = [call.args[2] for call in mock_arcade.draw_rect_outline.call_args_list]
+        assert 3.0 not in widths
+
+
+# ---------------------------------------------------------------------------
+# Cycle 8 (original) — room label includes room_id
 # ---------------------------------------------------------------------------
 
 def test_room_label_includes_room_id() -> None:

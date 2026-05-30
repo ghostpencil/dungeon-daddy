@@ -2,7 +2,7 @@
 import pytest
 
 from dungeon_daddy.map.dungeon_layout.camera_fit import compute_layout_bounds
-from dungeon_daddy.map.dungeon_layout.models import LabelBox, LayoutBounds, RoomRect, RoutedEdge
+from dungeon_daddy.map.dungeon_layout.models import LabelBox, RoomRect, RoutedEdge
 
 
 def _room(x: float, y: float, w: float, h: float) -> RoomRect:

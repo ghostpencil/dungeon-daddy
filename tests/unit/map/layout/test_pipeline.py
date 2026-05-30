@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 from dungeon_daddy.data.models import Connection, Level, Room
-from dungeon_daddy.map.dungeon_layout import LayoutResult, run_layout_pipeline
-
+from dungeon_daddy.map.dungeon_layout import run_layout_pipeline
 
 # ---------------------------------------------------------------------------
 # Helpers

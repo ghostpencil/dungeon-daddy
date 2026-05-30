@@ -17,7 +17,8 @@ RoomRole = Literal[
     "entrance", "exit", "hub", "boss", "objective",
     "key_room", "lock_room", "treasure", "hazard",
     "secret", "utility", "corridor", "side_room",
-    "transition", "unknown",
+    "transition", "descent", "elevator", "stairs",
+    "hall", "study", "library", "forge", "unknown",
 ]
 
 LayoutTemplate = Literal[
@@ -29,11 +30,21 @@ LayoutTemplate = Literal[
 # Keyword tables
 # ---------------------------------------------------------------------------
 
-_ENTRANCE_KEYWORDS = {"entrance", "entry", "stair", "landing", "arrival"}
+_ENTRANCE_KEYWORDS = {"entrance", "entry", "landing", "arrival", "approach", "receiving"}
+_STAIRS_KEYWORDS = {"stairs", "staircase", "stair"}
 _BOSS_KEYWORDS = {"boss", "lair", "throne", "core", "final"}
+_OBJECTIVE_KEYWORDS = {"objective", "sanctum"}
 _KEY_KEYWORDS = {"key", "control", "lever", "mechanism"}
-_LOCK_KEYWORDS = {"locked", "gate", "sealed", "descent"}
-_EXIT_KEYWORDS = {"exit", "descent"}
+_LOCK_KEYWORDS = {"locked", "gate", "sealed"}
+_EXIT_KEYWORDS = {"exit"}
+_DESCENT_KEYWORDS = {"descent", "shaft", "descend"}
+_ELEVATOR_KEYWORDS = {"elevator"}
+_HUB_NAME_KEYWORDS = {"nexus", "junction", "crossroads"}
+_TREASURE_KEYWORDS = {"treasury", "reliquary", "vault"}
+_HAZARD_KEYWORDS = {"trap", "hazard", "anomaly", "pit", "electrified"}
+_HALL_KEYWORDS = {"hall", "hallway", "processional"}
+_LIBRARY_KEYWORDS = {"library", "scriptorium", "archive"}
+_FORGE_KEYWORDS = {"forge", "foundry", "molten", "factory"}
 
 _HUB_DEGREE_THRESHOLD = 3  # rooms with >= this many connections are candidates
 
@@ -63,16 +74,36 @@ def classify_room_role(room: Room, degree: int) -> RoomRole:
     if room.layout_role is not None:
         return room.layout_role  # type: ignore[return-value]
 
+    if _matches(_DESCENT_KEYWORDS, room):
+        return "descent"
+    if _matches(_ELEVATOR_KEYWORDS, room):
+        return "elevator"
+    if _matches(_STAIRS_KEYWORDS, room):
+        return "stairs"
     if _matches(_ENTRANCE_KEYWORDS, room):
         return "entrance"
     if _matches(_BOSS_KEYWORDS, room):
         return "boss"
+    if _matches(_OBJECTIVE_KEYWORDS, room):
+        return "objective"
+    if _matches(_EXIT_KEYWORDS, room):
+        return "exit"
     if _matches(_KEY_KEYWORDS, room):
         return "key_room"
     if _matches(_LOCK_KEYWORDS, room):
         return "lock_room"
-    if degree >= _HUB_DEGREE_THRESHOLD:
+    if _matches(_HUB_NAME_KEYWORDS, room) or degree >= _HUB_DEGREE_THRESHOLD:
         return "hub"
+    if _matches(_TREASURE_KEYWORDS, room):
+        return "treasure"
+    if _matches(_HAZARD_KEYWORDS, room):
+        return "hazard"
+    if _matches(_HALL_KEYWORDS, room):
+        return "hall"
+    if _matches(_LIBRARY_KEYWORDS, room):
+        return "library"
+    if _matches(_FORGE_KEYWORDS, room):
+        return "forge"
 
     return "unknown"
 

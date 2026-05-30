@@ -4,7 +4,6 @@ from __future__ import annotations
 from dungeon_daddy.data.models import Connection, Level, Room
 from dungeon_daddy.map.dungeon_layout.seed_layout import compute_seed_layout
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

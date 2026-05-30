@@ -1,6 +1,7 @@
 # Dungeon Daddy — Improvement Plan
 
 _Written: 2026-05-25. Based on a full assessment of the project at Post-18 Stabilisation._
+_All items complete as of Stable Release milestone (2026-05-27)._
 
 This document records actionable improvements across two dimensions: software
 quality and AI SDLC practices. Items are ordered by impact, not difficulty.
@@ -14,17 +15,17 @@ quality sprint.
 
 ## Quick Reference
 
-| ID | Title | Priority | Effort |
-|---|---|---|---|
-| IP-1 | CI: add lint, type-check, coverage | High | Small |
-| IP-2 | LLM observability | High | Medium |
-| IP-3 | Structured output for generator agent | High | Small |
-| IP-4 | Model configurable via environment | Medium | Small |
-| IP-5 | Formal skip markers for API-gated integration tests | Medium | Small |
-| IP-6 | Minimal AI output evals | Medium | Large |
-| IP-7 | Prompt versioning | Medium | Medium |
-| IP-8 | Consolidate requirements files into pyproject.toml | Low | Small |
-| IP-9 | Fix mypy None-guard issues in 6 deferred files | Medium | Small–Medium | **IN PROGRESS** |
+| ID | Title | Priority | Effort | Status |
+|---|---|---|---|---|
+| IP-1 | CI: add lint, type-check, coverage | High | Small | **Done** |
+| IP-2 | LLM observability | High | Medium | **Done** |
+| IP-3 | Structured output for generator agent | High | Small | **Done** |
+| IP-4 | Model configurable via environment | Medium | Small | **Done** |
+| IP-5 | Formal skip markers for API-gated integration tests | Medium | Small | **Done** |
+| IP-6 | Minimal AI output evals | Medium | Large | **Done** |
+| IP-7 | Prompt versioning | Medium | Medium | **Done** |
+| IP-8 | Consolidate requirements files into pyproject.toml | Low | Small | **Done** |
+| IP-9 | Fix mypy None-guard issues in 6 deferred files | Medium | Small–Medium | **Done** |
 
 ---
 
@@ -391,7 +392,7 @@ one file and forgotten in another.
 
 **Priority:** Medium (quality debt)
 **Effort:** Small–Medium (1–2 hours)
-**Phase:** Post-18 Stabilisation — IN PROGRESS
+**Phase:** Post-18 Stabilisation — **DONE** (2026-05-27)
 **Spec:** `spec/FEATURE_IP9_MYPY_NONE_GUARDS.md` (step-by-step tracking)
 
 ### Background
@@ -456,5 +457,5 @@ Items IP-1 through IP-5 are suitable for STABILIZATION. Items IP-6 and IP-7
 are best addressed in a dedicated quality sprint or at the start of the next
 BUILD phase.
 
-**IP-9** was discovered during IP-1 execution and is tracked separately — see
-GitHub issue #2. Deferred to the next BUILD phase.
+**IP-9** was discovered during IP-1 execution, tracked separately in GitHub issue #2,
+and completed during the Post-18 Stabilisation phase.

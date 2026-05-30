@@ -13,7 +13,6 @@ from dungeon_daddy.map.dungeon_layout.models import LayoutBounds, RoomRect, Rout
 from dungeon_daddy.ui.panels.map_panel import MapPanel
 from dungeon_daddy.ui.theme import PAD_MD
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -130,7 +129,7 @@ def test_fit_layout_camera_sets_non_zero_pan() -> None:
 
 
 def test_fit_layout_camera_zoom_within_bounds() -> None:
-    from dungeon_daddy.ui.panels.map_panel import _ZOOM_MIN, _ZOOM_MAX
+    from dungeon_daddy.ui.panels.map_panel import _ZOOM_MAX, _ZOOM_MIN
     p = _panel_sized(w=900.0, h=700.0)
     level = _level(["a", "b"], [_conn("a", "b")])
     p.load(level, _state())

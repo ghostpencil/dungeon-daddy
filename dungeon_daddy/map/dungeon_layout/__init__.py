@@ -10,8 +10,8 @@ from dungeon_daddy.map.dungeon_layout.labels import place_labels
 from dungeon_daddy.map.dungeon_layout.models import LabelBox, LayoutBounds, RoomRect, RoutedEdge
 from dungeon_daddy.map.dungeon_layout.ports import generate_ports
 from dungeon_daddy.map.dungeon_layout.route_orthogonal import route_connections
-from dungeon_daddy.map.dungeon_layout.seed_layout import compute_seed_layout
-from dungeon_daddy.map.dungeon_layout.semantics import classify_all_roles, classify_template
+from dungeon_daddy.map.dungeon_layout.seed_layout import compute_critical_path, compute_seed_layout
+from dungeon_daddy.map.dungeon_layout.semantics import RoomRole, classify_all_roles, classify_template
 
 
 @dataclass
@@ -22,6 +22,9 @@ class LayoutResult:
     bounds: LayoutBounds
     debug_overlay: DebugOverlay
     room_names: dict[str, str] = field(default_factory=dict)
+    room_roles: dict[str, RoomRole] = field(default_factory=dict)
+    edge_labels: dict[str, str] = field(default_factory=dict)
+    critical_path: list[str] = field(default_factory=list)
 
 
 def run_layout_pipeline(level: Level) -> LayoutResult:
@@ -47,6 +50,7 @@ def run_layout_pipeline(level: Level) -> LayoutResult:
     bounds = compute_layout_bounds(room_list, edges, labels, margin=40.0)
 
     room_names = {r.id: r.name for r in level.rooms}
+    critical_path = compute_critical_path(level, roles)
 
     return LayoutResult(
         rooms=rooms,
@@ -54,6 +58,9 @@ def run_layout_pipeline(level: Level) -> LayoutResult:
         labels=labels,
         bounds=bounds,
         room_names=room_names,
+        room_roles=roles,
+        edge_labels=label_map,
+        critical_path=critical_path,
         debug_overlay=DebugOverlay(
             enabled=False,
             rooms=room_list,
