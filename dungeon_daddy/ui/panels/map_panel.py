@@ -7,7 +7,9 @@ import arcade
 import arcade.gui
 
 from dungeon_daddy.data.models import Level, SessionState
+from dungeon_daddy.map.dungeon_layout import LayoutResult, run_layout_pipeline
 from dungeon_daddy.map.grid_renderer import GridRenderer
+from dungeon_daddy.map.layout_renderer import LayoutRenderer
 from dungeon_daddy.map.loop_overlay import LoopOverlay
 from dungeon_daddy.ui.theme import (
     BG_0,
@@ -111,6 +113,8 @@ class MapPanel:
         self._dungeon_title: str = ""
         self._loop_strip_rects: dict[str, tuple[float, float, float, float]] = {}
         self._active_loop_id: str | None = None
+        self._layout_result: LayoutResult | None = None
+        self._layout_renderer = LayoutRenderer()
 
         from dungeon_daddy.ui.widgets.level_stepper import LevelStepper
         self._stepper = LevelStepper(on_level_change)
@@ -147,8 +151,12 @@ class MapPanel:
         self._stepper.set_label(f"L{idx}")
         self._stepper.set_up_enabled(idx > 1)
         self._stepper.set_down_enabled(idx < total_levels)
+        self._layout_result = run_layout_pipeline(level)
         self._zoom_level = _ZOOM_DEFAULT
-        self._center_level()
+        if self._active_variant == "Graph":
+            self._fit_layout_camera()
+        else:
+            self._center_level()
         self._active_loop_id = state.active_loop_id
         self._build_loop_strip_rects(level)
 
@@ -176,6 +184,24 @@ class MapPanel:
         grid_cy = (min_gy + max_gy) / 2
         self._pan_offset_x = map_w / 2 - PAD_MD - grid_cx * effective
         self._pan_offset_y = map_h / 2 - PAD_MD - grid_cy * effective
+
+    def _fit_layout_camera(self) -> None:
+        """Set zoom + pan so the layout bounds fill the Graph viewport."""
+        if not self._layout_result or self._w <= 0 or self._h <= 0:
+            return
+        b = self._layout_result.bounds
+        map_w = self._w - PANEL_STEPPER_WIDTH
+        map_h = self._h - _HEADER_H
+        if b.width > 0 and b.height > 0:
+            fit_zoom = min(
+                (map_w - 2 * PAD_MD) / b.width,
+                (map_h - 2 * PAD_MD) / b.height,
+            )
+            self._zoom_level = max(_ZOOM_MIN, min(_ZOOM_MAX, fit_zoom))
+        layout_cx = (b.min_x + b.max_x) / 2
+        layout_cy = (b.min_y + b.max_y) / 2
+        self._pan_offset_x = map_w / 2 - layout_cx * self._zoom_level
+        self._pan_offset_y = map_h / 2 - layout_cy * self._zoom_level
 
     def set_renderer(self, renderer: GridRenderer) -> None:
         self._renderer = renderer
@@ -237,6 +263,8 @@ class MapPanel:
             self._apply_zoom(self._zoom_level - _ZOOM_KEY_STEP, map_cx, map_cy)
         elif key == arcade.key.KEY_0:
             self._apply_zoom(_ZOOM_DEFAULT, map_cx, map_cy)
+        elif key == arcade.key.D and self._layout_result is not None:
+            self._layout_result.debug_overlay.enabled = not self._layout_result.debug_overlay.enabled
 
     # ------------------------------------------------------------------
     # Mouse interaction (delegated from PlayView)
@@ -287,8 +315,11 @@ class MapPanel:
             if self._level is not None and self._state is not None:
                 origin_x = x + PAD_MD + self._pan_offset_x
                 origin_y = y + PAD_MD + self._pan_offset_y
-                self._renderer.draw(self._level, self._state, origin_x, origin_y, self._zoom_level)
-                self._overlay.draw(self._level, self._state, self._renderer, origin_x, origin_y, self._zoom_level)
+                if self._active_variant == "Graph" and self._layout_result is not None:
+                    self._layout_renderer.draw(self._layout_result, origin_x, origin_y, self._zoom_level)
+                else:
+                    self._renderer.draw(self._level, self._state, origin_x, origin_y, self._zoom_level)
+                    self._overlay.draw(self._level, self._state, self._renderer, origin_x, origin_y, self._zoom_level)
             else:
                 arcade.draw_text(
                     "Load a dungeon to view the map",
@@ -386,6 +417,8 @@ class MapPanel:
     def _handle_variant_click(self, label: str) -> None:
         self._active_variant = label
         self._active_tool = "select"
+        if label == "Graph":
+            self._fit_layout_camera()
         self._refresh_tab_styles()
         if self._on_variant_change is not None:
             self._on_variant_change(label.lower())
