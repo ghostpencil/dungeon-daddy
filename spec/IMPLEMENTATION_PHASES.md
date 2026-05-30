@@ -1111,6 +1111,63 @@ All quality, tooling, and observability improvements from `spec/IMPROVEMENT_PLAN
 
 ---
 
+## Phase 19 — Vector Map Layout Phase 1
+
+**Status: Not Started**
+
+Spec: `spec/MAP_LAYOUT_PHASE_NEXT.md`
+
+Improve the dungeon map renderer from a generic node graph into a semantically-aware, visually authored dungeon schematic. Rooms are placed by role, connections are routed orthogonally, labels are placed collision-aware, and the camera auto-fits on load.
+
+### Modules
+
+| Module | Test File |
+|---|---|
+| `dungeon_daddy/map/dungeon_layout/models.py` (new) | `tests/unit/map/layout/test_models.py` |
+| `dungeon_daddy/map/dungeon_layout/semantics.py` (new) | `tests/unit/map/layout/test_semantics.py` |
+| `dungeon_daddy/map/dungeon_layout/seed_layout.py` (new) | `tests/unit/map/layout/test_seed_layout.py` |
+| `dungeon_daddy/map/dungeon_layout/ports.py` (new) | `tests/unit/map/layout/test_ports.py` |
+| `dungeon_daddy/map/dungeon_layout/route_orthogonal.py` (new) | `tests/unit/map/layout/test_routing.py` |
+| `dungeon_daddy/map/dungeon_layout/labels.py` (new) | `tests/unit/map/layout/test_labels.py` |
+| `dungeon_daddy/map/dungeon_layout/camera_fit.py` (new) | `tests/unit/map/layout/test_camera_fit.py` |
+| `dungeon_daddy/map/dungeon_layout/render_cache.py` (new) | (covered by integration) |
+| `dungeon_daddy/map/dungeon_layout/validation.py` (new) | `tests/unit/map/layout/test_layout_invariants.py` |
+| `dungeon_daddy/map/graph_renderer.py` (update) | `tests/unit/map/test_graph_renderer.py` |
+
+### Implementation Steps
+
+| Step | Task | Status |
+|---|---|---|
+| 1 | Geometry models | Not Started |
+| 2 | Room role classification + template selection | Not Started |
+| 3 | Critical-path-first seed layout (linear, hub_spoke, branch_merge, boss_endcap) | Not Started |
+| 4 | Port generation | Not Started |
+| 5 | Obstacle-aware orthogonal routing | Not Started |
+| 6 | Label placement | Not Started |
+| 7 | Camera auto-fit | Not Started |
+| 8 | Validation tests + JSON/Markdown feedback reports | Not Started |
+| 9 | Debug overlay | Not Started |
+
+### Exit Criteria
+
+- [ ] At least three real dungeon floor fixtures render using the new pipeline
+- [ ] Room roles read from metadata or inferred consistently
+- [ ] At least four layout templates supported: `linear`, `hub_spoke`, `branch_merge`, `boss_endcap` or `lock_key`
+- [ ] Normal connections use port-based orthogonal routing
+- [ ] Normal connections do not pass through unrelated rooms
+- [ ] Excessive rectangular detours are penalized and avoided where a better route exists
+- [ ] Connection labels placed after routing and avoid obvious collisions
+- [ ] Camera auto-fit frames the full map on level load
+- [ ] Debug overlay shows rooms, inflated obstacles, ports, routes, labels, and camera bounds
+- [ ] Automated tests validate core layout invariants
+- [ ] Fixture tests generate JSON feedback reports (`test_outputs/layout_feedback/`)
+- [ ] Fixture tests generate Markdown feedback summary with warnings, metrics, and human review checklists
+- [ ] Map viewer still uses vector/geometric rendering (not tiles)
+- [ ] Existing pan/zoom functionality continues to work
+- [ ] `pytest tests/unit/` green
+
+---
+
 ## Notes for the Implementing Agent
 
 - **Do not advance to the next phase until all exit criteria for the current phase are met.**

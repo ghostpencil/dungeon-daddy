@@ -2,10 +2,10 @@
 
 ## Phase
 
-Phase: Post-18 Stabilisation
-Status: COMPLETE — stable release (2026-05-27)
+Phase: Phase 19 — Vector Map Layout Phase 1
+Status: IN PROGRESS
 
-849 unit/integration tests passing (excl. UI harness and 3 live-API tests).
+849 unit/integration tests passing at phase start (excl. UI harness and 3 live-API tests).
 6 eval tests passing (run with `pytest -m eval` or `python tools/run_evals.py`).
 
 ---
@@ -16,15 +16,35 @@ _None._
 
 ---
 
-## Stable Release — 2026-05-27
+## Phase 19 — Vector Map Layout Phase 1
+
+Spec: `spec/MAP_LAYOUT_PHASE_NEXT.md`
+
+Improving the dungeon map renderer from a generic node graph to a semantically-aware,
+visually authored dungeon schematic. Rooms placed by role, connections routed orthogonally,
+labels placed collision-aware, camera auto-fits on load.
+
+### Progress
+
+| Step | Task | Status |
+|---|---|---|
+| 1 | Geometry models | Not Started |
+| 2 | Room role classification + template selection | Not Started |
+| 3 | Critical-path-first seed layout | Not Started |
+| 4 | Port generation | Not Started |
+| 5 | Obstacle-aware orthogonal routing | Not Started |
+| 6 | Label placement | Not Started |
+| 7 | Camera auto-fit | Not Started |
+| 8 | Validation tests + feedback reports | Not Started |
+| 9 | Debug overlay | Not Started |
+
+---
+
+## Previous Milestone — Stable Release (2026-05-27)
 
 All 10 improvement plan items (IP-1 through IP-9, MC-1) complete. Codebase is
 lint-clean (`ruff`), fully type-checked (`mypy` zero errors, zero overrides),
-and at 74% test coverage with a 70% CI gate. Prompt versioning, LLM
-observability, structured output, model env-var switching, and minimal AI evals
-are all in place.
-
-Next step: define new feature goals or start a new BUILD phase.
+and at 74% test coverage with a 70% CI gate.
 
 _Full session history in `spec/HISTORY.md`._
 
