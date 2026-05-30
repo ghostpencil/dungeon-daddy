@@ -101,7 +101,7 @@ def classify_template(level: Level, roles: dict[str, RoomRole]) -> LayoutTemplat
     }
     for tag in level.floor_tags:
         if tag in _VALID:
-            return tag  # type: ignore[return-value]
+            return tag
 
     degrees = {r.id: 0 for r in level.rooms}
     for conn in level.connections:

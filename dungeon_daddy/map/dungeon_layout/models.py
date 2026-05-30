@@ -24,32 +24,32 @@ class RoomRect(BaseModel):
     w: float
     h: float
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def left(self) -> float:
         return self.x
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def bottom(self) -> float:
         return self.y
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def right(self) -> float:
         return self.x + self.w
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def top(self) -> float:
         return self.y + self.h
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def cx(self) -> float:
         return self.x + self.w / 2
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def cy(self) -> float:
         return self.y + self.h / 2
@@ -96,7 +96,7 @@ class RouteSegment(BaseModel):
     start: Point
     end: Point
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def length(self) -> float:
         dx = self.end[0] - self.start[0]
@@ -118,7 +118,7 @@ class RoutedEdge(BaseModel):
     score: float
     warnings: list[str] = Field(default_factory=list)
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def bend_count(self) -> int:
         if len(self.points) < 3:
@@ -140,12 +140,12 @@ class LabelBox(BaseModel):
     w: float
     h: float
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def right(self) -> float:
         return self.x + self.w
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def top(self) -> float:
         return self.y + self.h
@@ -163,12 +163,12 @@ class LayoutBounds(BaseModel):
     max_x: float
     max_y: float
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def width(self) -> float:
         return self.max_x - self.min_x
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def height(self) -> float:
         return self.max_y - self.min_y

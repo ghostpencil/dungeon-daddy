@@ -36,16 +36,15 @@ labels placed collision-aware, camera auto-fits on load.
 | 6 | Label placement | **Done** — `dungeon_layout/labels.py`, 6 tests |
 | 7 | Camera auto-fit | **Done** — `dungeon_layout/camera_fit.py`, 6 tests |
 | 8 | Validation tests + feedback reports | **Done** — `dungeon_layout/validation.py`, 17 unit tests + 13 integration tests |
-| 9 | Debug overlay | Not Started |
+| 9 | Debug overlay | **Done** — `dungeon_layout/debug_overlay.py` + `map/layout_debug_renderer.py`, 9 tests |
+
+## Phase 19 Complete
+
+All 9 steps done. 929 unit tests passing (+ integration tests).
 
 ## Next Session
 
-Start **Step 9**: debug overlay.
-
-- Spec: `spec/MAP_LAYOUT_PHASE_NEXT.md` (read Debug Overlay Requirements section)
-- Read `spec/TESTING.md` then invoke TDD skill before writing tests
-- Branch: `phase-19-vector-map-layout`
-- Test count at session start: 975
+Phase 19 is complete. Decide next phase or wire the layout pipeline into the Arcade map panel.
 
 ---
 
