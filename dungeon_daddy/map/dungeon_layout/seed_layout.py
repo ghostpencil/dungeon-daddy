@@ -22,6 +22,11 @@ _TERMINAL_ROLES = frozenset({"boss", "objective", "exit"})
 # Public API
 # ---------------------------------------------------------------------------
 
+def compute_critical_path(level: Level, roles: dict[str, RoomRole]) -> list[str]:
+    """Return the ordered critical-path room IDs for *level* (public wrapper)."""
+    return _critical_path(level, roles)
+
+
 def compute_seed_layout(
     level: Level,
     roles: dict[str, RoomRole],

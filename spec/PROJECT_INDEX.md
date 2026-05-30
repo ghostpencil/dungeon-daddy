@@ -35,7 +35,7 @@ labels placed collision-aware, camera auto-fits on load.
 | 5 | Obstacle-aware orthogonal routing | **Done** — `dungeon_layout/route_orthogonal.py`, 7 tests |
 | 6 | Label placement | **Done** — `dungeon_layout/labels.py`, 6 tests |
 | 7 | Camera auto-fit | **Done** — `dungeon_layout/camera_fit.py`, 6 tests |
-| 8 | Validation tests + feedback reports | **Done** — `dungeon_layout/validation.py`, 17 tests |
+| 8 | Validation tests + feedback reports | **Done** — `dungeon_layout/validation.py`, 17 unit tests + 13 integration tests |
 | 9 | Debug overlay | Not Started |
 
 ## Next Session
@@ -45,7 +45,7 @@ Start **Step 9**: debug overlay.
 - Spec: `spec/MAP_LAYOUT_PHASE_NEXT.md` (read Debug Overlay Requirements section)
 - Read `spec/TESTING.md` then invoke TDD skill before writing tests
 - Branch: `phase-19-vector-map-layout`
-- Test count at session start: 962
+- Test count at session start: 975
 
 ---
 

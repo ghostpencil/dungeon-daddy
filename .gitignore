@@ -7,6 +7,9 @@
 # Local reference — not for publishing
 backup/
 
+# Generated layout feedback reports
+test_outputs/
+
 # Python
 __pycache__/
 *.pyc

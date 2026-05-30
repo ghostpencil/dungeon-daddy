@@ -50,6 +50,7 @@ def _route_one(
     exclude = {conn.from_room, conn.to_room}
 
     candidates = _dogleg_candidates(src, tgt)
+    candidates += _bypass_candidates(src, tgt, obstacles, exclude)
     best = min(candidates, key=lambda pts: _score(pts, obstacles, exclude))
     score = _score(best, obstacles, exclude)
 
@@ -60,6 +61,26 @@ def _route_one(
         target_port=tgt_key,
         score=score,
     )
+
+
+def _bypass_candidates(
+    src: Port,
+    tgt: Port,
+    obstacles: dict[str, RoomRect],
+    exclude: set[str],
+) -> list[list[tuple[float, float]]]:
+    """Generate 4-point bypass routes (above/below) for each blocking obstacle."""
+    sx, sy = src.x, src.y
+    tx, ty = tgt.x, tgt.y
+    basic = _dogleg_candidates(src, tgt)
+    candidates: list[list[tuple[float, float]]] = []
+    for rid, rect in obstacles.items():
+        if rid in exclude:
+            continue
+        if any(_polyline_intersects_rect(pts, rect) for pts in basic):
+            candidates.append([(sx, sy), (sx, rect.top), (tx, rect.top), (tx, ty)])
+            candidates.append([(sx, sy), (sx, rect.bottom), (tx, rect.bottom), (tx, ty)])
+    return candidates
 
 
 def _dogleg_candidates(src: Port, tgt: Port) -> list[list[tuple[float, float]]]:
