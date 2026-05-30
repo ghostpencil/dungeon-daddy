@@ -2,14 +2,13 @@
 import pytest
 
 from dungeon_daddy.map.dungeon_layout.models import (
-    LayoutBounds,
     LabelBox,
+    LayoutBounds,
     Port,
+    RoomRect,
     RoutedEdge,
     RouteSegment,
-    RoomRect,
 )
-
 
 # ---------------------------------------------------------------------------
 # RoomRect

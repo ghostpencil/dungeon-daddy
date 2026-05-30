@@ -1,0 +1,307 @@
+{
+  "fixture_name": "crucible_l1",
+  "seed": 42,
+  "layout_template": "freeform",
+  "template_confidence": 0.8,
+  "room_roles": {
+    "R1": "entrance",
+    "R2": "hub",
+    "R3": "unknown",
+    "R4": "descent",
+    "R5": "hazard"
+  },
+  "critical_path": [
+    "R1",
+    "R2",
+    "R4"
+  ],
+  "optional_branches": [],
+  "layout_metrics": {
+    "room_overlap_count": 0,
+    "illegal_connection_crossing_count": 0,
+    "edge_crossing_count": 0,
+    "average_route_length": 132.0,
+    "average_bend_count": 0.67,
+    "max_bend_count": 2,
+    "label_overlap_count": 0,
+    "offscreen_geometry_count": 0,
+    "excessive_detour_count": 0,
+    "layout_score": 100.0
+  },
+  "route_feedback": [
+    {
+      "connection_id": "R1→R2",
+      "style": "normal",
+      "source_port": "R1__R2",
+      "target_port": "R2__R1",
+      "bend_count": 0,
+      "route_length": 60.0,
+      "direct_distance": 60.0,
+      "detour_ratio": 1.0,
+      "score": 60.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "R1→R3",
+      "style": "normal",
+      "source_port": "R1__R3",
+      "target_port": "R3__R1",
+      "bend_count": 2,
+      "route_length": 352.0,
+      "direct_distance": 240.0,
+      "detour_ratio": 1.47,
+      "score": 400.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "R2→R4",
+      "style": "normal",
+      "source_port": "R2__R4",
+      "target_port": "R4__R2",
+      "bend_count": 2,
+      "route_length": 200.0,
+      "direct_distance": 152.32,
+      "detour_ratio": 1.31,
+      "score": 248.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "R3→R2",
+      "style": "normal",
+      "source_port": "R3__R2",
+      "target_port": "R2__R3",
+      "bend_count": 0,
+      "route_length": 60.0,
+      "direct_distance": 60.0,
+      "detour_ratio": 1.0,
+      "score": 60.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "R5→R2",
+      "style": "normal",
+      "source_port": "R5__R2",
+      "target_port": "R2__R5",
+      "bend_count": 0,
+      "route_length": 60.0,
+      "direct_distance": 60.0,
+      "detour_ratio": 1.0,
+      "score": 60.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "R5→R4",
+      "style": "normal",
+      "source_port": "R5__R4",
+      "target_port": "R4__R5",
+      "bend_count": 0,
+      "route_length": 60.0,
+      "direct_distance": 60.0,
+      "detour_ratio": 1.0,
+      "score": 60.0,
+      "warnings": []
+    }
+  ],
+  "label_feedback": [
+    {
+      "connection_id": "R1→R2",
+      "label": "arch",
+      "placement_segment_index": 0,
+      "overlaps_room": false,
+      "overlaps_other_label": false,
+      "near_viewport_edge": false,
+      "score": 0.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "R1→R3",
+      "label": "door",
+      "placement_segment_index": 0,
+      "overlaps_room": false,
+      "overlaps_other_label": false,
+      "near_viewport_edge": false,
+      "score": 0.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "R2→R4",
+      "label": "door",
+      "placement_segment_index": 0,
+      "overlaps_room": false,
+      "overlaps_other_label": false,
+      "near_viewport_edge": false,
+      "score": 0.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "R3→R2",
+      "label": "hall",
+      "placement_segment_index": 0,
+      "overlaps_room": false,
+      "overlaps_other_label": false,
+      "near_viewport_edge": false,
+      "score": 0.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "R5→R2",
+      "label": "hall",
+      "placement_segment_index": 0,
+      "overlaps_room": false,
+      "overlaps_other_label": false,
+      "near_viewport_edge": false,
+      "score": 0.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "R5→R4",
+      "label": "door",
+      "placement_segment_index": 0,
+      "overlaps_room": false,
+      "overlaps_other_label": false,
+      "near_viewport_edge": false,
+      "score": 0.0,
+      "warnings": []
+    }
+  ],
+  "camera_feedback": {
+    "fit_bounds": [
+      -80.0,
+      -220.0,
+      560.0,
+      198.0
+    ],
+    "contains_all_rooms": true,
+    "contains_all_routes": true,
+    "contains_all_labels": true,
+    "margin_applied": 0.0
+  },
+  "warnings": [
+    {
+      "category": "MISSING_OBJECTIVE_ROLE",
+      "severity": "medium",
+      "message": "No room has a boss/objective/exit role — layout destination is ambiguous.",
+      "connection_id": null,
+      "data": {}
+    }
+  ],
+  "human_review_notes": [],
+  "visual_hierarchy_feedback": {
+    "roles_styled": true,
+    "connection_styles_applied": false,
+    "critical_path_emphasized": true,
+    "endpoint_emphasized": true,
+    "shape_grammar_applied": true,
+    "semantic_score": 78.0,
+    "room_style_feedback": [
+      {
+        "room_id": "R1",
+        "room_name": "Receiving Hall",
+        "role": "entrance",
+        "style_key": "entrance",
+        "expected_visual_priority": "medium",
+        "actual_visual_priority": "medium",
+        "warnings": []
+      },
+      {
+        "room_id": "R2",
+        "room_name": "Marketplace",
+        "role": "hub",
+        "style_key": "hub",
+        "expected_visual_priority": "high",
+        "actual_visual_priority": "high",
+        "warnings": []
+      },
+      {
+        "room_id": "R3",
+        "room_name": "Cargo Bay",
+        "role": "unknown",
+        "style_key": "unknown",
+        "expected_visual_priority": "low",
+        "actual_visual_priority": "low",
+        "warnings": []
+      },
+      {
+        "room_id": "R4",
+        "room_name": "Elevator Shaft",
+        "role": "descent",
+        "style_key": "descent",
+        "expected_visual_priority": "medium",
+        "actual_visual_priority": "medium",
+        "warnings": []
+      },
+      {
+        "room_id": "R5",
+        "room_name": "Trap Room",
+        "role": "hazard",
+        "style_key": "hazard",
+        "expected_visual_priority": "medium",
+        "actual_visual_priority": "medium",
+        "warnings": []
+      }
+    ],
+    "connection_style_feedback": [
+      {
+        "connection_id": "R1→R2",
+        "label": "arch",
+        "connection_type": "normal",
+        "style_key": "normal",
+        "warnings": []
+      },
+      {
+        "connection_id": "R1→R3",
+        "label": "door",
+        "connection_type": "normal",
+        "style_key": "normal",
+        "warnings": []
+      },
+      {
+        "connection_id": "R2→R4",
+        "label": "door",
+        "connection_type": "normal",
+        "style_key": "normal",
+        "warnings": []
+      },
+      {
+        "connection_id": "R3→R2",
+        "label": "hall",
+        "connection_type": "normal",
+        "style_key": "normal",
+        "warnings": []
+      },
+      {
+        "connection_id": "R5→R2",
+        "label": "hall",
+        "connection_type": "normal",
+        "style_key": "normal",
+        "warnings": []
+      },
+      {
+        "connection_id": "R5→R4",
+        "label": "door",
+        "connection_type": "normal",
+        "style_key": "normal",
+        "warnings": []
+      }
+    ],
+    "endpoint_feedback": {
+      "endpoint_room_id": "R4",
+      "endpoint_role": "descent",
+      "is_emphasized": true,
+      "has_sufficient_spacing": true,
+      "warnings": []
+    },
+    "critical_path_feedback": {
+      "critical_path": [
+        "R1",
+        "R2",
+        "R4"
+      ],
+      "is_visually_distinguished": true,
+      "warnings": []
+    },
+    "warnings": [
+      "MISSING_SEMANTIC_ROLE"
+    ]
+  }
+}

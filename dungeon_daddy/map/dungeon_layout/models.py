@@ -10,7 +10,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, computed_field
 
-
 # ---------------------------------------------------------------------------
 # RoomRect
 # ---------------------------------------------------------------------------
@@ -54,7 +53,7 @@ class RoomRect(BaseModel):
     def cy(self) -> float:
         return self.y + self.h / 2
 
-    def inflate(self, amount: float) -> "RoomRect":
+    def inflate(self, amount: float) -> RoomRect:
         return RoomRect(
             room_id=self.room_id,
             x=self.x - amount,
@@ -173,7 +172,7 @@ class LayoutBounds(BaseModel):
     def height(self) -> float:
         return self.max_y - self.min_y
 
-    def expand(self, margin: float) -> "LayoutBounds":
+    def expand(self, margin: float) -> LayoutBounds:
         return LayoutBounds(
             min_x=self.min_x - margin,
             min_y=self.min_y - margin,
@@ -182,7 +181,7 @@ class LayoutBounds(BaseModel):
         )
 
     @classmethod
-    def from_rects(cls, rects: list[RoomRect]) -> "LayoutBounds":
+    def from_rects(cls, rects: list[RoomRect]) -> LayoutBounds:
         return cls(
             min_x=min(r.left for r in rects),
             min_y=min(r.bottom for r in rects),

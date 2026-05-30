@@ -1172,6 +1172,63 @@ Improve the dungeon map renderer from a generic node graph into a semantically-a
 
 ---
 
+## Phase 20 — Vector Map Layout Phase 2: Visual Hierarchy & Semantic Presentation
+
+**Status: Not Started**
+
+Spec: `spec/MAP_LAYOUT_PHASE_2.md`
+
+Build on Phase 19's collision-free graph layout to add semantic visual hierarchy:
+room role styling, connection type language, endpoint emphasis, critical path
+presentation, and visual hierarchy feedback output. Graph Mode only — Grid Mode
+stays untouched.
+
+### Modules
+
+| Module | Test File |
+|---|---|
+| `dungeon_daddy/map/dungeon_layout/visual_style.py` (new) | `tests/unit/map/layout/test_visual_style.py` |
+| `dungeon_daddy/map/dungeon_layout/semantics.py` (update) | `tests/unit/map/layout/test_semantics.py` |
+| `dungeon_daddy/map/dungeon_layout/models.py` (update) | `tests/unit/map/layout/test_models.py` |
+| `dungeon_daddy/map/dungeon_layout/validation.py` (update) | `tests/unit/map/layout/test_validation.py` |
+| `dungeon_daddy/map/dungeon_layout/route_orthogonal.py` (update) | `tests/unit/map/layout/test_route_orthogonal.py` |
+| `dungeon_daddy/map/layout_renderer.py` (update) | `tests/unit/map/test_layout_renderer.py` |
+
+### Implementation Steps
+
+| Step | Task | Status |
+|---|---|---|
+| 1 | Expand room role vocabulary + name inference rules | Not Started |
+| 2 | `GraphRoomStyle` dataclass + `GraphRoomStyleResolver` | Not Started |
+| 3 | `GraphConnectionStyle` dataclass + `GraphConnectionStyleResolver` | Not Started |
+| 4 | Endpoint emphasis detection + spacing check | Not Started |
+| 5 | Critical path presentation flags + config toggle | Not Started |
+| 6 | `VisualHierarchyConfig` constants object | Not Started |
+| 7 | `visual_hierarchy_feedback` JSON section + new warning categories | Not Started |
+| 8 | Markdown summary update (semantic score, visual warnings) | Not Started |
+| 9 | Wire styles into `LayoutRenderer` drawing (border weight, fill, markers) | Not Started |
+| 10 | Artifact generation: screenshots + `implementation_summary.md` | Not Started |
+
+### Exit Criteria
+
+- [ ] Graph Mode remains collision-free and readable (Phase 1 geometry tests still pass)
+- [ ] Grid Mode remains untouched (smoke test + regression tests pass)
+- [ ] Room roles produce visible styling differences (boss ≠ entrance ≠ unknown)
+- [ ] Boss / objective / exit rooms are visually emphasized
+- [ ] Entrance rooms read more clearly as starting points
+- [ ] Hub rooms read as organizing centers
+- [ ] Secret / shortcut / vertical connections are visually distinct from normal corridors
+- [ ] Critical path emphasis exists and can be enabled / disabled via config
+- [ ] Generated JSON feedback includes `visual_hierarchy_feedback` section
+- [ ] Generated Markdown summary includes visual hierarchy review prompts and semantic score
+- [ ] Screenshot artifacts produced for each fixture under `artifacts/layout/phase2/`
+- [ ] Role inference tests pass (name-based + metadata-based)
+- [ ] Room styling tests pass (style key resolved per role)
+- [ ] Connection styling tests pass (label → style key mapping)
+- [ ] `pytest tests/unit/` green
+
+---
+
 ## Notes for the Implementing Agent
 
 - **Do not advance to the next phase until all exit criteria for the current phase are met.**

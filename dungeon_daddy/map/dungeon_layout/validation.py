@@ -18,7 +18,7 @@ from dungeon_daddy.map.dungeon_layout.models import (
     RoomRect,
     RoutedEdge,
 )
-
+from dungeon_daddy.map.dungeon_layout.visual_hierarchy_feedback import VisualHierarchyFeedbackReport
 
 # ---------------------------------------------------------------------------
 # Warning model
@@ -99,6 +99,7 @@ class LayoutFeedbackReport(BaseModel):
     camera_feedback: CameraFeedback
     warnings: list[LayoutWarning] = Field(default_factory=list)
     human_review_notes: list[str] = Field(default_factory=list)
+    visual_hierarchy_feedback: VisualHierarchyFeedbackReport | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -155,30 +156,37 @@ def write_feedback_report(report: LayoutFeedbackReport, output_dir: Path) -> Pat
     return path
 
 
-def write_summary(reports: list[LayoutFeedbackReport], output_dir: Path) -> Path:
+def write_summary(
+    reports: list[LayoutFeedbackReport],
+    output_dir: Path,
+    visual_reports: dict[str, "VisualHierarchyFeedbackReport"] | None = None,
+) -> Path:
     """Write a Markdown summary of all *reports* to *output_dir*/layout_feedback_summary.md."""
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / "layout_feedback_summary.md"
 
     lines = [
         "# Layout Feedback Summary\n",
-        "| Fixture | Template | Critical Path | Warnings | Score | Status |",
-        "|---|---|---|---|---:|---|",
+        "| Fixture | Template | Critical Path | Semantic Score | Geometry Score | Visual Warnings | Status |",
+        "|---|---|---|---:|---:|---|---|",
     ]
     for r in reports:
         cp = " → ".join(r.critical_path) if r.critical_path else "—"
         m = r.layout_metrics
         hard_fail = m.room_overlap_count > 0 or m.illegal_connection_crossing_count > 0
         status = "FAIL" if hard_fail else "PASS"
-        top_warns = "; ".join(w.category for w in r.warnings[:3]) or "none"
+        vr = visual_reports.get(r.fixture_name) if visual_reports else None
+        sem_score = f"{vr.semantic_score:.1f}" if vr is not None else "—"
+        vis_warns = str(len(vr.warnings)) if vr is not None else "—"
         lines.append(
             f"| {r.fixture_name} | {r.layout_template} | {cp} "
-            f"| {top_warns} | {m.layout_score:.1f} | {status} |"
+            f"| {sem_score} | {m.layout_score:.1f} | {vis_warns} | {status} |"
         )
 
     lines.append("")
     for r in reports:
-        lines += _human_review_checklist(r)
+        vr = visual_reports.get(r.fixture_name) if visual_reports else None
+        lines += _human_review_checklist(r, vr)
 
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
@@ -594,9 +602,12 @@ def _polylines_cross(
 # Markdown helpers
 # ---------------------------------------------------------------------------
 
-def _human_review_checklist(report: LayoutFeedbackReport) -> list[str]:
+def _human_review_checklist(
+    report: LayoutFeedbackReport,
+    visual_report: "VisualHierarchyFeedbackReport | None" = None,
+) -> list[str]:
     name = report.fixture_name
-    return [
+    lines = [
         f"\n### Human Review: {name}\n",
         "- [ ] Does the entrance feel like the start of the map?",
         "- [ ] Does the objective/exit feel like the destination?",
@@ -606,3 +617,16 @@ def _human_review_checklist(report: LayoutFeedbackReport) -> list[str]:
         "- [ ] Does the camera frame the entire floor on load?",
         "- [ ] Did any layout choice make the map uglier even though tests passed?",
     ]
+    if visual_report is not None:
+        lines += [
+            "- [ ] Are boss/objective rooms visually more important than ordinary rooms?",
+            "- [ ] Are hub rooms visually stable and central?",
+            "- [ ] Are key rooms visually distinct without overpowering the map?",
+            "- [ ] Are locked rooms or locked connections understandable?",
+            "- [ ] Are secret/shortcut connections visually distinct from normal corridors?",
+            "- [ ] Are vertical travel connections visually distinct?",
+            "- [ ] Does the critical path read more clearly than optional branches?",
+            "- [ ] Did any Phase 2 styling make the map noisier or uglier?",
+            "- [ ] Does Graph Mode remain cleaner and more useful than Grid Mode for overview reading?",
+        ]
+    return lines

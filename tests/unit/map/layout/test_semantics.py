@@ -1,13 +1,12 @@
 """Tests for dungeon_layout.semantics — room role classification and template selection."""
 import pytest
 
-from dungeon_daddy.data.models import Connection, Entry, Level, Room
+from dungeon_daddy.data.models import Connection, Level, Room
 from dungeon_daddy.map.dungeon_layout.semantics import (
     classify_all_roles,
     classify_room_role,
     classify_template,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -71,7 +70,6 @@ def test_explicit_layout_role_beats_name_keyword() -> None:
 @pytest.mark.parametrize("name", [
     "Grand Entrance",
     "Entry Corridor",
-    "Stair Landing",
     "Arrival Chamber",
     "Upper Landing",
 ])
@@ -142,11 +140,116 @@ def test_key_room_inferred_from_name(name: str) -> None:
 @pytest.mark.parametrize("name", [
     "Locked Antechamber",
     "Sealed Gate",
-    "Descent to the Depths",
 ])
 def test_lock_room_inferred_from_name(name: str) -> None:
     room = _room(name=name)
     assert classify_room_role(room, degree=1) == "lock_room"
+
+
+# ---------------------------------------------------------------------------
+# Slice 6b — descent role (Phase 2)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("name", [
+    "Descent to the Depths",
+    "Elevator Shaft",
+    "Sealed Descent",
+])
+def test_descent_inferred_from_name(name: str) -> None:
+    room = _room(name=name)
+    assert classify_room_role(room, degree=1) == "descent"
+
+
+def test_elevator_inferred_from_name() -> None:
+    room = _room(name="Elevator Chamber")
+    assert classify_room_role(room, degree=1) == "elevator"
+
+
+@pytest.mark.parametrize("name", [
+    "Stair Landing",
+    "Spiral Staircase",
+    "Stairs to Upper Level",
+])
+def test_stairs_inferred_from_name(name: str) -> None:
+    room = _room(name=name)
+    assert classify_room_role(room, degree=1) == "stairs"
+
+
+@pytest.mark.parametrize("name", [
+    "Primary Objective Chamber",
+    "Inner Sanctum",
+])
+def test_objective_inferred_from_name(name: str) -> None:
+    room = _room(name=name)
+    assert classify_room_role(room, degree=1) == "objective"
+
+
+@pytest.mark.parametrize("name", [
+    "Receiving Hall",
+    "Approach Corridor",
+])
+def test_entrance_expanded_keywords(name: str) -> None:
+    room = _room(name=name)
+    assert classify_room_role(room, degree=1) == "entrance"
+
+
+@pytest.mark.parametrize("name", [
+    "Central Nexus",
+    "Junction Room",
+    "The Crossroads",
+])
+def test_hub_inferred_from_name_keywords(name: str) -> None:
+    room = _room(name=name)
+    assert classify_room_role(room, degree=1) == "hub"
+
+
+@pytest.mark.parametrize("name", [
+    "The Treasury",
+    "Reliquary of Bones",
+    "Vault of Secrets",
+])
+def test_treasure_inferred_from_name(name: str) -> None:
+    room = _room(name=name)
+    assert classify_room_role(room, degree=1) == "treasure"
+
+
+@pytest.mark.parametrize("name", [
+    "Trap Chamber",
+    "Hazard Zone",
+    "Electrified Pit",
+])
+def test_hazard_inferred_from_name(name: str) -> None:
+    room = _room(name=name)
+    assert classify_room_role(room, degree=1) == "hazard"
+
+
+@pytest.mark.parametrize("name", [
+    "Grand Processional",
+    "The Great Hallway",
+])
+def test_hall_inferred_from_name(name: str) -> None:
+    room = _room(name=name)
+    assert classify_room_role(room, degree=1) == "hall"
+
+
+@pytest.mark.parametrize("name", [
+    "The Great Library",
+    "Scriptorium",
+    "Archive Chamber",
+])
+def test_library_inferred_from_name(name: str) -> None:
+    room = _room(name=name)
+    assert classify_room_role(room, degree=1) == "library"
+
+
+@pytest.mark.parametrize("name", [
+    "Forge Room",
+    "The Foundry",
+    "Molten Works",
+])
+def test_forge_inferred_from_name(name: str) -> None:
+    room = _room(name=name)
+    assert classify_room_role(room, degree=1) == "forge"
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,278 @@
+{
+  "fixture_name": "tomb_l1",
+  "seed": 42,
+  "layout_template": "freeform",
+  "template_confidence": 0.8,
+  "room_roles": {
+    "1-A": "entrance",
+    "1-B": "unknown",
+    "1-C": "unknown",
+    "1-D": "unknown",
+    "1-E": "descent"
+  },
+  "critical_path": [
+    "1-A",
+    "1-B",
+    "1-D"
+  ],
+  "optional_branches": [],
+  "layout_metrics": {
+    "room_overlap_count": 0,
+    "illegal_connection_crossing_count": 0,
+    "edge_crossing_count": 0,
+    "average_route_length": 174.4,
+    "average_bend_count": 1.0,
+    "max_bend_count": 2,
+    "label_overlap_count": 0,
+    "offscreen_geometry_count": 0,
+    "excessive_detour_count": 0,
+    "layout_score": 100.0
+  },
+  "route_feedback": [
+    {
+      "connection_id": "1-A→1-B",
+      "style": "normal",
+      "source_port": "1-A__1-B",
+      "target_port": "1-B__1-A",
+      "bend_count": 0,
+      "route_length": 60.0,
+      "direct_distance": 60.0,
+      "detour_ratio": 1.0,
+      "score": 60.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "1-A→1-C",
+      "style": "normal",
+      "source_port": "1-A__1-C",
+      "target_port": "1-C__1-A",
+      "bend_count": 2,
+      "route_length": 352.0,
+      "direct_distance": 240.0,
+      "detour_ratio": 1.47,
+      "score": 400.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "1-B→1-D",
+      "style": "normal",
+      "source_port": "1-B__1-D",
+      "target_port": "1-D__1-B",
+      "bend_count": 2,
+      "route_length": 200.0,
+      "direct_distance": 152.32,
+      "detour_ratio": 1.31,
+      "score": 248.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "1-C→1-E",
+      "style": "normal",
+      "source_port": "1-C__1-E",
+      "target_port": "1-E__1-C",
+      "bend_count": 1,
+      "route_length": 200.0,
+      "direct_distance": 152.32,
+      "detour_ratio": 1.31,
+      "score": 224.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "1-D→1-E",
+      "style": "normal",
+      "source_port": "1-D__1-E",
+      "target_port": "1-E__1-D",
+      "bend_count": 0,
+      "route_length": 60.0,
+      "direct_distance": 60.0,
+      "detour_ratio": 1.0,
+      "score": 60.0,
+      "warnings": []
+    }
+  ],
+  "label_feedback": [
+    {
+      "connection_id": "1-A→1-B",
+      "label": "door",
+      "placement_segment_index": 0,
+      "overlaps_room": false,
+      "overlaps_other_label": false,
+      "near_viewport_edge": false,
+      "score": 0.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "1-A→1-C",
+      "label": "hall",
+      "placement_segment_index": 0,
+      "overlaps_room": false,
+      "overlaps_other_label": false,
+      "near_viewport_edge": false,
+      "score": 0.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "1-B→1-D",
+      "label": "door",
+      "placement_segment_index": 0,
+      "overlaps_room": false,
+      "overlaps_other_label": false,
+      "near_viewport_edge": false,
+      "score": 0.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "1-C→1-E",
+      "label": "hole",
+      "placement_segment_index": 0,
+      "overlaps_room": false,
+      "overlaps_other_label": false,
+      "near_viewport_edge": false,
+      "score": 0.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "1-D→1-E",
+      "label": "arch",
+      "placement_segment_index": 0,
+      "overlaps_room": false,
+      "overlaps_other_label": false,
+      "near_viewport_edge": false,
+      "score": 0.0,
+      "warnings": []
+    }
+  ],
+  "camera_feedback": {
+    "fit_bounds": [
+      -80.0,
+      -220.0,
+      560.0,
+      198.0
+    ],
+    "contains_all_rooms": true,
+    "contains_all_routes": true,
+    "contains_all_labels": true,
+    "margin_applied": 0.0
+  },
+  "warnings": [
+    {
+      "category": "MISSING_OBJECTIVE_ROLE",
+      "severity": "medium",
+      "message": "No room has a boss/objective/exit role — layout destination is ambiguous.",
+      "connection_id": null,
+      "data": {}
+    }
+  ],
+  "human_review_notes": [],
+  "visual_hierarchy_feedback": {
+    "roles_styled": true,
+    "connection_styles_applied": true,
+    "critical_path_emphasized": true,
+    "endpoint_emphasized": true,
+    "shape_grammar_applied": true,
+    "semantic_score": 67.0,
+    "room_style_feedback": [
+      {
+        "room_id": "1-A",
+        "room_name": "Flooded Entry",
+        "role": "entrance",
+        "style_key": "entrance",
+        "expected_visual_priority": "medium",
+        "actual_visual_priority": "medium",
+        "warnings": []
+      },
+      {
+        "room_id": "1-B",
+        "room_name": "Drowned Shrine",
+        "role": "unknown",
+        "style_key": "unknown",
+        "expected_visual_priority": "low",
+        "actual_visual_priority": "low",
+        "warnings": []
+      },
+      {
+        "room_id": "1-C",
+        "room_name": "Rat Warren",
+        "role": "unknown",
+        "style_key": "unknown",
+        "expected_visual_priority": "low",
+        "actual_visual_priority": "low",
+        "warnings": []
+      },
+      {
+        "room_id": "1-D",
+        "room_name": "Collapsed Gallery",
+        "role": "unknown",
+        "style_key": "unknown",
+        "expected_visual_priority": "low",
+        "actual_visual_priority": "low",
+        "warnings": []
+      },
+      {
+        "room_id": "1-E",
+        "room_name": "Descent Chamber",
+        "role": "descent",
+        "style_key": "descent",
+        "expected_visual_priority": "medium",
+        "actual_visual_priority": "medium",
+        "warnings": []
+      }
+    ],
+    "connection_style_feedback": [
+      {
+        "connection_id": "1-A→1-B",
+        "label": "door",
+        "connection_type": "normal",
+        "style_key": "normal",
+        "warnings": []
+      },
+      {
+        "connection_id": "1-A→1-C",
+        "label": "hall",
+        "connection_type": "normal",
+        "style_key": "normal",
+        "warnings": []
+      },
+      {
+        "connection_id": "1-B→1-D",
+        "label": "door",
+        "connection_type": "normal",
+        "style_key": "normal",
+        "warnings": []
+      },
+      {
+        "connection_id": "1-C→1-E",
+        "label": "hole",
+        "connection_type": "vertical",
+        "style_key": "vertical",
+        "warnings": []
+      },
+      {
+        "connection_id": "1-D→1-E",
+        "label": "arch",
+        "connection_type": "normal",
+        "style_key": "normal",
+        "warnings": []
+      }
+    ],
+    "endpoint_feedback": {
+      "endpoint_room_id": "1-E",
+      "endpoint_role": "descent",
+      "is_emphasized": true,
+      "has_sufficient_spacing": true,
+      "warnings": []
+    },
+    "critical_path_feedback": {
+      "critical_path": [
+        "1-A",
+        "1-B",
+        "1-D"
+      ],
+      "is_visually_distinguished": true,
+      "warnings": []
+    },
+    "warnings": [
+      "MISSING_SEMANTIC_ROLE"
+    ]
+  }
+}

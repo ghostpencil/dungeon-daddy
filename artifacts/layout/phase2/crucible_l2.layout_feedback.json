@@ -1,0 +1,290 @@
+{
+  "fixture_name": "crucible_l2",
+  "seed": 42,
+  "layout_template": "hub_spoke",
+  "template_confidence": 0.8,
+  "room_roles": {
+    "r01": "entrance",
+    "r02": "hub",
+    "r03": "key_room",
+    "r04": "unknown",
+    "r05": "hazard",
+    "r06": "unknown"
+  },
+  "critical_path": [
+    "r01",
+    "r02",
+    "r05",
+    "r06"
+  ],
+  "optional_branches": [],
+  "layout_metrics": {
+    "room_overlap_count": 0,
+    "illegal_connection_crossing_count": 0,
+    "edge_crossing_count": 0,
+    "average_route_length": 201.68,
+    "average_bend_count": 0.8,
+    "max_bend_count": 1,
+    "label_overlap_count": 0,
+    "offscreen_geometry_count": 0,
+    "excessive_detour_count": 0,
+    "layout_score": 100.0
+  },
+  "route_feedback": [
+    {
+      "connection_id": "r01→r02",
+      "style": "normal",
+      "source_port": "r01__r02",
+      "target_port": "r02__r01",
+      "bend_count": 0,
+      "route_length": 120.0,
+      "direct_distance": 120.0,
+      "detour_ratio": 1.0,
+      "score": 120.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "r02→r03",
+      "style": "normal",
+      "source_port": "r02__r03",
+      "target_port": "r03__r02",
+      "bend_count": 1,
+      "route_length": 222.42,
+      "direct_distance": 165.77,
+      "detour_ratio": 1.34,
+      "score": 246.41764256082425,
+      "warnings": []
+    },
+    {
+      "connection_id": "r02→r04",
+      "style": "normal",
+      "source_port": "r02__r04",
+      "target_port": "r04__r02",
+      "bend_count": 1,
+      "route_length": 215.23,
+      "direct_distance": 159.38,
+      "detour_ratio": 1.35,
+      "score": 239.23253920018095,
+      "warnings": []
+    },
+    {
+      "connection_id": "r02→r05",
+      "style": "normal",
+      "source_port": "r02__r05",
+      "target_port": "r05__r02",
+      "bend_count": 1,
+      "route_length": 215.23,
+      "direct_distance": 159.38,
+      "detour_ratio": 1.35,
+      "score": 239.23253920018092,
+      "warnings": []
+    },
+    {
+      "connection_id": "r05→r06",
+      "style": "normal",
+      "source_port": "r05__r06",
+      "target_port": "r06__r05",
+      "bend_count": 1,
+      "route_length": 235.51,
+      "direct_distance": 172.05,
+      "detour_ratio": 1.37,
+      "score": 259.51326066061813,
+      "warnings": []
+    }
+  ],
+  "label_feedback": [
+    {
+      "connection_id": "r01→r02",
+      "label": "hall",
+      "placement_segment_index": 0,
+      "overlaps_room": false,
+      "overlaps_other_label": false,
+      "near_viewport_edge": false,
+      "score": 0.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "r02→r03",
+      "label": "arch",
+      "placement_segment_index": 0,
+      "overlaps_room": false,
+      "overlaps_other_label": false,
+      "near_viewport_edge": false,
+      "score": 0.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "r02→r04",
+      "label": "door",
+      "placement_segment_index": 0,
+      "overlaps_room": false,
+      "overlaps_other_label": false,
+      "near_viewport_edge": false,
+      "score": 0.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "r02→r05",
+      "label": "hall",
+      "placement_segment_index": 0,
+      "overlaps_room": false,
+      "overlaps_other_label": false,
+      "near_viewport_edge": false,
+      "score": 0.0,
+      "warnings": []
+    },
+    {
+      "connection_id": "r05→r06",
+      "label": "hole",
+      "placement_segment_index": 0,
+      "overlaps_room": false,
+      "overlaps_other_label": false,
+      "near_viewport_edge": false,
+      "score": 0.0,
+      "warnings": []
+    }
+  ],
+  "camera_feedback": {
+    "fit_bounds": [
+      -274.1640786499874,
+      -308.2535639108369,
+      440.0,
+      388.2535639108369
+    ],
+    "contains_all_rooms": true,
+    "contains_all_routes": true,
+    "contains_all_labels": true,
+    "margin_applied": 0.0
+  },
+  "warnings": [
+    {
+      "category": "MISSING_OBJECTIVE_ROLE",
+      "severity": "medium",
+      "message": "No room has a boss/objective/exit role — layout destination is ambiguous.",
+      "connection_id": null,
+      "data": {}
+    }
+  ],
+  "human_review_notes": [],
+  "visual_hierarchy_feedback": {
+    "roles_styled": true,
+    "connection_styles_applied": true,
+    "critical_path_emphasized": true,
+    "endpoint_emphasized": false,
+    "shape_grammar_applied": true,
+    "semantic_score": 51.3,
+    "room_style_feedback": [
+      {
+        "room_id": "r01",
+        "room_name": "Entry Chamber",
+        "role": "entrance",
+        "style_key": "entrance",
+        "expected_visual_priority": "medium",
+        "actual_visual_priority": "medium",
+        "warnings": []
+      },
+      {
+        "room_id": "r02",
+        "room_name": "Central Hub",
+        "role": "hub",
+        "style_key": "hub",
+        "expected_visual_priority": "high",
+        "actual_visual_priority": "high",
+        "warnings": []
+      },
+      {
+        "room_id": "r03",
+        "room_name": "Conveyor Control",
+        "role": "key_room",
+        "style_key": "key_room",
+        "expected_visual_priority": "medium",
+        "actual_visual_priority": "medium",
+        "warnings": []
+      },
+      {
+        "room_id": "r04",
+        "room_name": "Arcane Power Room",
+        "role": "unknown",
+        "style_key": "unknown",
+        "expected_visual_priority": "low",
+        "actual_visual_priority": "low",
+        "warnings": []
+      },
+      {
+        "room_id": "r05",
+        "room_name": "Molten Metal Pit",
+        "role": "hazard",
+        "style_key": "hazard",
+        "expected_visual_priority": "medium",
+        "actual_visual_priority": "medium",
+        "warnings": []
+      },
+      {
+        "room_id": "r06",
+        "room_name": "Maintenance Tunnel",
+        "role": "unknown",
+        "style_key": "unknown",
+        "expected_visual_priority": "low",
+        "actual_visual_priority": "low",
+        "warnings": []
+      }
+    ],
+    "connection_style_feedback": [
+      {
+        "connection_id": "r01→r02",
+        "label": "hall",
+        "connection_type": "normal",
+        "style_key": "normal",
+        "warnings": []
+      },
+      {
+        "connection_id": "r02→r03",
+        "label": "arch",
+        "connection_type": "normal",
+        "style_key": "normal",
+        "warnings": []
+      },
+      {
+        "connection_id": "r02→r04",
+        "label": "door",
+        "connection_type": "normal",
+        "style_key": "normal",
+        "warnings": []
+      },
+      {
+        "connection_id": "r02→r05",
+        "label": "hall",
+        "connection_type": "normal",
+        "style_key": "normal",
+        "warnings": []
+      },
+      {
+        "connection_id": "r05→r06",
+        "label": "hole",
+        "connection_type": "vertical",
+        "style_key": "vertical",
+        "warnings": []
+      }
+    ],
+    "endpoint_feedback": {
+      "endpoint_room_id": "r06",
+      "endpoint_role": "unknown",
+      "is_emphasized": false,
+      "has_sufficient_spacing": true,
+      "warnings": []
+    },
+    "critical_path_feedback": {
+      "critical_path": [
+        "r01",
+        "r02",
+        "r05",
+        "r06"
+      ],
+      "is_visually_distinguished": true,
+      "warnings": []
+    },
+    "warnings": [
+      "MISSING_SEMANTIC_ROLE"
+    ]
+  }
+}

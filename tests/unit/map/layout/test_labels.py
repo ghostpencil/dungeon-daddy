@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 from dungeon_daddy.map.dungeon_layout.labels import place_labels
-from dungeon_daddy.map.dungeon_layout.models import LabelBox, RoutedEdge, RoomRect
-
+from dungeon_daddy.map.dungeon_layout.models import RoomRect, RoutedEdge
 
 # ---------------------------------------------------------------------------
 # Helpers
