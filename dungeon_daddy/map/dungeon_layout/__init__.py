@@ -1,7 +1,7 @@
 """Dungeon layout pipeline — public entry point."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from dungeon_daddy.data.models import Level
 from dungeon_daddy.map.dungeon_layout.camera_fit import compute_layout_bounds
@@ -21,6 +21,7 @@ class LayoutResult:
     labels: list[LabelBox]
     bounds: LayoutBounds
     debug_overlay: DebugOverlay
+    room_names: dict[str, str] = field(default_factory=dict)
 
 
 def run_layout_pipeline(level: Level) -> LayoutResult:
@@ -45,11 +46,14 @@ def run_layout_pipeline(level: Level) -> LayoutResult:
     room_list = list(rooms.values())
     bounds = compute_layout_bounds(room_list, edges, labels, margin=40.0)
 
+    room_names = {r.id: r.name for r in level.rooms}
+
     return LayoutResult(
         rooms=rooms,
         edges=edges,
         labels=labels,
         bounds=bounds,
+        room_names=room_names,
         debug_overlay=DebugOverlay(
             enabled=False,
             rooms=room_list,

@@ -1,8 +1,6 @@
 # Dungeon Daddy Map Layout Improvement Phase
 
-> **Status: IMPLEMENTED** — Phase 19 complete (2026-05-30). All 9 steps done.
-> All acceptance criteria met. 929 unit tests passing. mypy zero errors.
-> Next: wire the layout pipeline into the Arcade map panel, or begin Phase 20.
+> **Status: COMPLETE** — All steps done (2026-05-30). 332 unit tests passing. mypy zero errors.
 
 ## Phase Title
 
@@ -1131,6 +1129,31 @@ Add invariant tests, fixture-based regression checks, JSON layout feedback repor
 ### Step 9: Add Debug Overlay
 
 Make routing and layout decisions visible.
+
+### Step W: Wire Pipeline into Map Panel
+
+Connect the layout pipeline to the Arcade map panel (Graph tab).
+
+- `dungeon_daddy/map/dungeon_layout/__init__.py` — `LayoutResult` dataclass + `run_layout_pipeline(level)` entry point.
+- `dungeon_daddy/map/layout_renderer.py` — `LayoutRenderer` draws rooms, edges, and labels via Arcade.
+- `MapPanel.load()` caches `LayoutResult` per level; Graph tab calls `LayoutRenderer`.
+- `MapPanel._fit_layout_camera()` centres layout bounds in the viewport on Graph tab activation.
+- `D` key toggles `DebugOverlay.enabled`.
+- Cross-level stair connections filtered silently before port/routing stages.
+
+**Status: Done (2026-05-30).**
+
+### Step 10: Room Name Labels in Graph View — **Done (2026-05-30)**
+
+- `room_names: dict[str, str]` added to `LayoutResult` (default empty dict).
+- `run_layout_pipeline` populates it from `level.rooms`.
+- `LayoutRenderer._draw_rooms()` calls `arcade.draw_text` centred in each rect using `FONT_UI` / `TEXT_XS`.
+
+### Step 11: Room Click and Selection Highlight — **Done (2026-05-30)**
+
+- `_selected_room_id: str | None` on `MapPanel`; reset to `None` on `load()`.
+- `MapPanel.handle_mouse_press()` hit-tests layout-space rects when Graph/select mode active; toggles selection on same-room click.
+- `LayoutRenderer.draw()` accepts `selected_room_id`; draws teal 2px outline over the selected room.
 
 ---
 

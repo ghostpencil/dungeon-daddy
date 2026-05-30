@@ -37,14 +37,17 @@ def _result(
     rooms: dict[str, RoomRect] | None = None,
     edges: list[RoutedEdge] | None = None,
     labels: list[LabelBox] | None = None,
+    room_names: dict[str, str] | None = None,
 ) -> LayoutResult:
     r = rooms or {}
     e = edges or []
     lb = labels or []
+    rn = room_names or {}
     bounds = LayoutBounds(min_x=0.0, min_y=0.0, max_x=500.0, max_y=400.0)
     return LayoutResult(
         rooms=r, edges=e, labels=lb, bounds=bounds,
         debug_overlay=DebugOverlay(enabled=False, bounds=bounds),
+        room_names=rn,
     )
 
 
@@ -127,3 +130,55 @@ def test_zoom_scales_room_rect() -> None:
 
     # The XYWH passed should differ between zoom levels
     assert calls_zoom1 != calls_zoom2
+
+
+# ---------------------------------------------------------------------------
+# Cycle 6 — draw() renders room name centered inside each room rect
+# ---------------------------------------------------------------------------
+
+def test_draw_text_for_room_names() -> None:
+    rooms = {"a": _room("a", 0.0, 0.0), "b": _room("b", 200.0, 0.0)}
+    room_names = {"a": "Entrance Hall", "b": "Guard Room"}
+    result = _result(rooms=rooms, room_names=room_names)
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, origin_x=0.0, origin_y=0.0, zoom=1.0)
+        calls = [str(c) for c in mock_arcade.draw_text.call_args_list]
+        all_text = " ".join(calls)
+        assert "Entrance Hall" in all_text
+        assert "Guard Room" in all_text
+
+
+# ---------------------------------------------------------------------------
+# Cycle 7 — selected room gets an extra teal outline
+# ---------------------------------------------------------------------------
+
+def test_selected_room_gets_teal_outline() -> None:
+    from dungeon_daddy.ui.theme import TEAL
+    rooms = {"a": _room("a", 0.0, 0.0)}
+    result = _result(rooms=rooms)
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, origin_x=0.0, origin_y=0.0, zoom=1.0, selected_room_id="a")
+        colors = [call.args[1] for call in mock_arcade.draw_rect_outline.call_args_list]
+        assert TEAL in colors
+
+
+# ---------------------------------------------------------------------------
+# Cycle 8 — room label draws room_id alongside the name (two-line display)
+# ---------------------------------------------------------------------------
+
+def test_room_label_includes_room_id() -> None:
+    rooms = {"1-A": _room("1-A", 0.0, 0.0)}
+    room_names = {"1-A": "Flooded Entry"}
+    result = _result(rooms=rooms, room_names=room_names)
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, origin_x=0.0, origin_y=0.0, zoom=1.0)
+        calls = [str(c) for c in mock_arcade.draw_text.call_args_list]
+        all_text = " ".join(calls)
+        assert "Flooded Entry" in all_text
+        assert "1-A" in all_text

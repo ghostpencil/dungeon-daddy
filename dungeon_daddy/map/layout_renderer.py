@@ -5,13 +5,14 @@ import arcade
 
 from dungeon_daddy.map.dungeon_layout import LayoutResult
 from dungeon_daddy.map.layout_debug_renderer import LayoutDebugRenderer
-from dungeon_daddy.ui.theme import FONT_MONO, TEXT_XS
+from dungeon_daddy.ui.theme import FONT_MONO, FONT_UI, TEAL, TEXT_XS
 
 _ROOM_FILL = (30, 35, 45)
 _ROOM_BORDER = (100, 120, 140)
 _EDGE_COLOR = (80, 100, 130)
 _LABEL_COLOR = (160, 170, 180)
 _LINE_WIDTH = 1
+_SELECTION_WIDTH = 2
 
 
 class LayoutRenderer:
@@ -26,9 +27,10 @@ class LayoutRenderer:
         origin_x: float,
         origin_y: float,
         zoom: float,
+        selected_room_id: str | None = None,
     ) -> None:
         self._draw_edges(result, origin_x, origin_y, zoom)
-        self._draw_rooms(result, origin_x, origin_y, zoom)
+        self._draw_rooms(result, origin_x, origin_y, zoom, selected_room_id)
         self._draw_labels(result, origin_x, origin_y, zoom)
         if result.debug_overlay.enabled:
             self._debug_renderer.draw(result.debug_overlay, origin_x, origin_y, zoom)
@@ -49,6 +51,7 @@ class LayoutRenderer:
         origin_x: float,
         origin_y: float,
         zoom: float,
+        selected_room_id: str | None = None,
     ) -> None:
         for rect in result.rooms.values():
             wx = self._wx(rect.x, origin_x, zoom)
@@ -58,6 +61,17 @@ class LayoutRenderer:
             xywh = arcade.XYWH(wx + ww / 2, wy + wh / 2, ww, wh)
             arcade.draw_rect_filled(xywh, _ROOM_FILL)
             arcade.draw_rect_outline(xywh, _ROOM_BORDER, _LINE_WIDTH)
+            if rect.room_id == selected_room_id:
+                arcade.draw_rect_outline(xywh, TEAL, _SELECTION_WIDTH)
+            name = result.room_names.get(rect.room_id, "")
+            label = f"{name}\n{rect.room_id}" if name else rect.room_id
+            arcade.draw_text(
+                label, wx + ww / 2, wy + wh / 2,
+                _LABEL_COLOR, font_size=TEXT_XS, font_name=FONT_UI,
+                anchor_x="center", anchor_y="center",
+                width=int(ww), align="center",
+                multiline=True,
+            )
 
     def _draw_edges(
         self,

@@ -111,6 +111,8 @@ class PlayView(arcade.View):
             renderer=self._renderer,
             on_variant_change=lambda variant: self.window.set_map_variant(variant),
             on_activate_loop=self.on_activate_loop,
+            on_room_select=self._on_graph_room_select,
+            on_connection_select=self._on_graph_connection_select,
         )
         self._ui_built = False
         self._result_queue: queue.Queue[DMResult] = queue.Queue()
@@ -671,6 +673,51 @@ class PlayView(arcade.View):
             level = self._dungeon.levels[self._state.current_level_idx]
             self._map.load(level, self._state, len(self._dungeon.levels))
         self._edit_memory_rect = self._compute_edit_btn_rect(w, content_h)
+
+    def _on_graph_room_select(self, room_id: str) -> None:
+        if self._dungeon is None or self._state is None:
+            return
+        level = self._dungeon.levels[self._state.current_level_idx]
+        room_map = {r.id: r for r in level.rooms}
+        room = room_map.get(room_id)
+        if room is None:
+            return
+        self._state.current_room_id = room.id
+        if room.id not in self._state.visited_rooms:
+            self._state.visited_rooms.append(room.id)
+        total = len(self._dungeon.levels)
+        self._map.update_state(self._state, total)
+        self._chat.set_current_room(room.name, room.note or "", room_id=room.id)
+        _log.debug("Graph: selected room %s", room.id)
+        self._compact_history()
+        self._dm_history.append(LLMMessage(role="user", content=f"We enter {room.name}."))
+        self._chat.set_busy(True)
+        self._spawn_dm_thread(room, level)
+        self._save_session()
+
+    def _on_graph_connection_select(self, from_room: str, to_room: str) -> None:
+        if self._dungeon is None or self._state is None:
+            return
+        level = self._dungeon.levels[self._state.current_level_idx]
+        conn = next(
+            (c for c in level.connections
+             if (c.from_room == from_room and c.to_room == to_room)
+             or (c.from_room == to_room and c.to_room == from_room)),
+            None,
+        )
+        if conn is not None:
+            loops = [lp for lp in level.loops
+                     if from_room in lp.rooms or to_room in lp.rooms]
+            loop_info = ", ".join(lp.id for lp in loops) or "none"
+            note_part = f": {conn.note}" if conn.note else ""
+            msg = (
+                f"Connection: {conn.from_room} → {conn.to_room}"
+                f" [{conn.type}]{note_part} (loops: {loop_info})"
+            )
+        else:
+            msg = f"Connection: {from_room} → {to_room}"
+        self._chat.add_message("dm", msg)
+        _log.debug("Graph: selected connection %s → %s", from_room, to_room)
 
     def on_activate_loop(self, loop_id: str | None) -> None:
         if self._state is not None:
