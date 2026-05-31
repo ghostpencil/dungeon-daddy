@@ -1283,6 +1283,75 @@ Chamber), and added explicit critical paths for all target floors. Graph Mode on
 
 ---
 
+## Phase 22 — Graph Mode Phase 3: Interaction Polish + Phase 2.5 Cleanup
+
+**Status: Complete** — 1280 unit+integration tests passing. Closed 2026-05-31.
+
+Spec: `spec/MAP_LAYOUT_PHASE_3.md`
+
+Added interaction polish to Graph Mode: hover states, room selection, focus mode, connection hover, room detail panel, recenter/clear controls. Also included two Phase 2.5 follow-up items: objective warning naming refinement and connection metadata backfill for all target fixtures and local dungeon files. Grid Mode untouched.
+
+### Entry Conditions
+
+- Phase 21 complete ✓
+- 1184 unit+integration tests passing ✓
+- Spec: `spec/MAP_LAYOUT_PHASE_3.md`
+
+### Modules
+
+| Module | Test File |
+|---|---|
+| `dungeon_daddy/map/dungeon_layout/graph_view_state.py` (new) | `tests/unit/map/layout/test_graph_view_state.py` |
+| `dungeon_daddy/map/dungeon_layout/hit_test.py` (new) | `tests/unit/map/layout/test_hit_test.py` |
+| `dungeon_daddy/map/dungeon_layout/room_detail_panel.py` (new) | `tests/unit/map/layout/test_room_detail_panel.py` |
+| `dungeon_daddy/map/dungeon_layout/style_resolver.py` (new) | `tests/unit/map/layout/test_style_resolver.py` |
+| `dungeon_daddy/map/dungeon_layout/validation.py` (update) | `tests/unit/map/layout/test_validation.py` |
+| `dungeon_daddy/map/dungeon_layout/room_style.py` (update) | `tests/unit/map/layout/test_room_style.py` |
+| `dungeon_daddy/map/layout_renderer.py` (update) | `tests/unit/map/test_layout_renderer.py` |
+| `dungeon_daddy/ui/panels/map_panel.py` (update) | `tests/unit/map/test_map_panel_layout.py` |
+| `dungeon_daddy/views/play_view.py` (update) | (mouse motion routing) |
+| `dungeon_daddy/data/models.py` (update) | (graph_notes, visual_priority fields) |
+| `scripts/backfill_graph_metadata.py` (update) | (connection_patches support) |
+| `scripts/generate_phase3_graph_artifacts.py` (new) | (artifact generation — no unit test) |
+| `tests/fixtures/crucible.json` (update) | (connection metadata backfill) |
+| `tests/fixtures/tomb.json` (update) | (connection metadata backfill) |
+
+### Implementation Steps
+
+| Step | Task | Status |
+|---|---|---|
+| P3-1 | Phase 2.5 cleanup: refine objective warning naming (`MISSING_ENDPOINT_ROLE`, `NO_QUEST_OBJECTIVE_ROLE`, `ENDPOINT_IS_TRANSITION_ONLY`) in `validation.py` | **Done** — 4 new tests; severity tiering added |
+| P3-2 | Connection metadata backfill for crucible + tomb fixtures and local dungeon files; visual parity gaps (border color, fill color, marker position) | **Done** — `apply_connection_patch` added; 36 connections patched across 6 levels; `border_color`/`fill_color` on `GraphRoomStyle`; marker y fixed; 9 new tests |
+| P3-3 | `GraphViewState` model: camera, selected room, hovered room, hovered connection | **Done** — `CameraState` + `GraphViewState`; 12 new tests |
+| P3-4 | Room hit testing (point-in-rect) + connection hit testing (tolerance distance; room wins over connection) | **Done** — `hit_test.py`; 9 new tests |
+| P3-5 | Style resolution pipeline: base → semantic role → critical path → focus/fade → hover → selected | **Done** — `style_resolver.py`; 8 new tests |
+| P3-6 | Room hover visual state: border brightens/thickens; restores on mouse-out unless room is selected | **Done** — `view_state` wired into `LayoutRenderer.draw()`; 4 new tests |
+| P3-7 | Room selection + focus mode: connected rooms highlight, unrelated rooms/connections fade | **Done** — `_connected_room_ids` helper; edge fading at 40% alpha; 3 new tests |
+| P3-8 | Connection hover: brightens/thickens near segment; tolerance-based hit testing | **Done** — `alpha+60` + `line_width+0.5`; 3 new tests |
+| P3-9 | Room detail panel: fixed panel showing name, ID, role, connections, notes | **Done** — `room_detail_panel.py`; 24 new tests |
+| P3-10 | Critical path emphasis: stronger visual state when selected room is on the critical path | **Done** — `selected_on_critical_path` flag; `+40 border_alpha` + `+0.5 width`; 3 new tests |
+| P3-11 | Keyboard controls: R = recenter/reset view; Escape = clear selection | **Done** — `handle_key_press` in `map_panel.py`; 6 new tests |
+| P3-12 | Artifact generation script + screenshot artifacts under `artifacts/layout/phase3/` | **Done** — 31 artifacts generated; `map_panel.py` wired with `GraphViewState`; 5 new tests |
+| P3-13 | Integration tests: geometry/semantic/metadata scores do not regress; interaction states render without exception | **Done** — 4 new integration tests; 1279 passing |
+| P3-14 | Output artifacts: `interaction_feedback` JSON per fixture, `phase3_feedback_summary.md`, `before_after_summary.md`, `connection_metadata_migration_report.md`, `implementation_summary.md` | **Done** — all 6 artifact types present; 1280 passing |
+
+### Exit Criteria
+
+- [x] Grid Mode remains untouched
+- [x] Graph Mode still passes all Phase 1 geometry invariants (score 100.0 for all fixtures)
+- [x] Phase 2.5 semantic + metadata scores do not regress
+- [x] Room hover changes visual state; restores on mouse-out
+- [x] Room selection works; connected rooms and connections are highlighted
+- [x] Unrelated rooms and connections fade in focus mode
+- [x] Room detail panel shows metadata and connections for selected room
+- [x] Recenter (R) and clear selection (Escape) keyboard controls work
+- [x] Phase 2.5 warning naming refined (`MISSING_ENDPOINT_ROLE`, `NO_QUEST_OBJECTIVE_ROLE`, `ENDPOINT_IS_TRANSITION_ONLY`)
+- [x] Connection metadata backfilled for crucible + tomb fixtures and local dungeon files
+- [x] Required output artifacts generated under `artifacts/layout/phase3/`
+- [x] `pytest tests/unit/` green (1280 passing)
+
+---
+
 ## Notes for the Implementing Agent
 
 - **Do not advance to the next phase until all exit criteria for the current phase are met.**

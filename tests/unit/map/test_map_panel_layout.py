@@ -300,3 +300,132 @@ def test_miss_outside_room_and_edge_does_not_fire_callbacks() -> None:
     p.handle_mouse_press(p._x + PAD_MD + 600.0, p._y + PAD_MD + 400.0, arcade.MOUSE_BUTTON_LEFT)
     assert room_fired == []
     assert conn_fired == []
+
+
+# ---------------------------------------------------------------------------
+# Cycle 11 — R key recenters Graph Mode camera
+# ---------------------------------------------------------------------------
+
+def _graph_panel_with_layout() -> MapPanel:
+    """Panel in Graph mode with a layout result and non-default pan/zoom."""
+    p = _panel_sized(w=900.0, h=700.0)
+    p._active_variant = "Graph"
+    level = _level(["a", "b", "c"], [_conn("a", "b"), _conn("b", "c")])
+    p.load(level, _state())
+    # Shift pan so we can observe recenter effect
+    p._pan_offset_x = 9999.0
+    p._pan_offset_y = 9999.0
+    p._zoom_level = 0.5
+    return p
+
+
+def test_r_key_recenters_graph_camera() -> None:
+    p = _graph_panel_with_layout()
+    p.handle_key_press(arcade.key.R)
+    # After recenter, pan should no longer be the sentinel values
+    assert p._pan_offset_x != 9999.0
+    assert p._pan_offset_y != 9999.0
+
+
+def test_r_key_in_grid_mode_does_not_recenter() -> None:
+    p = _graph_panel_with_layout()
+    p._active_variant = "Grid"
+    p.handle_key_press(arcade.key.R)
+    # Pan should remain untouched
+    assert p._pan_offset_x == 9999.0
+    assert p._pan_offset_y == 9999.0
+
+
+def test_r_key_without_layout_does_not_raise() -> None:
+    p = _panel_sized(w=900.0, h=700.0)
+    p._active_variant = "Graph"
+    p._layout_result = None
+    p.handle_key_press(arcade.key.R)  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# Cycle 12 — Escape key clears Graph Mode selection
+# ---------------------------------------------------------------------------
+
+def test_escape_clears_selected_room_in_graph_mode() -> None:
+    p = _panel_sized(w=900.0, h=700.0)
+    p._active_variant = "Graph"
+    p._selected_room_id = "R1"
+    p.handle_key_press(arcade.key.ESCAPE)
+    assert p._selected_room_id is None
+
+
+def test_escape_in_grid_mode_does_not_clear_selection() -> None:
+    p = _panel_sized(w=900.0, h=700.0)
+    p._active_variant = "Grid"
+    p._selected_room_id = "R1"
+    p.handle_key_press(arcade.key.ESCAPE)
+    assert p._selected_room_id == "R1"
+
+
+def test_escape_with_no_selection_does_not_raise() -> None:
+    p = _panel_sized(w=900.0, h=700.0)
+    p._active_variant = "Graph"
+    p._selected_room_id = None
+    p.handle_key_press(arcade.key.ESCAPE)  # must not raise
+    assert p._selected_room_id is None
+
+
+# ---------------------------------------------------------------------------
+# Cycle 13 — handle_mouse_motion over room sets hover state
+# ---------------------------------------------------------------------------
+
+def test_mouse_motion_over_room_sets_hover() -> None:
+    p, room = _graph_panel_with_room("a")
+    cx, cy = _screen_center(p, room)
+    p.handle_mouse_motion(cx, cy)
+    assert p._view_state.hovered_room_id == "a"
+
+
+# ---------------------------------------------------------------------------
+# Cycle 14 — handle_mouse_motion off room clears hover state
+# ---------------------------------------------------------------------------
+
+def test_mouse_motion_off_room_clears_hover() -> None:
+    p, _ = _graph_panel_with_room("a")
+    p._view_state.hover_room("a")
+    p.handle_mouse_motion(p._x + PAD_MD + 500.0, p._y + PAD_MD + 500.0)
+    assert p._view_state.hovered_room_id is None
+
+
+# ---------------------------------------------------------------------------
+# Cycle 15 — handle_mouse_motion in non-graph mode does not update hover
+# ---------------------------------------------------------------------------
+
+def test_mouse_motion_in_grid_mode_does_not_set_hover() -> None:
+    p, room = _graph_panel_with_room("a")
+    p._active_variant = "Grid"
+    cx, cy = _screen_center(p, room)
+    p.handle_mouse_motion(cx, cy)
+    assert p._view_state.hovered_room_id is None
+
+
+# ---------------------------------------------------------------------------
+# Cycle 16 — handle_mouse_motion near connection sets connection hover
+# ---------------------------------------------------------------------------
+
+def test_mouse_motion_near_connection_sets_connection_hover() -> None:
+    p, _ = _graph_panel_with_callback()
+    # edge "1-A→1-B" runs from layout (120,40) to (200,40); click midpoint (160,40)
+    ex = p._x + PAD_MD + 160.0
+    ey = p._y + PAD_MD + 40.0
+    p.handle_mouse_motion(ex, ey)
+    assert p._view_state.hovered_connection_id == "1-A→1-B"
+
+
+# ---------------------------------------------------------------------------
+# Cycle 17 — load() resets view_state (hover and selection cleared)
+# ---------------------------------------------------------------------------
+
+def test_load_resets_view_state() -> None:
+    p = _panel()
+    p._view_state.select_room("R1")
+    p._view_state.hover_room("R2")
+    p.load(_level(["a"]), _state())
+    assert p._view_state.selected_room_id is None
+    assert p._view_state.hovered_room_id is None

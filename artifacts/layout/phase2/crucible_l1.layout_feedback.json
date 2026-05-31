@@ -178,9 +178,16 @@
   },
   "warnings": [
     {
-      "category": "MISSING_OBJECTIVE_ROLE",
-      "severity": "medium",
-      "message": "No room has a boss/objective/exit role — layout destination is ambiguous.",
+      "category": "ENDPOINT_IS_TRANSITION_ONLY",
+      "severity": "low",
+      "message": "Endpoint is a travel/transition room — no combat objective on this floor.",
+      "connection_id": null,
+      "data": {}
+    },
+    {
+      "category": "NO_QUEST_OBJECTIVE_ROLE",
+      "severity": "low",
+      "message": "No room has a boss/objective/key_room role — no combat objective on this floor.",
       "connection_id": null,
       "data": {}
     }
@@ -306,12 +313,18 @@
     "explicit_room_role_count": 5,
     "inferred_room_role_count": 0,
     "unknown_room_role_count": 0,
-    "explicit_connection_style_count": 0,
-    "inferred_connection_style_count": 6,
+    "explicit_connection_style_count": 6,
+    "inferred_connection_style_count": 0,
     "explicit_critical_path": true,
     "explicit_endpoint": true,
     "explicit_entrance": true,
-    "metadata_score": 85.0,
-    "warnings": []
+    "metadata_score": 100.0,
+    "warnings": [
+      "Connection 'R1→R2' has unrecognised layout_connection_role 'critical_path'.",
+      "Connection 'R1→R3' has unrecognised layout_connection_role 'optional_branch'.",
+      "Connection 'R3→R2' has unrecognised layout_connection_role 'optional_branch'.",
+      "Connection 'R5→R2' has unrecognised layout_connection_role 'optional_branch'.",
+      "Connection 'R5→R4' has unrecognised layout_connection_role 'optional_branch'."
+    ]
   }
 }

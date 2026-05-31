@@ -184,37 +184,49 @@
           "from": "R1",
           "to": "R2",
           "type": "arch",
-          "note": "Main path lined with traps."
+          "note": "Main path lined with traps.",
+          "layout_connection_role": "critical_path",
+          "graph_notes": "Main path from Receiving Hall to Marketplace."
         },
         {
           "from": "R1",
           "to": "R3",
           "type": "door",
-          "note": "Hidden door opening into the cargo bay."
+          "note": "Hidden door opening into the cargo bay.",
+          "layout_connection_role": "optional_branch",
+          "graph_notes": "Hidden door bypass into Cargo Bay."
         },
         {
           "from": "R2",
           "to": "R4",
           "type": "door",
-          "note": "Locked door requiring a key from the Marketplace."
+          "note": "Locked door requiring a key from the Marketplace.",
+          "layout_connection_role": "locked",
+          "graph_notes": "Locked door \u2014 key obtained in Marketplace."
         },
         {
           "from": "R3",
           "to": "R2",
           "type": "hall",
-          "note": "Fallback route converting to a confrontation point."
+          "note": "Fallback route converting to a confrontation point.",
+          "layout_connection_role": "optional_branch",
+          "graph_notes": "Cargo Bay fallback into Marketplace."
         },
         {
           "from": "R5",
           "to": "R2",
           "type": "hall",
-          "note": "Pursuit leads adventurers back to the Marketplace."
+          "note": "Pursuit leads adventurers back to the Marketplace.",
+          "layout_connection_role": "optional_branch",
+          "graph_notes": "Pursuit route back to Marketplace."
         },
         {
           "from": "R5",
           "to": "R4",
           "type": "door",
-          "note": "Direct yet hazardous path to the Elevator Shaft."
+          "note": "Direct yet hazardous path to the Elevator Shaft.",
+          "layout_connection_role": "optional_branch",
+          "graph_notes": "Direct hazardous path to Elevator Shaft."
         }
       ],
       "layout_metadata": {
@@ -383,31 +395,41 @@
           "from": "r01",
           "to": "r02",
           "type": "hall",
-          "note": "A narrow corridor lined with defunct control panels."
+          "note": "A narrow corridor lined with defunct control panels.",
+          "layout_connection_role": "critical_path",
+          "graph_notes": "Entry Chamber to Central Hub."
         },
         {
           "from": "r02",
           "to": "r03",
           "type": "arch",
-          "note": "An arched pathway with pipes overhead buzzing faintly."
+          "note": "An arched pathway with pipes overhead buzzing faintly.",
+          "layout_connection_role": "optional_branch",
+          "graph_notes": "Branch to Conveyor Control objective."
         },
         {
           "from": "r02",
           "to": "r04",
           "type": "door",
-          "note": "A heavy iron door painted with warning signs."
+          "note": "A heavy iron door painted with warning signs.",
+          "layout_connection_role": "optional_branch",
+          "graph_notes": "Branch to Arcane Power Room."
         },
         {
           "from": "r02",
           "to": "r05",
           "type": "hall",
-          "note": "A chilling corridor with a heat distortion in the air."
+          "note": "A chilling corridor with a heat distortion in the air.",
+          "layout_connection_role": "critical_path",
+          "graph_notes": "Hub to Molten Metal Pit \u2014 hazard on critical path."
         },
         {
           "from": "r05",
           "to": "r06",
           "type": "hole",
-          "note": "A hidden doorway along a man-made chasm."
+          "note": "A hidden doorway along a man-made chasm.",
+          "layout_connection_role": "critical_path",
+          "graph_notes": "Molten Pit to Maintenance Tunnel \u2014 floor exit."
         }
       ],
       "layout_metadata": {
@@ -626,43 +648,57 @@
           "from": "r1",
           "to": "r2",
           "type": "door",
-          "note": "Reinforced metal door with runic patterns."
+          "note": "Reinforced metal door with runic patterns.",
+          "layout_connection_role": "critical_path",
+          "graph_notes": "Control Nexus to Conduit Corridor."
         },
         {
           "from": "r2",
           "to": "r3",
           "type": "hall",
-          "note": "Arched passageway illuminated by the glow of the crystal array."
+          "note": "Arched passageway illuminated by the glow of the crystal array.",
+          "layout_connection_role": "critical_path",
+          "graph_notes": "Conduit Corridor to Crystal Array objective."
         },
         {
           "from": "r3",
           "to": "r4",
           "type": "arch",
-          "note": "Open archway leading to the electrified section."
+          "note": "Open archway leading to the electrified section.",
+          "layout_connection_role": "critical_path",
+          "graph_notes": "Crystal Array to Electrified Floor hazard."
         },
         {
           "from": "r4",
           "to": "r5",
           "type": "hole",
-          "note": "Secret passage hidden behind a false wall."
+          "note": "Secret passage hidden behind a false wall.",
+          "layout_connection_role": "secret",
+          "graph_notes": "Secret passage to Vault of Opportunities."
         },
         {
           "from": "r5",
           "to": "r6",
           "type": "hall",
-          "note": "A wide corridor descending into the gravity anomaly area."
+          "note": "A wide corridor descending into the gravity anomaly area.",
+          "layout_connection_role": "optional_branch",
+          "graph_notes": "Vault bypass route into Gravity Anomaly."
         },
         {
           "from": "r6",
           "to": "r7",
           "type": "arch",
-          "note": "An archway leading directly into the lair of the Prime Golem."
+          "note": "An archway leading directly into the lair of the Prime Golem.",
+          "layout_connection_role": "critical_path",
+          "graph_notes": "Gravity Anomaly to Prime Golem Lair boss."
         },
         {
           "from": "r7",
           "to": "r8",
           "type": "door",
-          "note": "Massive vault door embossed with arcane symbols."
+          "note": "Massive vault door embossed with arcane symbols.",
+          "layout_connection_role": "critical_path",
+          "graph_notes": "Prime Golem Lair to Power Core Chamber \u2014 final door."
         }
       ],
       "layout_metadata": {

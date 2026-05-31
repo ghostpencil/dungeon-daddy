@@ -1,0 +1,171 @@
+{
+  "fixture_name": "crucible_l2",
+  "geometry_score": 100.0,
+  "semantic_score": 82.2,
+  "metadata_score": 100.0,
+  "interaction_score": 100.0,
+  "default_state": {
+    "renders_without_error": true,
+    "selected_room_id": null,
+    "hovered_room_id": null,
+    "hovered_connection_id": null
+  },
+  "selection_tests": [
+    {
+      "selected_room_id": "r01",
+      "selected_room_role": "entrance",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "r02"
+      ],
+      "highlighted_connection_ids": [
+        "r01\u2192r02"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    },
+    {
+      "selected_room_id": "r02",
+      "selected_room_role": "hub",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "r01",
+        "r03",
+        "r04",
+        "r05"
+      ],
+      "highlighted_connection_ids": [
+        "r01\u2192r02",
+        "r02\u2192r03",
+        "r02\u2192r04",
+        "r02\u2192r05"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    },
+    {
+      "selected_room_id": "r03",
+      "selected_room_role": "key_room",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "r02"
+      ],
+      "highlighted_connection_ids": [
+        "r02\u2192r03"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    },
+    {
+      "selected_room_id": "r05",
+      "selected_room_role": "hazard",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "r02",
+        "r06"
+      ],
+      "highlighted_connection_ids": [
+        "r02\u2192r05",
+        "r05\u2192r06"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    },
+    {
+      "selected_room_id": "r06",
+      "selected_room_role": "transition",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "r05"
+      ],
+      "highlighted_connection_ids": [
+        "r05\u2192r06"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    }
+  ],
+  "hover_tests": [
+    {
+      "hovered_room_id": "r01",
+      "hover_visual_applied": true,
+      "warnings": []
+    },
+    {
+      "hovered_room_id": "r02",
+      "hover_visual_applied": true,
+      "warnings": []
+    },
+    {
+      "hovered_room_id": "r03",
+      "hover_visual_applied": true,
+      "warnings": []
+    },
+    {
+      "hovered_room_id": "r05",
+      "hover_visual_applied": true,
+      "warnings": []
+    },
+    {
+      "hovered_room_id": "r06",
+      "hover_visual_applied": true,
+      "warnings": []
+    }
+  ],
+  "connection_hover_tests": [
+    {
+      "connection_id": "r05\u2192r06",
+      "hover_visual_applied": true,
+      "label_visible": true,
+      "warnings": []
+    }
+  ],
+  "detail_panel_tests": [
+    {
+      "room_id": "r01",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    },
+    {
+      "room_id": "r02",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    },
+    {
+      "room_id": "r03",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    },
+    {
+      "room_id": "r05",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    },
+    {
+      "room_id": "r06",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    }
+  ],
+  "warnings": []
+}

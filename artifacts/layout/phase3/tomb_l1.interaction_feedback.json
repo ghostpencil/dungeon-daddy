@@ -1,0 +1,144 @@
+{
+  "fixture_name": "tomb_l1",
+  "geometry_score": 100.0,
+  "semantic_score": 81.0,
+  "metadata_score": 100.0,
+  "interaction_score": 100.0,
+  "default_state": {
+    "renders_without_error": true,
+    "selected_room_id": null,
+    "hovered_room_id": null,
+    "hovered_connection_id": null
+  },
+  "selection_tests": [
+    {
+      "selected_room_id": "1-A",
+      "selected_room_role": "entrance",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "1-B",
+        "1-C"
+      ],
+      "highlighted_connection_ids": [
+        "1-A\u21921-B",
+        "1-A\u21921-C"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    },
+    {
+      "selected_room_id": "1-B",
+      "selected_room_role": "objective",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "1-A",
+        "1-D"
+      ],
+      "highlighted_connection_ids": [
+        "1-A\u21921-B",
+        "1-B\u21921-D"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    },
+    {
+      "selected_room_id": "1-C",
+      "selected_room_role": "hazard",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "1-A",
+        "1-E"
+      ],
+      "highlighted_connection_ids": [
+        "1-A\u21921-C",
+        "1-C\u21921-E"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    },
+    {
+      "selected_room_id": "1-E",
+      "selected_room_role": "descent",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "1-C",
+        "1-D"
+      ],
+      "highlighted_connection_ids": [
+        "1-C\u21921-E",
+        "1-D\u21921-E"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    }
+  ],
+  "hover_tests": [
+    {
+      "hovered_room_id": "1-A",
+      "hover_visual_applied": true,
+      "warnings": []
+    },
+    {
+      "hovered_room_id": "1-B",
+      "hover_visual_applied": true,
+      "warnings": []
+    },
+    {
+      "hovered_room_id": "1-C",
+      "hover_visual_applied": true,
+      "warnings": []
+    },
+    {
+      "hovered_room_id": "1-E",
+      "hover_visual_applied": true,
+      "warnings": []
+    }
+  ],
+  "connection_hover_tests": [
+    {
+      "connection_id": "1-C\u21921-E",
+      "hover_visual_applied": true,
+      "label_visible": true,
+      "warnings": []
+    }
+  ],
+  "detail_panel_tests": [
+    {
+      "room_id": "1-A",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    },
+    {
+      "room_id": "1-B",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    },
+    {
+      "room_id": "1-C",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    },
+    {
+      "room_id": "1-E",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    }
+  ],
+  "warnings": []
+}

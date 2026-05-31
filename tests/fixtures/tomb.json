@@ -139,37 +139,49 @@
           "from": "1-A",
           "to": "1-B",
           "type": "door",
-          "note": ""
+          "note": "",
+          "layout_connection_role": "critical_path",
+          "graph_notes": "Flooded Entry to Drowned Shrine."
         },
         {
           "from": "1-A",
           "to": "1-C",
           "type": "hall",
-          "note": ""
+          "note": "",
+          "layout_connection_role": "optional_branch",
+          "graph_notes": "Branch into Rat Warren hazard area."
         },
         {
           "from": "1-B",
           "to": "1-D",
           "type": "door",
-          "note": ""
+          "note": "",
+          "layout_connection_role": "critical_path",
+          "graph_notes": "Drowned Shrine to Collapsed Gallery."
         },
         {
           "from": "1-C",
           "to": "1-E",
           "type": "hole",
-          "note": "Rat tunnel, squeeze DC 12"
+          "note": "Rat tunnel, squeeze DC 12",
+          "layout_connection_role": "shortcut",
+          "graph_notes": "Rat tunnel shortcut to Descent Chamber (squeeze DC 12)."
         },
         {
           "from": "1-D",
           "to": "1-E",
           "type": "arch",
-          "note": ""
+          "note": "",
+          "layout_connection_role": "critical_path",
+          "graph_notes": "Collapsed Gallery to Descent Chamber."
         },
         {
           "from": "1-E",
           "to": "2-A",
           "type": "stair_down",
-          "note": ""
+          "note": "",
+          "layout_connection_role": "vertical",
+          "graph_notes": "Stair down from Level 1 to Level 2."
         }
       ],
       "layout_metadata": {
@@ -359,43 +371,57 @@
           "from": "2-A",
           "to": "2-B",
           "type": "arch",
-          "note": ""
+          "note": "",
+          "layout_connection_role": "optional_branch",
+          "graph_notes": "Branch into Servants' Hall."
         },
         {
           "from": "2-A",
           "to": "2-C",
           "type": "door",
-          "note": ""
+          "note": "",
+          "layout_connection_role": "critical_path",
+          "graph_notes": "Entry to Reliquary \u2014 dangerous shortcut."
         },
         {
           "from": "2-B",
           "to": "2-D",
           "type": "door",
-          "note": ""
+          "note": "",
+          "layout_connection_role": "optional_branch",
+          "graph_notes": "Servants' Hall to Scriptorium alternate path."
         },
         {
           "from": "2-C",
           "to": "2-E",
           "type": "door",
-          "note": "Sigil-locked"
+          "note": "Sigil-locked",
+          "layout_connection_role": "locked",
+          "graph_notes": "Sigil-locked door to Wraith's Study."
         },
         {
           "from": "2-D",
           "to": "2-E",
           "type": "hall",
-          "note": ""
+          "note": "",
+          "layout_connection_role": "optional_branch",
+          "graph_notes": "Scriptorium alternate path to Wraith's Study."
         },
         {
           "from": "2-E",
           "to": "2-F",
           "type": "door",
-          "note": ""
+          "note": "",
+          "layout_connection_role": "critical_path",
+          "graph_notes": "Wraith's Study to Sealed Descent exit."
         },
         {
           "from": "2-F",
           "to": "3-A",
           "type": "stair_down",
-          "note": ""
+          "note": "",
+          "layout_connection_role": "vertical",
+          "graph_notes": "Stair down from Level 2 to Level 3."
         }
       ],
       "layout_metadata": {
@@ -565,31 +591,41 @@
           "from": "3-A",
           "to": "3-B",
           "type": "arch",
-          "note": ""
+          "note": "",
+          "layout_connection_role": "optional_branch",
+          "graph_notes": "Branch to Advisor's Nook \u2014 binding knowledge path."
         },
         {
           "from": "3-A",
           "to": "3-C",
           "type": "door",
-          "note": ""
+          "note": "",
+          "layout_connection_role": "optional_branch",
+          "graph_notes": "Branch to Golem Forge \u2014 bone golem hazard path."
         },
         {
           "from": "3-B",
           "to": "3-D",
           "type": "door",
-          "note": ""
+          "note": "",
+          "layout_connection_role": "optional_branch",
+          "graph_notes": "Advisor's Nook to Processional."
         },
         {
           "from": "3-C",
           "to": "3-D",
           "type": "hall",
-          "note": ""
+          "note": "",
+          "layout_connection_role": "optional_branch",
+          "graph_notes": "Golem Forge to Processional."
         },
         {
           "from": "3-D",
           "to": "3-E",
           "type": "arch",
-          "note": "Threshold of binding"
+          "note": "Threshold of binding",
+          "layout_connection_role": "critical_path",
+          "graph_notes": "Processional to Throne of Bone \u2014 threshold of binding."
         }
       ],
       "layout_metadata": {
