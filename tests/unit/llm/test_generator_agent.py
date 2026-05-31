@@ -452,16 +452,16 @@ def test_build_context_schema_includes_new_room_fields():
 # ---------------------------------------------------------------------------
 
 def test_system_prompt_mentions_gap_rule():
-    from dungeon_daddy.llm.agents.generator_agent import DungeonGeneratorAgent
+    from dungeon_daddy.llm.prompts import load_prompt
 
-    prompt = DungeonGeneratorAgent.SYSTEM_PROMPT
+    prompt = load_prompt("generator_system")
     assert "1 empty cell" in prompt
 
 
 def test_system_prompt_includes_concrete_gap_example():
-    from dungeon_daddy.llm.agents.generator_agent import DungeonGeneratorAgent
+    from dungeon_daddy.llm.prompts import load_prompt
 
-    prompt = DungeonGeneratorAgent.SYSTEM_PROMPT
+    prompt = load_prompt("generator_system")
     # Must show a numeric example: a right-edge value and minimum start for next room
     assert "right edge" in prompt.lower()
     assert "x≥" in prompt

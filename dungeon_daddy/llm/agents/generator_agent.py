@@ -62,20 +62,6 @@ class DungeonGeneratorAgent:
     Supports revision: if validation fails, caller passes errors back in.
     """
 
-    SYSTEM_PROMPT = (
-        "You are a dungeon architect. Generate one level of a dungeon as JSON.\n"
-        "The JSON must conform exactly to the Level schema provided.\n"
-        "Rooms use a grid coordinate system. Connections must be physically plausible.\n"
-        "Every room must have a unique, non-overlapping (x, y, w, h) rectangle. "
-        "No two rooms may share any grid cell.\n"
-        "Rooms must also be separated by at least 1 empty cell on every side. "
-        "If room A has x=0 and w=5 (right edge=5), the next room must have x≥6 — "
-        "touching edges (gap=0) are forbidden. "
-        "Plan positions with generous spacing to avoid gap violations.\n"
-        "Apply the specified loop pattern: assign rooms to path_a and path_b.\n"
-        "Output only valid JSON conforming to the Level schema. No prose, no markdown."
-    )
-
     def __init__(self, provider: LLMProvider) -> None:
         self._provider = provider
         self._system_prompt = load_prompt("generator_system")
