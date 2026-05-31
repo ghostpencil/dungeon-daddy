@@ -92,3 +92,43 @@ def test_entrance_has_marker():
     assert style.key == "entrance"
     assert style.show_marker is True
     assert style.marker_text is not None
+
+
+# ---------------------------------------------------------------------------
+# Cycle 9 — role-specific border_color differs from unknown default
+# ---------------------------------------------------------------------------
+
+def test_entrance_border_color_differs_from_unknown():
+    entrance = GraphRoomStyleResolver().resolve("entrance")
+    unknown = GraphRoomStyleResolver().resolve("unknown")
+    assert hasattr(entrance, "border_color")
+    assert entrance.border_color != unknown.border_color
+
+
+def test_hub_border_color_differs_from_unknown():
+    hub = GraphRoomStyleResolver().resolve("hub")
+    unknown = GraphRoomStyleResolver().resolve("unknown")
+    assert hub.border_color != unknown.border_color
+
+
+def test_hazard_border_color_differs_from_unknown():
+    hazard = GraphRoomStyleResolver().resolve("hazard")
+    unknown = GraphRoomStyleResolver().resolve("unknown")
+    assert hazard.border_color != unknown.border_color
+
+
+# ---------------------------------------------------------------------------
+# Cycle 10 — role-specific fill_color differs from unknown default
+# ---------------------------------------------------------------------------
+
+def test_hazard_fill_color_differs_from_unknown():
+    hazard = GraphRoomStyleResolver().resolve("hazard")
+    unknown = GraphRoomStyleResolver().resolve("unknown")
+    assert hasattr(hazard, "fill_color")
+    assert hazard.fill_color != unknown.fill_color
+
+
+def test_boss_fill_color_differs_from_unknown():
+    boss = GraphRoomStyleResolver().resolve("boss")
+    unknown = GraphRoomStyleResolver().resolve("unknown")
+    assert boss.fill_color != unknown.fill_color

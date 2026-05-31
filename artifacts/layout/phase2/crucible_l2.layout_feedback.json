@@ -156,15 +156,7 @@
     "contains_all_labels": true,
     "margin_applied": 0.0
   },
-  "warnings": [
-    {
-      "category": "MISSING_OBJECTIVE_ROLE",
-      "severity": "medium",
-      "message": "No room has a boss/objective/exit role — layout destination is ambiguous.",
-      "connection_id": null,
-      "data": {}
-    }
-  ],
+  "warnings": [],
   "human_review_notes": [],
   "visual_hierarchy_feedback": {
     "roles_styled": true,
@@ -289,12 +281,18 @@
     "explicit_room_role_count": 6,
     "inferred_room_role_count": 0,
     "unknown_room_role_count": 0,
-    "explicit_connection_style_count": 0,
-    "inferred_connection_style_count": 5,
+    "explicit_connection_style_count": 5,
+    "inferred_connection_style_count": 0,
     "explicit_critical_path": true,
     "explicit_endpoint": true,
     "explicit_entrance": true,
-    "metadata_score": 85.0,
-    "warnings": []
+    "metadata_score": 100.0,
+    "warnings": [
+      "Connection 'r01→r02' has unrecognised layout_connection_role 'critical_path'.",
+      "Connection 'r02→r03' has unrecognised layout_connection_role 'optional_branch'.",
+      "Connection 'r02→r04' has unrecognised layout_connection_role 'optional_branch'.",
+      "Connection 'r02→r05' has unrecognised layout_connection_role 'critical_path'.",
+      "Connection 'r05→r06' has unrecognised layout_connection_role 'critical_path'."
+    ]
   }
 }

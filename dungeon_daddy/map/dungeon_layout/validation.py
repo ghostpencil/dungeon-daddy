@@ -372,6 +372,11 @@ def _count_excessive_detours(
     return count
 
 
+_QUEST_OBJECTIVE_ROLES = frozenset({"boss", "objective", "key_room"})
+_TRAVEL_ENDPOINT_ROLES = frozenset({"exit", "descent", "elevator", "stairs", "transition"})
+_ANY_ENDPOINT_ROLES = _QUEST_OBJECTIVE_ROLES | _TRAVEL_ENDPOINT_ROLES
+
+
 def _check_role_warnings(
     roles: dict[str, str],
     warnings: list[LayoutWarning],
@@ -383,12 +388,26 @@ def _check_role_warnings(
             severity="medium",
             message="No room has the 'entrance' role — layout start is ambiguous.",
         ))
-    objective_roles = {"boss", "objective", "exit"}
-    if not (role_values & objective_roles):
+    has_any_endpoint = bool(role_values & _ANY_ENDPOINT_ROLES)
+    has_quest_objective = bool(role_values & _QUEST_OBJECTIVE_ROLES)
+    has_travel_endpoint = bool(role_values & _TRAVEL_ENDPOINT_ROLES)
+    if not has_any_endpoint:
         warnings.append(LayoutWarning(
-            category="MISSING_OBJECTIVE_ROLE",
-            severity="medium",
-            message="No room has a boss/objective/exit role — layout destination is ambiguous.",
+            category="MISSING_ENDPOINT_ROLE",
+            severity="high",
+            message="No room has an endpoint role — layout destination is ambiguous.",
+        ))
+    if has_travel_endpoint and not has_quest_objective:
+        warnings.append(LayoutWarning(
+            category="ENDPOINT_IS_TRANSITION_ONLY",
+            severity="low",
+            message="Endpoint is a travel/transition room — no combat objective on this floor.",
+        ))
+    if not has_quest_objective:
+        warnings.append(LayoutWarning(
+            category="NO_QUEST_OBJECTIVE_ROLE",
+            severity="low",
+            message="No room has a boss/objective/key_room role — no combat objective on this floor.",
         ))
 
 

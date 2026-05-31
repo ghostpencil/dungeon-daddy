@@ -134,3 +134,66 @@ def test_run_backfill_write_mode_creates_backup_and_updates_file(tmp_path):
     assert "layout_metadata" in level1
     assert level1["layout_metadata"]["entrance_room_id"] == "R1"
     assert level1["rooms"][0]["layout_role"] == "entrance"
+
+
+# ---------------------------------------------------------------------------
+# Behavior 7: apply_connection_patch adds metadata fields to connections
+# ---------------------------------------------------------------------------
+
+def _minimal_dungeon_with_connections() -> dict:
+    return {
+        "meta": {"title": "Test Dungeon"},
+        "levels": [
+            {
+                "id": 1,
+                "name": "Level 1",
+                "rooms": [],
+                "connections": [
+                    {"from": "R1", "to": "R2", "type": "door", "note": "Locked."},
+                    {"from": "R2", "to": "R3", "type": "arch", "note": ""},
+                ],
+            }
+        ],
+    }
+
+
+def test_apply_connection_patch_adds_fields_to_matching_connection():
+    level = {
+        "connections": [
+            {"from": "R1", "to": "R2", "type": "door", "note": "Locked."},
+            {"from": "R2", "to": "R3", "type": "arch", "note": ""},
+        ]
+    }
+    patches = {"R1→R2": {"layout_connection_role": "locked", "graph_notes": "Key door."}}
+    changed = bgm.apply_connection_patch(level, patches)
+    assert changed is True
+    r1r2 = next(c for c in level["connections"] if c["from"] == "R1" and c["to"] == "R2")
+    r2r3 = next(c for c in level["connections"] if c["from"] == "R2" and c["to"] == "R3")
+    assert r1r2["layout_connection_role"] == "locked"
+    assert r1r2["graph_notes"] == "Key door."
+    assert "layout_connection_role" not in r2r3
+
+
+def test_apply_connection_patch_returns_false_when_no_match():
+    level = {
+        "connections": [{"from": "R1", "to": "R2", "type": "door", "note": ""}]
+    }
+    changed = bgm.apply_connection_patch(level, {"R9→R10": {"layout_connection_role": "locked"}})
+    assert changed is False
+
+
+def test_run_backfill_applies_connection_patches(tmp_path):
+    dungeon_file = tmp_path / "test.json"
+    dungeon_file.write_text(json.dumps(_minimal_dungeon_with_connections(), indent=2))
+
+    patches = bgm.DungeonPatches(
+        levels={1: bgm.LevelPatch(
+            connection_patches={"R1→R2": {"layout_connection_role": "locked"}},
+        )},
+    )
+    bgm.run_backfill(dungeon_file, patches, dry_run=False)
+
+    updated = json.loads(dungeon_file.read_text())
+    conns = updated["levels"][0]["connections"]
+    r1r2 = next(c for c in conns if c["from"] == "R1" and c["to"] == "R2")
+    assert r1r2["layout_connection_role"] == "locked"

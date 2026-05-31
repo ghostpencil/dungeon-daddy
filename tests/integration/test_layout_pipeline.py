@@ -31,6 +31,11 @@ from dungeon_daddy.map.dungeon_layout.validation import (
     write_feedback_report,
     write_summary,
 )
+from dungeon_daddy.map.dungeon_layout import run_layout_pipeline
+from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+from dungeon_daddy.map.dungeon_layout.room_detail_panel import build_room_detail
+from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyleResolver
+from dungeon_daddy.map.dungeon_layout.style_resolver import resolve_room_render_style
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_config import VisualHierarchyConfig
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_feedback import (
     VisualHierarchyFeedbackReport,
@@ -411,3 +416,116 @@ def test_phase25_feedback_reports_written_to_artifacts() -> None:
         assert "metadata_quality_feedback" in data
     summary = write_summary(reports, _PHASE25_DIR, visual_reports=visual_reports)
     assert summary.exists()
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — Interaction Polish integration tests
+# ---------------------------------------------------------------------------
+
+_SEMANTIC_BASELINES = {
+    "crucible_l1": 78.0,
+    "crucible_l2": 82.2,
+    "crucible_l3": 82.8,
+    "tomb_l1": 81.0,
+}
+_METADATA_BASELINE = 85.0
+
+_FIXTURE_SPECS = [
+    ("crucible", 0, "crucible_l1"),
+    ("crucible", 1, "crucible_l2"),
+    ("crucible", 2, "crucible_l3"),
+    ("tomb", 0, "tomb_l1"),
+]
+
+
+def test_phase3_semantic_scores_do_not_regress() -> None:
+    """Semantic scores for all target fixtures stay at or above Phase 2.5 baselines."""
+    for dungeon_name, level_idx, fixture_name in _FIXTURE_SPECS:
+        dungeon = _load_dungeon(dungeon_name)
+        level = dungeon.levels[level_idx]
+        report = _run_pipeline(level, fixture_name=fixture_name)
+        vhf = report.visual_hierarchy_feedback
+        assert vhf is not None, f"{fixture_name}: visual_hierarchy_feedback is None"
+        score = vhf.semantic_score
+        baseline = _SEMANTIC_BASELINES[fixture_name]
+        assert score >= baseline, (
+            f"{fixture_name}: semantic score {score:.1f} regressed below {baseline}"
+        )
+
+
+def test_phase3_metadata_scores_do_not_regress() -> None:
+    """Metadata scores for all target fixtures stay at or above 85.0."""
+    for dungeon_name, level_idx, fixture_name in _FIXTURE_SPECS:
+        dungeon = _load_dungeon(dungeon_name)
+        level = dungeon.levels[level_idx]
+        report = _run_pipeline(level, fixture_name=fixture_name)
+        mqf = report.metadata_quality_feedback
+        assert mqf is not None, f"{fixture_name}: metadata_quality_feedback is None"
+        score = mqf.metadata_score
+        assert score >= _METADATA_BASELINE, (
+            f"{fixture_name}: metadata score {score:.1f} regressed below {_METADATA_BASELINE}"
+        )
+
+
+def test_phase3_interactive_states_render_without_exception() -> None:
+    """resolve_room_render_style raises no exceptions for any room when a selection is active."""
+    resolver = GraphRoomStyleResolver()
+    for dungeon_name, level_idx, fixture_name in _FIXTURE_SPECS:
+        dungeon = _load_dungeon(dungeon_name)
+        level = dungeon.levels[level_idx]
+        result = run_layout_pipeline(level)
+
+        entrance_id = (
+            level.layout_metadata.entrance_room_id
+            if level.layout_metadata is not None
+            else None
+        ) or next(iter(result.rooms), None)
+
+        view_state = GraphViewState()
+        view_state.select_room(entrance_id)
+        view_state.hover_room(None)
+
+        critical_ids = set(result.critical_path)
+        connected_ids = {
+            c.to_room if c.from_room == entrance_id else c.from_room
+            for c in level.connections
+            if c.from_room == entrance_id or c.to_room == entrance_id
+        }
+
+        for room_id in result.rooms:
+            base_style = resolver.resolve(result.room_roles.get(room_id, "unknown"))  # type: ignore[arg-type]
+            resolved = resolve_room_render_style(
+                room_id=room_id,
+                base_style=base_style,
+                view_state=view_state,
+                critical_path_room_ids=critical_ids,
+                connected_room_ids=connected_ids,
+            )
+            assert resolved is not None, f"{fixture_name}/{room_id}: resolved style is None"
+
+
+def test_phase3_detail_panel_produces_data_for_entrance_room() -> None:
+    """build_room_detail returns populated panel data for the entrance room of each fixture."""
+    for dungeon_name, level_idx, fixture_name in _FIXTURE_SPECS:
+        dungeon = _load_dungeon(dungeon_name)
+        level = dungeon.levels[level_idx]
+        result = run_layout_pipeline(level)
+
+        entrance_id = (
+            level.layout_metadata.entrance_room_id
+            if level.layout_metadata is not None
+            else None
+        )
+        if entrance_id is None:
+            entrance_id = next(
+                (rid for rid, role in result.room_roles.items() if str(role) == "entrance"),
+                next(iter(result.rooms), None),
+            )
+
+        assert entrance_id is not None, f"{fixture_name}: could not determine entrance room"
+
+        panel = build_room_detail(entrance_id, level, result)
+        assert panel is not None, f"{fixture_name}: build_room_detail returned None for {entrance_id}"
+        assert panel.room_name, f"{fixture_name}: panel.room_name is empty"
+        assert panel.role is not None, f"{fixture_name}: panel.role is None"
+        assert isinstance(panel.connections, list), f"{fixture_name}: panel.connections is not a list"

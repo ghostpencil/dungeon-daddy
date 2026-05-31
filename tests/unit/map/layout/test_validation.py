@@ -180,17 +180,47 @@ def test_no_entrance_role_adds_missing_entrance_warning() -> None:
     assert any(w.category == "MISSING_ENTRANCE_ROLE" for w in report.warnings)
 
 
-def test_no_objective_role_adds_missing_objective_warning() -> None:
+def test_no_endpoint_at_all_fires_missing_endpoint_role() -> None:
     roles = {"a": "entrance", "b": "side_room"}
     report = validate_layout(**_minimal_layout(roles=roles))
-    assert any(w.category == "MISSING_OBJECTIVE_ROLE" for w in report.warnings)
+    assert any(w.category == "MISSING_ENDPOINT_ROLE" for w in report.warnings)
 
 
-def test_roles_with_entrance_and_boss_have_no_missing_role_warnings() -> None:
+def test_descent_endpoint_does_not_fire_missing_endpoint_role() -> None:
+    roles = {"a": "entrance", "b": "descent"}
+    report = validate_layout(**_minimal_layout(roles=roles))
+    assert not any(w.category == "MISSING_ENDPOINT_ROLE" for w in report.warnings)
+
+
+def test_transition_endpoint_does_not_fire_missing_endpoint_role() -> None:
+    roles = {"a": "entrance", "b": "transition"}
+    report = validate_layout(**_minimal_layout(roles=roles))
+    assert not any(w.category == "MISSING_ENDPOINT_ROLE" for w in report.warnings)
+
+
+def test_descent_only_endpoint_fires_endpoint_is_transition_only() -> None:
+    roles = {"a": "entrance", "b": "descent"}
+    report = validate_layout(**_minimal_layout(roles=roles))
+    w = next((w for w in report.warnings if w.category == "ENDPOINT_IS_TRANSITION_ONLY"), None)
+    assert w is not None
+    assert w.severity in {"low", "info"}
+
+
+def test_no_quest_objective_fires_no_quest_objective_role() -> None:
+    roles = {"a": "entrance", "b": "descent"}
+    report = validate_layout(**_minimal_layout(roles=roles))
+    w = next((w for w in report.warnings if w.category == "NO_QUEST_OBJECTIVE_ROLE"), None)
+    assert w is not None
+    assert w.severity in {"low", "info"}
+
+
+def test_boss_role_suppresses_all_objective_warnings() -> None:
     roles = {"a": "entrance", "b": "boss"}
     report = validate_layout(**_minimal_layout(roles=roles))
     assert not any(w.category == "MISSING_ENTRANCE_ROLE" for w in report.warnings)
-    assert not any(w.category == "MISSING_OBJECTIVE_ROLE" for w in report.warnings)
+    assert not any(w.category == "MISSING_ENDPOINT_ROLE" for w in report.warnings)
+    assert not any(w.category == "NO_QUEST_OBJECTIVE_ROLE" for w in report.warnings)
+    assert not any(w.category == "ENDPOINT_IS_TRANSITION_ONLY" for w in report.warnings)
 
 
 # ---------------------------------------------------------------------------

@@ -254,6 +254,9 @@ class PlayView(arcade.View):
             self._chat.add_message("dm", msg)
             _log.debug("Selected connection: %s → %s", conn.from_room, conn.to_room)
 
+    def on_mouse_motion(self, x: float, y: float, dx: float, dy: float) -> None:
+        self._map.handle_mouse_motion(x, y)
+
     def on_mouse_drag(self, x: float, y: float, dx: float, dy: float, buttons: int, modifiers: int) -> None:
         self._map.handle_mouse_drag(x, y, dx, dy, buttons)
 

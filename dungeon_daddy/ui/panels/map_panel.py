@@ -8,6 +8,7 @@ import arcade.gui
 
 from dungeon_daddy.data.models import Level, SessionState
 from dungeon_daddy.map.dungeon_layout import LayoutResult, run_layout_pipeline
+from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
 from dungeon_daddy.map.grid_renderer import GridRenderer
 from dungeon_daddy.map.layout_renderer import LayoutRenderer
 from dungeon_daddy.map.loop_overlay import LoopOverlay
@@ -103,6 +104,14 @@ class MapPanel:
         - LevelStepper on the right rail (PANEL_STEPPER_WIDTH px)
     """
 
+    @property
+    def _selected_room_id(self) -> str | None:
+        return self._view_state.selected_room_id
+
+    @_selected_room_id.setter
+    def _selected_room_id(self, value: str | None) -> None:
+        self._view_state.select_room(value)
+
     def __init__(
         self,
         on_level_change: Callable[[int], None],
@@ -135,7 +144,8 @@ class MapPanel:
         self._active_loop_id: str | None = None
         self._layout_result: LayoutResult | None = None
         self._layout_renderer = LayoutRenderer()
-        self._selected_room_id: str | None = None
+        self._view_state = GraphViewState()
+        self._selected_room_id = None
 
         from dungeon_daddy.ui.widgets.level_stepper import LevelStepper
         self._stepper = LevelStepper(on_level_change)
@@ -173,7 +183,7 @@ class MapPanel:
         self._stepper.set_up_enabled(idx > 1)
         self._stepper.set_down_enabled(idx < total_levels)
         self._layout_result = run_layout_pipeline(level)
-        self._selected_room_id = None
+        self._view_state = GraphViewState()
         self._zoom_level = _ZOOM_DEFAULT
         if self._active_variant == "Graph":
             self._fit_layout_camera()
@@ -287,6 +297,10 @@ class MapPanel:
             self._apply_zoom(_ZOOM_DEFAULT, map_cx, map_cy)
         elif key == arcade.key.D and self._layout_result is not None:
             self._layout_result.debug_overlay.enabled = not self._layout_result.debug_overlay.enabled
+        elif key == arcade.key.R and self._active_variant == "Graph":
+            self._fit_layout_camera()
+        elif key == arcade.key.ESCAPE and self._active_variant == "Graph":
+            self._selected_room_id = None
 
     # ------------------------------------------------------------------
     # Mouse interaction (delegated from PlayView)
@@ -350,6 +364,36 @@ class MapPanel:
         if button == arcade.MOUSE_BUTTON_LEFT:
             self._is_panning = False
 
+    def handle_mouse_motion(self, x: float, y: float) -> None:
+        if self._active_variant != "Graph" or self._layout_result is None:
+            self._view_state.hover_room(None)
+            self._view_state.hover_connection(None)
+            return
+        if not self._in_map_viewport(x, y):
+            self._view_state.hover_room(None)
+            self._view_state.hover_connection(None)
+            return
+        origin_x = self._x + PAD_MD + self._pan_offset_x
+        origin_y = self._y + PAD_MD + self._pan_offset_y
+        lx = (x - origin_x) / self._zoom_level
+        ly = (y - origin_y) / self._zoom_level
+        for room_id, rect in self._layout_result.rooms.items():
+            if rect.x <= lx <= rect.x + rect.w and rect.y <= ly <= rect.y + rect.h:
+                self._view_state.hover_room(room_id)
+                self._view_state.hover_connection(None)
+                return
+        for edge in self._layout_result.edges:
+            pts = edge.points
+            for i in range(len(pts) - 1):
+                x1, y1 = pts[i]
+                x2, y2 = pts[i + 1]
+                if _point_near_segment(lx, ly, x1, y1, x2, y2, _EDGE_TOL):
+                    self._view_state.hover_room(None)
+                    self._view_state.hover_connection(edge.connection_id)
+                    return
+        self._view_state.hover_room(None)
+        self._view_state.hover_connection(None)
+
     # ------------------------------------------------------------------
     # Drawing
     # ------------------------------------------------------------------
@@ -373,7 +417,7 @@ class MapPanel:
                 if self._active_variant == "Graph" and self._layout_result is not None:
                     self._layout_renderer.draw(
                         self._layout_result, origin_x, origin_y, self._zoom_level,
-                        selected_room_id=self._selected_room_id,
+                        view_state=self._view_state,
                     )
                 else:
                     self._renderer.draw(self._level, self._state, origin_x, origin_y, self._zoom_level)

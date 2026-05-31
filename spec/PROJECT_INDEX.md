@@ -2,12 +2,32 @@
 
 ## Phase
 
-Phase: —
-Status: **No active phase** — Phase 21 complete. Next phase TBD.
+Phase: 22 — Graph Mode Phase 3: Interaction Polish + Phase 2.5 Cleanup
+Status: **Complete** (2026-05-31) — All 14 steps done. Spec: `spec/MAP_LAYOUT_PHASE_3.md`
 
 ---
 
 ## Next Steps
+
+| Step | Task |
+|---|---|
+| ~~1~~ | ~~Phase 2.5 cleanup: refine objective warning naming in `validation.py` (`MISSING_ENDPOINT_ROLE`, `NO_QUEST_OBJECTIVE_ROLE`, `ENDPOINT_IS_TRANSITION_ONLY`)~~ — **Done** (`MISSING_OBJECTIVE_ROLE` replaced; 3 new warning categories with severity tiering; 4 new tests; 1188 passing) |
+| ~~2~~ | ~~Connection metadata backfill for `crucible.json`, `tomb.json`, and local dungeon files~~ — **Done** (`apply_connection_patch` added to backfill script; `connection_patches` field in `LevelPatch`; all 6 levels patched with `layout_connection_role`/`graph_notes`; impactful: locked doors (Crucible L1 R2→R4, Tomb L2 2-C→2-E), secret passage (Crucible L3 r4→r5), vertical stairs (Tomb L1 1-E→2-A, Tomb L2 2-F→3-A); 3 new tests; 1199 passing) |
+| ~~2a~~ | ~~Renderer visual parity with Phase 2.5 artifact — three gaps: (1) role-based border color, (2) role-based fill color, (3) marker text at top of room box~~ — **Done** (`border_color` + `fill_color` fields added to `GraphRoomStyle`; renderer uses style fields instead of `_ROOM_BORDER`/`_ROOM_FILL` constants; marker y moved from `wh*0.15` to `wh*0.82`; 6 new tests; 1194 passing) |
+| ~~3~~ | ~~`GraphViewState` model: camera, selected room, hovered room, hovered connection~~ — **Done** (`CameraState` + `GraphViewState` in `graph_view_state.py`; `hover_room`, `select_room`, `hover_connection`, `clear_selection`, `recenter` methods; 12 new tests; 1211 passing) |
+| ~~4~~ | ~~Room hit testing (point-in-rect) + connection hit testing (tolerance; room wins)~~ — **Done** (`hit_test.py` added; `hit_test_room`, `hit_test_connection`, `hit_test` functions; `_point_to_segment_dist` helper; 9 new tests; 1220 passing) |
+| ~~5~~ | ~~Style resolution pipeline: base → semantic role → critical path → focus/fade → hover → selected~~ — **Done** (`style_resolver.py` added; `resolve_room_render_style` composites focus/fade + neighbor highlight + critical path subtle fade + hover + selected; 8 new tests; 1228 passing) |
+| ~~6~~ | ~~Room hover visual state: border brightens/thickens; restores on mouse-out unless selected~~ — **Done** (`view_state: GraphViewState | None` added to `LayoutRenderer.draw()`; `resolve_room_render_style` composited per room when provided; hover branch adds `border_width+0.5`, `border_alpha+40`; old `selected_room_id` path preserved; 4 new tests; 1232 passing) |
+| ~~7~~ | ~~Room selection + focus mode: connected rooms highlight, unrelated rooms/connections fade~~ — **Done** (`_connected_room_ids` helper added to `layout_renderer.py`; `_draw_rooms` passes real connected set to `resolve_room_render_style`; `_draw_edges` fades unrelated connections to 40% alpha when a room is selected; 3 new tests; 1235 passing) |
+| ~~8~~ | ~~Connection hover: brightens near segment; tolerance-based hit testing~~ — **Done** (`_draw_edges` checks `view_state.hovered_connection_id`; applies `alpha+60` (capped 255) and `line_width+0.5`; 3 new tests; 1238 passing) |
+| ~~9~~ | ~~Room detail panel: fixed panel showing name, ID, role, connections, notes~~ — **Done** (`room_detail_panel.py` added; `build_room_detail` assembles name/ID/role/visual_priority/on_critical_path/on_optional_branch/graph_notes/note/connections; `Room` + `Connection` models got `graph_notes`/`visual_priority` fields; 24 new tests; 1262 passing) |
+| ~~10~~ | ~~Critical path emphasis: stronger when selected room is on the critical path~~ — **Done** (`selected_on_critical_path` flag added to `resolve_room_render_style`; other crit-path rooms get `+40 border_alpha` + `+0.5 border_width` when selected room is on the path; 3 new tests; 1265 passing) |
+| ~~11~~ | ~~Keyboard controls: R = recenter, Escape = clear selection~~ — **Done** (`handle_key_press` in `map_panel.py` handles `R` → `_fit_layout_camera()` and `Escape` → `_selected_room_id = None`, both scoped to Graph mode; 6 new tests; 1271 passing) |
+| ~~12~~ | ~~Artifact generation script + screenshot artifacts under `artifacts/layout/phase3/`~~ — **Done** (`scripts/generate_phase3_graph_artifacts.py`; 31 artifacts in `artifacts/layout/phase3/`: 4 default PNGs, 20 selection PNGs, 4 hover-connection PNGs, 3 connection hover PNGs, 4 interaction feedback JSONs, `phase3_feedback_summary.md`, `before_after_summary.md`; `map_panel.py` wired up with `GraphViewState` property + `handle_mouse_motion`; `play_view.py` routes `on_mouse_motion`; 5 new tests; 1276 passing) |
+| ~~13~~ | ~~Integration tests: geometry/semantic/metadata scores do not regress; interaction states render~~ — **Done** (`test_phase3_semantic_scores_do_not_regress`, `test_phase3_metadata_scores_do_not_regress`, `test_phase3_interactive_states_render_without_exception`, `test_phase3_detail_panel_produces_data_for_entrance_room` added to `test_layout_pipeline.py`; 4 new tests; 1279 passing) |
+| ~~14~~ | ~~Output artifacts: interaction feedback JSON per fixture, `phase3_feedback_summary.md`, `before_after_summary.md`, `connection_metadata_migration_report.md`~~ — **Done** (`connection_metadata_migration_report.md` + `implementation_summary.md` written; 36 total connections patched across 6 levels for Crucible + Tomb; all 4 interaction feedback JSONs, summary MD, before/after MD confirmed present; 1280 passing) |
+
+### Phase 21 Completed Steps (archived)
 
 | Step | Task |
 |---|---|
@@ -36,6 +56,7 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 22 — Graph Mode Phase 3: Interaction Polish | **Complete** (2026-05-31) | 1280 passing |
 | Phase 21 — Graph Mode Phase 2.5: Semantic Metadata Backfill | **Complete** (2026-05-30) | 1184 passing |
 | Phase 20 — Map Layout Visual Hierarchy (Phase 2) | **Complete** (2026-05-30) | 1097 passing |
 | Phase 19 — Map Layout Phase 1 | **Complete** (2026-05-30) | 337 map tests |

@@ -327,6 +327,85 @@ def test_style_disabled_gives_default_border_for_boss() -> None:
 # Cycle 8 (original) — room label includes room_id
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Cycle 15 — entrance room uses role border_color, not the fixed _ROOM_BORDER
+# ---------------------------------------------------------------------------
+
+def test_entrance_uses_role_border_color() -> None:
+    from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyleResolver
+    entrance_style = GraphRoomStyleResolver().resolve("entrance")
+    unknown_style = GraphRoomStyleResolver().resolve("unknown")
+
+    # The two roles must have different border colors for this test to be meaningful.
+    assert entrance_style.border_color != unknown_style.border_color
+
+    entrance_rooms = {"e": _room("e")}
+    unknown_rooms = {"u": _room("u")}
+
+    def _border_colors(roles: dict[str, str], rooms: dict[str, "RoomRect"]) -> list[tuple]:
+        with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+            renderer = LayoutRenderer()
+            renderer.draw(_result(rooms=rooms, room_roles=roles), 0.0, 0.0, 1.0)
+            return [call.args[1] for call in mock_arcade.draw_rect_outline.call_args_list]
+
+    entrance_borders = _border_colors({"e": "entrance"}, entrance_rooms)
+    unknown_borders = _border_colors({"u": "unknown"}, unknown_rooms)
+
+    # Extract the RGB component only (first 3 elements) from the first outline call
+    entrance_rgb = set(c[:3] for c in entrance_borders)
+    unknown_rgb = set(c[:3] for c in unknown_borders)
+    assert entrance_rgb != unknown_rgb
+
+
+# ---------------------------------------------------------------------------
+# Cycle 16 — hazard room uses role fill_color, not the fixed _ROOM_FILL
+# ---------------------------------------------------------------------------
+
+def test_hazard_uses_role_fill_color() -> None:
+    from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyleResolver
+    hazard_style = GraphRoomStyleResolver().resolve("hazard")
+    unknown_style = GraphRoomStyleResolver().resolve("unknown")
+
+    assert hazard_style.fill_color != unknown_style.fill_color
+
+    hazard_rooms = {"h": _room("h")}
+    unknown_rooms = {"u": _room("u")}
+
+    def _fill_rgb(roles: dict[str, str], rooms: dict[str, "RoomRect"]) -> tuple:
+        with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+            renderer = LayoutRenderer()
+            renderer.draw(_result(rooms=rooms, room_roles=roles), 0.0, 0.0, 1.0)
+            color = mock_arcade.draw_rect_filled.call_args_list[0].args[1]
+            return color[:3]
+
+    hazard_rgb = _fill_rgb({"h": "hazard"}, hazard_rooms)
+    unknown_rgb = _fill_rgb({"u": "unknown"}, unknown_rooms)
+    assert hazard_rgb != unknown_rgb
+
+
+# ---------------------------------------------------------------------------
+# Cycle 17 — marker text is positioned near the top of the room box
+# ---------------------------------------------------------------------------
+
+def test_marker_text_is_near_top_of_room_box() -> None:
+    rooms = {"e": _room("e", x=0.0, y=0.0)}   # h=80, center_y=40, top=80
+    result = _result(rooms=rooms, room_roles={"e": "entrance"})
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, origin_x=0.0, origin_y=0.0, zoom=1.0)
+        # draw_text positional args: (text, x, y, ...)
+        text_calls = mock_arcade.draw_text.call_args_list
+        marker_ys = [
+            call.args[2]
+            for call in text_calls
+            if len(call.args) >= 3 and call.args[0] == "IN"
+        ]
+        assert marker_ys, "Marker text 'IN' was not drawn"
+        # Top half: y > midpoint (wy + wh/2 = 0 + 40 = 40)
+        assert all(y > 40.0 for y in marker_ys), f"Marker y={marker_ys} not near top"
+
+
 def test_room_label_includes_room_id() -> None:
     rooms = {"1-A": _room("1-A", 0.0, 0.0)}
     room_names = {"1-A": "Flooded Entry"}
@@ -339,3 +418,275 @@ def test_room_label_includes_room_id() -> None:
         all_text = " ".join(calls)
         assert "Flooded Entry" in all_text
         assert "1-A" in all_text
+
+
+# ---------------------------------------------------------------------------
+# Cycle 18 — hovered room gets wider border than no-hover
+# ---------------------------------------------------------------------------
+
+def test_hovered_room_gets_wider_border() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+
+    rooms = {"a": _room("a", 0.0, 0.0)}
+    result = _result(rooms=rooms)
+    renderer = LayoutRenderer()
+
+    def _max_border_width() -> float:
+        with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+            renderer.draw(result, 0.0, 0.0, 1.0, **extra)
+            return max(call.args[2] for call in mock_arcade.draw_rect_outline.call_args_list)
+
+    extra: dict = {}
+    width_no_hover = _max_border_width()
+
+    extra = {"view_state": GraphViewState(hovered_room_id="a")}
+    width_hovered = _max_border_width()
+
+    assert width_hovered > width_no_hover
+
+
+# ---------------------------------------------------------------------------
+# Cycle 19 — clearing hover restores base border width
+# ---------------------------------------------------------------------------
+
+def test_cleared_hover_restores_base_border_width() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+
+    rooms = {"a": _room("a", 0.0, 0.0)}
+    result = _result(rooms=rooms)
+    renderer = LayoutRenderer()
+
+    def _max_width(vs: GraphViewState) -> float:
+        with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+            renderer.draw(result, 0.0, 0.0, 1.0, view_state=vs)
+            return max(call.args[2] for call in mock_arcade.draw_rect_outline.call_args_list)
+
+    vs = GraphViewState(hovered_room_id="a")
+    width_hovered = _max_width(vs)
+
+    vs.hover_room(None)
+    width_cleared = _max_width(vs)
+
+    assert width_cleared < width_hovered
+
+
+# ---------------------------------------------------------------------------
+# Cycle 20 — hovered+selected room uses selected style, not hover-only style
+# ---------------------------------------------------------------------------
+
+def test_hovered_selected_room_uses_selected_border_color() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+
+    rooms = {"a": _room("a", 0.0, 0.0)}
+    result = _result(rooms=rooms)
+    renderer = LayoutRenderer()
+
+    # Both hover and select on same room
+    vs = GraphViewState(hovered_room_id="a", selected_room_id="a")
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, 0.0, 0.0, 1.0, view_state=vs)
+        border_colors = [call.args[1] for call in mock_arcade.draw_rect_outline.call_args_list]
+        # Selected border color (220, 220, 255) must appear; a pure hover-only tint would not
+        assert any(c[:3] == (220, 220, 255) for c in border_colors)
+
+
+# ---------------------------------------------------------------------------
+# Cycle 21 — boss room hover stacks on top of heavy role border (not reset)
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Cycle 22 — connected room gets wider border than unrelated room when a room is selected
+# ---------------------------------------------------------------------------
+
+def test_connected_room_wider_border_than_unrelated_when_selected() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+
+    # Rooms render in insertion order: a (selected), b (connected), c (unrelated).
+    # With no critical path, each room gets exactly one draw_rect_outline call from
+    # the style pass. Index 1 = b (connected), index 2 = c (unrelated).
+    rooms = {
+        "a": _room("a", 0.0, 0.0),
+        "b": _room("b", 200.0, 0.0),
+        "c": _room("c", 400.0, 0.0),
+    }
+    edges = [_edge("a→b", [(60.0, 40.0), (140.0, 40.0)])]
+    result = _result(rooms=rooms, edges=edges)
+    vs = GraphViewState(selected_room_id="a")
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, 0.0, 0.0, 1.0, view_state=vs)
+        widths = [call.args[2] for call in mock_arcade.draw_rect_outline.call_args_list]
+
+    # widths[0]=a (selected), widths[1]=b (connected), widths[2]=c (unrelated)
+    assert len(widths) >= 3, f"Expected ≥3 outline calls, got {len(widths)}: {widths}"
+    assert widths[1] > widths[2], (
+        f"Connected room b (width {widths[1]}) should be wider than "
+        f"unrelated room c (width {widths[2]})"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Cycle 23 — unrelated room fades (lower border alpha) when a room is selected
+# ---------------------------------------------------------------------------
+
+def test_unrelated_room_fades_when_room_selected() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+
+    # Single room "c" with no connection to "a".
+    # Compare border alpha with vs no selection.
+    rooms = {"a": _room("a", 0.0, 0.0), "c": _room("c", 400.0, 0.0)}
+    result = _result(rooms=rooms)  # no edges
+    renderer = LayoutRenderer()
+
+    def _room_c_border_alpha(vs: GraphViewState | None) -> int:
+        with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+            renderer.draw(result, 0.0, 0.0, 1.0, view_state=vs)
+            # draw_rect_outline args: (xywh, color, width)
+            # color is a 4-tuple (r, g, b, a); last room = "c" → last outline call
+            outline_calls = mock_arcade.draw_rect_outline.call_args_list
+            # get first outline for room c (2nd room in insertion order → index 1)
+            color = outline_calls[1].args[1]
+            return color[3] if len(color) == 4 else 255
+
+    alpha_no_selection = _room_c_border_alpha(None)
+    alpha_with_selection = _room_c_border_alpha(GraphViewState(selected_room_id="a"))
+
+    assert alpha_with_selection < alpha_no_selection, (
+        f"Unrelated room c alpha should drop when a is selected "
+        f"(no_sel={alpha_no_selection}, with_sel={alpha_with_selection})"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Cycle 24 — selected-room connections stay bright; unrelated connections fade
+# ---------------------------------------------------------------------------
+
+def test_selected_room_connections_brighter_than_unrelated_connections() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+
+    # "a" is selected. Edge a→b is related; edge c→d is unrelated.
+    rooms = {
+        "a": _room("a", 0.0, 0.0),
+        "b": _room("b", 200.0, 0.0),
+        "c": _room("c", 400.0, 0.0),
+        "d": _room("d", 600.0, 0.0),
+    }
+    edges = [
+        _edge("a→b", [(60.0, 40.0), (140.0, 40.0)]),
+        _edge("c→d", [(460.0, 40.0), (540.0, 40.0)]),
+    ]
+    result = _result(rooms=rooms, edges=edges)
+    vs = GraphViewState(selected_room_id="a")
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, 0.0, 0.0, 1.0, view_state=vs)
+        # draw_line args: (x1, y1, x2, y2, color, width) — color[3] = alpha
+        line_calls = mock_arcade.draw_line.call_args_list
+
+    # Each edge is a single segment → 2 draw_line calls total (one per edge)
+    assert len(line_calls) >= 2, f"Expected ≥2 draw_line calls, got {len(line_calls)}"
+    alpha_ab = line_calls[0].args[4][3]  # a→b edge alpha
+    alpha_cd = line_calls[1].args[4][3]  # c→d edge alpha
+
+    assert alpha_ab > alpha_cd, (
+        f"Edge a→b (alpha {alpha_ab}) should be brighter than unrelated c→d (alpha {alpha_cd})"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Cycle 25 — hovered connection uses higher alpha than default (no view_state)
+# ---------------------------------------------------------------------------
+
+def test_hovered_connection_uses_higher_alpha() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+
+    edge = _edge("a→b", [(0.0, 0.0), (100.0, 0.0)])
+    result = _result(edges=[edge], edge_labels={"a→b": "door"})
+    renderer = LayoutRenderer()
+
+    def _alpha(vs: GraphViewState | None) -> int:
+        with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+            renderer.draw(result, 0.0, 0.0, 1.0, view_state=vs)
+            return mock_arcade.draw_line.call_args_list[0].args[4][3]
+
+    alpha_default = _alpha(None)
+    alpha_hovered = _alpha(GraphViewState(hovered_connection_id="a→b"))
+    assert alpha_hovered > alpha_default, (
+        f"Hovered connection alpha {alpha_hovered} should be > default {alpha_default}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Cycle 26 — non-hovered connection alpha is unchanged when a different connection is hovered
+# ---------------------------------------------------------------------------
+
+def test_non_hovered_connection_alpha_unchanged() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+
+    edges = [
+        _edge("a→b", [(0.0, 0.0), (100.0, 0.0)]),
+        _edge("c→d", [(200.0, 0.0), (300.0, 0.0)]),
+    ]
+    result = _result(edges=edges, edge_labels={"a→b": "door", "c→d": "door"})
+    renderer = LayoutRenderer()
+
+    def _alphas(vs: GraphViewState | None) -> tuple[int, int]:
+        with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+            renderer.draw(result, 0.0, 0.0, 1.0, view_state=vs)
+            calls = mock_arcade.draw_line.call_args_list
+            return calls[0].args[4][3], calls[1].args[4][3]
+
+    alpha_ab_base, alpha_cd_base = _alphas(None)
+    alpha_ab_hov, alpha_cd_hov = _alphas(GraphViewState(hovered_connection_id="a→b"))
+
+    assert alpha_ab_hov > alpha_ab_base, "Hovered a→b should brighten"
+    assert alpha_cd_hov == alpha_cd_base, "Non-hovered c→d should be unchanged"
+
+
+# ---------------------------------------------------------------------------
+# Cycle 27 — hovered connection gets a wider line than default
+# ---------------------------------------------------------------------------
+
+def test_hovered_connection_uses_wider_line() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+
+    edge = _edge("a→b", [(0.0, 0.0), (100.0, 0.0)])
+    result = _result(edges=[edge], edge_labels={"a→b": "door"})
+    renderer = LayoutRenderer()
+
+    def _line_width(vs: GraphViewState | None) -> float:
+        with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+            renderer.draw(result, 0.0, 0.0, 1.0, view_state=vs)
+            return mock_arcade.draw_line.call_args_list[0].args[5]
+
+    width_default = _line_width(None)
+    width_hovered = _line_width(GraphViewState(hovered_connection_id="a→b"))
+    assert width_hovered > width_default, (
+        f"Hovered connection line width {width_hovered} should be > default {width_default}"
+    )
+
+
+def test_boss_hover_border_wider_than_boss_no_hover() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+    from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyleResolver
+
+    boss_base_width = GraphRoomStyleResolver().resolve("boss").border_width
+
+    rooms = {"b": _room("b", 0.0, 0.0)}
+    result = _result(rooms=rooms, room_roles={"b": "boss"})
+    renderer = LayoutRenderer()
+
+    def _max_width(vs: GraphViewState | None) -> float:
+        with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+            renderer.draw(result, 0.0, 0.0, 1.0, view_state=vs)
+            return max(call.args[2] for call in mock_arcade.draw_rect_outline.call_args_list)
+
+    width_no_hover = _max_width(GraphViewState())
+    width_hovered = _max_width(GraphViewState(hovered_room_id="b"))
+
+    # Hover adds 0.5 on top of the boss base border_width
+    assert width_hovered == boss_base_width + 0.5
+    assert width_hovered > width_no_hover

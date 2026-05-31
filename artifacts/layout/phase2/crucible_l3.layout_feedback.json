@@ -367,12 +367,19 @@
     "explicit_room_role_count": 8,
     "inferred_room_role_count": 0,
     "unknown_room_role_count": 0,
-    "explicit_connection_style_count": 0,
-    "inferred_connection_style_count": 7,
+    "explicit_connection_style_count": 7,
+    "inferred_connection_style_count": 0,
     "explicit_critical_path": true,
     "explicit_endpoint": true,
     "explicit_entrance": true,
-    "metadata_score": 85.0,
-    "warnings": []
+    "metadata_score": 100.0,
+    "warnings": [
+      "Connection 'r1→r2' has unrecognised layout_connection_role 'critical_path'.",
+      "Connection 'r2→r3' has unrecognised layout_connection_role 'critical_path'.",
+      "Connection 'r3→r4' has unrecognised layout_connection_role 'critical_path'.",
+      "Connection 'r5→r6' has unrecognised layout_connection_role 'optional_branch'.",
+      "Connection 'r6→r7' has unrecognised layout_connection_role 'critical_path'.",
+      "Connection 'r7→r8' has unrecognised layout_connection_role 'critical_path'."
+    ]
   }
 }

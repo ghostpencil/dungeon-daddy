@@ -12,7 +12,9 @@ from dungeon_daddy.map.dungeon_layout.critical_path_style import (
     CriticalPathPresentationResult,
     CriticalPathPresenter,
 )
+from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
 from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyle, GraphRoomStyleResolver
+from dungeon_daddy.map.dungeon_layout.style_resolver import resolve_room_render_style
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_config import VisualHierarchyConfig
 from dungeon_daddy.map.layout_debug_renderer import LayoutDebugRenderer
 from dungeon_daddy.ui.theme import FONT_MONO, FONT_UI, TEAL, TEXT_XS
@@ -28,6 +30,23 @@ _SELECTION_WIDTH = 2
 
 _DEFAULT_ROOM_STYLE = GraphRoomStyleResolver().resolve("unknown")
 _DEFAULT_CONN_STYLE = GraphConnectionStyleResolver().resolve("")
+
+
+def _connected_room_ids(result: "LayoutResult", selected_room_id: str | None) -> set[str]:
+    """Return room IDs directly adjacent to *selected_room_id* via any edge."""
+    if not selected_room_id:
+        return set()
+    ids: set[str] = set()
+    for edge in result.edges:
+        cid = edge.connection_id
+        if "→" not in cid:
+            continue
+        src, tgt = cid.split("→", 1)
+        if src == selected_room_id:
+            ids.add(tgt)
+        elif tgt == selected_room_id:
+            ids.add(src)
+    return ids
 
 
 class LayoutRenderer:
@@ -47,13 +66,14 @@ class LayoutRenderer:
         origin_y: float,
         zoom: float,
         selected_room_id: str | None = None,
+        view_state: GraphViewState | None = None,
     ) -> None:
         cp_result = self._cp_presenter.present(
             result.critical_path or None,
             self._config.emphasize_critical_path,
         )
-        self._draw_edges(result, origin_x, origin_y, zoom, cp_result)
-        self._draw_rooms(result, origin_x, origin_y, zoom, selected_room_id, cp_result)
+        self._draw_edges(result, origin_x, origin_y, zoom, cp_result, view_state)
+        self._draw_rooms(result, origin_x, origin_y, zoom, selected_room_id, cp_result, view_state)
         self._draw_labels(result, origin_x, origin_y, zoom)
         if result.debug_overlay.enabled:
             self._debug_renderer.draw(result.debug_overlay, origin_x, origin_y, zoom)
@@ -86,10 +106,21 @@ class LayoutRenderer:
         zoom: float,
         selected_room_id: str | None,
         cp_result: CriticalPathPresentationResult,
+        view_state: GraphViewState | None = None,
     ) -> None:
+
+        connected_ids = _connected_room_ids(result, view_state.selected_room_id) if view_state else set()
 
         for rect in result.rooms.values():
             style = self._room_style(rect.room_id, result)
+            if view_state is not None:
+                style = resolve_room_render_style(
+                    rect.room_id,
+                    style,
+                    view_state,
+                    cp_result.critical_path_room_ids,
+                    connected_ids,
+                )
 
             wx = self._wx(rect.x, origin_x, zoom)
             wy = self._wy(rect.y, origin_y, zoom)
@@ -97,8 +128,8 @@ class LayoutRenderer:
             wh = rect.h * zoom
             xywh = arcade.XYWH(wx + ww / 2, wy + wh / 2, ww, wh)
 
-            fill = (*_ROOM_FILL, style.fill_alpha)
-            border = (*_ROOM_BORDER, style.border_alpha)
+            fill = (*style.fill_color, style.fill_alpha)
+            border = (*style.border_color, style.border_alpha)
             arcade.draw_rect_filled(xywh, fill)
             arcade.draw_rect_outline(xywh, border, style.border_width)
 
@@ -122,7 +153,7 @@ class LayoutRenderer:
                     and style.show_marker and style.marker_text):
                 arcade.draw_text(
                     style.marker_text,
-                    wx + ww / 2, wy + wh * 0.15,
+                    wx + ww / 2, wy + wh * 0.82,
                     _LABEL_COLOR, font_size=TEXT_XS - 1, font_name=FONT_UI,
                     anchor_x="center", anchor_y="center",
                 )
@@ -134,14 +165,34 @@ class LayoutRenderer:
         origin_y: float,
         zoom: float,
         cp_result: CriticalPathPresentationResult,
+        view_state: GraphViewState | None = None,
     ) -> None:
+        selected_id = view_state.selected_room_id if view_state else None
 
         for edge in result.edges:
             style = self._conn_style(edge.connection_id, result)
             on_crit = edge.connection_id in cp_result.critical_path_connection_ids
             base_color = _CRIT_EDGE_COLOR if on_crit else _EDGE_COLOR
-            color = (*base_color, style.alpha)
+            alpha = style.alpha
+
+            if selected_id is not None:
+                cid = edge.connection_id
+                touches_selected = (
+                    "→" in cid and (
+                        cid.split("→", 1)[0] == selected_id
+                        or cid.split("→", 1)[1] == selected_id
+                    )
+                )
+                if not touches_selected:
+                    alpha = max(20, int(alpha * 0.4))
+
+            color = (*base_color, alpha)
             line_width = style.line_width + (0.5 if on_crit else 0.0)
+
+            if view_state is not None and view_state.hovered_connection_id == edge.connection_id:
+                alpha = min(255, alpha + 60)
+                color = (*base_color, alpha)
+                line_width += 0.5
 
             pts = edge.points
             for i in range(len(pts) - 1):

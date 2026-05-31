@@ -73,6 +73,8 @@ class Room(BaseModel):
     main_loop_role: str | None = None
     sub_loop_roles: list[SubLoopRole] | None = None
     layout_role: str | None = None
+    visual_priority: str | None = None
+    graph_notes: str | None = None
     tags: list[str] = Field(default_factory=list)
 
 
@@ -95,6 +97,7 @@ class Connection(BaseModel):
     waypoints: list[Waypoint] | None = None
     connection_style: str | None = None
     layout_connection_role: str | None = None
+    graph_notes: str | None = None
 
 
 # ---------------------------------------------------------------------------
