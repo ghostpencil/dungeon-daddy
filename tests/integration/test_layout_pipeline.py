@@ -11,31 +11,31 @@ import json
 from pathlib import Path
 
 from dungeon_daddy.data.models import Dungeon, Level
+from dungeon_daddy.map.dungeon_layout import run_layout_pipeline
 from dungeon_daddy.map.dungeon_layout.camera_fit import compute_layout_bounds
 from dungeon_daddy.map.dungeon_layout.critical_path_style import CriticalPathPresenter
 from dungeon_daddy.map.dungeon_layout.endpoint_emphasis import EndpointEmphasisDetector
+from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
 from dungeon_daddy.map.dungeon_layout.labels import place_labels
 from dungeon_daddy.map.dungeon_layout.metadata_quality_feedback import (
     generate_metadata_quality_feedback,
 )
 from dungeon_daddy.map.dungeon_layout.ports import generate_ports
+from dungeon_daddy.map.dungeon_layout.room_detail_panel import build_room_detail
+from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyleResolver
 from dungeon_daddy.map.dungeon_layout.route_orthogonal import route_connections
 from dungeon_daddy.map.dungeon_layout.seed_layout import (
     compute_critical_path,
     compute_seed_layout,
 )
 from dungeon_daddy.map.dungeon_layout.semantics import classify_all_roles, classify_template
+from dungeon_daddy.map.dungeon_layout.style_resolver import resolve_room_render_style
 from dungeon_daddy.map.dungeon_layout.validation import (
     LayoutFeedbackReport,
     validate_layout,
     write_feedback_report,
     write_summary,
 )
-from dungeon_daddy.map.dungeon_layout import run_layout_pipeline
-from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
-from dungeon_daddy.map.dungeon_layout.room_detail_panel import build_room_detail
-from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyleResolver
-from dungeon_daddy.map.dungeon_layout.style_resolver import resolve_room_render_style
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_config import VisualHierarchyConfig
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_feedback import (
     VisualHierarchyFeedbackReport,

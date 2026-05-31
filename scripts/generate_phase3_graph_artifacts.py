@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from PIL import Image, ImageDraw, ImageFont
 
 from dungeon_daddy.data.models import Dungeon, Level
-from dungeon_daddy.map.dungeon_layout import LayoutResult, run_layout_pipeline
+from dungeon_daddy.map.dungeon_layout import LayoutResult
 from dungeon_daddy.map.dungeon_layout.camera_fit import compute_layout_bounds
 from dungeon_daddy.map.dungeon_layout.connection_style import GraphConnectionStyleResolver
 from dungeon_daddy.map.dungeon_layout.critical_path_style import CriticalPathPresenter
@@ -37,7 +37,7 @@ from dungeon_daddy.map.dungeon_layout.metadata_quality_feedback import (
 from dungeon_daddy.map.dungeon_layout.models import LayoutBounds
 from dungeon_daddy.map.dungeon_layout.ports import generate_ports
 from dungeon_daddy.map.dungeon_layout.room_detail_panel import build_room_detail
-from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyle, GraphRoomStyleResolver
+from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyleResolver
 from dungeon_daddy.map.dungeon_layout.route_orthogonal import route_connections
 from dungeon_daddy.map.dungeon_layout.seed_layout import compute_critical_path, compute_seed_layout
 from dungeon_daddy.map.dungeon_layout.semantics import classify_all_roles, classify_template
@@ -302,7 +302,6 @@ def _run_full_pipeline(level: Level, fixture_name: str) -> tuple[LayoutResult, d
     critical_path = compute_critical_path(level, roles)
     room_names = {r.id: r.name for r in level.rooms}
 
-    from dungeon_daddy.map.dungeon_layout.models import RoutedEdge
     from dungeon_daddy.map.dungeon_layout.debug_overlay import DebugOverlay
 
     result = LayoutResult(
@@ -442,7 +441,6 @@ def _build_interaction_feedback(
         vs.select_room(room_id)
         connected = _connected_room_ids(result, room_id)
         role = str(result.room_roles.get(room_id, "unknown"))
-        on_crit = room_id in (result.critical_path or [])
         highlighted_conns = [
             e.connection_id for e in result.edges
             if "→" in e.connection_id and (

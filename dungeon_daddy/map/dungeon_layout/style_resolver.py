@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import dataclasses
 
-from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyle
 from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyle
 
 
 def resolve_room_render_style(

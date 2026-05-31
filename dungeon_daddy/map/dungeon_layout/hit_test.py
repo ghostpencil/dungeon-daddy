@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import math
 
-from dungeon_daddy.map.dungeon_layout.models import RoutedEdge, RoomRect
+from dungeon_daddy.map.dungeon_layout.models import RoomRect, RoutedEdge
 
 
 def hit_test_room(rooms: list[RoomRect], px: float, py: float) -> str | None:

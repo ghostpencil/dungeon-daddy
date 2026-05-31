@@ -342,7 +342,7 @@ def test_entrance_uses_role_border_color() -> None:
     entrance_rooms = {"e": _room("e")}
     unknown_rooms = {"u": _room("u")}
 
-    def _border_colors(roles: dict[str, str], rooms: dict[str, "RoomRect"]) -> list[tuple]:
+    def _border_colors(roles: dict[str, str], rooms: dict[str, RoomRect]) -> list[tuple]:
         with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
             renderer = LayoutRenderer()
             renderer.draw(_result(rooms=rooms, room_roles=roles), 0.0, 0.0, 1.0)
@@ -371,7 +371,7 @@ def test_hazard_uses_role_fill_color() -> None:
     hazard_rooms = {"h": _room("h")}
     unknown_rooms = {"u": _room("u")}
 
-    def _fill_rgb(roles: dict[str, str], rooms: dict[str, "RoomRect"]) -> tuple:
+    def _fill_rgb(roles: dict[str, str], rooms: dict[str, RoomRect]) -> tuple:
         with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
             renderer = LayoutRenderer()
             renderer.draw(_result(rooms=rooms, room_roles=roles), 0.0, 0.0, 1.0)

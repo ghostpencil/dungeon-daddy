@@ -1,6 +1,6 @@
 """Unit tests for hit_test.py — room and connection hit testing."""
 from dungeon_daddy.map.dungeon_layout.hit_test import hit_test, hit_test_connection, hit_test_room
-from dungeon_daddy.map.dungeon_layout.models import RoutedEdge, RoomRect
+from dungeon_daddy.map.dungeon_layout.models import RoomRect, RoutedEdge
 
 
 def _room(room_id: str, x: float, y: float, w: float = 80.0, h: float = 50.0) -> RoomRect:

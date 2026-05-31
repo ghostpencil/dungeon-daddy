@@ -1,12 +1,12 @@
 """Unit tests for room_detail_panel.py — detail panel data assembly."""
 from __future__ import annotations
 
+from dungeon_daddy.data.models import Connection, LayoutMetadata, Level, Room
 from dungeon_daddy.map.dungeon_layout import LayoutResult
 from dungeon_daddy.map.dungeon_layout.debug_overlay import DebugOverlay
-from dungeon_daddy.map.dungeon_layout.models import LayoutBounds, RoutedEdge, RoomRect
+from dungeon_daddy.map.dungeon_layout.models import LayoutBounds, RoomRect, RoutedEdge
 from dungeon_daddy.map.dungeon_layout.room_detail_panel import build_room_detail
-from dungeon_daddy.data.models import Connection, LayoutMetadata, Level, Room
-
+from dungeon_daddy.map.dungeon_layout.semantics import RoomRole
 
 # ---------------------------------------------------------------------------
 # Helpers

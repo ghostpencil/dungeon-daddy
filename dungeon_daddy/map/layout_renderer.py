@@ -32,7 +32,7 @@ _DEFAULT_ROOM_STYLE = GraphRoomStyleResolver().resolve("unknown")
 _DEFAULT_CONN_STYLE = GraphConnectionStyleResolver().resolve("")
 
 
-def _connected_room_ids(result: "LayoutResult", selected_room_id: str | None) -> set[str]:
+def _connected_room_ids(result: LayoutResult, selected_room_id: str | None) -> set[str]:
     """Return room IDs directly adjacent to *selected_room_id* via any edge."""
     if not selected_room_id:
         return set()

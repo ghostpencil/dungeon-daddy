@@ -1,6 +1,6 @@
 """Tests for dungeon_layout.style_resolver — interaction style resolution pipeline."""
-from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyleResolver
 from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyleResolver
 from dungeon_daddy.map.dungeon_layout.style_resolver import resolve_room_render_style
 
 
