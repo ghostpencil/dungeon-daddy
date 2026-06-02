@@ -1404,6 +1404,72 @@ Turn Graph Mode from a clean semantic schematic into a game-like dungeon interfa
 
 ---
 
+## Phase 24 — Graph Mode Phase 4.1: Cleanup
+
+**Status: Complete** — 1395 unit+integration tests passing. Closed 2026-06-02.
+
+Spec: `spec/MAP_LAYOUT_PHASE_4_1.md`
+
+Small cleanup pass on Phase 23 (Phase 4). No new features. No redesign. Grid Mode must remain untouched.
+
+### Goals
+
+1. Preserve improved Phase 4 visibility level.
+2. Prevent the room detail panel from covering the selected room and its connected paths.
+3. Improve framing for long linear floors (especially Crucible L3).
+4. Fix Crucible L2 connection marker gaps.
+5. Keep all Phase 1–4 guarantees intact.
+6. Produce required artifacts for human review.
+
+### Modules
+
+| Module | Notes |
+|---|---|
+| `dungeon_daddy/map/dungeon_layout/detail_panel_renderer.py` (update) | Smart panel placement (Option A/B/C from spec) |
+| `dungeon_daddy/map/dungeon_layout/validation.py` (update) | Visibility + panel-placement feedback fields |
+| `dungeon_daddy/map/layout_renderer.py` (update) | Long-linear floor framing logic |
+| `scripts/generate_phase4_1_graph_artifacts.py` (new) | Artifact generation — no unit test |
+| `tests/unit/map/layout/` (update) | Detail panel placement, long-floor framing, Crucible L2 marker scoring, visibility feedback |
+
+### Implementation Steps
+
+| Step | Task | Status |
+|---|---|---|
+| 4.1-1 | Detail panel placement: avoid covering selected room and connected paths | **Done** |
+| 4.1-2 | Long linear floor framing: detect wide-vs-tall layout, improve padding / viewport bias | **Done** |
+| 4.1-3 | Crucible L2 marker scoring: fix or justify non-penalized result | **Done** |
+| 4.1-4 | Visibility feedback fields: add to presentation feedback JSON | **Done** |
+| 4.1-5 | Artifact generation: screenshots + JSON feedback under `artifacts/layout/phase4_1/` | **Done** |
+| 4.1-6 | Markdown summaries: `phase4_1_feedback_summary.md`, `before_after_summary.md`, `implementation_summary.md` | **Done** |
+
+### Required Score Preservation
+
+```
+Geometry:      100.0 for all target fixtures
+Metadata:      100.0 for all target fixtures
+Interaction:   100.0 for all target fixtures
+Presentation:  100.0 for crucible_l1, crucible_l3, tomb_l1
+Presentation:  100.0 or justified non-penalized result for crucible_l2
+```
+
+### Target Fixtures
+
+- `crucible_l1`, `crucible_l2`, `crucible_l3`, `tomb_l1`
+
+### Exit Criteria
+
+- [x] Grid Mode unchanged
+- [x] All tests pass (1395 passing, up from 1368)
+- [x] Detail panel does not cover selected room in target screenshots
+- [x] Crucible L3 framing improved (wide-vs-tall detection + viewport bias)
+- [x] Crucible L2 marker scoring fixed (zero marker-worthy connections; not penalized)
+- [x] Map remains visibly readable and not overly dark
+- [x] Required screenshots generated under `artifacts/layout/phase4_1/`
+- [x] Required JSON feedback files generated
+- [x] Required Markdown summaries generated
+
+---
+
 ## Notes for the Implementing Agent
 
 - **Do not advance to the next phase until all exit criteria for the current phase are met.**

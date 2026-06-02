@@ -758,11 +758,16 @@ def test_phase4_grid_renderer_is_untouched_and_constructable() -> None:
 # --- Atmosphere spec ---
 
 def test_phase4_atmosphere_spec_is_enabled_by_default() -> None:
-    """build_atmosphere_spec() returns an enabled spec with vignette bands and corner ticks."""
+    """build_atmosphere_spec() returns an enabled spec with frame and corner ticks.
+
+    Vignette bands are intentionally disabled (alpha=0, bands=0): the stacking
+    algorithm darkens the center more than edges on a near-black background,
+    producing visible concentric-rectangle artefacts.
+    """
     spec = build_atmosphere_spec()
     assert spec.enabled is True
-    assert spec.vignette_alpha > 0
-    assert spec.vignette_bands > 0
+    assert spec.vignette_alpha == 0
+    assert spec.vignette_bands == 0
     assert spec.show_corner_ticks is True
 
 

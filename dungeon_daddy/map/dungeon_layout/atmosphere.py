@@ -36,8 +36,8 @@ _DISABLED = AtmosphereSpec(
 
 _DEFAULT = AtmosphereSpec(
     enabled=True,
-    vignette_alpha=80,
-    vignette_bands=6,
+    vignette_alpha=0,
+    vignette_bands=0,
     frame_color=_FRAME_COLOR,
     frame_width=1.5,
     frame_inset=4.0,

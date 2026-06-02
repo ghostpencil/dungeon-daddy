@@ -20,6 +20,7 @@ from dungeon_daddy.map.dungeon_layout.critical_path_style import (
 from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import PanelLine, format_detail_panel
 from dungeon_daddy.map.dungeon_layout.graph_presentation_config import GraphPresentationConfig
 from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+from dungeon_daddy.map.dungeon_layout.panel_placement import ScreenRect, compute_panel_position
 from dungeon_daddy.map.dungeon_layout.role_markers import resolve_role_marker
 from dungeon_daddy.map.dungeon_layout.room_detail_panel import build_room_detail
 from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyle, GraphRoomStyleResolver
@@ -116,10 +117,12 @@ class LayoutRenderer:
         panel_y: float = 20.0,
         canvas_w: float = 1200.0,
         canvas_h: float = 800.0,
+        viewport_x: float = 0.0,
+        viewport_y: float = 0.0,
     ) -> None:
         cfg = presentation_config or GraphPresentationConfig()
         if presentation_config is not None:
-            self._draw_atmosphere(build_atmosphere_spec(cfg), canvas_w, canvas_h)
+            self._draw_atmosphere(build_atmosphere_spec(cfg), canvas_w, canvas_h, viewport_x, viewport_y)
         cp_result = self._cp_presenter.present(
             result.critical_path or None,
             self._config.emphasize_critical_path,
@@ -142,7 +145,37 @@ class LayoutRenderer:
             if cfg.show_detail_panel:
                 sel = view_state.selected_room_id if view_state else selected_room_id
                 panel_data = build_room_detail(sel, level, result) if sel else None
-                self._draw_detail_panel(format_detail_panel(panel_data), panel_x, panel_y)
+                lines = format_detail_panel(panel_data)
+                panel_h = _PANEL_PADDING * 2 + len(lines) * _PANEL_LINE_HEIGHT
+                sel_rect: ScreenRect | None = None
+                conn_rects: list[ScreenRect] = []
+                if sel and sel in result.rooms:
+                    r = result.rooms[sel]
+                    sel_rect = ScreenRect(
+                        x=self._wx(r.x, origin_x, zoom),
+                        y=self._wy(r.y, origin_y, zoom),
+                        w=r.w * zoom,
+                        h=r.h * zoom,
+                    )
+                    for cid in _connected_room_ids(result, sel):
+                        if cid in result.rooms:
+                            cr = result.rooms[cid]
+                            conn_rects.append(ScreenRect(
+                                x=self._wx(cr.x, origin_x, zoom),
+                                y=self._wy(cr.y, origin_y, zoom),
+                                w=cr.w * zoom,
+                                h=cr.h * zoom,
+                            ))
+                placement = compute_panel_position(
+                    panel_w=_PANEL_WIDTH,
+                    panel_h=panel_h,
+                    viewport=ScreenRect(viewport_x, viewport_y, canvas_w, canvas_h),
+                    preferred_x=panel_x,
+                    preferred_y=panel_y,
+                    selected_rect=sel_rect,
+                    connected_rects=conn_rects,
+                )
+                self._draw_detail_panel(lines, placement.x, placement.y)
 
     # ------------------------------------------------------------------
     # Private
@@ -344,10 +377,13 @@ class LayoutRenderer:
         spec: AtmosphereSpec,
         canvas_w: float,
         canvas_h: float,
+        viewport_x: float = 0.0,
+        viewport_y: float = 0.0,
     ) -> None:
         if not spec.enabled:
             return
-        cx, cy = canvas_w / 2, canvas_h / 2
+        cx = viewport_x + canvas_w / 2
+        cy = viewport_y + canvas_h / 2
         for i in range(spec.vignette_bands):
             fraction = (spec.vignette_bands - i) / spec.vignette_bands
             alpha = int(spec.vignette_alpha * fraction)
@@ -364,10 +400,10 @@ class LayoutRenderer:
             t = spec.corner_tick_size
             color = spec.corner_tick_color
             corners = [
-                (inset, canvas_h - inset),
-                (canvas_w - inset, canvas_h - inset),
-                (inset, inset),
-                (canvas_w - inset, inset),
+                (viewport_x + inset, viewport_y + canvas_h - inset),
+                (viewport_x + canvas_w - inset, viewport_y + canvas_h - inset),
+                (viewport_x + inset, viewport_y + inset),
+                (viewport_x + canvas_w - inset, viewport_y + inset),
             ]
             offsets = [
                 ((t, 0), (0, -t)),
