@@ -139,8 +139,8 @@ def classify_all_roles(level: Level) -> dict[str, RoomRole]:
             roles[meta.entrance_room_id] = "entrance"
 
     for obj_id in meta.objective_room_ids:
-        room = room_by_id.get(obj_id)
-        if room is not None and room.layout_role is None:
+        obj_room: Room | None = room_by_id.get(obj_id)
+        if obj_room is not None and obj_room.layout_role is None:
             roles[obj_id] = "objective"
 
     return roles

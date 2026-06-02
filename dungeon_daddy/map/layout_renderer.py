@@ -54,7 +54,7 @@ _DEFAULT_CONN_STYLE = GraphConnectionStyleResolver().resolve("")
 
 def _draw_dashed_segment(
     x1: float, y1: float, x2: float, y2: float,
-    color: tuple, width: float, dash: float, gap: float,
+    color: tuple[int, int, int] | tuple[int, int, int, int], width: float, dash: float, gap: float,
 ) -> None:
     dx, dy = x2 - x1, y2 - y1
     total = math.sqrt(dx * dx + dy * dy)
@@ -127,7 +127,7 @@ class LayoutRenderer:
             result.critical_path or None,
             self._config.emphasize_critical_path,
         )
-        conn_metadata: dict[str, dict] | None = None
+        conn_metadata: dict[str, dict[str, str | None]] | None = None
         if level is not None:
             conn_metadata = {
                 f"{c.from_room}→{c.to_room}": {
@@ -197,7 +197,7 @@ class LayoutRenderer:
         self,
         connection_id: str,
         result: LayoutResult,
-        conn_metadata: dict[str, dict] | None = None,
+        conn_metadata: dict[str, dict[str, str | None]] | None = None,
     ) -> GraphConnectionStyle:
         label = result.edge_labels.get(connection_id, "")
         meta = conn_metadata.get(connection_id, {}) if conn_metadata else {}
@@ -288,7 +288,7 @@ class LayoutRenderer:
         zoom: float,
         cp_result: CriticalPathPresentationResult,
         view_state: GraphViewState | None = None,
-        conn_metadata: dict[str, dict] | None = None,
+        conn_metadata: dict[str, dict[str, str | None]] | None = None,
     ) -> None:
         selected_id = view_state.selected_room_id if view_state else None
 

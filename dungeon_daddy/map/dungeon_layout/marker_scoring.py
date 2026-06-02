@@ -14,7 +14,7 @@ _MARKER_WORTHY_ROLES: frozenset[str] = frozenset(
 )
 
 
-def compute_marker_feedback(level: Level) -> dict:
+def compute_marker_feedback(level: Level) -> dict[str, object]:
     """Return marker_feedback dict for a presentation report.
 
     If no marker-worthy connections exist, sets not_penalized_reason so the
@@ -31,7 +31,7 @@ def compute_marker_feedback(level: Level) -> dict:
     )
     applied = detected > 0
 
-    result: dict = {
+    result: dict[str, object] = {
         "role_markers_applied": role_markers_applied,
         "connection_markers_applied": applied,
         "marker_worthy_connections_detected": detected,

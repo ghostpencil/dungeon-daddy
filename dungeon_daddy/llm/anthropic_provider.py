@@ -40,7 +40,7 @@ class AnthropicProvider:
                 model=self._model,
                 max_tokens=max_tokens,
                 system=system,
-                messages=[{"role": m.role, "content": m.content} for m in messages],  # type: ignore[typeddict-item]
+                messages=[{"role": m.role, "content": m.content} for m in messages],  # type: ignore[typeddict-item, unused-ignore]
             )
             return response.content[0].text  # type: ignore[union-attr]
         except anthropic.APIError as e:
@@ -57,7 +57,7 @@ class AnthropicProvider:
                 model=self._model,
                 max_tokens=max_tokens,
                 system=system,
-                messages=[{"role": m.role, "content": m.content} for m in messages],  # type: ignore[typeddict-item]
+                messages=[{"role": m.role, "content": m.content} for m in messages],  # type: ignore[typeddict-item, unused-ignore]
             ) as stream:
                 yield from stream.text_stream
         except anthropic.APIError as e:

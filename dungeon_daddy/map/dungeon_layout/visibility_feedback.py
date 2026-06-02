@@ -13,7 +13,7 @@ _MAX_READABLE_VIGNETTE_ALPHA = 120
 def compute_visibility_feedback(
     pres_config: GraphPresentationConfig,
     atm_spec: AtmosphereSpec,
-) -> dict:
+) -> dict[str, object]:
     """Return a visibility_feedback dict for the presentation feedback JSON."""
     if not atm_spec.enabled:
         atmosphere_ok = True

@@ -20,7 +20,7 @@ def is_long_linear_floor(bounds: LayoutBounds) -> bool:
 def compute_long_floor_framing_feedback(
     bounds: LayoutBounds,
     fit_zoom: float | None = None,
-) -> dict:
+) -> dict[str, object]:
     """Return a framing feedback dict for the given layout bounds."""
     if not is_long_linear_floor(bounds):
         return {"is_long_linear_floor": False}
