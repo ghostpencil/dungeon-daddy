@@ -1,9 +1,13 @@
 """Unit tests for atmosphere.py — restrained atmosphere layer."""
 from __future__ import annotations
 
-from dungeon_daddy.map.dungeon_layout.atmosphere import AtmosphereSpec, build_atmosphere_spec
-from dungeon_daddy.map.dungeon_layout.graph_presentation_config import GraphPresentationConfig
+from unittest.mock import patch
 
+from dungeon_daddy.map.dungeon_layout.atmosphere import build_atmosphere_spec
+from dungeon_daddy.map.dungeon_layout.debug_overlay import DebugOverlay
+from dungeon_daddy.map.dungeon_layout.graph_presentation_config import GraphPresentationConfig
+from dungeon_daddy.map.dungeon_layout.models import LayoutBounds
+from dungeon_daddy.map.layout_renderer import LayoutRenderer
 
 # ---------------------------------------------------------------------------
 # Cycle 1 — disabled config → enabled=False
@@ -91,13 +95,6 @@ def test_disabled_does_not_show_corner_ticks() -> None:
 # ---------------------------------------------------------------------------
 # Cycles 6 & 7 — LayoutRenderer draws atmosphere when enabled, skips when disabled
 # ---------------------------------------------------------------------------
-
-from unittest.mock import patch
-
-from dungeon_daddy.map.dungeon_layout.debug_overlay import DebugOverlay
-from dungeon_daddy.map.dungeon_layout.models import LayoutBounds, RoomRect
-from dungeon_daddy.map.layout_renderer import LayoutRenderer
-
 
 def _minimal_result():
     from dungeon_daddy.map.dungeon_layout import LayoutResult

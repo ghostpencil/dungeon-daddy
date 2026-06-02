@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from dungeon_daddy.data.models import Entry, Level, Room
+from dungeon_daddy.data.models import Level, Room
 from dungeon_daddy.map.dungeon_layout import LayoutResult
 from dungeon_daddy.map.dungeon_layout.debug_overlay import DebugOverlay
 from dungeon_daddy.map.dungeon_layout.graph_presentation_config import GraphPresentationConfig

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from dungeon_daddy.data.models import Connection, Dungeon, Level, LayoutMetadata, Room
+from dungeon_daddy.data.models import Dungeon, Level, Room
 from dungeon_daddy.map.dungeon_layout.marker_scoring import compute_marker_feedback
 
 # ---------------------------------------------------------------------------

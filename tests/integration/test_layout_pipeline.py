@@ -12,9 +12,14 @@ from pathlib import Path
 
 from dungeon_daddy.data.models import Dungeon, Level
 from dungeon_daddy.map.dungeon_layout import run_layout_pipeline
+from dungeon_daddy.map.dungeon_layout.atmosphere import build_atmosphere_spec
 from dungeon_daddy.map.dungeon_layout.camera_fit import compute_layout_bounds
+from dungeon_daddy.map.dungeon_layout.connection_markers import resolve_connection_marker
+from dungeon_daddy.map.dungeon_layout.connection_style import GraphConnectionStyleResolver
 from dungeon_daddy.map.dungeon_layout.critical_path_style import CriticalPathPresenter
+from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import format_detail_panel
 from dungeon_daddy.map.dungeon_layout.endpoint_emphasis import EndpointEmphasisDetector
+from dungeon_daddy.map.dungeon_layout.graph_presentation_config import GraphPresentationConfig
 from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
 from dungeon_daddy.map.dungeon_layout.labels import place_labels
 from dungeon_daddy.map.dungeon_layout.metadata_quality_feedback import (
@@ -534,13 +539,6 @@ def test_phase3_detail_panel_produces_data_for_entrance_room() -> None:
 # ---------------------------------------------------------------------------
 # Phase 4 — Presentation, Detail Panel, Dungeon Personality (integration)
 # ---------------------------------------------------------------------------
-
-from dungeon_daddy.map.dungeon_layout.atmosphere import build_atmosphere_spec  # noqa: E402
-from dungeon_daddy.map.dungeon_layout.connection_markers import resolve_connection_marker  # noqa: E402
-from dungeon_daddy.map.dungeon_layout.connection_style import GraphConnectionStyleResolver  # noqa: E402
-from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import format_detail_panel  # noqa: E402
-from dungeon_daddy.map.dungeon_layout.graph_presentation_config import GraphPresentationConfig  # noqa: E402
-
 
 # --- Detail panel empty state ---
 
