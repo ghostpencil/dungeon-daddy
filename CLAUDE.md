@@ -145,6 +145,34 @@ Only if:
 - writing or running UI harness tests
 - using `UITestHarness`, `computer-use-mcp`, or smoke tests
 
+## RPG_MEMORY_ROADMAP.md
+Only if:
+- planning or reviewing RPG/memory phase sequence
+- checking design thesis, chosen rules direction, or non-goals for the RPG system
+- understanding module plan or dependency order between RPG phases
+
+## RPG_MEMORY_ARCHITECTURE.md
+Only if:
+- creating or changing `rpg/` or `memory/` modules
+- checking dependency direction between RPG, memory, UI, or LLM layers
+- understanding domain event boundaries or threading rules for those systems
+
+## RPG_MEMORY_DATA_MODEL.md
+Only if:
+- implementing or changing RPG/memory Pydantic models
+- working with DuckDB schema or SQL migrations for RPG/memory tables
+- working with Markdown front matter format or the tag taxonomy
+
+## RPG_SYSTEM_SPEC.md
+Only if:
+- implementing dice, action rolls, momentum, clocks, stress tracks, or fallout mechanics
+- checking RPG rules, action list, non-goals, or recovery rules
+
+## MEMORY_SYSTEM_SPEC.md
+Only if:
+- implementing memory storage, retrieval, context bundles, or Markdown sync
+- checking memory types, creation triggers, retrieval ranking, or LLM boundary rules
+
 ---
 
 # Workflow (TDD)

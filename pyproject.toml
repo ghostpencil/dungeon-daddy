@@ -18,6 +18,8 @@ dependencies = [
     "openai>=1.0",
     "pydantic>=2.9",
     "platformdirs>=4.2",
+    "duckdb>=1.1",
+    "PyYAML>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -38,6 +40,7 @@ include = ["dungeon_daddy*"]
 
 [tool.setuptools.package-data]
 "dungeon_daddy.prompts" = ["*.txt"]
+"dungeon_daddy.data" = ["migrations/*.sql"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
