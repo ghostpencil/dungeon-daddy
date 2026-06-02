@@ -2,8 +2,8 @@
 
 ## Phase
 
-Phase: 24 — Graph Mode Phase 4.1: Cleanup
-Status: **Complete** (2026-06-02) — Spec: `spec/MAP_LAYOUT_PHASE_4_1.md`
+Phase: 26 — RPG + Memory Foundation
+Status: **Proposed / Ready to Start** — Spec: `spec/PHASE_26_RPG_MEMORY_FOUNDATION.md`
 
 ---
 
@@ -11,12 +11,34 @@ Status: **Complete** (2026-06-02) — Spec: `spec/MAP_LAYOUT_PHASE_4_1.md`
 
 | Step | Task | Status |
 |---|---|---|
-| 4.1-1 | Detail panel placement — avoid covering selected room and its connected paths | Done |
-| 4.1-2 | Long linear floor framing — detect wide-vs-tall layout; improve padding/viewport bias for Crucible L3 | Done |
-| 4.1-3 | Crucible L2 marker scoring — fix marker application or justify zero-marker result without penalty | Done |
-| 4.1-4 | Visibility feedback fields — add to presentation feedback JSON for all four target fixtures | Done |
-| 4.1-5 | Artifact generation — screenshots + JSON feedback under `artifacts/layout/phase4_1/` | Done |
-| 4.1-6 | Markdown summaries — `phase4_1_feedback_summary.md`, `before_after_summary.md`, `implementation_summary.md` | Done |
+| 26-1 | Add RPG and memory module skeletons | Not Started |
+| 26-2 | Add base RPG and memory models | Not Started |
+| 26-3 | Add DuckDB migration runner | Not Started |
+| 26-4 | Add `001_rpg_memory_foundation.sql` migration | Not Started |
+| 26-5 | Add Markdown memory store shell | Not Started |
+| 26-6 | Add repository health check and domain event insert | Not Started |
+| 26-7 | Add unit/integration tests for foundation modules | Not Started |
+
+### Phase 25 Completed Steps (archived)
+
+| Step | Task |
+|---|---|
+| ~~VP-1~~ | ~~Asset loading infrastructure — safe load helper for background PNG + 6 frame PNGs; log-once on missing; path resolution from package root~~ — **Done** |
+| ~~VP-2~~ | ~~Background image — draw `background_graph_default.png` in `MapPanel`, Graph mode only, scissor-clipped, scaled to viewport, over solid fallback~~ — **Done** |
+| ~~VP-3~~ | ~~Room frame textures — load and draw centered 136×96 frame PNGs in `LayoutRenderer._draw_rooms()`, scaled by zoom~~ — **Done** |
+| ~~VP-4~~ | ~~Frame selection logic — `frame_current` > `frame_hover` > `frame_default`; stub hooks for memory/danger/locked frames~~ — **Done** |
+| ~~VP-5~~ | ~~Regression pass — Grid mode, Tiles mode, zoom/pan, hit testing, selection, detail panel, existing tests all green~~ — **Done** |
+
+### Phase 24 Completed Steps (archived)
+
+| Step | Task |
+|---|---|
+| ~~4.1-1~~ | ~~Detail panel placement — avoid covering selected room and its connected paths~~ — **Done** |
+| ~~4.1-2~~ | ~~Long linear floor framing — detect wide-vs-tall layout; improve padding/viewport bias for Crucible L3~~ — **Done** |
+| ~~4.1-3~~ | ~~Crucible L2 marker scoring — fix marker application or justify zero-marker result without penalty~~ — **Done** |
+| ~~4.1-4~~ | ~~Visibility feedback fields — add to presentation feedback JSON for all four target fixtures~~ — **Done** |
+| ~~4.1-5~~ | ~~Artifact generation — screenshots + JSON feedback under `artifacts/layout/phase4_1/`~~ — **Done** |
+| ~~4.1-6~~ | ~~Markdown summaries — `phase4_1_feedback_summary.md`, `before_after_summary.md`, `implementation_summary.md`~~ — **Done** |
 
 ### Phase 23 Completed Steps (archived)
 
@@ -69,6 +91,7 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 25 — Map Visual Polish Phase 1 | **Complete** (2026-06-02) | 1410 passing |
 | Phase 24 — Graph Mode Phase 4.1: Cleanup | **Complete** (2026-06-02) | 1395 passing (post-fix) |
 | Phase 23 — Graph Mode Phase 4: Presentation, Detail Panel, Dungeon Personality | **Complete** (2026-06-01) | 1368 passing |
 | Phase 22 — Graph Mode Phase 3: Interaction Polish | **Complete** (2026-05-31) | 1280 passing |
@@ -89,3 +112,6 @@ _Full session history in `spec/HISTORY.md`._
 - `AnthropicProvider` still exists and is tested — not removed, just not the active provider.
 - Spec loading rules and skills are in `CLAUDE.md` (canonical source).
 - Published: https://github.com/ghostpencil/dungeon-daddy (2026-05-24).
+- RPG + Memory roadmap begins at Phase 26. See `spec/RPG_MEMORY_ROADMAP.md`.
+- The RPG engine and memory layer are authoritative; the LLM is advisory.
+- Use `spec/RPG_MEMORY_ARCHITECTURE.md`, `spec/RPG_MEMORY_DATA_MODEL.md`, `spec/RPG_SYSTEM_SPEC.md`, and `spec/MEMORY_SYSTEM_SPEC.md` only when relevant to the active task.

@@ -148,7 +148,9 @@ class MapPanel:
         self._layout_renderer = LayoutRenderer()
         self._pres_config = GraphPresentationConfig()
         self._view_state = GraphViewState()
+        self._level_view_states: dict[int, GraphViewState] = {}
         self._selected_room_id = None
+        self._art = None  # MapArtAssets, lazy-loaded on first draw
 
         from dungeon_daddy.ui.widgets.level_stepper import LevelStepper
         self._stepper = LevelStepper(on_level_change)
@@ -186,7 +188,10 @@ class MapPanel:
         self._stepper.set_up_enabled(idx > 1)
         self._stepper.set_down_enabled(idx < total_levels)
         self._layout_result = run_layout_pipeline(level)
-        self._view_state = GraphViewState()
+        level_idx = state.current_level_idx
+        if level_idx not in self._level_view_states:
+            self._level_view_states[level_idx] = GraphViewState()
+        self._view_state = self._level_view_states[level_idx]
         self._zoom_level = _ZOOM_DEFAULT
         if self._active_variant == "Graph":
             self._fit_layout_camera()
@@ -417,6 +422,14 @@ class MapPanel:
         old_scissor = ctx.scissor
         ctx.scissor = (int(x), int(y), int(map_w), int(map_h))
         try:
+            if self._art is None:
+                from dungeon_daddy.map.map_art_assets import MapArtAssets
+                self._art = MapArtAssets()
+            if self._active_variant == "Graph" and self._art.background is not None:
+                arcade.draw_texture_rect(
+                    self._art.background,
+                    arcade.XYWH(x + map_w / 2, y + map_h / 2, map_w, map_h),
+                )
             if self._level is not None and self._state is not None:
                 origin_x = x + PAD_MD + self._pan_offset_x
                 origin_y = y + PAD_MD + self._pan_offset_y
