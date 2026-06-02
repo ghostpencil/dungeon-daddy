@@ -1,0 +1,163 @@
+{
+  "fixture_name": "crucible_l1",
+  "geometry_score": 100.0,
+  "semantic_score": 78.0,
+  "metadata_score": 100.0,
+  "interaction_score": 100.0,
+  "presentation_score": 100.0,
+  "visibility_feedback": {
+    "room_labels_readable": true,
+    "connection_labels_readable": true,
+    "detail_panel_text_readable": true,
+    "atmosphere_not_too_dark": true,
+    "unrelated_rooms_still_identifiable_when_faded": true
+  },
+  "detail_panel_feedback": {
+    "renders_when_room_selected": true,
+    "empty_state_available": true,
+    "contains_room_name": true,
+    "contains_room_role": true,
+    "contains_connected_rooms": true,
+    "contains_graph_notes": true,
+    "warnings": []
+  },
+  "detail_panel_placement_feedback": {
+    "panel_inside_viewport": true,
+    "panel_overlaps_selected_room": false,
+    "panel_overlaps_connected_rooms": false,
+    "panel_overlaps_highlighted_connections": false,
+    "fallback_position_used": true,
+    "warnings": []
+  },
+  "marker_feedback": {
+    "role_markers_applied": true,
+    "connection_markers_applied": true,
+    "marker_worthy_connections_detected": 1,
+    "marker_worthy_connections_rendered": 1,
+    "warnings": []
+  },
+  "atmosphere_feedback": {
+    "enabled": true,
+    "does_not_reduce_readability": true,
+    "warnings": []
+  },
+  "hover_feedback": {
+    "room_hover_visible": true,
+    "connection_hover_visible": true,
+    "warnings": []
+  },
+  "selection_feedback": {
+    "selected_room_visible": true,
+    "connected_rooms_visible": true,
+    "unrelated_rooms_still_readable": true,
+    "warnings": []
+  },
+  "long_floor_framing_feedback": {
+    "is_long_linear_floor": false
+  },
+  "detail_panel_tests": [
+    {
+      "room_id": "R1",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    },
+    {
+      "room_id": "R2",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    },
+    {
+      "room_id": "R4",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    },
+    {
+      "room_id": "R5",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    }
+  ],
+  "selection_tests": [
+    {
+      "selected_room_id": "R1",
+      "selected_room_role": "entrance",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "R2",
+        "R3"
+      ],
+      "highlighted_connection_ids": [
+        "R1→R2",
+        "R1→R3"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    },
+    {
+      "selected_room_id": "R2",
+      "selected_room_role": "hub",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "R1",
+        "R3",
+        "R4",
+        "R5"
+      ],
+      "highlighted_connection_ids": [
+        "R1→R2",
+        "R2→R4",
+        "R3→R2",
+        "R5→R2"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    },
+    {
+      "selected_room_id": "R4",
+      "selected_room_role": "descent",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "R2",
+        "R5"
+      ],
+      "highlighted_connection_ids": [
+        "R2→R4",
+        "R5→R4"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    },
+    {
+      "selected_room_id": "R5",
+      "selected_room_role": "hazard",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "R2",
+        "R4"
+      ],
+      "highlighted_connection_ids": [
+        "R5→R2",
+        "R5→R4"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    }
+  ],
+  "warnings": []
+}

@@ -8,7 +8,9 @@ import arcade.gui
 
 from dungeon_daddy.data.models import Level, SessionState
 from dungeon_daddy.map.dungeon_layout import LayoutResult, run_layout_pipeline
+from dungeon_daddy.map.dungeon_layout.graph_presentation_config import GraphPresentationConfig
 from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+from dungeon_daddy.map.dungeon_layout.long_floor_framing import is_long_linear_floor
 from dungeon_daddy.map.grid_renderer import GridRenderer
 from dungeon_daddy.map.layout_renderer import LayoutRenderer
 from dungeon_daddy.map.loop_overlay import LoopOverlay
@@ -144,6 +146,7 @@ class MapPanel:
         self._active_loop_id: str | None = None
         self._layout_result: LayoutResult | None = None
         self._layout_renderer = LayoutRenderer()
+        self._pres_config = GraphPresentationConfig()
         self._view_state = GraphViewState()
         self._selected_room_id = None
 
@@ -225,8 +228,11 @@ class MapPanel:
         map_w = self._w - PANEL_STEPPER_WIDTH
         map_h = self._h - _HEADER_H
         if b.width > 0 and b.height > 0:
+            # Long linear floors need extra horizontal breathing room so
+            # both endpoints remain visible and don't feel clipped.
+            h_pad = 60.0 if is_long_linear_floor(b) else PAD_MD
             fit_zoom = min(
-                (map_w - 2 * PAD_MD) / b.width,
+                (map_w - 2 * h_pad) / b.width,
                 (map_h - 2 * PAD_MD) / b.height,
             )
             self._zoom_level = max(_ZOOM_MIN, min(_ZOOM_MAX, fit_zoom))
@@ -419,10 +425,13 @@ class MapPanel:
                         self._layout_result, origin_x, origin_y, self._zoom_level,
                         view_state=self._view_state,
                         level=self._level,
+                        presentation_config=self._pres_config,
                         panel_x=x + map_w - 320.0,
                         panel_y=y + 20.0,
                         canvas_w=float(map_w),
                         canvas_h=float(map_h),
+                        viewport_x=float(x),
+                        viewport_y=float(y),
                     )
                 else:
                     self._renderer.draw(self._level, self._state, origin_x, origin_y, self._zoom_level)

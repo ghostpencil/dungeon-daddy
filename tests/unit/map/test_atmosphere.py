@@ -29,17 +29,20 @@ def test_explicit_enabled_config_returns_enabled_true() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Cycle 3 — default → vignette has visible alpha and multiple bands
+# Cycle 3 — default → vignette disabled (bands caused visible banding on dark BG)
 # ---------------------------------------------------------------------------
 
-def test_default_vignette_alpha_is_positive() -> None:
+def test_default_vignette_alpha_is_zero() -> None:
+    # Vignette bands are intentionally disabled: they invert the gradient
+    # (center darker than edges) on a near-black background, causing visible
+    # concentric rectangle artefacts. Frame + corner ticks provide the mood.
     spec = build_atmosphere_spec()
-    assert 0 < spec.vignette_alpha <= 255
+    assert spec.vignette_alpha == 0
 
 
-def test_default_vignette_bands_are_positive() -> None:
+def test_default_vignette_bands_are_zero() -> None:
     spec = build_atmosphere_spec()
-    assert spec.vignette_bands > 0
+    assert spec.vignette_bands == 0
 
 
 def test_disabled_vignette_alpha_is_zero() -> None:
@@ -112,7 +115,7 @@ def _minimal_result():
     )
 
 
-def test_renderer_atmosphere_enabled_draws_rect_fills() -> None:
+def test_renderer_atmosphere_enabled_draws_frame_and_ticks() -> None:
     renderer = LayoutRenderer()
     result = _minimal_result()
     cfg = GraphPresentationConfig(enable_atmosphere=True)
@@ -123,11 +126,12 @@ def test_renderer_atmosphere_enabled_draws_rect_fills() -> None:
             presentation_config=cfg,
             canvas_w=1200.0, canvas_h=800.0,
         )
-        # Atmosphere vignette bands generate multiple rect fills
-        assert mock_arcade.draw_rect_filled.call_count > 0
+        # Frame outline + corner ticks (8 lines) drawn when atmosphere enabled
+        assert mock_arcade.draw_rect_outline.call_count >= 1
+        assert mock_arcade.draw_line.call_count >= 8
 
 
-def test_renderer_atmosphere_disabled_draws_no_atmosphere_fills() -> None:
+def test_renderer_atmosphere_disabled_draws_no_frame() -> None:
     renderer = LayoutRenderer()
     cfg_on = GraphPresentationConfig(enable_atmosphere=True)
     cfg_off = GraphPresentationConfig(enable_atmosphere=False)
@@ -135,11 +139,47 @@ def test_renderer_atmosphere_disabled_draws_no_atmosphere_fills() -> None:
     with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_on:
         renderer.draw(_minimal_result(), 0.0, 0.0, 1.0, presentation_config=cfg_on,
                       canvas_w=1200.0, canvas_h=800.0)
-        fills_on = mock_on.draw_rect_filled.call_count
+        outlines_on = mock_on.draw_rect_outline.call_count
 
     with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_off:
         renderer.draw(_minimal_result(), 0.0, 0.0, 1.0, presentation_config=cfg_off,
                       canvas_w=1200.0, canvas_h=800.0)
-        fills_off = mock_off.draw_rect_filled.call_count
+        outlines_off = mock_off.draw_rect_outline.call_count
 
-    assert fills_on > fills_off
+    assert outlines_on > outlines_off
+
+
+# ---------------------------------------------------------------------------
+# Cycle 8 — atmosphere frame is offset by viewport_x / viewport_y
+# ---------------------------------------------------------------------------
+
+def test_atmosphere_frame_centered_on_viewport_origin() -> None:
+    """Frame center must be viewport_x + canvas_w/2, viewport_y + canvas_h/2."""
+    renderer = LayoutRenderer()
+    cfg = GraphPresentationConfig(enable_atmosphere=True)
+
+    captured_rects: list = []
+
+    class FakeXYWH:
+        def __init__(self, x, y, w, h):
+            self.x, self.y, self.w, self.h = x, y, w, h
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        mock_arcade.XYWH.side_effect = FakeXYWH
+        renderer.draw(
+            _minimal_result(), origin_x=0.0, origin_y=0.0, zoom=1.0,
+            presentation_config=cfg,
+            canvas_w=1200.0, canvas_h=800.0,
+            viewport_x=100.0, viewport_y=50.0,
+        )
+        for call in mock_arcade.draw_rect_outline.call_args_list:
+            rect = call.args[0]
+            captured_rects.append(rect)
+
+    # The atmosphere frame rect must be centred at (100 + 600, 50 + 400) = (700, 450)
+    frame = captured_rects[0]
+    assert frame.x == pytest.approx(700.0), f"frame cx={frame.x}, expected 700.0"
+    assert frame.y == pytest.approx(450.0), f"frame cy={frame.y}, expected 450.0"
+
+
+import pytest

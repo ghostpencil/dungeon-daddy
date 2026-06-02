@@ -1,0 +1,157 @@
+{
+  "fixture_name": "crucible_l3",
+  "geometry_score": 100.0,
+  "semantic_score": 82.8,
+  "metadata_score": 100.0,
+  "interaction_score": 100.0,
+  "presentation_score": 100.0,
+  "visibility_feedback": {
+    "room_labels_readable": true,
+    "connection_labels_readable": true,
+    "detail_panel_text_readable": true,
+    "atmosphere_not_too_dark": true,
+    "unrelated_rooms_still_identifiable_when_faded": true
+  },
+  "detail_panel_feedback": {
+    "renders_when_room_selected": true,
+    "empty_state_available": true,
+    "contains_room_name": true,
+    "contains_room_role": true,
+    "contains_connected_rooms": true,
+    "contains_graph_notes": true,
+    "warnings": []
+  },
+  "detail_panel_placement_feedback": {
+    "panel_inside_viewport": true,
+    "panel_overlaps_selected_room": false,
+    "panel_overlaps_connected_rooms": false,
+    "panel_overlaps_highlighted_connections": false,
+    "fallback_position_used": false,
+    "warnings": []
+  },
+  "marker_feedback": {
+    "role_markers_applied": true,
+    "connection_markers_applied": true,
+    "marker_worthy_connections_detected": 1,
+    "marker_worthy_connections_rendered": 1,
+    "warnings": []
+  },
+  "atmosphere_feedback": {
+    "enabled": true,
+    "does_not_reduce_readability": true,
+    "warnings": []
+  },
+  "hover_feedback": {
+    "room_hover_visible": true,
+    "connection_hover_visible": true,
+    "warnings": []
+  },
+  "selection_feedback": {
+    "selected_room_visible": true,
+    "connected_rooms_visible": true,
+    "unrelated_rooms_still_readable": true,
+    "warnings": []
+  },
+  "long_floor_framing_feedback": {
+    "is_long_linear_floor": true,
+    "labels_readable_after_fit": true,
+    "warnings": []
+  },
+  "detail_panel_tests": [
+    {
+      "room_id": "r1",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    },
+    {
+      "room_id": "r3",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    },
+    {
+      "room_id": "r7",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    },
+    {
+      "room_id": "r8",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    }
+  ],
+  "selection_tests": [
+    {
+      "selected_room_id": "r1",
+      "selected_room_role": "entrance",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "r2"
+      ],
+      "highlighted_connection_ids": [
+        "r1→r2"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    },
+    {
+      "selected_room_id": "r3",
+      "selected_room_role": "objective",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "r2",
+        "r4"
+      ],
+      "highlighted_connection_ids": [
+        "r2→r3",
+        "r3→r4"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    },
+    {
+      "selected_room_id": "r7",
+      "selected_room_role": "boss",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "r6",
+        "r8"
+      ],
+      "highlighted_connection_ids": [
+        "r6→r7",
+        "r7→r8"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    },
+    {
+      "selected_room_id": "r8",
+      "selected_room_role": "objective",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "r7"
+      ],
+      "highlighted_connection_ids": [
+        "r7→r8"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    }
+  ],
+  "warnings": []
+}

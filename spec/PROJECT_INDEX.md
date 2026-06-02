@@ -2,14 +2,21 @@
 
 ## Phase
 
-Phase: 23 — Graph Mode Phase 4: Presentation, Detail Panel, and Dungeon Personality
-Status: **Complete** (2026-06-01) — Spec: `spec/MAP_LAYOUT_PHASE_4.md`
+Phase: 24 — Graph Mode Phase 4.1: Cleanup
+Status: **Complete** (2026-06-02) — Spec: `spec/MAP_LAYOUT_PHASE_4_1.md`
 
 ---
 
 ## Next Steps
 
-_No active phase. Phase 24 not yet defined._
+| Step | Task | Status |
+|---|---|---|
+| 4.1-1 | Detail panel placement — avoid covering selected room and its connected paths | Done |
+| 4.1-2 | Long linear floor framing — detect wide-vs-tall layout; improve padding/viewport bias for Crucible L3 | Done |
+| 4.1-3 | Crucible L2 marker scoring — fix marker application or justify zero-marker result without penalty | Done |
+| 4.1-4 | Visibility feedback fields — add to presentation feedback JSON for all four target fixtures | Done |
+| 4.1-5 | Artifact generation — screenshots + JSON feedback under `artifacts/layout/phase4_1/` | Done |
+| 4.1-6 | Markdown summaries — `phase4_1_feedback_summary.md`, `before_after_summary.md`, `implementation_summary.md` | Done |
 
 ### Phase 23 Completed Steps (archived)
 
@@ -50,12 +57,19 @@ _No active phase. Phase 24 not yet defined._
 
 _None._
 
+## Bug Fixes (post-Phase 24)
+
+| Date | Fix |
+|---|---|
+| 2026-06-02 | Atmosphere frame misalignment — `_draw_atmosphere` was centering on `(canvas_w/2, canvas_h/2)` instead of `(viewport_x + canvas_w/2, viewport_y + canvas_h/2)`, causing the frame to draw relative to screen origin rather than the map panel. Fixed in `layout_renderer.py:_draw_atmosphere`. 1395 passing. |
+
 ---
 
 ## Previous Phases
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 24 — Graph Mode Phase 4.1: Cleanup | **Complete** (2026-06-02) | 1395 passing (post-fix) |
 | Phase 23 — Graph Mode Phase 4: Presentation, Detail Panel, Dungeon Personality | **Complete** (2026-06-01) | 1368 passing |
 | Phase 22 — Graph Mode Phase 3: Interaction Polish | **Complete** (2026-05-31) | 1280 passing |
 | Phase 21 — Graph Mode Phase 2.5: Semantic Metadata Backfill | **Complete** (2026-05-30) | 1184 passing |
