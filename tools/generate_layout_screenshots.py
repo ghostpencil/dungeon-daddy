@@ -19,8 +19,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 from dungeon_daddy.data.models import Dungeon, Level
 from dungeon_daddy.map.dungeon_layout import run_layout_pipeline
+from dungeon_daddy.map.dungeon_layout.atmosphere import AtmosphereSpec, build_atmosphere_spec
 from dungeon_daddy.map.dungeon_layout.connection_style import GraphConnectionStyleResolver
 from dungeon_daddy.map.dungeon_layout.critical_path_style import CriticalPathPresenter
+from dungeon_daddy.map.dungeon_layout.graph_presentation_config import GraphPresentationConfig
 from dungeon_daddy.map.dungeon_layout.models import LayoutBounds, RoutedEdge
 from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyleResolver
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_config import VisualHierarchyConfig
@@ -225,6 +227,48 @@ def _draw_conn_label(
     draw.text(midpoint, label, font=font, fill=(*LABEL_COLOR, 160), anchor="mm")
 
 
+def _draw_atmosphere_pil(img: Image.Image, spec: AtmosphereSpec) -> None:
+    """Apply atmosphere effects (vignette, frame, corner ticks) to a PIL RGB image."""
+    if not spec.enabled:
+        return
+    w, h = img.size
+    draw = ImageDraw.Draw(img, "RGBA")
+
+    # Vignette: semi-transparent dark bands from the edges inward
+    for i in range(spec.vignette_bands):
+        fraction = (spec.vignette_bands - i) / spec.vignette_bands
+        alpha = int(spec.vignette_alpha * fraction)
+        shrink_x = w * i / spec.vignette_bands * 0.25
+        shrink_y = h * i / spec.vignette_bands * 0.25
+        draw.rectangle(
+            [shrink_x, shrink_y, w - shrink_x, h - shrink_y],
+            fill=(0, 0, 0, alpha),
+        )
+
+    # Thin frame
+    inset = spec.frame_inset
+    fc = spec.frame_color
+    draw.rectangle(
+        [inset, inset, w - inset, h - inset],
+        outline=fc,
+        width=max(1, int(spec.frame_width)),
+    )
+
+    # Corner ticks
+    if spec.show_corner_ticks:
+        t = spec.corner_tick_size
+        tc = spec.corner_tick_color
+        corners_and_offsets = [
+            ((inset, inset),         (t, 0), (0, t)),
+            ((w - inset, inset),     (-t, 0), (0, t)),
+            ((inset, h - inset),     (t, 0), (0, -t)),
+            ((w - inset, h - inset), (-t, 0), (0, -t)),
+        ]
+        for (x, y), (dx1, dy1), (dx2, dy2) in corners_and_offsets:
+            draw.line([(x, y), (x + dx1, y + dy1)], fill=tc, width=1)
+            draw.line([(x, y), (x + dx2, y + dy2)], fill=tc, width=1)
+
+
 # ---------------------------------------------------------------------------
 # Main render
 # ---------------------------------------------------------------------------
@@ -280,6 +324,10 @@ def render_fixture(level: Level, fixture_name: str, output_dir: Path) -> Path:
 
     # Merge layers
     base.paste(overlay, mask=overlay.split()[3])
+
+    # Atmosphere (vignette, frame, corner ticks) — applied after content merge
+    atm_spec = build_atmosphere_spec(GraphPresentationConfig())
+    _draw_atmosphere_pil(base, atm_spec)
 
     # Fixture title
     title_draw = ImageDraw.Draw(base)

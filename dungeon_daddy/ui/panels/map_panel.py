@@ -418,6 +418,11 @@ class MapPanel:
                     self._layout_renderer.draw(
                         self._layout_result, origin_x, origin_y, self._zoom_level,
                         view_state=self._view_state,
+                        level=self._level,
+                        panel_x=x + map_w - 320.0,
+                        panel_y=y + 20.0,
+                        canvas_w=float(map_w),
+                        canvas_h=float(map_h),
                     )
                 else:
                     self._renderer.draw(self._level, self._state, origin_x, origin_y, self._zoom_level)

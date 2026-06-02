@@ -1352,6 +1352,58 @@ Added interaction polish to Graph Mode: hover states, room selection, focus mode
 
 ---
 
+## Phase 23 — Graph Mode Phase 4: Presentation, Detail Panel, and Dungeon Personality
+
+**Status: Complete** — 1368 unit+integration tests passing. Closed 2026-06-01.
+
+Spec: `spec/MAP_LAYOUT_PHASE_4.md`
+
+Turn Graph Mode from a clean semantic schematic into a game-like dungeon interface. Build on Phase 3 without destabilising it. Grid Mode must remain untouched.
+
+### Modules
+
+| Module | Test File |
+|---|---|
+| `dungeon_daddy/map/dungeon_layout/graph_presentation_config.py` (new) | `tests/unit/map/layout/test_graph_presentation_config.py` |
+| `dungeon_daddy/map/dungeon_layout/detail_panel_renderer.py` (new) | `tests/unit/map/layout/test_detail_panel_renderer.py` |
+| `dungeon_daddy/map/dungeon_layout/role_markers.py` (new) | `tests/unit/map/layout/test_role_markers.py` |
+| `dungeon_daddy/map/dungeon_layout/connection_markers.py` (new) | `tests/unit/map/layout/test_connection_markers.py` |
+| `dungeon_daddy/map/dungeon_layout/atmosphere.py` (new) | `tests/unit/map/layout/test_atmosphere.py` |
+| `dungeon_daddy/map/dungeon_layout/style_resolver.py` (update) | `tests/unit/map/layout/test_style_resolver.py` |
+| `dungeon_daddy/map/layout_renderer.py` (update) | `tests/unit/map/test_layout_renderer.py` |
+| `scripts/generate_phase4_graph_artifacts.py` (new) | (artifact generation — no unit test) |
+
+### Implementation Steps
+
+| Step | Task | Status |
+|---|---|---|
+| P4-1 | `GraphPresentationConfig` dataclass with all toggles; defaults all enabled | **Done** |
+| P4-2 | Visible detail panel rendered in Graph Mode using existing `build_room_detail` data | **Done** |
+| P4-3 | Strengthen hover (border +1 px, brighter alpha, optional glow) and selected-room styling (border +2 px, second outline) | **Done** |
+| P4-4 | Role markers: small text glyphs (`IN`, `OBJ`, `BOSS`, `!`, `KEY`, `↓`, `HUB`) drawn in room boxes | **Done** |
+| P4-5 | Connection markers: `critical_path` (brighter/thicker), `locked` (lock marker), `secret`/`shortcut` (dashed/faint), `vertical` (arrow marker) | **Done** |
+| P4-6 | Restrained atmosphere layer: vignette, subtle background, thin frame, deterministic and configurable | **Done** |
+| P4-7 | Artifact generation script and all required screenshots + JSON reports under `artifacts/layout/phase4/` | **Done** |
+| P4-8 | Integration tests: regression checks for geometry, semantic, metadata, interaction scores; Grid Mode untouched | **Done** |
+
+### Exit Criteria
+
+- [x] All existing tests continue to pass
+- [x] New Phase 4 tests pass
+- [x] Grid Mode remains untouched
+- [x] Geometry score does not regress (100.0 for all target fixtures)
+- [x] Metadata and interaction scores do not regress
+- [x] A selected room visibly opens or updates a readable detail panel
+- [x] Hover and selected states are obvious in generated PNG screenshots
+- [x] Special connection roles (`locked`, `secret`, `shortcut`, `vertical`) are visually distinguishable
+- [x] Role markers appear in room boxes and are non-intrusive
+- [x] Atmosphere layer is present, deterministic, and does not reduce readability
+- [x] `GraphPresentationConfig` can disable each presentation effect independently
+- [x] Required artifacts generated under `artifacts/layout/phase4/`
+- [x] `pytest tests/unit/` green (1368 passing)
+
+---
+
 ## Notes for the Implementing Agent
 
 - **Do not advance to the next phase until all exit criteria for the current phase are met.**

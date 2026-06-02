@@ -23,6 +23,8 @@ class GraphRoomStyle:
     show_marker: bool
     marker_text: str | None
     priority: str
+    glow_alpha: int = 0
+    has_second_outline: bool = False
 
 
 # Default neutral colors used when no role-specific color is defined.
