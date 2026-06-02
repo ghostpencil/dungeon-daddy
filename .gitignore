@@ -19,6 +19,10 @@ __pycache__/
 dist/
 build/
 .mypy_cache/
+.coverage
+
+# Test fixture backups
+tests/fixtures/*.bak
 
 # Virtual environments
 .venv/

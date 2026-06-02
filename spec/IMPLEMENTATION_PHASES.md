@@ -1470,6 +1470,141 @@ Presentation:  100.0 or justified non-penalized result for crucible_l2
 
 ---
 
+## Phase 25 — Map Visual Polish Phase 1: Background + Room Frame Assets
+
+**Status: Complete** — 1410 unit+integration tests passing. Closed 2026-06-02.
+
+Spec: `spec/MAP_VISUAL_POLISH_PHASE_1.md`
+
+Add asset-backed visual polish to the Play Mode Graph map. No layout behavior changes. Grid Mode and Tiles Mode must remain untouched.
+
+### Modules
+
+| Module | Notes |
+|---|---|
+| `dungeon_daddy/ui/panels/map_panel.py` (update) | Background texture loading + draw |
+| `dungeon_daddy/map/layout_renderer.py` (update) | Room frame texture loading + draw in `_draw_rooms` |
+
+### Implementation Steps
+
+| Step | Task | Status |
+|---|---|---|
+| VP-1 | Asset loading infrastructure — safe load helper for background PNG + 6 frame PNGs; log-once on missing; path resolution from package root | Not Started |
+| VP-2 | Background image — draw `background_graph_default.png` in `MapPanel`, Graph mode only, scissor-clipped, scaled to viewport, over solid `BG_0` fallback | Not Started |
+| VP-3 | Room frame textures — load and draw centered 136×96 frame PNGs in `LayoutRenderer._draw_rooms()`, scaled by zoom, after existing outlines, before label text | Not Started |
+| VP-4 | Frame selection logic — `frame_current` > `frame_hover` > `frame_default`; stub hooks for memory/danger/locked | Not Started |
+| VP-5 | Regression pass — Grid mode, Tiles mode, zoom/pan, hit testing, selection, detail panel, existing tests all green | Not Started |
+
+### Asset Paths
+
+```
+dungeon_daddy/assets/ui/map/background_graph_default.png   (1780×1584 px)
+dungeon_daddy/assets/ui/map/room_frames/frame_default.png  (136×96 px)
+dungeon_daddy/assets/ui/map/room_frames/frame_current.png
+dungeon_daddy/assets/ui/map/room_frames/frame_hover.png
+dungeon_daddy/assets/ui/map/room_frames/frame_locked.png
+dungeon_daddy/assets/ui/map/room_frames/frame_memory.png
+dungeon_daddy/assets/ui/map/room_frames/frame_danger.png
+```
+
+### Exit Criteria
+
+- [x] `background_graph_default.png` loaded once; drawn only in Graph mode filling the map viewport
+- [x] Background is beneath atmosphere overlay, rooms, and edges
+- [x] Missing background file: logs warning once, falls back to `BG_0`, no crash
+- [x] Frame PNGs loaded once; each Graph room shows a centered 136×96 frame scaled by zoom
+- [x] `frame_current.png` used when `rect.room_id == selected_room_id`
+- [x] `frame_hover.png` used when `rect.room_id == view_state.hovered_room_id` (current wins)
+- [x] `frame_default.png` used for all other rooms
+- [x] Missing frame assets: fall back to existing primitive rectangles, no crash
+- [x] Hit testing, camera fitting, routing, detail panel, and selection unchanged
+- [x] Grid Mode and Tiles Mode unaffected
+- [x] `pytest tests/unit/` green (1410 passing)
+
+---
+
+## Phase 26 — RPG + Memory Foundation
+
+**Status: Proposed**
+
+Spec: `spec/PHASE_26_RPG_MEMORY_FOUNDATION.md`
+
+Create module skeletons, base models, migration runner, DuckDB repository shell, and Markdown memory store shell.
+
+### Implementation Steps
+
+| Step | Task | Status |
+|---|---|---|
+| 26-1 | Add RPG and memory module skeletons | Not Started |
+| 26-2 | Add base RPG and memory models | Not Started |
+| 26-3 | Add DuckDB migration runner | Not Started |
+| 26-4 | Add `001_rpg_memory_foundation.sql` migration | Not Started |
+| 26-5 | Add Markdown memory store shell | Not Started |
+| 26-6 | Add repository health check and domain event insert | Not Started |
+| 26-7 | Add unit/integration tests for foundation modules | Not Started |
+
+---
+
+## Phase 27 — RPG Core Loop
+
+**Status: Proposed**
+
+Spec: `spec/PHASE_27_RPG_CORE_LOOP.md`
+
+Implement headless Charge-style action resolution, momentum, clocks, stress tracks, and RPG service orchestration.
+
+---
+
+## Phase 28 — Memory Persistence
+
+**Status: Proposed**
+
+Spec: `spec/PHASE_28_MEMORY_PERSISTENCE.md`
+
+Persist campaigns, sessions, scenes, actors, actions, clocks, domain events, memory entries, Markdown files, tags, and links.
+
+---
+
+## Phase 29 — Fallout + Dungeon Influence
+
+**Status: Proposed**
+
+Spec: `spec/PHASE_29_FALLOUT_AND_DUNGEON_INFLUENCE.md`
+
+Implement Body, Composure, Bonds, and Weird fallout; intimacy risk; dungeon influence; and memory projection for consequences.
+
+---
+
+## Phase 30 — Play Mode UI + Debug Tools
+
+**Status: Proposed**
+
+Spec: `spec/PHASE_30_PLAY_MODE_UI_AND_DEBUG_TOOLS.md`
+
+Expose RPG state, clocks, fallout, and memory in Play Mode using panels and debug tools.
+
+---
+
+## Phase 31 — Context Bundles + AI Integration
+
+**Status: Proposed**
+
+Spec: `spec/PHASE_31_CONTEXT_BUNDLES_AND_AI_INTEGRATION.md`
+
+Generate LLM-ready context bundles from RPG state and memory retrieval; update DM agent to consume bundles.
+
+---
+
+## Phase 32 — Stabilization + Balancing
+
+**Status: Proposed**
+
+Spec: `spec/PHASE_32_STABILIZATION_AND_BALANCING.md`
+
+Harden end-to-end tests, smoke tests, golden fixtures, sync repair tools, balance, and documentation.
+
+---
+
 ## Notes for the Implementing Agent
 
 - **Do not advance to the next phase until all exit criteria for the current phase are met.**

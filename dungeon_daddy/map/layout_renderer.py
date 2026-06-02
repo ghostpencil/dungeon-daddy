@@ -102,6 +102,7 @@ class LayoutRenderer:
         self._room_resolver = GraphRoomStyleResolver()
         self._conn_resolver = GraphConnectionStyleResolver()
         self._cp_presenter = CriticalPathPresenter()
+        self._art = None  # MapArtAssets, lazy-loaded on first draw
 
     def draw(
         self,
@@ -207,6 +208,21 @@ class LayoutRenderer:
             layout_connection_role=meta.get("layout_connection_role"),
         )
 
+    def _select_frame_key(
+        self,
+        room_id: str,
+        selected_room_id: str | None,
+        view_state: GraphViewState | None,
+    ) -> str:
+        if room_id == selected_room_id:
+            return "current"
+        if view_state is not None:
+            if room_id == view_state.selected_room_id:
+                return "current"
+            if room_id == view_state.hovered_room_id:
+                return "hover"
+        return "default"
+
     def _draw_rooms(
         self,
         result: LayoutResult,
@@ -217,6 +233,9 @@ class LayoutRenderer:
         cp_result: CriticalPathPresentationResult,
         view_state: GraphViewState | None = None,
     ) -> None:
+        if self._art is None:
+            from dungeon_daddy.map.map_art_assets import MapArtAssets
+            self._art = MapArtAssets()
 
         connected_ids = _connected_room_ids(result, view_state.selected_room_id) if view_state else set()
 
@@ -257,6 +276,16 @@ class LayoutRenderer:
 
             if rect.room_id == selected_room_id:
                 arcade.draw_rect_outline(xywh, TEAL, _SELECTION_WIDTH)
+
+            frame_key = self._select_frame_key(rect.room_id, selected_room_id, view_state)
+            frame_tex = self._art.frames.get(frame_key)
+            if frame_tex is not None:
+                center_x = wx + ww / 2
+                center_y = wy + wh / 2
+                arcade.draw_texture_rect(
+                    frame_tex,
+                    arcade.XYWH(center_x, center_y, 136.0 * zoom, 96.0 * zoom),
+                )
 
             name = result.room_names.get(rect.room_id, "")
             label = f"{name}\n{rect.room_id}" if name else rect.room_id
