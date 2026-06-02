@@ -1,0 +1,165 @@
+{
+  "fixture_name": "crucible_l2",
+  "geometry_score": 100.0,
+  "semantic_score": 82.2,
+  "metadata_score": 100.0,
+  "interaction_score": 100.0,
+  "presentation_score": 85.0,
+  "detail_panel_feedback": {
+    "renders_when_room_selected": true,
+    "empty_state_available": true,
+    "contains_room_name": true,
+    "contains_room_role": true,
+    "contains_connected_rooms": true,
+    "contains_graph_notes": true,
+    "warnings": []
+  },
+  "marker_feedback": {
+    "role_markers_applied": true,
+    "connection_markers_applied": false,
+    "locked_connection_marker_count": 0,
+    "secret_connection_marker_count": 0,
+    "shortcut_connection_marker_count": 0,
+    "vertical_connection_marker_count": 0,
+    "warnings": []
+  },
+  "atmosphere_feedback": {
+    "enabled": true,
+    "does_not_reduce_readability": true,
+    "warnings": []
+  },
+  "hover_feedback": {
+    "room_hover_visible": true,
+    "connection_hover_visible": true,
+    "warnings": []
+  },
+  "selection_feedback": {
+    "selected_room_visible": true,
+    "connected_rooms_visible": true,
+    "unrelated_rooms_still_readable": true,
+    "warnings": []
+  },
+  "detail_panel_tests": [
+    {
+      "room_id": "r01",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    },
+    {
+      "room_id": "r02",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    },
+    {
+      "room_id": "r03",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    },
+    {
+      "room_id": "r05",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    },
+    {
+      "room_id": "r06",
+      "contains_name": true,
+      "contains_role": true,
+      "contains_connected_rooms": true,
+      "contains_graph_notes": true,
+      "warnings": []
+    }
+  ],
+  "selection_tests": [
+    {
+      "selected_room_id": "r01",
+      "selected_room_role": "entrance",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "r02"
+      ],
+      "highlighted_connection_ids": [
+        "r01→r02"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    },
+    {
+      "selected_room_id": "r02",
+      "selected_room_role": "hub",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "r01",
+        "r03",
+        "r04",
+        "r05"
+      ],
+      "highlighted_connection_ids": [
+        "r01→r02",
+        "r02→r03",
+        "r02→r04",
+        "r02→r05"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    },
+    {
+      "selected_room_id": "r03",
+      "selected_room_role": "key_room",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "r02"
+      ],
+      "highlighted_connection_ids": [
+        "r02→r03"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    },
+    {
+      "selected_room_id": "r05",
+      "selected_room_role": "hazard",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "r02",
+        "r06"
+      ],
+      "highlighted_connection_ids": [
+        "r02→r05",
+        "r05→r06"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    },
+    {
+      "selected_room_id": "r06",
+      "selected_room_role": "transition",
+      "detail_panel_available": true,
+      "connected_room_ids": [
+        "r05"
+      ],
+      "highlighted_connection_ids": [
+        "r05→r06"
+      ],
+      "unrelated_rooms_faded": true,
+      "critical_path_visible": true,
+      "warnings": []
+    }
+  ],
+  "warnings": []
+}

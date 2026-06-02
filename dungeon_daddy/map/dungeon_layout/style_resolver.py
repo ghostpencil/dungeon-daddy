@@ -57,19 +57,22 @@ def resolve_room_render_style(
     if view_state.hovered_room_id == room_id and not is_selected:
         s = dataclasses.replace(
             s,
-            border_alpha=min(255, s.border_alpha + 40),
-            fill_alpha=min(255, s.fill_alpha + 15),
-            border_width=s.border_width + 0.5,
+            border_alpha=min(255, s.border_alpha + 60),
+            fill_alpha=min(255, s.fill_alpha + 20),
+            border_width=base_style.border_width + 1.0,
+            glow_alpha=80,
         )
 
     # --- Selected (dominant) ---
     if is_selected:
         s = dataclasses.replace(
             s,
-            border_width=max(base_style.border_width, 3.5),
+            border_width=base_style.border_width + 2.0,
             border_alpha=255,
             border_color=(220, 220, 255),
             fill_alpha=min(255, base_style.fill_alpha + 30),
+            glow_alpha=140,
+            has_second_outline=True,
         )
 
     return s

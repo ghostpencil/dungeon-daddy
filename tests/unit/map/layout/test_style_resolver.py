@@ -67,7 +67,7 @@ def test_hover_suppressed_when_room_is_selected():
     # Selected styling dominates: bright white-blue border, not a hover-bumped alpha
     assert result.border_color == (220, 220, 255)
     assert result.border_alpha == 255
-    assert result.border_width >= 3.5
+    assert result.border_width == base.border_width + 2.0
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ def test_selected_state_dominant_style():
         critical_path_room_ids=set(),
         connected_room_ids=set(),
     )
-    assert result.border_width == max(base.border_width, 3.5)
+    assert result.border_width == base.border_width + 2.0
     assert result.border_alpha == 255
     assert result.border_color == (220, 220, 255)
     assert result.fill_alpha == min(255, base.fill_alpha + 30)
@@ -235,3 +235,99 @@ def test_unrelated_room_still_fades_when_selected_room_is_on_critical_path():
     # Unrelated rooms must still fade regardless of critical-path selection
     assert result.border_alpha < base.border_alpha
     assert result.fill_alpha < base.fill_alpha
+
+
+# ---------------------------------------------------------------------------
+# Cycle 12 — GraphRoomStyle has glow_alpha=0 and has_second_outline=False by default
+# ---------------------------------------------------------------------------
+
+def test_graph_room_style_default_glow_and_outline_fields():
+    base = _base("hub")
+    assert base.glow_alpha == 0
+    assert base.has_second_outline is False
+
+
+# ---------------------------------------------------------------------------
+# Cycle 13 — hover border width is base + 1.0 (stronger than old +0.5)
+# ---------------------------------------------------------------------------
+
+def test_hover_border_width_is_base_plus_one():
+    base = _base("hall")
+    state = GraphViewState()
+    state.hover_room("R1")
+    result = resolve_room_render_style(
+        room_id="R1",
+        base_style=base,
+        view_state=state,
+        critical_path_room_ids=set(),
+        connected_room_ids=set(),
+    )
+    assert result.border_width == base.border_width + 1.0
+
+
+# ---------------------------------------------------------------------------
+# Cycle 14 — hover sets glow_alpha > 0 (visible outer glow)
+# ---------------------------------------------------------------------------
+
+def test_hover_sets_glow_alpha():
+    base = _base("hall")
+    state = GraphViewState()
+    state.hover_room("R1")
+    result = resolve_room_render_style(
+        room_id="R1",
+        base_style=base,
+        view_state=state,
+        critical_path_room_ids=set(),
+        connected_room_ids=set(),
+    )
+    assert result.glow_alpha > 0
+
+
+# ---------------------------------------------------------------------------
+# Cycle 15 — selected glow_alpha > hover glow_alpha (stronger emphasis)
+# ---------------------------------------------------------------------------
+
+def test_selected_glow_stronger_than_hover_glow():
+    base = _base("hall")
+
+    hover_state = GraphViewState()
+    hover_state.hover_room("R1")
+    hover_result = resolve_room_render_style(
+        room_id="R1", base_style=base, view_state=hover_state,
+        critical_path_room_ids=set(), connected_room_ids=set(),
+    )
+
+    sel_state = GraphViewState()
+    sel_state.select_room("R1")
+    sel_result = resolve_room_render_style(
+        room_id="R1", base_style=base, view_state=sel_state,
+        critical_path_room_ids=set(), connected_room_ids=set(),
+    )
+
+    assert sel_result.glow_alpha > hover_result.glow_alpha
+
+
+# ---------------------------------------------------------------------------
+# Cycle 16 — selected sets has_second_outline=True
+# ---------------------------------------------------------------------------
+
+def test_selected_sets_has_second_outline():
+    base = _base("hall")
+    state = GraphViewState()
+    state.select_room("R1")
+    result = resolve_room_render_style(
+        room_id="R1", base_style=base, view_state=state,
+        critical_path_room_ids=set(), connected_room_ids=set(),
+    )
+    assert result.has_second_outline is True
+
+
+def test_hover_does_not_set_second_outline():
+    base = _base("hall")
+    state = GraphViewState()
+    state.hover_room("R1")
+    result = resolve_room_render_style(
+        room_id="R1", base_style=base, view_state=state,
+        critical_path_room_ids=set(), connected_room_ids=set(),
+    )
+    assert result.has_second_outline is False

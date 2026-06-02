@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+from dungeon_daddy.data.models import Entry, Level, Room
 from dungeon_daddy.map.dungeon_layout import LayoutResult
 from dungeon_daddy.map.dungeon_layout.debug_overlay import DebugOverlay
+from dungeon_daddy.map.dungeon_layout.graph_presentation_config import GraphPresentationConfig
 from dungeon_daddy.map.dungeon_layout.models import (
     LabelBox,
     LayoutBounds,
@@ -519,11 +521,13 @@ def test_connected_room_wider_border_than_unrelated_when_selected() -> None:
         renderer.draw(result, 0.0, 0.0, 1.0, view_state=vs)
         widths = [call.args[2] for call in mock_arcade.draw_rect_outline.call_args_list]
 
-    # widths[0]=a (selected), widths[1]=b (connected), widths[2]=c (unrelated)
-    assert len(widths) >= 3, f"Expected ≥3 outline calls, got {len(widths)}: {widths}"
-    assert widths[1] > widths[2], (
-        f"Connected room b (width {widths[1]}) should be wider than "
-        f"unrelated room c (width {widths[2]})"
+    # Selected room "a" now generates 3 outline calls (base + glow + second outline).
+    # Room "b" (connected) and room "c" (unrelated) each get 1 call.
+    # Ordering: a[0]=base, a[1]=glow, a[2]=second, b[3]=base, c[4]=base
+    assert len(widths) >= 5, f"Expected ≥5 outline calls, got {len(widths)}: {widths}"
+    assert widths[3] > widths[4], (
+        f"Connected room b (width {widths[3]}) should be wider than "
+        f"unrelated room c (width {widths[4]})"
     )
 
 
@@ -687,6 +691,143 @@ def test_boss_hover_border_wider_than_boss_no_hover() -> None:
     width_no_hover = _max_width(GraphViewState())
     width_hovered = _max_width(GraphViewState(hovered_room_id="b"))
 
-    # Hover adds 0.5 on top of the boss base border_width
-    assert width_hovered == boss_base_width + 0.5
+    # Hover adds 1.0 on top of the boss base border_width
+    assert width_hovered == boss_base_width + 1.0
     assert width_hovered > width_no_hover
+
+
+# ---------------------------------------------------------------------------
+# Cycle — hovered room triggers an extra draw_rect_outline call (glow)
+# ---------------------------------------------------------------------------
+
+def test_hovered_room_draws_glow_outline() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+
+    rooms = {"a": _room("a", 0.0, 0.0)}
+    result = _result(rooms=rooms)
+    renderer = LayoutRenderer()
+
+    def _outline_count(vs: GraphViewState) -> int:
+        with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+            renderer.draw(result, 0.0, 0.0, 1.0, view_state=vs)
+            return mock_arcade.draw_rect_outline.call_count
+
+    count_default = _outline_count(GraphViewState())
+    count_hovered = _outline_count(GraphViewState(hovered_room_id="a"))
+    assert count_hovered > count_default
+
+
+# ---------------------------------------------------------------------------
+# Cycle — selected room triggers extra draw_rect_outline calls (glow + second outline)
+# ---------------------------------------------------------------------------
+
+def test_selected_room_draws_more_outlines_than_hovered() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+
+    rooms = {"a": _room("a", 0.0, 0.0)}
+    result = _result(rooms=rooms)
+    renderer = LayoutRenderer()
+
+    def _outline_count(vs: GraphViewState) -> int:
+        with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+            renderer.draw(result, 0.0, 0.0, 1.0, view_state=vs)
+            return mock_arcade.draw_rect_outline.call_count
+
+    count_hovered = _outline_count(GraphViewState(hovered_room_id="a"))
+    sel_state = GraphViewState()
+    sel_state.select_room("a")
+    count_selected = _outline_count(sel_state)
+    assert count_selected > count_hovered
+
+
+# ---------------------------------------------------------------------------
+# Helpers for detail panel tests
+# ---------------------------------------------------------------------------
+
+def _minimal_level(room_id: str = "R1", room_name: str = "Receiving Hall") -> Level:
+    room = Room(
+        id=room_id, num=1, name=room_name,
+        x=0, y=0, w=120, h=80, type="room", note="",
+        layout_role="entrance",
+    )
+    return Level(
+        id=1, name="Test Level", summary="", ecology="", loop="", loops=[],
+        width=10, height=10, entries=[], rooms=[room], connections=[],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Cycle 28 — detail panel draws room name when room selected and level provided
+# ---------------------------------------------------------------------------
+
+def test_detail_panel_shows_room_name_when_selected() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+
+    rooms = {"R1": _room("R1", 0.0, 0.0)}
+    result = _result(rooms=rooms, room_names={"R1": "Receiving Hall"})
+    level = _minimal_level("R1", "Receiving Hall")
+    vs = GraphViewState(selected_room_id="R1")
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, 0.0, 0.0, 1.0, view_state=vs, level=level)
+        all_text = " ".join(str(c) for c in mock_arcade.draw_text.call_args_list)
+        assert "Receiving Hall" in all_text
+
+
+# ---------------------------------------------------------------------------
+# Cycle 29 — detail panel suppressed when show_detail_panel=False
+# ---------------------------------------------------------------------------
+
+def test_detail_panel_suppressed_when_config_disabled() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+
+    rooms = {"R1": _room("R1", 0.0, 0.0)}
+    result = _result(rooms=rooms, room_names={"R1": "Receiving Hall"})
+    level = _minimal_level("R1", "Receiving Hall")
+    vs = GraphViewState(selected_room_id="R1")
+    config = GraphPresentationConfig(show_detail_panel=False)
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, 0.0, 0.0, 1.0, view_state=vs, level=level,
+                      presentation_config=config)
+        all_text = " ".join(str(c) for c in mock_arcade.draw_text.call_args_list)
+        # Room name appears in the room label but NOT in a panel context;
+        # check the panel-specific section header is absent
+        assert "ROOM" not in all_text
+
+
+# ---------------------------------------------------------------------------
+# Cycle 30 — locked connection draws "LOCK" midpoint glyph
+# ---------------------------------------------------------------------------
+
+def test_locked_connection_draws_lock_glyph() -> None:
+    edge = _edge("a→b", [(0.0, 0.0), (100.0, 0.0)])
+    result = _result(edges=[edge], edge_labels={"a→b": "locked"})
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, 0.0, 0.0, 1.0)
+        all_text = " ".join(str(c) for c in mock_arcade.draw_text.call_args_list)
+        assert "LOCK" in all_text
+
+
+# ---------------------------------------------------------------------------
+# Cycle 31 — secret connection uses more draw_line calls than normal (dashes)
+# ---------------------------------------------------------------------------
+
+def test_secret_connection_draws_more_lines_than_normal() -> None:
+    edge = _edge("a→b", [(0.0, 0.0), (100.0, 0.0)])
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer = LayoutRenderer()
+        renderer.draw(_result(edges=[edge], edge_labels={"a→b": "secret"}), 0.0, 0.0, 1.0)
+        count_secret = mock_arcade.draw_line.call_count
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer = LayoutRenderer()
+        renderer.draw(_result(edges=[edge], edge_labels={"a→b": "door"}), 0.0, 0.0, 1.0)
+        count_normal = mock_arcade.draw_line.call_count
+
+    assert count_secret > count_normal
