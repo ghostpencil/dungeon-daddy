@@ -39,5 +39,9 @@ def make_play_view():
         view._overlay_level_id = None
         view._overlay_content = None
         view._is_test_drive = False
+        view._rpg_toggle_rect = None
+        view._rpg_open = False
+        view._rpg_scene = MagicMock()
+        view._rpg_side = MagicMock()
         return view
     return _factory

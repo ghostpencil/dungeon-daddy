@@ -3,17 +3,167 @@
 ## Phase
 
 Phase: 30 — Play Mode UI + Debug Tools
-Status: **Not Started** — Spec: `spec/PHASE_30_PLAY_MODE_UI_AND_DEBUG_TOOLS.md`
+Status: **Complete** — Spec: `spec/PHASE_30_PLAY_MODE_UI_AND_DEBUG_TOOLS.md`
 
 ---
 
 ## Next Steps
 
-_Phase 30 steps TBD — see `spec/PHASE_30_PLAY_MODE_UI_AND_DEBUG_TOOLS.md`._
+| Step | Task | Status |
+|---|---|---|
+| 30-1 | Panel module skeletons | **Done** |
+| 30-2 | Character sheet panel (TDD) | **Done** |
+| 30-3 | Scene state panel (TDD) | **Done** |
+| 30-4 | Fallout panel (TDD) | **Done** |
+| 30-5 | Memory inspector panel (TDD) | **Done** |
+| 30-6 | Debug controls (TDD) | **Done** |
+| 30-7 | Play Mode wiring | **Done** |
+| 30-8 | Integration tests | **Done** |
+| 30-9 | Smoke test | **Done** |
+
+**Manual UI test pass completed 2026-06-03 — all checks passed after bug fixes.**
 
 ---
 
 ### Step Detail
+
+#### 30-1 — Panel module skeletons
+
+Create empty Python files for the four new UI panels. No logic yet.
+
+**New files:**
+- `dungeon_daddy/ui/panels/character_sheet_panel.py`
+- `dungeon_daddy/ui/panels/scene_state_panel.py`
+- `dungeon_daddy/ui/panels/fallout_panel.py`
+- `dungeon_daddy/ui/panels/memory_inspector_panel.py`
+
+**Exit check:** `python -c "from dungeon_daddy.ui.panels import character_sheet_panel, scene_state_panel, fallout_panel, memory_inspector_panel"` succeeds; full test suite still green.
+
+---
+
+#### 30-2 — Character sheet panel (TDD)
+
+**Test file:** `tests/unit/ui/test_character_sheet_panel.py`
+
+Tracer bullets:
+1. Panel renders with no actor selected — shows placeholder text.
+2. Panel shows actor display name and type when an `ActorState` is provided.
+3. Action ratings section renders each action key and its rating (0–3).
+4. Momentum field displays current value.
+5. Stress tracks render each track with filled/capacity.
+6. Active fallout entries are listed with severity and status.
+7. Abilities section renders key/value pairs.
+8. Tags section renders tag list.
+
+**Source file:** `dungeon_daddy/ui/panels/character_sheet_panel.py`
+
+---
+
+#### 30-3 — Scene state panel (TDD)
+
+**Test file:** `tests/unit/ui/test_scene_state_panel.py`
+
+Tracer bullets:
+1. Panel renders with no scene — shows placeholder text.
+2. Scene title and location slug are displayed when a scene is provided.
+3. Open clocks are listed with label, filled/segments, and status.
+4. Active actors list renders display names.
+5. Recent actions list shows last N action resolutions (outcome, actor, action key).
+6. Risk/effect selector shows current values and accepts updates.
+
+**Source file:** `dungeon_daddy/ui/panels/scene_state_panel.py`
+
+---
+
+#### 30-4 — Fallout panel (TDD)
+
+**Test file:** `tests/unit/ui/test_fallout_panel.py`
+
+Tracer bullets:
+1. Panel renders empty state when no active fallout exists.
+2. Active fallout entries render track, severity, and status.
+3. Mechanical hooks are shown alongside each fallout entry.
+4. Linked memory path is displayed (or "—" if absent).
+5. Panel updates when fallout list changes.
+
+**Source file:** `dungeon_daddy/ui/panels/fallout_panel.py`
+
+---
+
+#### 30-5 — Memory inspector panel (TDD)
+
+**Test file:** `tests/unit/ui/test_memory_inspector_panel.py`
+
+Tracer bullets:
+1. Panel renders a search input (tag/actor/location).
+2. Submitting a search returns a filtered list of memory entries (title, summary, status, importance).
+3. Selecting an entry opens the Markdown body in a read-only view.
+4. Sync warnings are highlighted when present on an entry.
+5. Empty results show "No memories found" message.
+
+**Source file:** `dungeon_daddy/ui/panels/memory_inspector_panel.py`
+
+---
+
+#### 30-6 — Debug controls (TDD)
+
+Debug controls live in a collapsible section within Play Mode (not a separate panel).
+
+**Test file:** `tests/unit/ui/test_debug_controls.py`
+
+Tracer bullets:
+1. "Resolve sample action" button calls `RPGService.resolve_action()` and displays the outcome.
+2. "Add stress" control calls `RPGService.apply_stress()` with actor and track selection.
+3. "Advance clock" control calls `RPGService.advance_clock()` with clock selection.
+4. "Generate sync report" button calls `MemorySyncService.validate()` and shows pass/fail summary.
+5. "Create test memory note" button creates a `MemoryEntry` via the application layer.
+
+**Source file:** `dungeon_daddy/ui/panels/debug_controls.py` (new small module)
+
+---
+
+#### 30-7 — Play Mode wiring
+
+Wire the four panels and debug controls into `play_view.py`. Update `map_panel.py` and `chat_panel.py` only if layout changes are needed. Use collapsible tabs/panels so the map remains primary.
+
+**Constraints:**
+- Usable at 1400×900.
+- Do not obscure the current map selection.
+- UI calls only `RPGService` and application-level wrappers — no direct SQL or Markdown writes.
+
+**Exit check:** App launches in Play Mode; all four panels are accessible; map is still primary.
+
+---
+
+#### 30-8 — Integration tests
+
+**Test file:** `tests/integration/test_play_mode_rpg_wiring.py`
+
+Tests (no mocks for RPG/memory layer):
+1. Resolving an action via the wired UI updates `action_resolutions` in the repository.
+2. Applying stress via the wired UI updates `stress_tracks` in the repository.
+3. Advancing a clock via the wired UI updates `clocks` in the repository.
+4. Memory inspector search returns fallout/memory entries created in prior phases.
+5. Sync report reflects current repository state.
+6. No existing tests regress (run full suite).
+
+---
+
+#### 30-9 — Smoke test
+
+**File:** `tools/smoke_test_phase30.py`
+
+Script flow:
+1. Launch app in Play Mode with a test campaign.
+2. Screenshot initial state (all panels visible, map primary).
+3. Trigger "Resolve sample action" debug control — screenshot result.
+4. Open memory inspector, run a search — screenshot results.
+5. Open fallout panel — screenshot active fallout list.
+6. Confirm no crashes; save artifacts under `artifacts/play_mode/phase30/`.
+
+---
+
+### Phase 26–29 Completed Steps (archived)
 
 #### 26-1 — Module skeletons
 
@@ -229,6 +379,10 @@ _None._
 | Date | Fix |
 |---|---|
 | 2026-06-02 | Atmosphere frame misalignment — `_draw_atmosphere` was centering on `(canvas_w/2, canvas_h/2)` instead of `(viewport_x + canvas_w/2, viewport_y + canvas_h/2)`, causing the frame to draw relative to screen origin rather than the map panel. Fixed in `layout_renderer.py:_draw_atmosphere`. 1395 passing. |
+| 2026-06-03 | MEM tab had no interactive search input — `MemoryInspectorPanel.draw()` only rendered a drawn box. Added `setup_widget`/`teardown_widget` to create a real `arcade.gui.UIInputText` via `_RpgSidePanel` (which now holds a `UIManager` ref). Widget lifecycle tied to tab switching and RPG panel open/close. |
+| 2026-06-03 | MEM search input placeholder text lost when widget present — added manual placeholder draw in `draw()` when widget text is empty. |
+| 2026-06-03 | Map keyboard shortcuts (D=debug, R=recenter) fired while typing in MEM search — fixed `on_key_press` in `PlayView` to return early when `self._rpg_open and self._rpg_side._active == 3`. |
+| 2026-06-03 | "Edit Memory" button unclickable when RPG panel open — RPG panel click absorption (`if x >= rpg_x`) had no y-bound, swallowing title-bar clicks. Added `and y < content_h` guard. 1639 passing. |
 
 ---
 
@@ -236,6 +390,7 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 30 — Play Mode UI + Debug Tools (steps 30-1–30-9, bugs fixed) | **Complete** (2026-06-03) | 1639 passing |
 | Phase 29.5 — Campaign Save Folder Rename | **Complete** (2026-06-02) | 1575 passing |
 | Phase 29 — Fallout + Dungeon Influence | **Complete** (2026-06-02) | 1568 passing |
 | Phase 28 — Memory Persistence | **Complete** (2026-06-02) | 1549 passing |

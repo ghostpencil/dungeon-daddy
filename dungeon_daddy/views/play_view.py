@@ -1,4 +1,4 @@
-"""PlayView — Play Mode view with ChatPanel and GridMap."""
+"""PlayView — Play Mode view with ChatPanel, GridMap, and RPG side panels."""
 from __future__ import annotations
 
 import logging
@@ -15,9 +15,15 @@ from dungeon_daddy.data.repository import DungeonRepository
 from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
 from dungeon_daddy.llm.provider import LLMMessage
 from dungeon_daddy.map.grid_renderer import GridRenderer
+from dungeon_daddy.rpg.service import RpgService
 from dungeon_daddy.ui.chrome import MenuBar, draw_title_bar
+from dungeon_daddy.ui.panels.character_sheet_panel import CharacterSheetPanel
 from dungeon_daddy.ui.panels.chat_panel import ChatPanel
+from dungeon_daddy.ui.panels.debug_controls import DebugControls
+from dungeon_daddy.ui.panels.fallout_panel import FalloutPanel
 from dungeon_daddy.ui.panels.map_panel import MapPanel
+from dungeon_daddy.ui.panels.memory_inspector_panel import MemoryInspectorPanel
+from dungeon_daddy.ui.panels.scene_state_panel import SceneStatePanel
 from dungeon_daddy.ui.theme import (
     BG_0,
     BG_1,
@@ -56,6 +62,12 @@ _OVERLAY_TAB_H = 0   # tab bar is now an in-canvas overlay, not a reserved strip
 _BTN_EDIT_W = 100
 _BTN_EDIT_H = 24
 
+_RPG_PANEL_W = 300
+_RPG_TAB_H = 26
+_BTN_RPG_W = 88
+
+_RPG_TAB_LABELS = ["CHAR", "SCENE", "FALLOUT", "MEM", "DBG"]
+
 
 def _overlay_btn_style(variant: str) -> dict[str, arcade.gui.UIFlatButton.UIStyle]:
     if variant == "teal":
@@ -88,19 +100,148 @@ def _overlay_btn_style(variant: str) -> dict[str, arcade.gui.UIFlatButton.UIStyl
     }
 
 
+class _RpgSidePanel:
+    """Collapsible side panel housing the four RPG/memory display panels."""
+
+    def __init__(
+        self,
+        char_panel: CharacterSheetPanel,
+        scene_panel: SceneStatePanel,
+        fallout_panel: FalloutPanel,
+        memory_panel: MemoryInspectorPanel,
+        debug_controls: DebugControls | None,
+        manager: arcade.gui.UIManager | None = None,
+    ) -> None:
+        self._char = char_panel
+        self._scene = scene_panel
+        self._fallout = fallout_panel
+        self._memory = memory_panel
+        self._debug = debug_controls
+        self._manager = manager
+        self._active = 0
+        self._x = self._y = self._w = self._h = 0.0
+        self._tab_rects: list[tuple[float, float, float, float]] = []
+
+    def setup(self, x: float, y: float, w: float, h: float) -> None:
+        self._x, self._y, self._w, self._h = x, y, w, h
+        tab_w = w / len(_RPG_TAB_LABELS)
+        tab_y = y + h - _RPG_TAB_H
+        self._tab_rects = [
+            (x + i * tab_w, tab_y, tab_w, float(_RPG_TAB_H))
+            for i in range(len(_RPG_TAB_LABELS))
+        ]
+        content_h = h - _RPG_TAB_H
+        for panel in (self._char, self._scene, self._fallout, self._memory):
+            panel.setup(x, y, w, content_h)
+        if self._active == 3:
+            self._memory.setup_widget(self._manager, x, y, w, content_h)
+
+    def teardown(self) -> None:
+        """Remove any active UI widgets (call before hiding the panel)."""
+        self._memory.teardown_widget(self._manager)
+
+    def set_active(self, index: int) -> None:
+        if 0 <= index < len(_RPG_TAB_LABELS):
+            if self._active == 3:
+                self._memory.teardown_widget(self._manager)
+            self._active = index
+            if self._active == 3:
+                content_h = self._h - _RPG_TAB_H
+                self._memory.setup_widget(
+                    self._manager, self._x, self._y, self._w, content_h,
+                )
+
+    def hit_tab(self, x: float, y: float) -> int | None:
+        for i, (tx, ty, tw, th) in enumerate(self._tab_rects):
+            if tx <= x < tx + tw and ty <= y < ty + th:
+                return i
+        return None
+
+    def draw(self) -> None:
+        x, y, w, h = self._x, self._y, self._w, self._h
+        arcade.draw_rect_filled(arcade.XYWH(x + w / 2, y + h / 2, w, h), BG_1)
+        arcade.draw_rect_outline(arcade.XYWH(x + w / 2, y + h / 2, w, h), LINE, 1)
+
+        if self._active == 0:
+            self._char.draw()
+        elif self._active == 1:
+            self._scene.draw()
+        elif self._active == 2:
+            self._fallout.draw()
+        elif self._active == 3:
+            self._memory.draw()
+        else:
+            self._draw_debug_tab()
+
+        self._draw_tab_bar()
+
+    def _draw_tab_bar(self) -> None:
+        tab_w = self._w / len(_RPG_TAB_LABELS)
+        for i, label in enumerate(_RPG_TAB_LABELS):
+            tx, ty, tw, th = self._tab_rects[i]
+            tcx, tcy = tx + tw / 2, ty + th / 2
+            bg = BG_HI if i == self._active else BG_2
+            fg = INK_2 if i == self._active else INK_4
+            arcade.draw_rect_filled(arcade.XYWH(tcx, tcy, tw, th), bg)
+            arcade.draw_rect_outline(arcade.XYWH(tcx, tcy, tw, th), LINE, 1)
+            arcade.draw_text(
+                label, tcx, tcy, fg,
+                font_size=9, font_name=FONT_UI,
+                anchor_x="center", anchor_y="center",
+            )
+
+    def _draw_debug_tab(self) -> None:
+        x, y, w = self._x, self._y, self._w
+        content_h = self._h - _RPG_TAB_H
+        if self._debug is None:
+            arcade.draw_text(
+                "No RPG service", x + PAD_MD, y + content_h / 2,
+                INK_4, font_size=TEXT_SM, font_name=FONT_UI, anchor_y="center",
+            )
+            return
+        cur_y = y + content_h - PAD_MD
+        arcade.draw_text(
+            "DEBUG CONTROLS", x + PAD_MD, cur_y,
+            INK_3, font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="top",
+        )
+        cur_y -= 20
+        res = self._debug._last_resolution
+        if res is not None:
+            arcade.draw_text(
+                f"Last action: {res.outcome}", x + PAD_MD, cur_y,
+                INK_3, font_size=TEXT_SM, font_name=FONT_UI, anchor_y="top",
+            )
+            cur_y -= 16
+        sync = self._debug._last_sync_issues
+        if sync is not None:
+            label = "Sync: OK" if not sync else f"Sync: {len(sync)} issue(s)"
+            arcade.draw_text(
+                label, x + PAD_MD, cur_y,
+                INK_3, font_size=TEXT_SM, font_name=FONT_UI, anchor_y="top",
+            )
+
+
 class PlayView(arcade.View):
     """
     Play Mode view.
 
-    Layout: ChatPanel (440 px) left, MapPanel (flex) right.
-    Mouse clicks on the map highlight rooms and track visited state.
+    Layout: ChatPanel (440 px) left, MapPanel (flex) centre, optional RPG
+    side panel (300 px) right.  The RPG panel is toggled via a button in
+    the title bar and is collapsed by default.
     """
 
-    def __init__(self, repo: DungeonRepository, menu_bar: MenuBar, dm_agent: DungeonMasterAgent | None = None) -> None:
+    def __init__(
+        self,
+        repo: DungeonRepository,
+        menu_bar: MenuBar,
+        dm_agent: DungeonMasterAgent | None = None,
+        rpg_service: RpgService | None = None,
+    ) -> None:
         super().__init__()
         self._repo = repo
         self._menu_bar = menu_bar
         self._dm_agent = dm_agent
+        self._rpg_service = rpg_service
         self._dungeon: Dungeon | None = None
         self._state: SessionState | None = None
         self._manager = arcade.gui.UIManager()
@@ -128,6 +269,19 @@ class PlayView(arcade.View):
         self._overlay_content: str | None = None
         self._edit_memory_rect: tuple[float, float, float, float] | None = None
         self._is_test_drive: bool = False
+        # RPG side panel
+        self._rpg_char = CharacterSheetPanel()
+        self._rpg_scene = SceneStatePanel()
+        self._rpg_fallout = FalloutPanel()
+        self._rpg_memory = MemoryInspectorPanel()
+        self._rpg_debug = DebugControls(rpg_service) if rpg_service is not None else None
+        self._rpg_side = _RpgSidePanel(
+            self._rpg_char, self._rpg_scene, self._rpg_fallout,
+            self._rpg_memory, self._rpg_debug,
+            manager=self._manager,
+        )
+        self._rpg_open: bool = False
+        self._rpg_toggle_rect: tuple[float, float, float, float] | None = None
 
     # ------------------------------------------------------------------
     # View lifecycle
@@ -136,8 +290,6 @@ class PlayView(arcade.View):
     def on_show_view(self) -> None:
         self.window.background_color = BG_0
         self._manager.enable()
-        # Sync UIManager camera to current window size — it may have changed
-        # while this view was inactive (e.g. window maximised in Design mode).
         self._manager.on_resize(self.window.width, self.window.height)  # type: ignore[no-untyped-call]
         if not self._ui_built:
             self._build_ui()
@@ -162,6 +314,9 @@ class PlayView(arcade.View):
         self._map.draw()
         if self._dungeon is not None and self._edit_memory_rect:
             self._draw_edit_memory_btn()
+        self._draw_rpg_toggle_btn()
+        if self._rpg_open:
+            self._rpg_side.draw()
         if getattr(self, "_overlay_open", False):
             self._draw_overlay_backdrop()
         self._manager.draw()
@@ -195,6 +350,19 @@ class PlayView(arcade.View):
             return
         if button != arcade.MOUSE_BUTTON_LEFT:
             return
+        # RPG panel toggle button (title bar)
+        if self._rpg_toggle_rect and self._point_in_rect(x, y, self._rpg_toggle_rect):
+            self._toggle_rpg_panel()
+            return
+        # RPG panel content area (absorbs clicks when open, content area only)
+        if self._rpg_open:
+            rpg_x = float(PANEL_CHAT_WIDTH) + self._map_area_w(self.window.width)
+            content_h = float(self.window.height - CHROME_TOTAL_HEIGHT)
+            if x >= rpg_x and y < content_h:
+                tab_idx = self._rpg_side.hit_tab(x, y)
+                if tab_idx is not None:
+                    self._rpg_side.set_active(tab_idx)
+                return
         # Edit Memory button
         if (self._dungeon is not None and self._edit_memory_rect
                 and self._point_in_rect(x, y, self._edit_memory_rect)):
@@ -229,6 +397,7 @@ class PlayView(arcade.View):
                 total = len(self._dungeon.levels)
                 self._map.update_state(self._state, total)
                 self._chat.set_current_room(room.name, room.note or "", room_id=room.id)
+                self._rpg_scene.set_scene(room.name, str(level.id))
                 _log.debug("Selected room: %s", room.id)
                 self._compact_history()
                 self._dm_history.append(LLMMessage(role="user", content=f"We enter {room.name}."))
@@ -272,6 +441,9 @@ class PlayView(arcade.View):
     def on_key_press(self, key: int, modifiers: int) -> None:
         if getattr(self, "_overlay_open", False) and key == arcade.key.ESCAPE:
             self.close_memory_overlay()
+            return
+        # Suppress map shortcuts while the MEM search box is active
+        if self._rpg_open and self._rpg_side._active == 3:
             return
         self._map.handle_key_press(key)
 
@@ -339,6 +511,19 @@ class PlayView(arcade.View):
     def set_map_renderer(self, renderer: GridRenderer) -> None:
         self._renderer = renderer
         self._map.set_renderer(renderer)
+
+    # ------------------------------------------------------------------
+    # RPG side panel
+    # ------------------------------------------------------------------
+
+    def _map_area_w(self, window_w: int) -> float:
+        return float(window_w - PANEL_CHAT_WIDTH - (_RPG_PANEL_W if self._rpg_open else 0))
+
+    def _toggle_rpg_panel(self) -> None:
+        if self._rpg_open:
+            self._rpg_side.teardown()
+        self._rpg_open = not self._rpg_open
+        self._reposition_panels(self.window.width, self.window.height)
 
     # ------------------------------------------------------------------
     # Edit Memory Overlay
@@ -426,6 +611,7 @@ class PlayView(arcade.View):
             level = self._dungeon.levels[new_idx]
             self._map.load(level, self._state, len(self._dungeon.levels))
             self._chat.add_message("dm", f"Now on Level {new_idx + 1}: {level.name}.")
+            self._rpg_scene.set_scene(None, None)
             self._refresh_memory_state()
 
     def _on_chat_send(self, text: str) -> None:
@@ -610,6 +796,23 @@ class PlayView(arcade.View):
             anchor_y="center",
         )
 
+    def _draw_rpg_toggle_btn(self) -> None:
+        if self._rpg_toggle_rect is None:
+            return
+        x, y, w, h = self._rpg_toggle_rect
+        cx, cy = x + w / 2, y + h / 2
+        arcade.draw_rect_filled(arcade.XYWH(cx, cy, w, h), BG_2)
+        arcade.draw_rect_outline(arcade.XYWH(cx, cy, w, h), LINE, 1)
+        label = "RPG ‹" if self._rpg_open else "RPG ›"
+        arcade.draw_text(
+            label, cx, cy,
+            color=INK_2,
+            font_size=TEXT_SM,
+            font_name=FONT_UI,
+            anchor_x="center",
+            anchor_y="center",
+        )
+
     def _draw_overlay_backdrop(self) -> None:
         w = self.window.width
         content_h = self.window.height - CHROME_TOTAL_HEIGHT
@@ -650,32 +853,40 @@ class PlayView(arcade.View):
         w, h = self.window.width, self.window.height
         content_h = h - CHROME_TOTAL_HEIGHT
         map_x = float(PANEL_CHAT_WIDTH)
-        map_w = float(w - PANEL_CHAT_WIDTH)
+        map_w = self._map_area_w(w)
 
         self._chat.setup(self._manager, 0.0, 0.0, float(PANEL_CHAT_WIDTH), float(content_h))
         self._map.setup(self._manager, map_x, 0.0, map_w, float(content_h))
+        if self._rpg_open:
+            rpg_x = map_x + map_w
+            self._rpg_side.setup(rpg_x, 0.0, float(_RPG_PANEL_W), float(content_h))
         # Re-apply dungeon state so stepper buttons get correct enabled/disabled
         # state even when load_dungeon() was called before the UI was built.
         if self._dungeon is not None and self._state is not None:
             level = self._dungeon.levels[self._state.current_level_idx]
             self._map.load(level, self._state, len(self._dungeon.levels))
         self._edit_memory_rect = self._compute_edit_btn_rect(w, content_h)
+        self._rpg_toggle_rect = self._compute_rpg_toggle_rect(w, content_h)
 
     def _reposition_panels(self, w: int, h: int) -> None:
         if getattr(self, "_overlay_open", False):
             self._close_overlay_ui()
         content_h = h - CHROME_TOTAL_HEIGHT
         map_x = float(PANEL_CHAT_WIDTH)
-        map_w = float(w - PANEL_CHAT_WIDTH)
+        map_w = self._map_area_w(w)
 
         self._chat.resize(0.0, 0.0, float(PANEL_CHAT_WIDTH), float(content_h))
         # MapPanel teardown/rebuild on resize (simplest for Phase 6)
         self._map.teardown(self._manager)
         self._map.setup(self._manager, map_x, 0.0, map_w, float(content_h))
+        if self._rpg_open:
+            rpg_x = map_x + map_w
+            self._rpg_side.setup(rpg_x, 0.0, float(_RPG_PANEL_W), float(content_h))
         if self._dungeon is not None and self._state is not None:
             level = self._dungeon.levels[self._state.current_level_idx]
             self._map.load(level, self._state, len(self._dungeon.levels))
         self._edit_memory_rect = self._compute_edit_btn_rect(w, content_h)
+        self._rpg_toggle_rect = self._compute_rpg_toggle_rect(w, content_h)
 
     def _on_graph_room_select(self, room_id: str) -> None:
         if self._dungeon is None or self._state is None:
@@ -691,6 +902,7 @@ class PlayView(arcade.View):
         total = len(self._dungeon.levels)
         self._map.update_state(self._state, total)
         self._chat.set_current_room(room.name, room.note or "", room_id=room.id)
+        self._rpg_scene.set_scene(room.name, str(level.id))
         _log.debug("Graph: selected room %s", room.id)
         self._compact_history()
         self._dm_history.append(LLMMessage(role="user", content=f"We enter {room.name}."))
@@ -760,3 +972,13 @@ class PlayView(arcade.View):
         bar_mid = content_h + CHROME_TITLEBAR_HEIGHT / 2
         btn_y = bar_mid - _BTN_EDIT_H / 2
         return (float(btn_x), float(btn_y), float(_BTN_EDIT_W), float(_BTN_EDIT_H))
+
+    @staticmethod
+    def _compute_rpg_toggle_rect(window_w: int, content_h: int) -> tuple[float, float, float, float]:
+        _PLAY_BADGE_W = 100
+        edit_left = window_w - PAD_MD - _PLAY_BADGE_W - PAD_MD * 2 - _BTN_EDIT_W
+        btn_right = edit_left - PAD_MD
+        btn_x = btn_right - _BTN_RPG_W
+        bar_mid = content_h + CHROME_TITLEBAR_HEIGHT / 2
+        btn_y = bar_mid - _BTN_EDIT_H / 2
+        return (float(btn_x), float(btn_y), float(_BTN_RPG_W), float(_BTN_EDIT_H))

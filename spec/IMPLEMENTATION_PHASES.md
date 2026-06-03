@@ -1591,7 +1591,7 @@ This links each campaign row to the dungeon folder it was started from (`Dungeon
 
 ## Phase 29 — Fallout + Dungeon Influence
 
-**Status: Proposed**
+**Status: Complete** — 1568 unit+integration tests passing. Closed 2026-06-02.
 
 Spec: `spec/PHASE_29_FALLOUT_AND_DUNGEON_INFLUENCE.md`
 
@@ -1649,11 +1649,11 @@ This is a pure rename. It touches `AppConfig`, `DungeonRepository`, and all call
 
 ## Phase 30 — Play Mode UI + Debug Tools
 
-**Status: Proposed**
+**Status: Complete** — 1639 unit+integration tests passing. Closed 2026-06-03.
 
 Spec: `spec/PHASE_30_PLAY_MODE_UI_AND_DEBUG_TOOLS.md`
 
-Expose RPG state, clocks, fallout, and memory in Play Mode using panels and debug tools.
+Expose RPG state, clocks, fallout, and memory in Play Mode using panels and debug tools. Added CharacterSheetPanel, SceneStatePanel, FalloutPanel, MemoryInspectorPanel, and DebugControls behind a collapsible RPG side panel with five tabs (CHAR / SCENE / FALLOUT / MEM / DBG). Smoke test passes all 8 behaviors.
 
 ---
 
