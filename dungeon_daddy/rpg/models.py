@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 class StressTrack(BaseModel):
     track_key: str
-    capacity: int = 6
+    capacity: int = 4
     filled: int = 0
 
     @field_validator("filled")

@@ -1,0 +1,37 @@
+{
+  "campaign_id": "camp-32",
+  "action_roll": {
+    "resolution_id": "7a89cce0-9ee3-4663-9b3a-5f950629a990",
+    "outcome": "miss",
+    "stress_cost": 1,
+    "dice_rolled": [
+      1,
+      1,
+      1
+    ]
+  },
+  "stress": {
+    "body_before": 3,
+    "body_after_action": 4,
+    "body_filled": 6,
+    "body_reset": 0
+  },
+  "fallout": {
+    "fallout_id": "3db3dbe4-0328-44a4-95ba-7d5a1cec08f7",
+    "title": "Battered",
+    "severity": "minor",
+    "track_key": "body"
+  },
+  "memory": {
+    "memory_id": "mem-smoke32-10961308-e7d8-4006-8e32-e7a78192f4b6",
+    "title": "Fallout: Battered",
+    "in_bundle": true
+  },
+  "bundle": {
+    "bundle_id": "5e67f7bf-90b0-4609-9f8e-299852ad118c",
+    "memory_cards": 6,
+    "active_fallout": 3,
+    "open_clocks": 1
+  },
+  "prompt_length": 1599
+}

@@ -1669,11 +1669,30 @@ Built `MemoryRetriever` (tag/actor/location filtering, importance+recency rankin
 
 ## Phase 32 — Stabilization + Balancing
 
-**Status: Proposed**
+**Status: Complete** — 1708 unit+integration tests passing. Closed 2026-06-03.
 
 Spec: `spec/PHASE_32_STABILIZATION_AND_BALANCING.md`
 
-Harden end-to-end tests, smoke tests, golden fixtures, sync repair tools, balance, and documentation.
+Hardened end-to-end tests, smoke tests, golden fixtures, sync repair tools, balance pass, and documentation. All six steps complete.
+
+### Implementation Steps
+
+| Step | Task | Status |
+|---|---|---|
+| 32-1 | Golden fixtures (`tests/fixtures/phase32_campaign.py`) | Done |
+| 32-2 | Golden context bundle snapshots (`tests/integration/test_context_bundle_snapshots.py`) | Done |
+| 32-3 | Repair tools (`validate_campaign`, `rebuild_memory_projection`, `export_campaign`, `import_campaign_fixture`) | Done |
+| 32-4 | Balance pass — constants locked in `spec/BALANCE_NOTES.md` | Done |
+| 32-5 | Documentation (`docs/GM_RULES.md`, `ARCHITECTURE.md`, `TROUBLESHOOTING.md`, `MIGRATION.md`) | Done |
+| 32-6 | Full pipeline test + smoke script (`test_rpg_memory_full_pipeline.py`, `smoke_test_phase32.py`) | Done |
+
+### Exit Criteria
+
+- [x] End-to-end action → stress → fallout → memory → context → DM narration path works
+- [x] Sync validator catches and reports drift
+- [x] Golden context bundle snapshots are stable
+- [x] Documentation sufficient for future phases without re-deriving architecture
+- [x] Full test suite remains green (1708 passing)
 
 ---
 
