@@ -1601,7 +1601,7 @@ Implement Body, Composure, Bonds, and Weird fallout; intimacy risk; dungeon infl
 
 ## Phase 29.5 — Campaign Save Folder Rename
 
-**Status: Proposed (post-Phase 29 improvement)**
+**Status: Complete** — 1575 tests passing. Closed 2026-06-03.
 
 No spec file yet. This is a structural rename with no new game behaviour.
 

@@ -2,22 +2,14 @@
 
 ## Phase
 
-Phase: 29.5 — Campaign Save Folder Rename
-Status: **Complete** (2026-06-02)
+Phase: 30 — Play Mode UI + Debug Tools
+Status: **Not Started** — Spec: `spec/PHASE_30_PLAY_MODE_UI_AND_DEBUG_TOOLS.md`
 
 ---
 
 ## Next Steps
 
-| Step | Task | Status |
-|---|---|---|
-| 29.5-1 | `DungeonRepository.clone_dungeon(source_slug, dest_slug)` | Done |
-| 29.5-2 | Rename `AppConfig.dungeons_dir` → `campaigns_dir` | Done |
-| 29.5-3 | Rename `DungeonRepository.__init__` param `dungeons_dir` → `campaigns_dir` | Done |
-| 29.5-4 | Convention: campaign folder name = campaign slug | Done |
-| 29.5-5 | `list_dungeons()` → `list_campaigns()`; deprecation alias kept | Done |
-| 29.5-6 | Migration note in `spec/HISTORY.md` | Done |
-| 29.5-7 | Full test suite green — 1575 passing | Done |
+_Phase 30 steps TBD — see `spec/PHASE_30_PLAY_MODE_UI_AND_DEBUG_TOOLS.md`._
 
 ---
 
@@ -276,27 +268,20 @@ _Full session history in `spec/HISTORY.md`._
 
 ### Save Folder Structure (current)
 
-Each dungeon lives at `<dungeons_dir>/<dungeon_name>/`. The campaign's DuckDB and Markdown memory files live in the same folder. The `campaigns` table has a `dungeon_slug` column (added post-Phase 28) that records which dungeon folder the campaign belongs to.
+Each campaign lives at `<campaigns_dir>/<campaign_slug>/`. The campaign's DuckDB and Markdown memory files live in the same folder. The `campaigns` table has a `dungeon_slug` column that records which dungeon design the campaign is running.
 
 ```
-<dungeons_dir>/
-  <dungeon_name>/
-    dungeon.json        ← dungeon design
+<campaigns_dir>/
+  <campaign_slug>/
+    dungeon.json        ← dungeon design (copied from source on clone)
     session.json        ← play session state
     campaign.duckdb     ← MemoryRepository (RPG state + memory)
     memory/             ← room play notes (level_N.md)
     rpg-memory/         ← Phase 28 Markdown narrative memory
-    setting.md          ← AI context docs
+      actors/
+      events/
+      fallout/
+    setting.md          ← AI context docs (copied on clone)
     party.md
     level_N_design.md
 ```
-
-### Phase 29.5 — Campaign Save Folder Rename (planned, post-Phase 29)
-
-After Phase 29 is stable, rename the save structure so the **campaign** is the primary save entity. The GM's "save file" becomes the campaign name, not the dungeon name. Key changes:
-- `AppConfig.dungeons_dir` → `campaigns_dir`
-- Folder name = campaign `slug`
-- `DungeonRepository.clone_dungeon(source, dest)` added for running same dungeon with a new group
-- `dungeon_slug` column becomes "source template" reference only
-
-See `spec/IMPLEMENTATION_PHASES.md` Phase 29.5 for full detail.
