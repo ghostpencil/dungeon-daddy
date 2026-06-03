@@ -2,6 +2,27 @@
 
 ---
 
+## 2026-06-02 — Phase 29.5: Campaign Save Folder Rename (breaking)
+
+**Migration required for existing save data.**
+
+The save folder structure changed from `<user_data>/dungeons/<dungeon_name>/` to
+`<user_data>/campaigns/<campaign_slug>/`. To migrate existing saves:
+
+1. Rename your `dungeons/` directory to `campaigns/` inside the DungeonDaddy user data
+   folder (see `platformdirs.user_data_path("DungeonDaddy")`).
+2. Folder names are unchanged — only the parent directory name changes.
+
+**Code changes:**
+- `AppConfig.dungeons_dir` → `AppConfig.campaigns_dir` (returns `user_data_dir / "campaigns"`)
+- `DungeonRepository.__init__(dungeons_dir)` → `DungeonRepository.__init__(campaigns_dir)`
+- `DungeonRepository.list_dungeons()` → `list_campaigns()`; `list_dungeons()` kept as deprecated alias
+- `DungeonRepository.clone_dungeon(source_slug, dest_slug)` added — copies dungeon design and
+  context docs (dungeon.json, setting.md, party.md, level_*_design.md) to a new campaign folder;
+  does not copy session.json, campaign.duckdb, memory/, or rpg-memory/
+
+---
+
 ## 2026-05-24 — Smoke test improvements (phase 7)
 
 - `tools/smoke_test_phase7.py` rewritten from hardcoded pixel script to vision-guided Strategy B

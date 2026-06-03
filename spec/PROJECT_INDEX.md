@@ -2,8 +2,8 @@
 
 ## Phase
 
-Phase: 29 — Fallout + Dungeon Influence
-Status: **Complete** (2026-06-02) — Spec: `spec/PHASE_29_FALLOUT_AND_DUNGEON_INFLUENCE.md`
+Phase: 29.5 — Campaign Save Folder Rename
+Status: **Complete** (2026-06-02)
 
 ---
 
@@ -11,12 +11,13 @@ Status: **Complete** (2026-06-02) — Spec: `spec/PHASE_29_FALLOUT_AND_DUNGEON_I
 
 | Step | Task | Status |
 |---|---|---|
-| 29-1 | Fallout evaluator — `evaluate_fallout()`, severity ladder, stress reset | Done |
-| 29-2 | Fallout catalog — 12 entries (4 tracks × 3 severities) | Done |
-| 29-3 | Weird fallout special hooks — `dungeon_influence`, `write_memory`, `dungeon_knowledge_tag` | Done |
-| 29-4 | Intimacy risk — `apply_intimacy_risk()`, Weird stress cost, cost tags per benefit type | Done |
-| 29-5 | Fallout persistence — `save_fallout_record` / `get_fallout_records` in `MemoryRepository` | Done |
-| 29-6 | Weird fallout Markdown — `write_fallout_markdown()` with correct front matter and tags | Done |
+| 29.5-1 | `DungeonRepository.clone_dungeon(source_slug, dest_slug)` | Done |
+| 29.5-2 | Rename `AppConfig.dungeons_dir` → `campaigns_dir` | Done |
+| 29.5-3 | Rename `DungeonRepository.__init__` param `dungeons_dir` → `campaigns_dir` | Done |
+| 29.5-4 | Convention: campaign folder name = campaign slug | Done |
+| 29.5-5 | `list_dungeons()` → `list_campaigns()`; deprecation alias kept | Done |
+| 29.5-6 | Migration note in `spec/HISTORY.md` | Done |
+| 29.5-7 | Full test suite green — 1575 passing | Done |
 
 ---
 
@@ -243,6 +244,7 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 29.5 — Campaign Save Folder Rename | **Complete** (2026-06-02) | 1575 passing |
 | Phase 29 — Fallout + Dungeon Influence | **Complete** (2026-06-02) | 1568 passing |
 | Phase 28 — Memory Persistence | **Complete** (2026-06-02) | 1549 passing |
 | Phase 27 — RPG Core Loop | **Complete** (2026-06-02) | 1511 passing |
