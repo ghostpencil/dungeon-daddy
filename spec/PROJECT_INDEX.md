@@ -2,8 +2,8 @@
 
 ## Phase
 
-Phase: 28 — Memory Persistence
-Status: **Complete** (2026-06-02) — Spec: `spec/PHASE_28_MEMORY_PERSISTENCE.md`
+Phase: 29 — Fallout + Dungeon Influence
+Status: **Complete** (2026-06-02) — Spec: `spec/PHASE_29_FALLOUT_AND_DUNGEON_INFLUENCE.md`
 
 ---
 
@@ -11,15 +11,12 @@ Status: **Complete** (2026-06-02) — Spec: `spec/PHASE_28_MEMORY_PERSISTENCE.md
 
 | Step | Task | Status |
 |---|---|---|
-| 28-1 | Campaign / actor / stress track / action rating persistence (`repository.py`) | Done |
-| 28-2 | Clock + action resolution persistence (`repository.py`) | Done |
-| 28-3 | Memory entry CRUD — save, get, tags, links, checksum update | Done |
-| 28-4 | Sync report (`sync.py`) — missing file, invalid front matter, checksum mismatch, orphan Markdown, orphan DB row | Done |
-| 28-5 | Deterministic retrieval (`retrieval.py`) — by actor, location, tag, importance rank | Done |
-| 28-6 | Integration roundtrip — RPG state + memory entry survive restart, sync passes, retrieval works | Done |
-| 28-X1 | Migration `002_dungeon_slug.sql` — add `dungeon_slug TEXT` to `campaigns` table | Done |
-| 28-X2 | `save_campaign` + `get_campaign` updated to carry `dungeon_slug` | Done |
-| 28-X3 | Tests for dungeon_slug round-trip | Done |
+| 29-1 | Fallout evaluator — `evaluate_fallout()`, severity ladder, stress reset | Done |
+| 29-2 | Fallout catalog — 12 entries (4 tracks × 3 severities) | Done |
+| 29-3 | Weird fallout special hooks — `dungeon_influence`, `write_memory`, `dungeon_knowledge_tag` | Done |
+| 29-4 | Intimacy risk — `apply_intimacy_risk()`, Weird stress cost, cost tags per benefit type | Done |
+| 29-5 | Fallout persistence — `save_fallout_record` / `get_fallout_records` in `MemoryRepository` | Done |
+| 29-6 | Weird fallout Markdown — `write_fallout_markdown()` with correct front matter and tags | Done |
 
 ---
 
@@ -246,6 +243,7 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 29 — Fallout + Dungeon Influence | **Complete** (2026-06-02) | 1568 passing |
 | Phase 28 — Memory Persistence | **Complete** (2026-06-02) | 1549 passing |
 | Phase 27 — RPG Core Loop | **Complete** (2026-06-02) | 1511 passing |
 | Phase 26 — RPG + Memory Foundation | **Complete** (2026-06-02) | 1480 passing |

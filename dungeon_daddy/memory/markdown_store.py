@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -38,3 +39,27 @@ def validate_front_matter(data: dict[str, object]) -> None:
     missing = _REQUIRED_FIELDS - set(data.keys())
     if missing:
         raise ValueError(f"Missing required front matter fields: {', '.join(sorted(missing))}")
+
+
+def write_fallout_markdown(fallout: object, base_dir: Path) -> Path:
+    from dungeon_daddy.rpg.models import FalloutRecord  # local import avoids circular dep
+    assert isinstance(fallout, FalloutRecord)
+
+    tags = [f"track:{fallout.track_key}", f"fallout:{fallout.status}"]
+    if fallout.actor_id:
+        tags.append(f"actor:{fallout.actor_id}")
+
+    fm: dict[str, object] = {
+        "id": fallout.fallout_id,
+        "type": "fallout",
+        "campaign_id": fallout.campaign_id,
+        "track": fallout.track_key,
+        "severity": fallout.severity,
+        "status": fallout.status,
+        "tags": tags,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    body = f"# {fallout.title}\n\n## Summary\n\n{fallout.summary}\n"
+    path = base_dir / f"{fallout.fallout_id}.md"
+    write_memory(path, fm, body)
+    return path
