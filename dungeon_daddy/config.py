@@ -18,9 +18,9 @@ class AppConfig:
     default_map_variant: str = "grid"
 
     @property
-    def dungeons_dir(self) -> Path:
-        return self.user_data_dir / "dungeons"
+    def campaigns_dir(self) -> Path:
+        return self.user_data_dir / "campaigns"
 
     def ensure_dirs(self) -> None:
         """Create user data directories if they do not exist."""
-        self.dungeons_dir.mkdir(parents=True, exist_ok=True)
+        self.campaigns_dir.mkdir(parents=True, exist_ok=True)

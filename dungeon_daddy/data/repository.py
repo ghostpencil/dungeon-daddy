@@ -14,26 +14,30 @@ _log = logging.getLogger(__name__)
 
 
 class DungeonRepository:
-    def __init__(self, dungeons_dir: Path | None) -> None:
+    def __init__(self, campaigns_dir: Path | None) -> None:
         """
-        dungeons_dir must already exist. DungeonRepository does NOT create it.
+        campaigns_dir must already exist. DungeonRepository does NOT create it.
         Call AppConfig.ensure_dirs() before constructing the repository.
         Pass None only when calling load_sample().
         """
-        self._dir = dungeons_dir
+        self._dir = campaigns_dir
 
     # ------------------------------------------------------------------
     # Dungeon CRUD
     # ------------------------------------------------------------------
 
-    def list_dungeons(self) -> list[str]:
-        """Return names of all dungeon subdirectories that contain dungeon.json."""
+    def list_campaigns(self) -> list[str]:
+        """Return names of all campaign subdirectories that contain dungeon.json."""
         assert self._dir is not None
         return sorted(
             p.name
             for p in self._dir.iterdir()
             if p.is_dir() and (p / "dungeon.json").exists()
         )
+
+    def list_dungeons(self) -> list[str]:
+        """Deprecated alias for list_campaigns()."""
+        return self.list_campaigns()
 
     def load(self, name: str) -> Dungeon:
         """Load and validate dungeon by name. Raises FileNotFoundError."""
@@ -142,6 +146,27 @@ class DungeonRepository:
         path = self._context_doc_path(dungeon_name, doc_type, level_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         _atomic_write(path, content)
+
+    def clone_dungeon(self, source_slug: str, dest_slug: str) -> None:
+        """Copy dungeon design and context docs from source to dest folder.
+
+        Copies: dungeon.json, setting.md, party.md, level_*_design.md
+        Does NOT copy: session.json, campaign.duckdb, memory/, rpg-memory/
+        """
+        import shutil
+        assert self._dir is not None
+        src_dir = self._dir / source_slug
+        dst_dir = self._dir / dest_slug
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        # dungeon design
+        shutil.copy2(src_dir / "dungeon.json", dst_dir / "dungeon.json")
+        # context docs
+        for filename in ["setting.md", "party.md"]:
+            src_file = src_dir / filename
+            if src_file.exists():
+                shutil.copy2(src_file, dst_dir / filename)
+        for src_file in src_dir.glob("level_*_design.md"):
+            shutil.copy2(src_file, dst_dir / src_file.name)
 
     def migrate_legacy_layout(self) -> None:
         """Move legacy root-level files into per-dungeon subdirectories."""

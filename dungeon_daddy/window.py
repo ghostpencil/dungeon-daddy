@@ -150,7 +150,7 @@ class DungeonDaddyWindow(arcade.Window):
         self._mode: str = "design"
 
         # Repository — None-dir is fine for load_sample()
-        self._repo = DungeonRepository(config.dungeons_dir)
+        self._repo = DungeonRepository(config.campaigns_dir)
         self._repo.migrate_legacy_layout()
 
         _load_fonts()
@@ -291,7 +291,7 @@ class DungeonDaddyWindow(arcade.Window):
         root = self._make_tk_root()
         path = filedialog.askdirectory(
             title="Open Dungeon",
-            initialdir=str(self._config.dungeons_dir),
+            initialdir=str(self._config.campaigns_dir),
         )
         root.destroy()
         if not path:

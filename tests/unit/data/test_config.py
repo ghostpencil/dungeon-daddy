@@ -18,34 +18,34 @@ def test_appconfig_defaults(field, expected):
 
 
 # ---------------------------------------------------------------------------
-# Behavior 2: AppConfig.dungeons_dir is user_data_dir / "dungeons"
+# Behavior 2: AppConfig.campaigns_dir is user_data_dir / "campaigns"
 # ---------------------------------------------------------------------------
 
-def test_dungeons_dir_is_under_user_data_dir(tmp_path):
+def test_campaigns_dir_is_under_user_data_dir(tmp_path):
     from dungeon_daddy.config import AppConfig
     cfg = AppConfig(user_data_dir=tmp_path)
-    assert cfg.dungeons_dir == tmp_path / "dungeons"
+    assert cfg.campaigns_dir == tmp_path / "campaigns"
 
 
-def test_dungeons_dir_is_a_property_not_a_field(tmp_path):
+def test_campaigns_dir_is_a_property_not_a_field(tmp_path):
     import dataclasses
 
     from dungeon_daddy.config import AppConfig
     field_names = {f.name for f in dataclasses.fields(AppConfig)}
-    assert "dungeons_dir" not in field_names
+    assert "campaigns_dir" not in field_names
 
 
 # ---------------------------------------------------------------------------
-# Behavior 3: AppConfig.ensure_dirs() creates the dungeons directory
+# Behavior 3: AppConfig.ensure_dirs() creates the campaigns directory
 # ---------------------------------------------------------------------------
 
-def test_ensure_dirs_creates_dungeons_dir(tmp_path):
+def test_ensure_dirs_creates_campaigns_dir(tmp_path):
     from dungeon_daddy.config import AppConfig
     cfg = AppConfig(user_data_dir=tmp_path)
-    assert not cfg.dungeons_dir.exists()
+    assert not cfg.campaigns_dir.exists()
     cfg.ensure_dirs()
-    assert cfg.dungeons_dir.exists()
-    assert cfg.dungeons_dir.is_dir()
+    assert cfg.campaigns_dir.exists()
+    assert cfg.campaigns_dir.is_dir()
 
 
 # ---------------------------------------------------------------------------
@@ -57,4 +57,4 @@ def test_ensure_dirs_idempotent(tmp_path):
     cfg = AppConfig(user_data_dir=tmp_path)
     cfg.ensure_dirs()
     cfg.ensure_dirs()   # must not raise
-    assert cfg.dungeons_dir.is_dir()
+    assert cfg.campaigns_dir.is_dir()
