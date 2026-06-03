@@ -2,8 +2,10 @@
 
 ## Phase
 
-Phase: 30 — Play Mode UI + Debug Tools
-Status: **Complete** — Spec: `spec/PHASE_30_PLAY_MODE_UI_AND_DEBUG_TOOLS.md`
+Phase: 31 — Context Bundles + AI Integration
+Status: **Complete** — Spec: `spec/PHASE_31_CONTEXT_BUNDLES_AND_AI_INTEGRATION.md`
+
+Next phase: TBD
 
 ---
 
@@ -11,368 +13,194 @@ Status: **Complete** — Spec: `spec/PHASE_30_PLAY_MODE_UI_AND_DEBUG_TOOLS.md`
 
 | Step | Task | Status |
 |---|---|---|
-| 30-1 | Panel module skeletons | **Done** |
-| 30-2 | Character sheet panel (TDD) | **Done** |
-| 30-3 | Scene state panel (TDD) | **Done** |
-| 30-4 | Fallout panel (TDD) | **Done** |
-| 30-5 | Memory inspector panel (TDD) | **Done** |
-| 30-6 | Debug controls (TDD) | **Done** |
-| 30-7 | Play Mode wiring | **Done** |
-| 30-8 | Integration tests | **Done** |
-| 30-9 | Smoke test | **Done** |
-
-**Manual UI test pass completed 2026-06-03 — all checks passed after bug fixes.**
+| 31-1 | Module skeletons | Complete |
+| 31-2 | Memory retrieval (TDD) | Complete |
+| 31-3 | Context bundle generator (TDD) | Complete |
+| 31-4 | DM agent update (TDD) | Complete |
+| 31-5 | Memory provenance debug display (TDD) | Complete |
+| 31-6 | Integration tests | Complete |
+| 31-7 | Smoke test | Complete |
 
 ---
 
 ### Step Detail
 
-#### 30-1 — Panel module skeletons
+#### 31-1 — Module skeletons
 
-Create empty Python files for the four new UI panels. No logic yet.
+Create empty Python files for the two new memory modules.
 
 **New files:**
-- `dungeon_daddy/ui/panels/character_sheet_panel.py`
-- `dungeon_daddy/ui/panels/scene_state_panel.py`
-- `dungeon_daddy/ui/panels/fallout_panel.py`
-- `dungeon_daddy/ui/panels/memory_inspector_panel.py`
+- `dungeon_daddy/memory/retrieval.py`
+- `dungeon_daddy/memory/context_bundle.py`
 
-**Exit check:** `python -c "from dungeon_daddy.ui.panels import character_sheet_panel, scene_state_panel, fallout_panel, memory_inspector_panel"` succeeds; full test suite still green.
+**Exit check:** `python -c "from dungeon_daddy.memory import retrieval, context_bundle"` succeeds; full test suite still green.
 
 ---
 
-#### 30-2 — Character sheet panel (TDD)
+#### 31-2 — Memory retrieval (TDD)
 
-**Test file:** `tests/unit/ui/test_character_sheet_panel.py`
+**Test file:** `tests/unit/memory/test_retrieval.py`
 
 Tracer bullets:
-1. Panel renders with no actor selected — shows placeholder text.
-2. Panel shows actor display name and type when an `ActorState` is provided.
-3. Action ratings section renders each action key and its rating (0–3).
-4. Momentum field displays current value.
-5. Stress tracks render each track with filled/capacity.
-6. Active fallout entries are listed with severity and status.
-7. Abilities section renders key/value pairs.
-8. Tags section renders tag list.
+1. `MemoryRetriever` accepts a `MemoryRepository` and a campaign ID.
+2. `.query(tags=[], actor_ids=[], location_slug=None)` returns a list of `MemoryEntry` objects matching any filter.
+3. Results are ranked by importance (descending), then recency.
+4. `.query()` with no filters returns all active entries for the campaign.
+5. Entries with status `"archived"` are excluded unless `include_archived=True` is passed.
+6. Token budget trim: `.trim_to_budget(entries, max_tokens)` returns a prefix of entries whose estimated token count stays within budget, and records how many were omitted.
 
-**Source file:** `dungeon_daddy/ui/panels/character_sheet_panel.py`
+**Source file:** `dungeon_daddy/memory/retrieval.py`
 
 ---
 
-#### 30-3 — Scene state panel (TDD)
+#### 31-3 — Context bundle generator (TDD)
 
-**Test file:** `tests/unit/ui/test_scene_state_panel.py`
+**Test file:** `tests/unit/memory/test_context_bundle.py`
 
 Tracer bullets:
-1. Panel renders with no scene — shows placeholder text.
-2. Scene title and location slug are displayed when a scene is provided.
-3. Open clocks are listed with label, filled/segments, and status.
-4. Active actors list renders display names.
-5. Recent actions list shows last N action resolutions (outcome, actor, action key).
-6. Risk/effect selector shows current values and accepts updates.
+1. `ContextBundleBuilder` accepts `campaign_id`, `scene_id`, `mode`, `focus_actor_ids`, `token_budget`.
+2. `.build(repo)` returns a `ContextBundle` with `bundle_id`, `campaign_id`, `scene_id`, `mode`.
+3. `scene_brief` field is populated from the scenes table (title, location slug, status).
+4. `mechanical_state` includes each focus actor's action ratings, momentum, and stress tracks.
+5. `active_fallout` lists all non-resolved fallout records for focus actors.
+6. `open_clocks` lists all clocks with status `"open"` for the campaign.
+7. `memory_cards` are retrieved via `MemoryRetriever`, ranked, and trimmed to token budget.
+8. `provenance` records how many memories were retrieved, how many trimmed, and the filter criteria used.
+9. `must_remember` entries (importance ≥ 9) are always included regardless of budget.
 
-**Source file:** `dungeon_daddy/ui/panels/scene_state_panel.py`
+**Source file:** `dungeon_daddy/memory/context_bundle.py`
 
 ---
 
-#### 30-4 — Fallout panel (TDD)
+#### 31-4 — DM agent update (TDD)
 
-**Test file:** `tests/unit/ui/test_fallout_panel.py`
+**Test file:** `tests/unit/llm/test_dm_agent_context_bundle.py`
 
 Tracer bullets:
-1. Panel renders empty state when no active fallout exists.
-2. Active fallout entries render track, severity, and status.
-3. Mechanical hooks are shown alongside each fallout entry.
-4. Linked memory path is displayed (or "—" if absent).
-5. Panel updates when fallout list changes.
+1. `DMAgent.build_prompt(context_bundle=None)` returns the existing prompt when no bundle is passed (no regression).
+2. When a bundle is provided, the system prompt includes the scene brief and mechanical state.
+3. Memory cards are injected as a numbered list with title, summary, and importance.
+4. Active fallout and open clocks are appended as a mechanical context block.
+5. LLM output is returned as-is; no RPG or memory state is mutated.
+6. If the bundle has draft memory content, it is labelled `[DRAFT]` in the prompt.
 
-**Source file:** `dungeon_daddy/ui/panels/fallout_panel.py`
+**Source file:** `dungeon_daddy/llm/agents/dm_agent.py`
+
+No real API call in unit tests — inject a mock LLM provider.
 
 ---
 
-#### 30-5 — Memory inspector panel (TDD)
+#### 31-5 — Memory provenance debug display (TDD)
 
-**Test file:** `tests/unit/ui/test_memory_inspector_panel.py`
+Update the debug controls panel to show the most recently built context bundle.
+
+**Test file:** `tests/unit/ui/test_debug_controls.py` (extend existing)
 
 Tracer bullets:
-1. Panel renders a search input (tag/actor/location).
-2. Submitting a search returns a filtered list of memory entries (title, summary, status, importance).
-3. Selecting an entry opens the Markdown body in a read-only view.
-4. Sync warnings are highlighted when present on an entry.
-5. Empty results show "No memories found" message.
+1. `DebugControls` accepts an optional `last_bundle: ContextBundle | None`.
+2. When `last_bundle` is set, rendering includes a "Context bundle" section showing `bundle_id`, memory card count, and trimmed count.
+3. Each memory card is listed with title and reason for inclusion (tag match, importance, actor match).
+4. When `last_bundle` is None, the section shows "No bundle built yet".
 
-**Source file:** `dungeon_daddy/ui/panels/memory_inspector_panel.py`
-
----
-
-#### 30-6 — Debug controls (TDD)
-
-Debug controls live in a collapsible section within Play Mode (not a separate panel).
-
-**Test file:** `tests/unit/ui/test_debug_controls.py`
-
-Tracer bullets:
-1. "Resolve sample action" button calls `RPGService.resolve_action()` and displays the outcome.
-2. "Add stress" control calls `RPGService.apply_stress()` with actor and track selection.
-3. "Advance clock" control calls `RPGService.advance_clock()` with clock selection.
-4. "Generate sync report" button calls `MemorySyncService.validate()` and shows pass/fail summary.
-5. "Create test memory note" button creates a `MemoryEntry` via the application layer.
-
-**Source file:** `dungeon_daddy/ui/panels/debug_controls.py` (new small module)
+**Source file:** `dungeon_daddy/ui/panels/debug_controls.py` (extend)
 
 ---
 
-#### 30-7 — Play Mode wiring
+#### 31-6 — Integration tests
 
-Wire the four panels and debug controls into `play_view.py`. Update `map_panel.py` and `chat_panel.py` only if layout changes are needed. Use collapsible tabs/panels so the map remains primary.
+**Test files:**
+- `tests/integration/test_context_bundle_retrieval.py`
+- `tests/integration/test_dm_agent_with_rpg_memory_context.py`
 
-**Constraints:**
-- Usable at 1400×900.
-- Do not obscure the current map selection.
-- UI calls only `RPGService` and application-level wrappers — no direct SQL or Markdown writes.
-
-**Exit check:** App launches in Play Mode; all four panels are accessible; map is still primary.
-
----
-
-#### 30-8 — Integration tests
-
-**Test file:** `tests/integration/test_play_mode_rpg_wiring.py`
-
-Tests (no mocks for RPG/memory layer):
-1. Resolving an action via the wired UI updates `action_resolutions` in the repository.
-2. Applying stress via the wired UI updates `stress_tracks` in the repository.
-3. Advancing a clock via the wired UI updates `clocks` in the repository.
-4. Memory inspector search returns fallout/memory entries created in prior phases.
-5. Sync report reflects current repository state.
+Tests (no mocks for RPG/memory layer; mock LLM provider):
+1. `ContextBundleBuilder.build()` against a real `tmp_path` DuckDB populates all bundle fields from seeded data.
+2. Retriever query filters by tag, actor, and location against real DB rows.
+3. Token budget trim leaves `provenance.omitted_count` accurate.
+4. `DMAgent` with a real bundle builds a prompt that contains the scene brief text.
+5. `DMAgent` fallback (no bundle) still returns a valid prompt — existing behavior not broken.
 6. No existing tests regress (run full suite).
 
 ---
 
-#### 30-9 — Smoke test
+#### 31-7 — Smoke test
 
-**File:** `tools/smoke_test_phase30.py`
+**File:** `tools/smoke_test_phase31.py`
 
 Script flow:
-1. Launch app in Play Mode with a test campaign.
-2. Screenshot initial state (all panels visible, map primary).
-3. Trigger "Resolve sample action" debug control — screenshot result.
-4. Open memory inspector, run a search — screenshot results.
-5. Open fallout panel — screenshot active fallout list.
-6. Confirm no crashes; save artifacts under `artifacts/play_mode/phase30/`.
-
----
-
-### Phase 26–29 Completed Steps (archived)
-
-#### 26-1 — Module skeletons
-
-Create empty Python packages and placeholder module files. No logic yet.
-
-**New directories / `__init__.py` files:**
-- `dungeon_daddy/rpg/__init__.py`
-- `dungeon_daddy/memory/__init__.py`
-- `tests/unit/rpg/__init__.py`
-- `tests/unit/memory/__init__.py`
-
-**Placeholder source files (empty or `# TODO` stubs):**
-- `dungeon_daddy/rpg/models.py`
-- `dungeon_daddy/rpg/dice.py`
-- `dungeon_daddy/rpg/actions.py`
-- `dungeon_daddy/rpg/clocks.py`
-- `dungeon_daddy/rpg/stress.py`
-- `dungeon_daddy/rpg/service.py`
-- `dungeon_daddy/memory/models.py`
-- `dungeon_daddy/memory/repository.py`
-- `dungeon_daddy/memory/markdown_store.py`
-- `dungeon_daddy/memory/sync.py`
-
-**Exit check:** `python -c "import dungeon_daddy.rpg; import dungeon_daddy.memory"` succeeds, full test suite still green.
-
----
-
-#### 26-2 — Base RPG and memory models (TDD, tracer-bullet)
-
-All model work uses real Pydantic v2. No mocks needed. Follow Red→Green→Refactor per behavior.
-
-**Test file:** `tests/unit/rpg/test_models.py`
-
-Tracer bullets (one at a time):
-
-1. `ActorState` constructs with required fields; `status` defaults to `"active"`.
-2. `StressTrack` stores `filled` count; rejects negative values.
-3. `ClockState` stores `segments` and `filled`; `filled` cannot exceed `segments`.
-4. `ActionRating` stores a single `action_key` and `rating` (0–3 range).
-5. `ActionResolution` has outcome literal (`"critical"`, `"full"`, `"partial"`, `"miss"`).
-6. `FalloutRecord` stores track, severity, and status literals.
-
-**Test file:** `tests/unit/memory/test_models.py`
-
-Tracer bullets:
-
-1. `MemoryEntry` constructs with `id`, `type`, `title`; `status` defaults to `"active"`.
-2. `DomainEvent` requires `event_type` and `campaign_id`; `occurred_at` auto-sets.
-3. `ContextBundle` validates `mode` is one of the four literals.
-
-**Source files:** `dungeon_daddy/rpg/models.py`, `dungeon_daddy/memory/models.py`
-
----
-
-#### 26-3 — DuckDB migration runner (TDD)
-
-**Prerequisite:** `duckdb` added to `pyproject.toml` dependencies (approval required).
-
-Migration runner lives in `dungeon_daddy/memory/repository.py` as a standalone `MigrationRunner` class (or top-level functions). It does **not** touch any existing `data/repository.py`.
-
-**Test file:** `tests/unit/memory/test_repository.py`
-
-Tracer bullets:
-
-1. Runner accepts a `migrations_dir: Path` and a `db_path: Path`. Returns list of `.sql` files sorted by name.
-2. Runner applies one migration against a `tmp_path` DuckDB; creates `schema_migration` table on first run.
-3. Runner records the migration name and timestamp in `schema_migration` after applying.
-4. Running the same migration a second time is a no-op (idempotent). `schema_migration` has exactly 1 row.
-
-**Source file:** `dungeon_daddy/memory/repository.py` (add `MigrationRunner`)
-
----
-
-#### 26-4 — SQL migration file
-
-**File:** `dungeon_daddy/data/migrations/001_rpg_memory_foundation.sql`
-
-Tables to create (all with `IF NOT EXISTS`):
-
-| Table | Key columns |
-|---|---|
-| `schema_migration` | `name TEXT PK`, `applied_at TIMESTAMP` |
-| `campaigns` | `campaign_id`, `slug`, `title`, `status`, `created_at` |
-| `sessions` | `session_id`, `campaign_id`, `session_number`, `played_at` |
-| `scenes` | `scene_id`, `campaign_id`, `session_id`, `location_slug`, `status` |
-| `actors` | `actor_id`, `campaign_id`, `actor_type`, `slug`, `display_name`, `status` |
-| `action_ratings` | `actor_id`, `action_key`, `rating` |
-| `stress_tracks` | `actor_id`, `track_key`, `capacity`, `filled` |
-| `abilities` | `actor_id`, `ability_key`, `value` |
-| `clocks` | `clock_id`, `campaign_id`, `label`, `segments`, `filled`, `status` |
-| `action_resolutions` | `resolution_id`, `campaign_id`, `scene_id`, `actor_id`, `action_key`, `outcome`, `resolved_at` |
-| `fallout` | `fallout_id`, `campaign_id`, `actor_id`, `track_key`, `severity`, `status` |
-| `memory_entries` | `memory_id`, `campaign_id`, `type`, `title`, `summary`, `status`, `importance`, `markdown_path`, `checksum` |
-| `memory_tags` | `memory_id`, `tag` |
-| `memory_links` | `from_id`, `to_id`, `link_type` |
-| `domain_events` | `event_id`, `campaign_id`, `event_type`, `payload TEXT`, `occurred_at TIMESTAMP` |
-
-No foreign-key enforcement in first pass (DuckDB supports it but keep schema simple).
-
----
-
-#### 26-5 — Markdown memory store shell (TDD)
-
-**Test file:** `tests/unit/memory/test_markdown_store.py`
-
-All tests use `tmp_path`. No mocks needed.
-
-Tracer bullets:
-
-1. `write_memory(path, front_matter, body)` creates a file. File starts with `---`.
-2. `read_memory(path)` returns `(front_matter: dict, body: str)`. Round-trip preserves all front matter keys.
-3. `compute_checksum(path)` returns a hex string; calling it twice on the same file returns the same string.
-4. `validate_front_matter(data)` raises `ValueError` if any of `id`, `type`, `campaign_id`, `updated_at` are missing.
-5. Front matter with unknown extra keys passes validation (forward-compatible).
-
-**Source file:** `dungeon_daddy/memory/markdown_store.py`
-
-Front matter format: YAML between `---` delimiters. Use stdlib `re` + `json`/manual parsing, or PyYAML if already approved. (Check before using PyYAML — not currently in deps.)
-
----
-
-#### 26-6 — Repository health check and domain event insert (TDD)
-
-**Test file:** `tests/unit/memory/test_repository.py` (extend existing file)
-
-Tracer bullets:
-
-1. `MemoryRepository(db_path)` opens a DuckDB connection; `.health_check()` returns `True`.
-2. After `.initialize_schema(migrations_dir)`, all expected tables exist.
-3. `.insert_domain_event(event: DomainEvent)` writes one row to `domain_events`.
-4. `.get_domain_events(campaign_id)` retrieves the inserted event by campaign.
-5. `.list_migrations()` returns names of applied migrations from `schema_migration`.
-6. `.close()` releases the connection; subsequent calls to `.health_check()` raise or return `False`.
-
-**Source file:** `dungeon_daddy/memory/repository.py` (add `MemoryRepository` class)
-
----
-
-#### 26-7 — Integration tests for migration runner
-
-**Test file:** `tests/integration/test_rpg_memory_migrations.py`
-
-Tests (all against `tmp_path` DuckDB — no mocks):
-
-1. Migration runner applies `001_rpg_memory_foundation.sql` against a fresh DB; `schema_migration` has 1 row.
-2. Running the runner again on the same DB is idempotent; `schema_migration` still has 1 row.
-3. All tables from Step 26-4 exist after migration.
-4. `MemoryRepository.insert_domain_event()` + `.get_domain_events()` round-trip works post-migration.
-5. No existing Play Mode tests regress (run full suite).
-
-### Phase 25 Completed Steps (archived)
-
-| Step | Task |
-|---|---|
-| ~~VP-1~~ | ~~Asset loading infrastructure — safe load helper for background PNG + 6 frame PNGs; log-once on missing; path resolution from package root~~ — **Done** |
-| ~~VP-2~~ | ~~Background image — draw `background_graph_default.png` in `MapPanel`, Graph mode only, scissor-clipped, scaled to viewport, over solid fallback~~ — **Done** |
-| ~~VP-3~~ | ~~Room frame textures — load and draw centered 136×96 frame PNGs in `LayoutRenderer._draw_rooms()`, scaled by zoom~~ — **Done** |
-| ~~VP-4~~ | ~~Frame selection logic — `frame_current` > `frame_hover` > `frame_default`; stub hooks for memory/danger/locked frames~~ — **Done** |
-| ~~VP-5~~ | ~~Regression pass — Grid mode, Tiles mode, zoom/pan, hit testing, selection, detail panel, existing tests all green~~ — **Done** |
-
-### Phase 24 Completed Steps (archived)
-
-| Step | Task |
-|---|---|
-| ~~4.1-1~~ | ~~Detail panel placement — avoid covering selected room and its connected paths~~ — **Done** |
-| ~~4.1-2~~ | ~~Long linear floor framing — detect wide-vs-tall layout; improve padding/viewport bias for Crucible L3~~ — **Done** |
-| ~~4.1-3~~ | ~~Crucible L2 marker scoring — fix marker application or justify zero-marker result without penalty~~ — **Done** |
-| ~~4.1-4~~ | ~~Visibility feedback fields — add to presentation feedback JSON for all four target fixtures~~ — **Done** |
-| ~~4.1-5~~ | ~~Artifact generation — screenshots + JSON feedback under `artifacts/layout/phase4_1/`~~ — **Done** |
-| ~~4.1-6~~ | ~~Markdown summaries — `phase4_1_feedback_summary.md`, `before_after_summary.md`, `implementation_summary.md`~~ — **Done** |
-
-### Phase 23 Completed Steps (archived)
-
-| Step | Task |
-|---|---|
-| ~~1~~ | ~~`GraphPresentationConfig` dataclass — all toggles, defaults enabled~~ — **Done** |
-| ~~2~~ | ~~Visible detail panel in Graph Mode (right-side/bottom-right card)~~ — **Done** |
-| ~~3~~ | ~~Strengthen hover and selected-room styling; improve style resolver~~ — **Done** |
-| ~~4~~ | ~~Role markers: `IN`, `OBJ`, `BOSS`, `!`, `KEY`, `↓`, `HUB` drawn in room boxes~~ — **Done** |
-| ~~5~~ | ~~Connection markers: `critical_path`, `locked`, `secret`/`shortcut` (dashed), `vertical`~~ — **Done** |
-| ~~6~~ | ~~Restrained atmosphere layer: vignette, subtle background, thin frame~~ — **Done** |
-| ~~7~~ | ~~Artifact generation script + screenshots and JSON reports under `artifacts/layout/phase4/`~~ — **Done** |
-| ~~8~~ | ~~Integration tests: geometry, semantic, metadata, interaction score regressions; Grid Mode untouched~~ — **Done** |
-
-### Phase 22 Completed Steps (archived)
-
-| Step | Task |
-|---|---|
-| ~~1~~ | ~~Phase 2.5 cleanup: refine objective warning naming in `validation.py`~~ — **Done** (1188 passing) |
-| ~~2~~ | ~~Connection metadata backfill for `crucible.json`, `tomb.json`, and local dungeon files~~ — **Done** (1199 passing) |
-| ~~2a~~ | ~~Renderer visual parity: role-based border color, fill color, marker position~~ — **Done** (1194 passing) |
-| ~~3~~ | ~~`GraphViewState` model~~ — **Done** (1211 passing) |
-| ~~4~~ | ~~Room + connection hit testing~~ — **Done** (1220 passing) |
-| ~~5~~ | ~~Style resolution pipeline~~ — **Done** (1228 passing) |
-| ~~6~~ | ~~Room hover visual state~~ — **Done** (1232 passing) |
-| ~~7~~ | ~~Room selection + focus mode~~ — **Done** (1235 passing) |
-| ~~8~~ | ~~Connection hover~~ — **Done** (1238 passing) |
-| ~~9~~ | ~~Room detail panel (`room_detail_panel.py`)~~ — **Done** (1262 passing) |
-| ~~10~~ | ~~Critical path emphasis when selected room is on path~~ — **Done** (1265 passing) |
-| ~~11~~ | ~~Keyboard controls: R = recenter, Escape = clear selection~~ — **Done** (1271 passing) |
-| ~~12~~ | ~~Artifact generation script + screenshots under `artifacts/layout/phase3/`~~ — **Done** (1276 passing) |
-| ~~13~~ | ~~Integration tests: geometry/semantic/metadata scores do not regress~~ — **Done** (1279 passing) |
-| ~~14~~ | ~~Output artifacts: feedback JSON, summary MDs, migration report~~ — **Done** (1280 passing) |
+1. Create a test campaign DB in `tmp_path`; seed actors, clocks, fallout, and memory entries.
+2. Build a context bundle for a seeded scene.
+3. Print bundle summary (scene brief, mechanical state, memory card count, provenance).
+4. Build a DM prompt from the bundle using a mock provider; print first 200 chars.
+5. Assert bundle fields are non-empty; assert prompt contains scene brief.
+6. Save bundle JSON artifact to `artifacts/play_mode/phase31/bundle_sample.json`.
 
 ---
 
 ## Known Failures
 
 _None._
+
+## Step 31-7 Completion Notes
+
+- `tools/smoke_test_phase31.py` — 8 behaviors; real DuckDB via `tempfile.TemporaryDirectory`; mock LLM provider
+  - Builds context bundle from seeded campaign (scene, actor, clock, fallout, memory entries)
+  - Verifies scene_brief, mechanical_state, memory_cards, must_remember, active_fallout, open_clocks, provenance
+  - Verifies `DMAgent.build_prompt(bundle)` injects location slug and memory card title into prompt
+  - Saves bundle JSON artifact to `artifacts/play_mode/phase31/bundle_sample.json`
+- Bug fixed: `dm_agent.py` `build_prompt()` used `c['name']` for clock label but repo dict key is `label` → changed to `c.get('label', c.get('name', ''))`
+- Manual UI regression tests all passed (6/6): Play Mode launch, DM chat fallback, RPG panel all tabs, DBG tab, MEM search input, tab switch/reopen
+- 1686 passing (no new tests added; bug fix only)
+
+## Step 31-6 Completion Notes
+
+- `tests/integration/test_context_bundle_retrieval.py` — 10 tests; real DuckDB via `tmp_path`; no LLM mocks
+  - `TestContextBundleBuilderIntegration`: all bundle fields populated from seeded data (scene_brief, mechanical_state, open_clocks, active_fallout, memory_cards, must_remember)
+  - `TestMemoryRetrieverFilters`: query by tag, location_slug, no-filter; archived excluded
+  - `TestTokenBudgetTrim`: provenance omitted count accurate with tiny budget
+- `tests/integration/test_dm_agent_with_rpg_memory_context.py` — 5 tests; real bundle from real DB; mock LLM provider
+  - build_prompt with real bundle contains scene location slug and memory card title
+  - fallback (no bundle) returns system prompt unchanged
+  - respond() with real bundle sets system to contain scene location; without bundle returns provider output
+- 1686 passing
+
+## Step 31-5 Completion Notes
+
+- `DebugControls.set_bundle(bundle: ContextBundle)` stores bundle as `_last_bundle`
+- `DebugControls.bundle_section_lines() -> list[str]` returns header (`bundle_id`, card count, trimmed count) + one line per card (`title [importance|retrieved]`)
+- Reason derived from `must_remember`: if `memory_id` in `must_remember` → `"importance"`, otherwise `"retrieved"`
+- When `_last_bundle` is None → returns `["No bundle built yet"]`
+- 4 new tests in `tests/unit/ui/test_debug_controls.py`; 1671 passing
+
+## Step 31-4 Completion Notes
+
+- `DungeonMasterAgent.build_prompt(context_bundle=None)` added to `dungeon_daddy/llm/agents/dm_agent.py`
+- No bundle → returns `self._system_prompt` unchanged
+- With bundle → appends `# Scene` (location_slug + status), `# Memory` (numbered list: title, summary, importance; `[DRAFT]` prefix when `card["draft"] is True`), `# Mechanical Context` (active fallout + open clocks)
+- `respond()` gained `context_bundle=None` parameter; calls `build_prompt(context_bundle)` as base system prompt
+- 11 new tests in `tests/unit/llm/test_dm_agent_context_bundle.py`
+- All existing DM agent tests green; 1667 passing
+
+## Step 31-3 Completion Notes
+
+- `ContextBundleBuilder` in `dungeon_daddy/memory/context_bundle.py`: accepts `campaign_id`, `scene_id`, `mode`, `focus_actor_ids`, `token_budget`
+- `.build(repo)` returns a `ContextBundle` (from `memory/models.py`) with all fields populated:
+  - `scene_brief` — queried from `scenes` table (`scene_id`, `location_slug`, `status`; no title column in schema)
+  - `mechanical_state` — per focus actor: action ratings + stress tracks (no momentum in schema)
+  - `active_fallout` — non-resolved fallout for focus actors
+  - `open_clocks` — clocks with `status="active"` for the campaign
+  - `memory_cards` — retrieved via `MemoryRetriever`, budget-trimmed; importance ≥ 9 entries pinned and always included
+  - `must_remember` — list of `memory_id` strings for importance ≥ 9 entries
+  - `provenance` — `retrieved`, `omitted`, `focus_actor_ids`
+- 9 new tests in `tests/unit/memory/test_context_bundle.py::TestContextBundleBuilder`
+- 1656 passing
+
+## Step 31-2 Completion Notes
+
+- Added `dungeon_daddy/data/migrations/003_memory_created_at.sql` — adds `created_at TIMESTAMP` to `memory_entries`
+- `MemoryEntry` model gained `created_at: datetime | None` field
+- New `MemoryRetriever` class in `retrieval.py`: `.query(tags, actor_ids, location_slug, include_archived)` → `list[MemoryEntry]` ranked by importance desc then recency desc; `.trim_to_budget(entries, max_tokens)` → `(kept, omitted_count)`
+- Old `MemoryRetrieval` class retained (unchanged); all existing tests green
+- 7 new tests in `tests/unit/memory/test_retrieval.py::TestMemoryRetriever`
 
 ## Bug Fixes (post-Phase 24)
 
@@ -390,7 +218,12 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
-| Phase 30 — Play Mode UI + Debug Tools (steps 30-1–30-9, bugs fixed) | **Complete** (2026-06-03) | 1639 passing |
+| Phase 31 — Context Bundles + AI Integration | **Complete** (2026-06-03) | 1686 passing |
+| Phase 31 step 31-5 — Memory provenance debug display (TDD) | **Complete** (2026-06-03) | 1671 passing |
+| Phase 31 step 31-4 — DM agent update (TDD) | **Complete** (2026-06-03) | 1667 passing |
+| Phase 31 step 31-3 — Context bundle generator (TDD) | **Complete** (2026-06-03) | 1656 passing |
+| Phase 31 step 31-2 — Memory retrieval (TDD) | **Complete** (2026-06-03) | 1646 passing |
+| Phase 30 — Play Mode UI + Debug Tools | **Complete** (2026-06-03) | 1639 passing |
 | Phase 29.5 — Campaign Save Folder Rename | **Complete** (2026-06-02) | 1575 passing |
 | Phase 29 — Fallout + Dungeon Influence | **Complete** (2026-06-02) | 1568 passing |
 | Phase 28 — Memory Persistence | **Complete** (2026-06-02) | 1549 passing |

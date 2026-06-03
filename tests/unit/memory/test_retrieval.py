@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.memory.retrieval import MemoryRetrieval
+from dungeon_daddy.memory.retrieval import MemoryRetrieval, MemoryRetriever
 
 MIGRATIONS_DIR = (
     Path(__file__).parent.parent.parent.parent
@@ -21,6 +21,99 @@ def repo(tmp_path: Path) -> MemoryRepository:
     r.initialize_schema(MIGRATIONS_DIR)
     yield r
     r.close()
+
+
+class TestMemoryRetriever:
+    def test_constructor_stores_campaign_id(self, repo: MemoryRepository) -> None:
+        retriever = MemoryRetriever(repo, "camp_abc")
+        assert retriever._campaign_id == "camp_abc"
+
+    def test_query_ranked_by_importance_desc_then_recency(self, repo: MemoryRepository) -> None:
+        from datetime import datetime, timezone, timedelta
+        base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        repo.save_memory_entry("mem_lo", "camp_001", "event", "Low", importance=2)
+        repo.add_memory_tag("mem_lo", "theme:guilt")
+        repo.save_memory_entry("mem_hi", "camp_001", "event", "High", importance=9)
+        repo.add_memory_tag("mem_hi", "theme:guilt")
+        repo.save_memory_entry("mem_mid_old", "camp_001", "event", "MidOld", importance=5)
+        repo.add_memory_tag("mem_mid_old", "theme:guilt")
+        repo.save_memory_entry("mem_mid_new", "camp_001", "event", "MidNew", importance=5)
+        repo.add_memory_tag("mem_mid_new", "theme:guilt")
+        # Set created_at manually so recency is deterministic
+        conn = repo._conn
+        conn.execute("UPDATE memory_entries SET created_at = ? WHERE memory_id = 'mem_mid_old'", [base])
+        conn.execute("UPDATE memory_entries SET created_at = ? WHERE memory_id = 'mem_mid_new'", [base + timedelta(hours=1)])
+
+        results = MemoryRetriever(repo, "camp_001").query(tags=["theme:guilt"])
+        ids = [r.memory_id for r in results]
+        # importance 9 first, then mid importance sorted newest-first, then importance 2
+        assert ids.index("mem_hi") < ids.index("mem_mid_new")
+        assert ids.index("mem_mid_new") < ids.index("mem_mid_old")
+        assert ids.index("mem_mid_old") < ids.index("mem_lo")
+
+    def test_query_no_filters_returns_all_active_for_campaign(self, repo: MemoryRepository) -> None:
+        repo.save_memory_entry("mem_a", "camp_001", "event", "A", importance=5)
+        repo.save_memory_entry("mem_b", "camp_001", "event", "B", importance=3)
+        repo.save_memory_entry("mem_other", "camp_999", "event", "Other", importance=7)
+
+        results = MemoryRetriever(repo, "camp_001").query()
+
+        ids = {r.memory_id for r in results}
+        assert ids == {"mem_a", "mem_b"}
+
+    def test_query_excludes_archived_by_default(self, repo: MemoryRepository) -> None:
+        repo.save_memory_entry("mem_active", "camp_001", "event", "Active", status="active")
+        repo.save_memory_entry("mem_archived", "camp_001", "event", "Archived", status="archived")
+
+        results = MemoryRetriever(repo, "camp_001").query()
+
+        ids = {r.memory_id for r in results}
+        assert "mem_active" in ids
+        assert "mem_archived" not in ids
+
+    def test_query_include_archived_flag_includes_archived(self, repo: MemoryRepository) -> None:
+        repo.save_memory_entry("mem_active", "camp_001", "event", "Active", status="active")
+        repo.save_memory_entry("mem_archived", "camp_001", "event", "Archived", status="archived")
+
+        results = MemoryRetriever(repo, "camp_001").query(include_archived=True)
+
+        ids = {r.memory_id for r in results}
+        assert "mem_active" in ids
+        assert "mem_archived" in ids
+
+    def test_trim_to_budget_returns_prefix_within_tokens(self, repo: MemoryRepository) -> None:
+        from dungeon_daddy.memory.models import MemoryEntry
+        entries = [
+            MemoryEntry(memory_id=f"m{i}", campaign_id="c", type="event",
+                        title="x" * 40, summary="y" * 40, importance=5)
+            for i in range(5)
+        ]
+        # Each entry: (40+40) chars = 80 chars → ~20 tokens. Budget of 50 fits 2.
+        kept, omitted = MemoryRetriever(repo, "camp_001").trim_to_budget(entries, max_tokens=50)
+        assert len(kept) == 2
+        assert omitted == 3
+
+    def test_trim_to_budget_budget_larger_than_all_returns_all(self, repo: MemoryRepository) -> None:
+        from dungeon_daddy.memory.models import MemoryEntry
+        entries = [
+            MemoryEntry(memory_id=f"m{i}", campaign_id="c", type="event",
+                        title="short", summary="entry", importance=5)
+            for i in range(3)
+        ]
+        kept, omitted = MemoryRetriever(repo, "camp_001").trim_to_budget(entries, max_tokens=10000)
+        assert len(kept) == 3
+        assert omitted == 0
+
+    def test_query_by_tag_returns_memory_entries(self, repo: MemoryRepository) -> None:
+        repo.save_memory_entry("mem_001", "camp_001", "event", "Mara fights", importance=7)
+        repo.add_memory_tag("mem_001", "actor:pc:mara")
+        repo.save_memory_entry("mem_002", "camp_001", "event", "Unrelated", importance=5)
+
+        results = MemoryRetriever(repo, "camp_001").query(tags=["actor:pc:mara"])
+
+        assert len(results) == 1
+        assert results[0].memory_id == "mem_001"
+        assert results[0].title == "Mara fights"
 
 
 class TestRetrievalByActor:

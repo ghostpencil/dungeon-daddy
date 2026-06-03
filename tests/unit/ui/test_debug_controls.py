@@ -135,3 +135,77 @@ def test_create_test_memory_note_stores_entry():
     ctrl.create_test_memory_note(campaign_id="c1", title="Test Note")
     assert ctrl._last_memory_note is not None
     assert ctrl._last_memory_note.title == "Test Note"
+
+
+# ---------------------------------------------------------------------------
+# Bullet 1 — set_bundle stores the bundle as _last_bundle
+# ---------------------------------------------------------------------------
+
+def _bundle(**kwargs):
+    from dungeon_daddy.memory.models import ContextBundle
+    defaults = dict(bundle_id="b1", campaign_id="c1", mode="run_scene")
+    defaults.update(kwargs)
+    return ContextBundle(**defaults)
+
+
+def test_set_bundle_stores_last_bundle():
+    ctrl = _controls()
+    b = _bundle()
+    ctrl.set_bundle(b)
+    assert ctrl._last_bundle is b
+
+
+# ---------------------------------------------------------------------------
+# Bullet 2 — bundle_section_lines includes bundle_id, card count, trimmed count
+# ---------------------------------------------------------------------------
+
+def test_bundle_section_lines_shows_bundle_id_and_counts():
+    ctrl = _controls()
+    b = _bundle(
+        bundle_id="bbb-123",
+        memory_cards=[
+            {"memory_id": "m1", "title": "T1", "summary": "", "importance": 5},
+            {"memory_id": "m2", "title": "T2", "summary": "", "importance": 9},
+        ],
+        must_remember=["m2"],
+        provenance={"retrieved": 5, "omitted": 3, "focus_actor_ids": []},
+    )
+    ctrl.set_bundle(b)
+    lines = ctrl.bundle_section_lines()
+    text = "\n".join(lines)
+    assert "bbb-123" in text
+    assert "2" in text   # card count
+    assert "3" in text   # omitted / trimmed count
+
+
+# ---------------------------------------------------------------------------
+# Bullet 3 — each card listed with title and reason (importance vs retrieved)
+# ---------------------------------------------------------------------------
+
+def test_bundle_section_lines_shows_card_title_and_reason():
+    ctrl = _controls()
+    b = _bundle(
+        memory_cards=[
+            {"memory_id": "m1", "title": "Dragon Sighting", "summary": "", "importance": 5},
+            {"memory_id": "m2", "title": "King's Promise", "summary": "", "importance": 9},
+        ],
+        must_remember=["m2"],
+        provenance={"retrieved": 2, "omitted": 0, "focus_actor_ids": []},
+    )
+    ctrl.set_bundle(b)
+    lines = ctrl.bundle_section_lines()
+    text = "\n".join(lines)
+    assert "Dragon Sighting" in text
+    assert "retrieved" in text
+    assert "King's Promise" in text
+    assert "importance" in text
+
+
+# ---------------------------------------------------------------------------
+# Bullet 4 — no bundle → "No bundle built yet"
+# ---------------------------------------------------------------------------
+
+def test_bundle_section_lines_no_bundle():
+    ctrl = _controls()
+    lines = ctrl.bundle_section_lines()
+    assert any("No bundle built yet" in line for line in lines)
