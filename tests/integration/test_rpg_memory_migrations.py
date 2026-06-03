@@ -37,14 +37,14 @@ class TestMigrationRunnerIntegration:
         applied = runner.run()
         assert "001_rpg_memory_foundation.sql" in applied
 
-    def test_schema_migration_has_one_row_after_run(self, tmp_path: Path) -> None:
+    def test_schema_migration_row_count_matches_files(self, tmp_path: Path) -> None:
         db_path = tmp_path / "dungeon.duckdb"
         runner = MigrationRunner(migrations_dir=MIGRATIONS_DIR, db_path=db_path)
         runner.run()
         conn = duckdb.connect(str(db_path))
         count = conn.execute("SELECT count(*) FROM schema_migration").fetchone()[0]
         conn.close()
-        assert count == 1
+        assert count == len(list(MIGRATIONS_DIR.glob("*.sql")))
 
     def test_run_twice_is_idempotent(self, tmp_path: Path) -> None:
         db_path = tmp_path / "dungeon.duckdb"
@@ -55,7 +55,7 @@ class TestMigrationRunnerIntegration:
         conn = duckdb.connect(str(db_path))
         count = conn.execute("SELECT count(*) FROM schema_migration").fetchone()[0]
         conn.close()
-        assert count == 1
+        assert count == len(list(MIGRATIONS_DIR.glob("*.sql")))
 
     def test_all_expected_tables_exist_after_migration(self, tmp_path: Path) -> None:
         db_path = tmp_path / "dungeon.duckdb"
@@ -91,7 +91,8 @@ class TestMemoryRepositoryIntegration:
         repo = MemoryRepository(db_path=tmp_path / "dungeon.duckdb")
         repo.initialize_schema(MIGRATIONS_DIR)
         migrations = repo.list_migrations()
-        assert migrations == ["001_rpg_memory_foundation.sql"]
+        assert "001_rpg_memory_foundation.sql" in migrations
+        assert "002_dungeon_slug.sql" in migrations
         repo.close()
 
     def test_no_existing_play_mode_tables_affected(self, tmp_path: Path) -> None:

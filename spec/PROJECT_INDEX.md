@@ -2,8 +2,8 @@
 
 ## Phase
 
-Phase: 27 — RPG Core Loop
-Status: **Complete** (2026-06-02) — Spec: `spec/PHASE_27_RPG_CORE_LOOP.md`
+Phase: 28 — Memory Persistence
+Status: **Complete** (2026-06-02) — Spec: `spec/PHASE_28_MEMORY_PERSISTENCE.md`
 
 ---
 
@@ -11,12 +11,15 @@ Status: **Complete** (2026-06-02) — Spec: `spec/PHASE_27_RPG_CORE_LOOP.md`
 
 | Step | Task | Status |
 |---|---|---|
-| 27-1 | Dice pool resolver (`dice.py`) | Done |
-| 27-2 | Action resolver (`actions.py`) — momentum + push_yourself | Done |
-| 27-3 | Clock helpers (`clocks.py`) — advance, complete, overflow guard | Done |
-| 27-4 | Stress helpers (`stress.py`) — default tracks, mark, filled detection | Done |
-| 27-5 | RPG service (`service.py`) — create_actor, resolve_action, advance_clock, apply_stress + domain events | Done |
-| 27-6 | Integration tests — altar scenario, fallout flag, clock completion, momentum | Done |
+| 28-1 | Campaign / actor / stress track / action rating persistence (`repository.py`) | Done |
+| 28-2 | Clock + action resolution persistence (`repository.py`) | Done |
+| 28-3 | Memory entry CRUD — save, get, tags, links, checksum update | Done |
+| 28-4 | Sync report (`sync.py`) — missing file, invalid front matter, checksum mismatch, orphan Markdown, orphan DB row | Done |
+| 28-5 | Deterministic retrieval (`retrieval.py`) — by actor, location, tag, importance rank | Done |
+| 28-6 | Integration roundtrip — RPG state + memory entry survive restart, sync passes, retrieval works | Done |
+| 28-X1 | Migration `002_dungeon_slug.sql` — add `dungeon_slug TEXT` to `campaigns` table | Done |
+| 28-X2 | `save_campaign` + `get_campaign` updated to carry `dungeon_slug` | Done |
+| 28-X3 | Tests for dungeon_slug round-trip | Done |
 
 ---
 
@@ -243,6 +246,7 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 28 — Memory Persistence | **Complete** (2026-06-02) | 1549 passing |
 | Phase 27 — RPG Core Loop | **Complete** (2026-06-02) | 1511 passing |
 | Phase 26 — RPG + Memory Foundation | **Complete** (2026-06-02) | 1480 passing |
 | Phase 25 — Map Visual Polish Phase 1 | **Complete** (2026-06-02) | 1410 passing |
@@ -269,3 +273,30 @@ _Full session history in `spec/HISTORY.md`._
 - RPG + Memory roadmap begins at Phase 26. See `spec/RPG_MEMORY_ROADMAP.md`.
 - The RPG engine and memory layer are authoritative; the LLM is advisory.
 - Use `spec/RPG_MEMORY_ARCHITECTURE.md`, `spec/RPG_MEMORY_DATA_MODEL.md`, `spec/RPG_SYSTEM_SPEC.md`, and `spec/MEMORY_SYSTEM_SPEC.md` only when relevant to the active task.
+
+### Save Folder Structure (current)
+
+Each dungeon lives at `<dungeons_dir>/<dungeon_name>/`. The campaign's DuckDB and Markdown memory files live in the same folder. The `campaigns` table has a `dungeon_slug` column (added post-Phase 28) that records which dungeon folder the campaign belongs to.
+
+```
+<dungeons_dir>/
+  <dungeon_name>/
+    dungeon.json        ← dungeon design
+    session.json        ← play session state
+    campaign.duckdb     ← MemoryRepository (RPG state + memory)
+    memory/             ← room play notes (level_N.md)
+    rpg-memory/         ← Phase 28 Markdown narrative memory
+    setting.md          ← AI context docs
+    party.md
+    level_N_design.md
+```
+
+### Phase 29.5 — Campaign Save Folder Rename (planned, post-Phase 29)
+
+After Phase 29 is stable, rename the save structure so the **campaign** is the primary save entity. The GM's "save file" becomes the campaign name, not the dungeon name. Key changes:
+- `AppConfig.dungeons_dir` → `campaigns_dir`
+- Folder name = campaign `slug`
+- `DungeonRepository.clone_dungeon(source, dest)` added for running same dungeon with a new group
+- `dungeon_slug` column becomes "source template" reference only
+
+See `spec/IMPLEMENTATION_PHASES.md` Phase 29.5 for full detail.

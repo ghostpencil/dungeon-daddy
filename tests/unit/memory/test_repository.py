@@ -120,3 +120,13 @@ class TestMemoryRepository:
         repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
         repo.close()
         assert repo.health_check() is False
+
+    def test_campaigns_table_has_dungeon_slug_column(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        import duckdb
+        conn = duckdb.connect(str(tmp_path / "test.duckdb"))
+        cols = [row[1] for row in conn.execute("PRAGMA table_info('campaigns')").fetchall()]
+        conn.close()
+        repo.close()
+        assert "dungeon_slug" in cols

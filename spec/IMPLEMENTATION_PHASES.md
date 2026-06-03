@@ -1525,7 +1525,7 @@ dungeon_daddy/assets/ui/map/room_frames/frame_danger.png
 
 ## Phase 26 — RPG + Memory Foundation
 
-**Status: Proposed**
+**Status: Complete** — 1480 unit+integration tests passing. Closed 2026-06-02.
 
 Spec: `spec/PHASE_26_RPG_MEMORY_FOUNDATION.md`
 
@@ -1535,19 +1535,19 @@ Create module skeletons, base models, migration runner, DuckDB repository shell,
 
 | Step | Task | Status |
 |---|---|---|
-| 26-1 | Add RPG and memory module skeletons | Not Started |
-| 26-2 | Add base RPG and memory models | Not Started |
-| 26-3 | Add DuckDB migration runner | Not Started |
-| 26-4 | Add `001_rpg_memory_foundation.sql` migration | Not Started |
-| 26-5 | Add Markdown memory store shell | Not Started |
-| 26-6 | Add repository health check and domain event insert | Not Started |
-| 26-7 | Add unit/integration tests for foundation modules | Not Started |
+| 26-1 | Add RPG and memory module skeletons | Done |
+| 26-2 | Add base RPG and memory models | Done |
+| 26-3 | Add DuckDB migration runner | Done |
+| 26-4 | Add `001_rpg_memory_foundation.sql` migration | Done |
+| 26-5 | Add Markdown memory store shell | Done |
+| 26-6 | Add repository health check and domain event insert | Done |
+| 26-7 | Add unit/integration tests for foundation modules | Done |
 
 ---
 
 ## Phase 27 — RPG Core Loop
 
-**Status: Proposed**
+**Status: Complete** — 1511 unit+integration tests passing. Closed 2026-06-02.
 
 Spec: `spec/PHASE_27_RPG_CORE_LOOP.md`
 
@@ -1557,11 +1557,35 @@ Implement headless Charge-style action resolution, momentum, clocks, stress trac
 
 ## Phase 28 — Memory Persistence
 
-**Status: Proposed**
+**Status: Complete** — 1546 unit+integration tests passing. Closed 2026-06-02.
 
 Spec: `spec/PHASE_28_MEMORY_PERSISTENCE.md`
 
 Persist campaigns, sessions, scenes, actors, actions, clocks, domain events, memory entries, Markdown files, tags, and links.
+
+### Implementation Steps
+
+| Step | Task | Status |
+|---|---|---|
+| 28-1 | Campaign / actor / stress track / action rating persistence | Done |
+| 28-2 | Clock + action resolution persistence | Done |
+| 28-3 | Memory entry CRUD — save, get, tags, links, checksum update | Done |
+| 28-4 | Sync report — missing file, invalid front matter, checksum mismatch, orphan Markdown/DB | Done |
+| 28-5 | Deterministic retrieval — by actor, location, tag, importance rank | Done |
+| 28-6 | Integration roundtrip — RPG state + memory survive restart | Done |
+
+### Post-Phase 28 — Campaign-Dungeon Link
+
+Add `dungeon_slug` column to `campaigns` table via migration `002_dungeon_slug.sql`.
+
+This links each campaign row to the dungeon folder it was started from (`DungeonRepository` uses folder name as the dungeon identifier). The `dungeon_slug` records which dungeon design the campaign is running — it is the folder name under `dungeons_dir`, not a file path.
+
+| Step | Task | Status |
+|---|---|---|
+| 28-X1 | Add `002_dungeon_slug.sql` migration — `ALTER TABLE campaigns ADD COLUMN dungeon_slug TEXT` | Not Started |
+| 28-X2 | Add `save_campaign` overload / update to accept `dungeon_slug` param | Not Started |
+| 28-X3 | Update `get_campaign` to return `dungeon_slug` in the result dict | Not Started |
+| 28-X4 | Tests: save campaign with dungeon_slug, retrieve, confirm round-trip | Not Started |
 
 ---
 
@@ -1572,6 +1596,54 @@ Persist campaigns, sessions, scenes, actors, actions, clocks, domain events, mem
 Spec: `spec/PHASE_29_FALLOUT_AND_DUNGEON_INFLUENCE.md`
 
 Implement Body, Composure, Bonds, and Weird fallout; intimacy risk; dungeon influence; and memory projection for consequences.
+
+---
+
+## Phase 29.5 — Campaign Save Folder Rename
+
+**Status: Proposed (post-Phase 29 improvement)**
+
+No spec file yet. This is a structural rename with no new game behaviour.
+
+### Background
+
+Currently the save folder structure is `<dungeons_dir>/<dungeon_name>/`. The primary entity is the dungeon; campaign save data (DuckDB, Markdown memory, session state) is attached to it.
+
+The intended end state is that the **campaign** is the primary save entity: `<campaigns_dir>/<campaign_slug>/`. A GM's "save file" is their campaign name, not the dungeon design name. Multiple campaigns can run the same dungeon by cloning the dungeon folder first.
+
+### What to build
+
+| Step | Task |
+|---|---|
+| 29.5-1 | `DungeonRepository.clone_dungeon(source_slug, dest_slug)` — copies `dungeon.json` and all context docs (`setting.md`, `party.md`, `level_*_design.md`); does NOT copy `session.json`, `campaign.duckdb`, `memory/`, `rpg-memory/` |
+| 29.5-2 | Rename `AppConfig.dungeons_dir` → `AppConfig.campaigns_dir`; update all call sites |
+| 29.5-3 | Rename `DungeonRepository.__init__(dungeons_dir)` parameter → `campaigns_dir`; update all call sites |
+| 29.5-4 | Convention: campaign folder name = campaign `slug`; `dungeon_slug` column on `campaigns` table becomes a "source template" reference only |
+| 29.5-5 | Update `DungeonRepository.list_dungeons()` → `list_campaigns()`; deprecation alias kept for one phase |
+| 29.5-6 | Migration guide note in `spec/HISTORY.md` — folder rename is breaking for existing save data; instruct users to rename their `dungeons/` directory to `campaigns/` |
+| 29.5-7 | Full test suite green; no behaviour change for existing dungeons/campaigns |
+
+### Why defer
+
+This is a pure rename. It touches `AppConfig`, `DungeonRepository`, and all call sites but adds no new game capability. Doing it mid-build (before Phase 29 fallout is stable) adds noise. Run it as a clean, dedicated pass once Phase 29 is closed.
+
+### Save folder layout (target state)
+
+```
+<campaigns_dir>/
+  <campaign_slug>/          ← folder name IS the campaign save name
+    dungeon.json            ← dungeon design (copied from source template on clone)
+    session.json            ← play session state
+    campaign.duckdb         ← MemoryRepository — RPG state + narrative memory
+    memory/                 ← existing room play notes (level_N.md)
+    rpg-memory/             ← Phase 28 Markdown narrative memory files
+      actors/
+      events/
+      fallout/
+    setting.md              ← AI context docs (copied on clone)
+    party.md
+    level_N_design.md
+```
 
 ---
 
