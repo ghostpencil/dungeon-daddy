@@ -2,8 +2,8 @@
 
 ## Phase
 
-Phase: 26 — RPG + Memory Foundation
-Status: **Complete** (2026-06-02) — Spec: `spec/PHASE_26_RPG_MEMORY_FOUNDATION.md`
+Phase: 27 — RPG Core Loop
+Status: **Complete** (2026-06-02) — Spec: `spec/PHASE_27_RPG_CORE_LOOP.md`
 
 ---
 
@@ -11,13 +11,12 @@ Status: **Complete** (2026-06-02) — Spec: `spec/PHASE_26_RPG_MEMORY_FOUNDATION
 
 | Step | Task | Status |
 |---|---|---|
-| 26-1 | Add RPG and memory module skeletons | Done |
-| 26-2 | Add base RPG and memory models (TDD) | Done |
-| 26-3 | Add DuckDB migration runner (TDD) | Done |
-| 26-4 | Add `001_rpg_memory_foundation.sql` migration | Done |
-| 26-5 | Add Markdown memory store shell (TDD) | Done |
-| 26-6 | Add repository health check and domain event insert (TDD) | Done |
-| 26-7 | Add integration tests for migration runner | Done |
+| 27-1 | Dice pool resolver (`dice.py`) | Done |
+| 27-2 | Action resolver (`actions.py`) — momentum + push_yourself | Done |
+| 27-3 | Clock helpers (`clocks.py`) — advance, complete, overflow guard | Done |
+| 27-4 | Stress helpers (`stress.py`) — default tracks, mark, filled detection | Done |
+| 27-5 | RPG service (`service.py`) — create_actor, resolve_action, advance_clock, apply_stress + domain events | Done |
+| 27-6 | Integration tests — altar scenario, fallout flag, clock completion, momentum | Done |
 
 ---
 
@@ -244,6 +243,7 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 27 — RPG Core Loop | **Complete** (2026-06-02) | 1511 passing |
 | Phase 26 — RPG + Memory Foundation | **Complete** (2026-06-02) | 1480 passing |
 | Phase 25 — Map Visual Polish Phase 1 | **Complete** (2026-06-02) | 1410 passing |
 | Phase 24 — Graph Mode Phase 4.1: Cleanup | **Complete** (2026-06-02) | 1395 passing (post-fix) |
