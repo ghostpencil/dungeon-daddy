@@ -6,6 +6,7 @@ from pathlib import Path
 import duckdb
 
 from dungeon_daddy.memory.models import DomainEvent
+from dungeon_daddy.rpg.models import FalloutRecord
 
 
 def _ensure_migration_table(conn: duckdb.DuckDBPyConnection) -> None:
@@ -522,6 +523,62 @@ class MemoryRepository:
             "status": row[3],
             "dungeon_slug": row[4],
         }
+
+    # ------------------------------------------------------------------
+    # Fallout
+    # ------------------------------------------------------------------
+
+    def save_fallout_record(self, fallout: FalloutRecord) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO fallout
+                (fallout_id, campaign_id, actor_id, track_key, severity,
+                 title, summary, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (fallout_id) DO UPDATE SET
+                track_key = excluded.track_key,
+                severity  = excluded.severity,
+                title     = excluded.title,
+                summary   = excluded.summary,
+                status    = excluded.status
+            """,
+            [
+                fallout.fallout_id,
+                fallout.campaign_id,
+                fallout.actor_id,
+                fallout.track_key,
+                fallout.severity,
+                fallout.title,
+                fallout.summary,
+                fallout.status,
+            ],
+        )
+
+    def get_fallout_records(
+        self, campaign_id: str, actor_id: str
+    ) -> list[dict]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT fallout_id, campaign_id, actor_id, track_key, severity, status
+            FROM fallout
+            WHERE campaign_id = ? AND actor_id = ?
+            ORDER BY fallout_id
+            """,
+            [campaign_id, actor_id],
+        ).fetchall()
+        return [
+            {
+                "fallout_id": r[0],
+                "campaign_id": r[1],
+                "actor_id": r[2],
+                "track_key": r[3],
+                "severity": r[4],
+                "status": r[5],
+            }
+            for r in rows
+        ]
 
     def close(self) -> None:
         if self._conn is not None:
