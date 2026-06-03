@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed.
+Complete — 1708 tests passing. Closed 2026-06-03.
 
 ## Goal
 

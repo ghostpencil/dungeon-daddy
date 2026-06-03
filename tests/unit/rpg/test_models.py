@@ -72,9 +72,9 @@ class TestStressTrack:
         assert t.track_key == "body"
         assert t.filled == 0
 
-    def test_capacity_defaults_to_six(self) -> None:
+    def test_capacity_defaults_to_four(self) -> None:
         t = StressTrack(track_key="weird")
-        assert t.capacity == 6
+        assert t.capacity == 4
 
     def test_filled_cannot_be_negative(self) -> None:
         with pytest.raises(ValidationError):
