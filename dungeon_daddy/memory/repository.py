@@ -131,6 +131,398 @@ class MemoryRepository:
         ).fetchall()
         return [row[0] for row in rows]
 
+    # ------------------------------------------------------------------
+    # Actors
+    # ------------------------------------------------------------------
+
+    def save_actor(
+        self,
+        actor_id: str,
+        campaign_id: str,
+        actor_type: str,
+        slug: str,
+        display_name: str,
+        status: str = "active",
+    ) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO actors (actor_id, campaign_id, actor_type, slug, display_name, status)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT (actor_id) DO UPDATE SET
+                actor_type   = excluded.actor_type,
+                slug         = excluded.slug,
+                display_name = excluded.display_name,
+                status       = excluded.status
+            """,
+            [actor_id, campaign_id, actor_type, slug, display_name, status],
+        )
+
+    def get_actor(self, actor_id: str) -> dict | None:
+        assert self._conn is not None
+        row = self._conn.execute(
+            """
+            SELECT actor_id, campaign_id, actor_type, slug, display_name, status
+            FROM actors WHERE actor_id = ?
+            """,
+            [actor_id],
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "actor_id": row[0],
+            "campaign_id": row[1],
+            "actor_type": row[2],
+            "slug": row[3],
+            "display_name": row[4],
+            "status": row[5],
+        }
+
+    def save_actor_stress_track(
+        self, actor_id: str, track_key: str, capacity: int, filled: int
+    ) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO stress_tracks (actor_id, track_key, capacity, filled)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (actor_id, track_key) DO UPDATE SET
+                capacity = excluded.capacity,
+                filled   = excluded.filled
+            """,
+            [actor_id, track_key, capacity, filled],
+        )
+
+    def get_actor_stress_tracks(self, actor_id: str) -> list[dict]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            "SELECT track_key, capacity, filled FROM stress_tracks WHERE actor_id = ?",
+            [actor_id],
+        ).fetchall()
+        return [{"track_key": r[0], "capacity": r[1], "filled": r[2]} for r in rows]
+
+    def save_actor_action_rating(
+        self, actor_id: str, action_key: str, rating: int
+    ) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO action_ratings (actor_id, action_key, rating)
+            VALUES (?, ?, ?)
+            ON CONFLICT (actor_id, action_key) DO UPDATE SET rating = excluded.rating
+            """,
+            [actor_id, action_key, rating],
+        )
+
+    def get_actor_action_ratings(self, actor_id: str) -> list[dict]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            "SELECT action_key, rating FROM action_ratings WHERE actor_id = ?",
+            [actor_id],
+        ).fetchall()
+        return [{"action_key": r[0], "rating": r[1]} for r in rows]
+
+    # ------------------------------------------------------------------
+    # Memory entries
+    # ------------------------------------------------------------------
+
+    def save_memory_entry(
+        self,
+        memory_id: str,
+        campaign_id: str,
+        entry_type: str,
+        title: str,
+        summary: str = "",
+        status: str = "active",
+        importance: int = 5,
+        markdown_path: str | None = None,
+        checksum: str | None = None,
+    ) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO memory_entries
+                (memory_id, campaign_id, type, title, summary, status, importance,
+                 markdown_path, checksum)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (memory_id) DO UPDATE SET
+                type          = excluded.type,
+                title         = excluded.title,
+                summary       = excluded.summary,
+                status        = excluded.status,
+                importance    = excluded.importance,
+                markdown_path = excluded.markdown_path,
+                checksum      = excluded.checksum
+            """,
+            [
+                memory_id, campaign_id, entry_type, title, summary,
+                status, importance, markdown_path, checksum,
+            ],
+        )
+
+    def get_memory_entry(self, memory_id: str) -> dict | None:
+        assert self._conn is not None
+        row = self._conn.execute(
+            """
+            SELECT memory_id, campaign_id, type, title, summary, status,
+                   importance, markdown_path, checksum
+            FROM memory_entries WHERE memory_id = ?
+            """,
+            [memory_id],
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "memory_id": row[0],
+            "campaign_id": row[1],
+            "type": row[2],
+            "title": row[3],
+            "summary": row[4],
+            "status": row[5],
+            "importance": row[6],
+            "markdown_path": row[7],
+            "checksum": row[8],
+        }
+
+    def add_memory_tag(self, memory_id: str, tag: str) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO memory_tags (memory_id, tag) VALUES (?, ?)
+            ON CONFLICT (memory_id, tag) DO NOTHING
+            """,
+            [memory_id, tag],
+        )
+
+    def get_memory_tags(self, memory_id: str) -> list[str]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            "SELECT tag FROM memory_tags WHERE memory_id = ?", [memory_id]
+        ).fetchall()
+        return [r[0] for r in rows]
+
+    def add_memory_link(self, from_id: str, to_id: str, link_type: str) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO memory_links (from_id, to_id, link_type) VALUES (?, ?, ?)
+            ON CONFLICT (from_id, to_id, link_type) DO NOTHING
+            """,
+            [from_id, to_id, link_type],
+        )
+
+    def get_memory_links(self, from_id: str) -> list[dict]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            "SELECT from_id, to_id, link_type FROM memory_links WHERE from_id = ?",
+            [from_id],
+        ).fetchall()
+        return [{"from_id": r[0], "to_id": r[1], "link_type": r[2]} for r in rows]
+
+    def update_memory_checksum(
+        self, memory_id: str, checksum: str, markdown_path: str
+    ) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            UPDATE memory_entries SET checksum = ?, markdown_path = ?
+            WHERE memory_id = ?
+            """,
+            [checksum, markdown_path, memory_id],
+        )
+
+    def get_memory_entries_by_campaign_all(self) -> list[dict]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT memory_id, campaign_id, type, title, summary, status,
+                   importance, markdown_path, checksum
+            FROM memory_entries
+            ORDER BY importance DESC
+            """
+        ).fetchall()
+        return [
+            {
+                "memory_id": r[0],
+                "campaign_id": r[1],
+                "type": r[2],
+                "title": r[3],
+                "summary": r[4],
+                "status": r[5],
+                "importance": r[6],
+                "markdown_path": r[7],
+                "checksum": r[8],
+            }
+            for r in rows
+        ]
+
+    def get_memory_entries_by_campaign(self, campaign_id: str) -> list[dict]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT memory_id, campaign_id, type, title, summary, status,
+                   importance, markdown_path, checksum
+            FROM memory_entries WHERE campaign_id = ?
+            ORDER BY importance DESC
+            """,
+            [campaign_id],
+        ).fetchall()
+        return [
+            {
+                "memory_id": r[0],
+                "campaign_id": r[1],
+                "type": r[2],
+                "title": r[3],
+                "summary": r[4],
+                "status": r[5],
+                "importance": r[6],
+                "markdown_path": r[7],
+                "checksum": r[8],
+            }
+            for r in rows
+        ]
+
+    # ------------------------------------------------------------------
+    # Action resolutions
+    # ------------------------------------------------------------------
+
+    def save_action_resolution(
+        self,
+        resolution_id: str,
+        campaign_id: str,
+        actor_id: str,
+        action_key: str,
+        outcome: str,
+        scene_id: str | None = None,
+    ) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO action_resolutions
+                (resolution_id, campaign_id, scene_id, actor_id, action_key, outcome)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT (resolution_id) DO UPDATE SET
+                outcome    = excluded.outcome,
+                action_key = excluded.action_key
+            """,
+            [resolution_id, campaign_id, scene_id, actor_id, action_key, outcome],
+        )
+
+    def get_action_resolutions(self, campaign_id: str) -> list[dict]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT resolution_id, campaign_id, scene_id, actor_id, action_key, outcome
+            FROM action_resolutions WHERE campaign_id = ?
+            ORDER BY resolved_at
+            """,
+            [campaign_id],
+        ).fetchall()
+        return [
+            {
+                "resolution_id": r[0],
+                "campaign_id": r[1],
+                "scene_id": r[2],
+                "actor_id": r[3],
+                "action_key": r[4],
+                "outcome": r[5],
+            }
+            for r in rows
+        ]
+
+    # ------------------------------------------------------------------
+    # Clocks
+    # ------------------------------------------------------------------
+
+    def save_clock(
+        self,
+        clock_id: str,
+        campaign_id: str,
+        label: str,
+        segments: int,
+        filled: int = 0,
+        status: str = "active",
+    ) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO clocks (clock_id, campaign_id, label, segments, filled, status)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT (clock_id) DO UPDATE SET
+                label    = excluded.label,
+                segments = excluded.segments,
+                filled   = excluded.filled,
+                status   = excluded.status
+            """,
+            [clock_id, campaign_id, label, segments, filled, status],
+        )
+
+    def get_clocks(self, campaign_id: str) -> list[dict]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT clock_id, campaign_id, label, segments, filled, status
+            FROM clocks WHERE campaign_id = ?
+            """,
+            [campaign_id],
+        ).fetchall()
+        return [
+            {
+                "clock_id": r[0],
+                "campaign_id": r[1],
+                "label": r[2],
+                "segments": r[3],
+                "filled": r[4],
+                "status": r[5],
+            }
+            for r in rows
+        ]
+
+    # ------------------------------------------------------------------
+    # Campaign
+    # ------------------------------------------------------------------
+
+    def save_campaign(
+        self,
+        campaign_id: str,
+        slug: str,
+        title: str,
+        status: str = "active",
+        dungeon_slug: str | None = None,
+    ) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO campaigns (campaign_id, slug, title, status, dungeon_slug)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (campaign_id) DO UPDATE SET
+                slug         = excluded.slug,
+                title        = excluded.title,
+                status       = excluded.status,
+                dungeon_slug = excluded.dungeon_slug
+            """,
+            [campaign_id, slug, title, status, dungeon_slug],
+        )
+
+    def get_campaign(self, campaign_id: str) -> dict | None:
+        assert self._conn is not None
+        row = self._conn.execute(
+            """
+            SELECT campaign_id, slug, title, status, dungeon_slug
+            FROM campaigns WHERE campaign_id = ?
+            """,
+            [campaign_id],
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "campaign_id": row[0],
+            "slug": row[1],
+            "title": row[2],
+            "status": row[3],
+            "dungeon_slug": row[4],
+        }
+
     def close(self) -> None:
         if self._conn is not None:
             self._conn.close()
