@@ -79,6 +79,7 @@ class ActionRequest(BaseModel):
     actor_id: str
     action_key: str
     dice_pool: int = 1
+    momentum_spend: int = 0
     push_yourself: bool = False
 
 
