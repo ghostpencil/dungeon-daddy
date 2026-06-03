@@ -38,6 +38,39 @@ class TestContextBundleBuilder:
         assert builder._focus_actor_ids == ["actor_001"]
         assert builder._token_budget == 500
 
+    def test_build_with_no_data_returns_empty_collections(
+        self, repo: MemoryRepository
+    ) -> None:
+        builder = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+        )
+        bundle = builder.build(repo)
+        assert bundle.memory_cards == []
+        assert bundle.active_fallout == []
+        assert bundle.open_clocks == []
+        assert bundle.mechanical_state == {}
+        assert bundle.must_remember == []
+
+    def test_build_with_unknown_actor_returns_empty_actor_state(
+        self, repo: MemoryRepository
+    ) -> None:
+        builder = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=["actor_does_not_exist"],
+            token_budget=500,
+        )
+        bundle = builder.build(repo)
+        actor_state = bundle.mechanical_state.get("actor_does_not_exist")
+        assert actor_state is not None
+        assert actor_state["action_ratings"] == []
+        assert actor_state["stress_tracks"] == []
+
     def test_build_returns_context_bundle_with_core_fields(
         self, repo: MemoryRepository
     ) -> None:
