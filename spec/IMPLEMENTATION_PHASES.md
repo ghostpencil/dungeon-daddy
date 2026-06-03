@@ -1659,11 +1659,11 @@ Expose RPG state, clocks, fallout, and memory in Play Mode using panels and debu
 
 ## Phase 31 — Context Bundles + AI Integration
 
-**Status: Proposed**
+**Status: Complete** — 1686 unit+integration tests passing. Closed 2026-06-03.
 
 Spec: `spec/PHASE_31_CONTEXT_BUNDLES_AND_AI_INTEGRATION.md`
 
-Generate LLM-ready context bundles from RPG state and memory retrieval; update DM agent to consume bundles.
+Built `MemoryRetriever` (tag/actor/location filtering, importance+recency ranking, token budget trim), `ContextBundleBuilder` (assembles `ContextBundle` from real DuckDB: scene brief, mechanical state, fallout, clocks, memory cards, provenance), `DMAgent.build_prompt(context_bundle)` (injects bundle into system prompt), and `DebugControls.set_bundle()` / `bundle_section_lines()` for provenance display. Bug fix: `dm_agent.build_prompt()` clock label key was `name`; repo uses `label`. Context bundle not yet wired into live app UI flow — wiring is a Phase 32+ concern.
 
 ---
 

@@ -5,7 +5,7 @@
 Phase: 31 — Context Bundles + AI Integration
 Status: **Complete** — Spec: `spec/PHASE_31_CONTEXT_BUNDLES_AND_AI_INTEGRATION.md`
 
-Next phase: TBD
+Next phase: 32 — Stabilization + Balancing (`spec/PHASE_32_STABILIZATION_AND_BALANCING.md`)
 
 ---
 
