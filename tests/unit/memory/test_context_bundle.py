@@ -1,0 +1,235 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
+from dungeon_daddy.memory.repository import MemoryRepository
+
+MIGRATIONS_DIR = (
+    Path(__file__).parent.parent.parent.parent
+    / "dungeon_daddy"
+    / "data"
+    / "migrations"
+)
+
+
+@pytest.fixture
+def repo(tmp_path: Path) -> MemoryRepository:
+    r = MemoryRepository(db_path=tmp_path / "test.duckdb")
+    r.initialize_schema(MIGRATIONS_DIR)
+    yield r
+    r.close()
+
+
+class TestContextBundleBuilder:
+    def test_constructor_stores_params(self) -> None:
+        builder = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id="scene_001",
+            mode="run_scene",
+            focus_actor_ids=["actor_001"],
+            token_budget=500,
+        )
+        assert builder._campaign_id == "camp_001"
+        assert builder._scene_id == "scene_001"
+        assert builder._mode == "run_scene"
+        assert builder._focus_actor_ids == ["actor_001"]
+        assert builder._token_budget == 500
+
+    def test_build_returns_context_bundle_with_core_fields(
+        self, repo: MemoryRepository
+    ) -> None:
+        from dungeon_daddy.memory.models import ContextBundle
+
+        builder = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id="scene_001",
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+        )
+        bundle = builder.build(repo)
+
+        assert isinstance(bundle, ContextBundle)
+        assert bundle.campaign_id == "camp_001"
+        assert bundle.scene_id == "scene_001"
+        assert bundle.mode == "run_scene"
+        assert bundle.bundle_id  # non-empty
+
+    def test_build_populates_scene_brief_from_scenes_table(
+        self, repo: MemoryRepository
+    ) -> None:
+        repo._conn.execute(
+            "INSERT INTO scenes (scene_id, campaign_id, location_slug, status)"
+            " VALUES (?, ?, ?, ?)",
+            ["scene_001", "camp_001", "moonlit-cathedral", "active"],
+        )
+        builder = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id="scene_001",
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+        )
+        bundle = builder.build(repo)
+
+        assert bundle.scene_brief["location_slug"] == "moonlit-cathedral"
+        assert bundle.scene_brief["status"] == "active"
+
+    def test_build_mechanical_state_includes_focus_actor_data(
+        self, repo: MemoryRepository
+    ) -> None:
+        repo.save_actor("actor_001", "camp_001", "pc", "mara", "Mara")
+        repo.save_actor_action_rating("actor_001", "prowl", 2)
+        repo.save_actor_stress_track("actor_001", "body", 6, 3)
+
+        builder = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=["actor_001"],
+            token_budget=500,
+        )
+        bundle = builder.build(repo)
+
+        actor_data = bundle.mechanical_state.get("actor_001")
+        assert actor_data is not None
+        assert {"action_key": "prowl", "rating": 2} in actor_data["action_ratings"]
+        assert {"track_key": "body", "capacity": 6, "filled": 3} in actor_data["stress_tracks"]
+
+    def test_build_active_fallout_excludes_resolved(
+        self, repo: MemoryRepository
+    ) -> None:
+        from dungeon_daddy.rpg.models import FalloutRecord
+
+        repo.save_fallout_record(
+            FalloutRecord(
+                fallout_id="fall_001",
+                campaign_id="camp_001",
+                actor_id="actor_001",
+                track_key="body",
+                severity="minor",
+                title="Bruised",
+                summary="Light hit",
+                status="active",
+            )
+        )
+        repo.save_fallout_record(
+            FalloutRecord(
+                fallout_id="fall_002",
+                campaign_id="camp_001",
+                actor_id="actor_001",
+                track_key="body",
+                severity="minor",
+                title="Healed",
+                summary="Recovered",
+                status="resolved",
+            )
+        )
+
+        builder = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=["actor_001"],
+            token_budget=500,
+        )
+        bundle = builder.build(repo)
+
+        fallout_ids = {f["fallout_id"] for f in bundle.active_fallout}
+        assert "fall_001" in fallout_ids
+        assert "fall_002" not in fallout_ids
+
+    def test_build_open_clocks_excludes_completed(
+        self, repo: MemoryRepository
+    ) -> None:
+        repo.save_clock("clk_001", "camp_001", "Dungeon Awakens", 8, 3, "active")
+        repo.save_clock("clk_002", "camp_001", "Old Quest", 4, 4, "completed")
+
+        builder = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+        )
+        bundle = builder.build(repo)
+
+        clock_ids = {c["clock_id"] for c in bundle.open_clocks}
+        assert "clk_001" in clock_ids
+        assert "clk_002" not in clock_ids
+
+    def test_build_memory_cards_trimmed_to_token_budget(
+        self, repo: MemoryRepository
+    ) -> None:
+        # Each entry title+summary = 80 chars → ~20 tokens. Budget 50 fits 2.
+        for i in range(5):
+            repo.save_memory_entry(
+                f"mem_{i:03d}", "camp_001", "event", "x" * 40,
+                summary="y" * 40, importance=5,
+            )
+
+        builder = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=50,
+        )
+        bundle = builder.build(repo)
+
+        assert len(bundle.memory_cards) == 2
+
+    def test_build_provenance_records_counts_and_criteria(
+        self, repo: MemoryRepository
+    ) -> None:
+        for i in range(5):
+            repo.save_memory_entry(
+                f"mem_{i:03d}", "camp_001", "event", "x" * 40,
+                summary="y" * 40, importance=5,
+            )
+
+        builder = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=["actor_001"],
+            token_budget=50,
+        )
+        bundle = builder.build(repo)
+
+        assert bundle.provenance["retrieved"] == 5
+        assert bundle.provenance["omitted"] == 3
+        assert bundle.provenance["focus_actor_ids"] == ["actor_001"]
+
+    def test_build_must_remember_included_when_budget_exhausted(
+        self, repo: MemoryRepository
+    ) -> None:
+        # Three normal-importance entries that fill the budget
+        for i in range(3):
+            repo.save_memory_entry(
+                f"mem_{i:03d}", "camp_001", "event", "x" * 40,
+                summary="y" * 40, importance=5,
+            )
+        # A must-remember entry with importance >= 9
+        repo.save_memory_entry(
+            "mem_must", "camp_001", "event", "Critical Fact",
+            summary="Must know this", importance=9,
+        )
+
+        builder = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=1,  # budget too small for anything
+        )
+        bundle = builder.build(repo)
+
+        # must_remember lists the pinned entry ID
+        assert "mem_must" in bundle.must_remember
+        # the card still appears in memory_cards
+        card_ids = {c["memory_id"] for c in bundle.memory_cards}
+        assert "mem_must" in card_ids

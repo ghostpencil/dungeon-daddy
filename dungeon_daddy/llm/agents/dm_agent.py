@@ -37,6 +37,38 @@ class DungeonMasterAgent:
         self._context_builder = context_builder
         self._system_prompt = load_prompt("dm_system")
 
+    def build_prompt(self, context_bundle=None) -> str:
+        if context_bundle is None:
+            return self._system_prompt
+        lines = [self._system_prompt]
+        brief = context_bundle.scene_brief
+        if brief:
+            lines.append("\n# Scene")
+            lines.append(f"Location: {brief.get('location_slug', '')}")
+            lines.append(f"Status: {brief.get('status', '')}")
+        cards = context_bundle.memory_cards
+        if cards:
+            lines.append("\n# Memory")
+            for i, card in enumerate(cards, 1):
+                label = "[DRAFT] " if card.get("draft") else ""
+                lines.append(
+                    f"{i}. {label}{card['title']} (importance: {card['importance']})"
+                    f"\n   {card['summary']}"
+                )
+        fallout = context_bundle.active_fallout
+        clocks = context_bundle.open_clocks
+        if fallout or clocks:
+            lines.append("\n# Mechanical Context")
+            if fallout:
+                lines.append("Active Fallout:")
+                for f in fallout:
+                    lines.append(f"  - {f.get('description', '')} [{f.get('status', '')}]")
+            if clocks:
+                lines.append("Open Clocks:")
+                for c in clocks:
+                    lines.append(f"  - {c.get('label', c.get('name', ''))} ({c.get('filled', 0)}/{c.get('segments', 0)})")
+        return "\n".join(lines)
+
     def respond(
         self,
         history: list[LLMMessage],
@@ -46,9 +78,11 @@ class DungeonMasterAgent:
         room_memory: str = "",
         level_id: int | None = None,
         active_loop: Loop | None = None,
+        context_bundle=None,
     ) -> str:
         context = self._build_context(room, level, dungeon, room_memory)
-        system = self._system_prompt + "\n\n" + context
+        base = self.build_prompt(context_bundle)
+        system = base + "\n\n" + context
         if active_loop is not None:
             system += "\n\n" + self._build_loop_context(active_loop, room, level)
         if self._context_builder is not None:

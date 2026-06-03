@@ -1,0 +1,82 @@
+{
+  "bundle_id": "e4109ceb-4cb6-4805-86d5-69dd44458bb8",
+  "campaign_id": "camp-smoke",
+  "scene_id": "scene-smoke",
+  "mode": "run_scene",
+  "scene_brief": {
+    "scene_id": "scene-smoke",
+    "location_slug": "ossuary",
+    "status": "active"
+  },
+  "mechanical_state": {
+    "actor-smoke": {
+      "action_ratings": [
+        {
+          "action_key": "skirmish",
+          "rating": 2
+        },
+        {
+          "action_key": "study",
+          "rating": 1
+        }
+      ],
+      "stress_tracks": [
+        {
+          "track_key": "body",
+          "capacity": 6,
+          "filled": 2
+        }
+      ]
+    }
+  },
+  "active_fallout": [
+    {
+      "fallout_id": "fall-smoke",
+      "campaign_id": "camp-smoke",
+      "actor_id": "actor-smoke",
+      "track_key": "body",
+      "severity": "minor",
+      "status": "active"
+    }
+  ],
+  "open_clocks": [
+    {
+      "clock_id": "clk-smoke",
+      "campaign_id": "camp-smoke",
+      "label": "Ritual of Binding",
+      "segments": 8,
+      "filled": 5,
+      "status": "active"
+    }
+  ],
+  "must_remember": [
+    "mem-smoke-1"
+  ],
+  "memory_cards": [
+    {
+      "memory_id": "mem-smoke-1",
+      "title": "The Betrayal",
+      "summary": "The guide turned on the party at the bone gate.",
+      "importance": 9
+    },
+    {
+      "memory_id": "mem-smoke-2",
+      "title": "Ossuary Legend",
+      "summary": "The dead here were sealed by an old pact.",
+      "importance": 5
+    },
+    {
+      "memory_id": "mem-smoke-3",
+      "title": "Party Note",
+      "summary": "Theron suspects the warden is still alive.",
+      "importance": 3
+    }
+  ],
+  "provenance": {
+    "retrieved": 3,
+    "omitted": 0,
+    "focus_actor_ids": [
+      "actor-smoke"
+    ]
+  }
+}

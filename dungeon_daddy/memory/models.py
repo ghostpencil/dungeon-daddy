@@ -17,6 +17,7 @@ class MemoryEntry(BaseModel):
     markdown_path: str | None = None
     checksum: str | None = None
     tags: list[str] = Field(default_factory=list)
+    created_at: datetime | None = None
 
 
 class MemoryTag(BaseModel):

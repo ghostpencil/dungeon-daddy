@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from dungeon_daddy.memory.models import MemoryEntry
+from dungeon_daddy.memory.models import ContextBundle, MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.models import ActionRequest, ActionResolution, ClockState, StressTrack
 from dungeon_daddy.rpg.service import RpgService
@@ -24,6 +24,24 @@ class DebugControls:
         self._last_clock: ClockState | None = None
         self._last_sync_issues: list | None = None
         self._last_memory_note: MemoryEntry | None = None
+        self._last_bundle: ContextBundle | None = None
+
+    def set_bundle(self, bundle: ContextBundle) -> None:
+        self._last_bundle = bundle
+
+    def bundle_section_lines(self) -> list[str]:
+        if self._last_bundle is None:
+            return ["No bundle built yet"]
+        b = self._last_bundle
+        omitted = b.provenance.get("omitted", 0)
+        lines = [
+            f"Context bundle: {b.bundle_id}",
+            f"  Cards: {len(b.memory_cards)}  Trimmed: {omitted}",
+        ]
+        for card in b.memory_cards:
+            reason = "importance" if card["memory_id"] in b.must_remember else "retrieved"
+            lines.append(f"  - {card['title']} [{reason}]")
+        return lines
 
     def resolve_sample_action(
         self,
