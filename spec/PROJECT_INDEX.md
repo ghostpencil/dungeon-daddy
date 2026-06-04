@@ -2,20 +2,43 @@
 
 ## Phase
 
-Phase: 33 — (not yet defined)
-Status: **Ready to plan** — Phase 32 closed out 2026-06-03. See `docs/PHASE_32_CLOSEOUT.md`.
+Phase: 33 — Player-Controlled Action Loop
+Status: **In Progress** — Branch `phase-33-player-controlled-action-loop` open. Specs committed 2026-06-03.
 
 ---
 
-## Next Steps
+## Product Direction
 
-Phase 33 not yet scoped. Top deferred items from Phase 32 closeout:
+> Dungeon Daddy controls the world, dungeon, monsters, NPCs, secrets, clocks, consequences, and narration.
+> The human player controls the player side: one or more player-controlled actors and the actions they attempt.
+
+**Core authority rule:** The RPG engine and memory layer are authoritative. The LLM is advisory. The LLM may narrate, frame choices, interpret tone, and eventually propose structured world reactions. It must not directly mutate authoritative state.
+
+---
+
+## Phase 33–37 Roadmap
+
+| Phase | Name | Goal |
+|---|---|---|
+| **33** | Player-Controlled Action Loop | Make Play Mode resolve player-controlled actor actions through the RPG service and narrate with live context bundles. |
+| 34 | Campaign RPG Data Deepening | Patch the two existing campaigns with RPG-ready player actors, NPCs, monsters, clocks, memories, and room threat hooks. |
+| 35 | Deterministic World Reaction Service | Add a deterministic service that turns player outcomes into dungeon/NPC/monster reactions, clocks, stress, fallout, and memory events. |
+| 36 | LLM-Proposed Reaction Drafts | Allow the LLM to propose structured reactions, but validate and apply them through deterministic services only. |
+| 37 | Memory Approval and Playtest Curation | Add curated approval/edit/reject workflows for LLM-drafted memories and run an alpha playtest scenario across seeded campaigns. |
+
+See `spec/PHASE_33_PLAYER_CONTROLLED_ACTION_LOOP.md` for Phase 33 detail. Full phase specs in `spec/IMPLEMENTATION_PHASES.md`.
+
+---
+
+## Next Steps — Phase 33
 
 | Priority | Item | Notes |
 |---|---|---|
-| 1 | Wire `ContextBundleBuilder` into `PlayView._spawn_dm_thread` | Bundle built but never passed to `agent.respond()` — DM still uses room-memory-only path during live play |
-| 2 | Memory provenance in Debug tab | `bundle.provenance` data available; UI not wired |
-| 3 | LLM-drafted memory entry approval flow | `[DRAFT]` label renders in prompt; persist/approve logic not implemented |
+| 1 | Seed both existing campaigns with RPG-ready player-controlled actors | Must support one or more player-controlled actors; do not hardcode party-only assumptions |
+| 2 | Add Player Action UI | Select actor, enter intent, choose action, resolve through `RpgService` |
+| 3 | Wire `ContextBundleBuilder` into `PlayView._spawn_dm_thread` | Build/snapshot bundle before thread; pass to `DungeonMasterAgent.respond(context_bundle=...)` |
+| 4 | Add Debug provenance display | Show bundle id, memory counts, focus actors, clocks/fallout counts, and whether bundle was passed to DM |
+| 5 | Smoke test both existing campaigns | Screenshots after each visible UI action |
 
 ## Known Failures
 
@@ -67,6 +90,10 @@ _Full session history in `spec/HISTORY.md`._
 
 ## Notes
 
+- Player controls the player side: one or more player-controlled actors.
+- Dungeon Daddy controls the dungeon, monsters, NPCs, factions, clocks, secrets, and consequences.
+- The LLM is advisory. It may narrate or propose, but deterministic services apply authoritative state.
+- World reactions are deferred to Phase 35 via `WorldReactionService`.
 - Provider is OpenAI (`gpt-4o`); `OPENAI_API_KEY` must be set in environment.
 - `AnthropicProvider` still exists and is tested — not removed, just not the active provider.
 - Spec loading rules and skills are in `CLAUDE.md` (canonical source).
