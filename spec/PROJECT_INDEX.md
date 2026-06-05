@@ -5,6 +5,8 @@
 Phase: 36 — LLM-Proposed Reaction Drafts
 Status: **Not Started**
 
+_Phase 35.5 — Clock Scoping complete (2026-06-05). Branch: `phase-35.5-clock-scoping`. PR pending._
+
 ---
 
 ## Product Direction
@@ -23,6 +25,7 @@ Status: **Not Started**
 | **33** | Player-Controlled Action Loop | Make Play Mode resolve player-controlled actor actions through the RPG service and narrate with live context bundles. |
 | 34 | Campaign RPG Data Deepening | Patch the two existing campaigns with RPG-ready player actors, NPCs, monsters, clocks, memories, and room threat hooks. |
 | 35 | Deterministic World Reaction Service | Add a deterministic service that turns player outcomes into dungeon/NPC/monster reactions, clocks, stress, fallout, and memory events. |
+| 35.5 | Clock Scoping | Make clocks room-scoped and action-tagged so they only advance when contextually relevant. |
 | 36 | LLM-Proposed Reaction Drafts | Allow the LLM to propose structured reactions, but validate and apply them through deterministic services only. |
 | 37 | Memory Approval and Playtest Curation | Add curated approval/edit/reject workflows for LLM-drafted memories and run an alpha playtest scenario across seeded campaigns. |
 
@@ -30,20 +33,7 @@ Full phase specs in `spec/IMPLEMENTATION_PHASES.md`.
 
 ---
 
-## Next Steps — Clock Scoping (pre-Phase 36)
-
-Spec: `spec/FEATURE_CLOCK_SCOPING.md`
-
-Implement room-scoped and action-tagged clocks before moving to Phase 36.
-Currently all active clocks advance on every failed roll. The feature adds:
-- `scope_room_id` — clock only advances when the action occurs in that room
-- `action_tags` — clock only advances when the action key matches
-
-Requires: DB migration, `ClockState` model update, `save_clock`/`get_clocks`
-update, `compute_world_reaction` signature change, `apply_seed_pack` finally
-using `room_threats` data, and 8 new TDD slices. See spec for full detail.
-
-## Next Steps — Phase 36 (after clock scoping)
+## Next Steps — Phase 36
 
 Spec: `spec/IMPLEMENTATION_PHASES.md` (Phase 36 section)
 
@@ -80,6 +70,7 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 35.5 — Clock Scoping | **Complete** (2026-06-05) | 1682 passing |
 | Phase 35 — Deterministic World Reaction Service | **Complete** (2026-06-05) | 1818 passing |
 | Phase 34 — Campaign RPG Data Deepening | **Complete** (2026-06-05) | 1802 passing |
 | Phase 33 — Player-Controlled Action Loop | **Complete** (2026-06-04) | 1761 passing; live-app verified end-to-end |
