@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready to implement after Phase 32 closeout.
+**Complete** (2026-06-04) — 1761 passing. All acceptance criteria met. Live-app verified end-to-end: RESOLVE fires, dice roll, DM narrates with context bundle.
 
 ## Goal
 

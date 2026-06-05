@@ -2,8 +2,8 @@
 
 ## Phase
 
-Phase: 33 — Player-Controlled Action Loop
-Status: **In Progress** — Branch `phase-33-player-controlled-action-loop` open. Specs committed 2026-06-03.
+Phase: 34 — Campaign RPG Data Deepening
+Status: **Ready to begin**
 
 ---
 
@@ -30,15 +30,9 @@ See `spec/PHASE_33_PLAYER_CONTROLLED_ACTION_LOOP.md` for Phase 33 detail. Full p
 
 ---
 
-## Next Steps — Phase 33
+## Next Steps — Phase 34
 
-| Priority | Item | Notes |
-|---|---|---|
-| 1 | Seed both existing campaigns with RPG-ready player-controlled actors | Must support one or more player-controlled actors; do not hardcode party-only assumptions |
-| 2 | Add Player Action UI | Select actor, enter intent, choose action, resolve through `RpgService` |
-| 3 | Wire `ContextBundleBuilder` into `PlayView._spawn_dm_thread` | Build/snapshot bundle before thread; pass to `DungeonMasterAgent.respond(context_bundle=...)` |
-| 4 | Add Debug provenance display | Show bundle id, memory counts, focus actors, clocks/fallout counts, and whether bundle was passed to DM |
-| 5 | Smoke test both existing campaigns | Screenshots after each visible UI action |
+See `spec/PHASE_34_CAMPAIGN_RPG_DATA_DEEPENING.md` for detail.
 
 ## Known Failures
 
@@ -53,6 +47,10 @@ _None._
 | 2026-06-03 | MEM search input placeholder text lost when widget present — added manual placeholder draw in `draw()` when widget text is empty. |
 | 2026-06-03 | Map keyboard shortcuts (D=debug, R=recenter) fired while typing in MEM search — fixed `on_key_press` in `PlayView` to return early when `self._rpg_open and self._rpg_side._active == 3`. |
 | 2026-06-03 | "Edit Memory" button unclickable when RPG panel open — RPG panel click absorption (`if x >= rpg_x`) had no y-bound, swallowing title-bar clicks. Added `and y < content_h` guard. 1639 passing. |
+| 2026-06-04 | ACTION tab intent label overlapped widget — `setup_widget` missing 18px actor-name row offset; `draw()` was rendering "Intent:" inside the widget bounds. Fixed by adding `cur_y -= 18` in `setup_widget`. |
+| 2026-06-04 | ACTION key buttons permanently selected — button styles fixed at creation, never refreshed on click. Added `_action_btn_refs` dict; `on_click` now updates all button styles via `btn.style = _btn_style(...)`. |
+| 2026-06-04 | RESOLVE crash — `RpgService.resolve_action` returns `tuple[ActionResolution, DomainEvent]` but `_format_result` received the tuple directly. Fixed tuple unpacking in `_on_resolve_action`. 1761 passing. |
+| 2026-06-04 | RESOLVE produced no narration — `_on_resolve_action` stored result but never appended to DM history or spawned narration thread. Added history append + `_spawn_dm_thread` call after successful resolution. |
 
 ---
 
@@ -60,6 +58,7 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 33 — Player-Controlled Action Loop | **Complete** (2026-06-04) | 1761 passing; live-app verified end-to-end |
 | Phase 32 — Closeout pass | **Complete** (2026-06-03) | 1704 passing (excl. evals); see `docs/PHASE_32_CLOSEOUT.md` |
 | Phase 32 step 32-6 — Smoke test + full pipeline test | **Complete** (2026-06-03) | 1708 passing |
 | Phase 32 step 32-5 — Documentation | **Complete** (2026-06-03) | 1698 passing |

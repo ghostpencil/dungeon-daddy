@@ -1708,7 +1708,7 @@ Hardened end-to-end tests, smoke tests, golden fixtures, sync repair tools, bala
 
 ---
 
-## Phase 33 — Player-Controlled Action Loop
+## Phase 33 — Player-Controlled Action Loop ✓ Complete (2026-06-04, 1761 passing)
 
 Make the RPG loop visible and playable in Play Mode.
 

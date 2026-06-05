@@ -15,6 +15,10 @@ from dungeon_daddy.data.repository import DungeonRepository
 from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
 from dungeon_daddy.llm.provider import LLMMessage
 from dungeon_daddy.map.grid_renderer import GridRenderer
+from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
+from dungeon_daddy.memory.repository import MemoryRepository
+from dungeon_daddy.rpg.actor_control import filter_player_actors
+from dungeon_daddy.rpg.models import ActorState
 from dungeon_daddy.rpg.service import RpgService
 from dungeon_daddy.ui.chrome import MenuBar, draw_title_bar
 from dungeon_daddy.ui.panels.character_sheet_panel import CharacterSheetPanel
@@ -23,6 +27,7 @@ from dungeon_daddy.ui.panels.debug_controls import DebugControls
 from dungeon_daddy.ui.panels.fallout_panel import FalloutPanel
 from dungeon_daddy.ui.panels.map_panel import MapPanel
 from dungeon_daddy.ui.panels.memory_inspector_panel import MemoryInspectorPanel
+from dungeon_daddy.ui.panels.player_action_panel import PlayerActionPanel
 from dungeon_daddy.ui.panels.scene_state_panel import SceneStatePanel
 from dungeon_daddy.ui.theme import (
     BG_0,
@@ -66,7 +71,10 @@ _RPG_PANEL_W = 300
 _RPG_TAB_H = 26
 _BTN_RPG_W = 88
 
-_RPG_TAB_LABELS = ["CHAR", "SCENE", "FALLOUT", "MEM", "DBG"]
+_RPG_TAB_LABELS = ["CHAR", "SCENE", "FALLOUT", "MEM", "ACTION", "DBG"]
+_TAB_MEM = 3
+_TAB_ACTION = 4
+_TAB_DBG = 5
 
 
 def _overlay_btn_style(variant: str) -> dict[str, arcade.gui.UIFlatButton.UIStyle]:
@@ -101,7 +109,7 @@ def _overlay_btn_style(variant: str) -> dict[str, arcade.gui.UIFlatButton.UIStyl
 
 
 class _RpgSidePanel:
-    """Collapsible side panel housing the four RPG/memory display panels."""
+    """Collapsible side panel housing the RPG/memory display panels."""
 
     def __init__(
         self,
@@ -109,6 +117,7 @@ class _RpgSidePanel:
         scene_panel: SceneStatePanel,
         fallout_panel: FalloutPanel,
         memory_panel: MemoryInspectorPanel,
+        action_panel: PlayerActionPanel,
         debug_controls: DebugControls | None,
         manager: arcade.gui.UIManager | None = None,
     ) -> None:
@@ -116,6 +125,7 @@ class _RpgSidePanel:
         self._scene = scene_panel
         self._fallout = fallout_panel
         self._memory = memory_panel
+        self._action = action_panel
         self._debug = debug_controls
         self._manager = manager
         self._active = 0
@@ -133,21 +143,31 @@ class _RpgSidePanel:
         content_h = h - _RPG_TAB_H
         for panel in (self._char, self._scene, self._fallout, self._memory):
             panel.setup(x, y, w, content_h)
-        if self._active == 3:
+        if self._active == _TAB_MEM:
             self._memory.setup_widget(self._manager, x, y, w, content_h)
+        if self._active == _TAB_ACTION:
+            self._action.setup_widget(self._manager, x, y, w, content_h)
 
     def teardown(self) -> None:
         """Remove any active UI widgets (call before hiding the panel)."""
         self._memory.teardown_widget(self._manager)
+        self._action.teardown_widget(self._manager)
 
     def set_active(self, index: int) -> None:
         if 0 <= index < len(_RPG_TAB_LABELS):
-            if self._active == 3:
+            if self._active == _TAB_MEM:
                 self._memory.teardown_widget(self._manager)
+            if self._active == _TAB_ACTION:
+                self._action.teardown_widget(self._manager)
             self._active = index
-            if self._active == 3:
+            if self._active == _TAB_MEM:
                 content_h = self._h - _RPG_TAB_H
                 self._memory.setup_widget(
+                    self._manager, self._x, self._y, self._w, content_h,
+                )
+            if self._active == _TAB_ACTION:
+                content_h = self._h - _RPG_TAB_H
+                self._action.setup_widget(
                     self._manager, self._x, self._y, self._w, content_h,
                 )
 
@@ -168,8 +188,12 @@ class _RpgSidePanel:
             self._scene.draw()
         elif self._active == 2:
             self._fallout.draw()
-        elif self._active == 3:
+        elif self._active == _TAB_MEM:
             self._memory.draw()
+        elif self._active == _TAB_ACTION:
+            self._action.draw(
+                self._x, self._y, self._w, self._h - _RPG_TAB_H
+            )
         else:
             self._draw_debug_tab()
 
@@ -236,12 +260,14 @@ class PlayView(arcade.View):
         menu_bar: MenuBar,
         dm_agent: DungeonMasterAgent | None = None,
         rpg_service: RpgService | None = None,
+        mem_repo: MemoryRepository | None = None,
     ) -> None:
         super().__init__()
         self._repo = repo
         self._menu_bar = menu_bar
         self._dm_agent = dm_agent
         self._rpg_service = rpg_service
+        self._mem_repo = mem_repo
         self._dungeon: Dungeon | None = None
         self._state: SessionState | None = None
         self._manager = arcade.gui.UIManager()
@@ -274,14 +300,17 @@ class PlayView(arcade.View):
         self._rpg_scene = SceneStatePanel()
         self._rpg_fallout = FalloutPanel()
         self._rpg_memory = MemoryInspectorPanel()
+        self._rpg_action = PlayerActionPanel()
         self._rpg_debug = DebugControls(rpg_service) if rpg_service is not None else None
         self._rpg_side = _RpgSidePanel(
             self._rpg_char, self._rpg_scene, self._rpg_fallout,
-            self._rpg_memory, self._rpg_debug,
+            self._rpg_memory, self._rpg_action, self._rpg_debug,
             manager=self._manager,
         )
         self._rpg_open: bool = False
         self._rpg_toggle_rect: tuple[float, float, float, float] | None = None
+        self._rpg_action.set_resolve_callback(self._on_resolve_action)
+        self._rpg_campaign_id: str | None = None
 
     # ------------------------------------------------------------------
     # View lifecycle
@@ -443,7 +472,7 @@ class PlayView(arcade.View):
             self.close_memory_overlay()
             return
         # Suppress map shortcuts while the MEM search box is active
-        if self._rpg_open and self._rpg_side._active == 3:
+        if self._rpg_open and self._rpg_side._active == _TAB_MEM:
             return
         self._map.handle_key_press(key)
 
@@ -466,6 +495,7 @@ class PlayView(arcade.View):
         )
         _log.info("PlayView: loaded dungeon=%s (test drive)", dungeon.meta.title)
         self._refresh_memory_state()
+        self._load_player_actors()
 
     def load_dungeon_session(self, dungeon: Dungeon) -> None:
         self._is_test_drive = False
@@ -495,6 +525,7 @@ class PlayView(arcade.View):
             )
         _log.info("PlayView: loaded dungeon=%s (session)", dungeon.meta.title)
         self._refresh_memory_state()
+        self._load_player_actors()
 
     def load_dungeon(self, dungeon: Dungeon) -> None:
         """Alias for load_dungeon_transient — kept until window.py callers are updated."""
@@ -503,6 +534,89 @@ class PlayView(arcade.View):
     def _save_session(self) -> None:
         if not self._is_test_drive and self._state is not None:
             self._repo.save_session(self._state)
+
+    # ------------------------------------------------------------------
+    # Player actors
+    # ------------------------------------------------------------------
+
+    def set_rpg_context(self, mem_repo: MemoryRepository | None, campaign_id: str | None) -> None:
+        """Update the active RPG repository and campaign id. Closes the previous repo if any."""
+        old = getattr(self, "_mem_repo", None)
+        if old is not None and old is not mem_repo:
+            try:
+                old.close()
+            except Exception:
+                pass
+        self._mem_repo = mem_repo
+        self._rpg_campaign_id = campaign_id
+        self._load_player_actors()
+
+    def _load_player_actors(self) -> None:
+        if not hasattr(self, "_mem_repo") or self._mem_repo is None:
+            return
+        if not hasattr(self, "_state") or self._state is None:
+            return
+        campaign_id = getattr(self, "_rpg_campaign_id", None) or self._state.dungeon_id
+        raw = self._mem_repo.get_actors_by_campaign(campaign_id)
+        actor_states = [
+            ActorState(
+                actor_id=a["actor_id"],
+                campaign_id=a["campaign_id"],
+                actor_type=a["actor_type"],
+                slug=a["slug"],
+                display_name=a["display_name"],
+                status=a["status"],
+            )
+            for a in raw
+        ]
+        self._rpg_action.set_actors(filter_player_actors(actor_states))
+
+    def _on_resolve_action(
+        self,
+        campaign_id: str,
+        actor_id: str,
+        intent: str,
+        action_key: str,
+        push_yourself: bool,
+        momentum_spend: int,
+        dice_pool: int,
+    ) -> None:
+        if self._rpg_service is None:
+            return
+        request = self._rpg_action._build_request(
+            campaign_id=campaign_id,
+            actor_id=actor_id,
+            intent=intent,
+            action_key=action_key,
+            push_yourself=push_yourself,
+            momentum_spend=momentum_spend,
+            dice_pool=dice_pool,
+        )
+        try:
+            resolution, _event = self._rpg_service.resolve_action(request)
+            summary = self._rpg_action._format_result(resolution)
+            self._rpg_action.store_result(summary)
+            if self._dungeon is not None and self._state is not None:
+                level = self._dungeon.levels[self._state.current_level_idx]
+                room = None
+                if self._state.current_room_id:
+                    room_map = {r.id: r for r in level.rooms}
+                    room = room_map.get(self._state.current_room_id)
+                if room is None:
+                    self._chat.add_message("system", "Select a room to get DM narration.")
+                else:
+                    outcome = summary.get("outcome", "?").upper()
+                    dice = summary.get("dice", [])
+                    msg = (
+                        f"[{action_key.upper()}] {intent or '(no intent)'}"
+                        f" — {outcome}  dice={dice}"
+                    )
+                    self._compact_history()
+                    self._dm_history.append(LLMMessage(role="user", content=msg))
+                    self._chat.set_busy(True)
+                    self._spawn_dm_thread(room, level)
+        except Exception:
+            _log.exception("resolve_action failed")
 
     # ------------------------------------------------------------------
     # Map variant switching
@@ -563,6 +677,40 @@ class PlayView(arcade.View):
     # DM threading
     # ------------------------------------------------------------------
 
+    def _build_context_bundle(self):
+        """Build a ContextBundle snapshot on the main thread. Returns None when RPG state is unavailable."""
+        if self._rpg_service is None or self._mem_repo is None or self._state is None:
+            return None
+        campaign_id = self._rpg_campaign_id or self._state.dungeon_id
+        raw_actors = self._mem_repo.get_actors_by_campaign(campaign_id)
+        actor_states = [
+            ActorState(
+                actor_id=a["actor_id"],
+                campaign_id=a["campaign_id"],
+                actor_type=a["actor_type"],
+                slug=a["slug"],
+                display_name=a["display_name"],
+                status=a["status"],
+            )
+            for a in raw_actors
+        ]
+        focus_ids = [a.actor_id for a in filter_player_actors(actor_states)]
+        builder = ContextBundleBuilder(
+            campaign_id=campaign_id,
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=focus_ids,
+            token_budget=2000,
+        )
+        try:
+            bundle = builder.build(self._mem_repo)
+            if self._rpg_debug is not None:
+                self._rpg_debug.set_bundle(bundle)
+            return bundle
+        except Exception:
+            _log.exception("ContextBundle build failed — proceeding without bundle")
+            return None
+
     def _spawn_dm_thread(self, room: Room, level: Level) -> None:
         if self._llm_busy:
             return
@@ -572,6 +720,7 @@ class PlayView(arcade.View):
         assert self._state is not None
         assert self._dungeon is not None
         memory = self._repo.load_room_memory(self._state.dungeon_id, level.id)
+        bundle = self._build_context_bundle()
         self._llm_busy = True
         _history = list(self._dm_history)
         _agent = self._dm_agent
@@ -585,6 +734,7 @@ class PlayView(arcade.View):
                     level=level,
                     dungeon=_dungeon,
                     room_memory=memory,
+                    context_bundle=bundle,
                 )
                 self._result_queue.put(DMResult(content=response))
             except Exception as exc:

@@ -179,6 +179,27 @@ class MemoryRepository:
             "status": row[5],
         }
 
+    def get_actors_by_campaign(self, campaign_id: str) -> list[dict]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT actor_id, campaign_id, actor_type, slug, display_name, status
+            FROM actors WHERE campaign_id = ?
+            """,
+            [campaign_id],
+        ).fetchall()
+        return [
+            {
+                "actor_id": row[0],
+                "campaign_id": row[1],
+                "actor_type": row[2],
+                "slug": row[3],
+                "display_name": row[4],
+                "status": row[5],
+            }
+            for row in rows
+        ]
+
     def save_actor_stress_track(
         self, actor_id: str, track_key: str, capacity: int, filled: int
     ) -> None:
@@ -478,6 +499,79 @@ class MemoryRepository:
             }
             for r in rows
         ]
+
+    # ------------------------------------------------------------------
+    # Sessions
+    # ------------------------------------------------------------------
+
+    def save_session(
+        self,
+        session_id: str,
+        campaign_id: str,
+        session_number: int,
+        notes: str | None = None,
+    ) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO sessions (session_id, campaign_id, session_number, notes)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (session_id) DO UPDATE SET
+                session_number = excluded.session_number,
+                notes          = excluded.notes
+            """,
+            [session_id, campaign_id, session_number, notes],
+        )
+
+    def get_session(self, session_id: str) -> dict | None:
+        assert self._conn is not None
+        row = self._conn.execute(
+            "SELECT session_id, campaign_id, session_number, notes FROM sessions WHERE session_id = ?",
+            [session_id],
+        ).fetchone()
+        if row is None:
+            return None
+        return {"session_id": row[0], "campaign_id": row[1], "session_number": row[2], "notes": row[3]}
+
+    # ------------------------------------------------------------------
+    # Scenes
+    # ------------------------------------------------------------------
+
+    def save_scene(
+        self,
+        scene_id: str,
+        campaign_id: str,
+        location_slug: str | None = None,
+        session_id: str | None = None,
+        status: str = "active",
+    ) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO scenes (scene_id, campaign_id, session_id, location_slug, status)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (scene_id) DO UPDATE SET
+                location_slug = excluded.location_slug,
+                status        = excluded.status
+            """,
+            [scene_id, campaign_id, session_id, location_slug, status],
+        )
+
+    def get_scene(self, scene_id: str) -> dict | None:
+        assert self._conn is not None
+        row = self._conn.execute(
+            "SELECT scene_id, campaign_id, session_id, location_slug, status FROM scenes WHERE scene_id = ?",
+            [scene_id],
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "scene_id": row[0],
+            "campaign_id": row[1],
+            "session_id": row[2],
+            "location_slug": row[3],
+            "status": row[4],
+        }
 
     # ------------------------------------------------------------------
     # Campaign

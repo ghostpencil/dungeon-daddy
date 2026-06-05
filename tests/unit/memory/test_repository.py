@@ -121,6 +121,24 @@ class TestMemoryRepository:
         repo.close()
         assert repo.health_check() is False
 
+    def test_get_actors_by_campaign_returns_matching_actors(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.save_actor("a1", "camp-A", "pc", "hero", "Elara", "active")
+        repo.save_actor("a2", "camp-A", "npc", "merchant", "Old Tom", "active")
+        repo.save_actor("a3", "camp-B", "pc", "rogue", "Silas", "active")
+        actors = repo.get_actors_by_campaign("camp-A")
+        assert len(actors) == 2
+        ids = {a["actor_id"] for a in actors}
+        assert ids == {"a1", "a2"}
+        repo.close()
+
+    def test_get_actors_by_campaign_returns_empty_for_unknown_campaign(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        assert repo.get_actors_by_campaign("nonexistent") == []
+        repo.close()
+
     def test_campaigns_table_has_dungeon_slug_column(self, tmp_path: Path) -> None:
         repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
         repo.initialize_schema(MIGRATIONS_DIR)

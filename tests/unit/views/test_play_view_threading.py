@@ -106,6 +106,9 @@ def _make_view(provider: object) -> PlayView:
     view._active_thread = None
     view._dm_history = []
     view._dm_agent = DungeonMasterAgent(provider)
+    view._rpg_service = None
+    view._mem_repo = None
+    view._rpg_debug = None
     return view
 
 
