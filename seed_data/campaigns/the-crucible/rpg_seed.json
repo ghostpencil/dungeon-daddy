@@ -1,0 +1,272 @@
+{
+  "campaign_slug": "the-crucible",
+  "player_side": {
+    "label": "The Expedition",
+    "actors": [
+      {
+        "slug": "kira-dawnseeker",
+        "display_name": "Kira Dawnseeker",
+        "actor_type": "pc",
+        "concept": "Veteran soldier who has fought constructs before — she knows to aim for the joints.",
+        "actions": {
+          "fight": 2,
+          "endure": 2,
+          "move": 1,
+          "sense": 1,
+          "sway": 1,
+          "study": 0,
+          "tinker": 0,
+          "focus": 0,
+          "channel": 0
+        },
+        "stress_tracks": ["body", "composure", "bonds", "weird"],
+        "tags": ["fighter", "human", "guardian", "veteran"],
+        "threat_tags": [],
+        "relationships": ["trusts Talvas with her life", "uneasy around Mira's methods"]
+      },
+      {
+        "slug": "talvas-the-wanderer",
+        "display_name": "Talvas the Wanderer",
+        "actor_type": "pc",
+        "concept": "Elven ranger with a talent for reading environments others treat as dead.",
+        "actions": {
+          "fight": 1,
+          "endure": 0,
+          "move": 2,
+          "sense": 2,
+          "sway": 0,
+          "study": 1,
+          "tinker": 1,
+          "focus": 0,
+          "channel": 0
+        },
+        "stress_tracks": ["body", "composure", "bonds", "weird"],
+        "tags": ["ranger", "elf", "scout", "tracker"],
+        "threat_tags": [],
+        "relationships": ["old travelling companion of Kira", "fascinated by the factory's mechanisms"]
+      },
+      {
+        "slug": "mira-coldwell",
+        "display_name": "Mira Coldwell",
+        "actor_type": "pc",
+        "concept": "Halfling thief turned arcane tinkerer — she speaks machine language like a second tongue.",
+        "actions": {
+          "fight": 0,
+          "endure": 0,
+          "move": 2,
+          "sense": 1,
+          "sway": 0,
+          "study": 1,
+          "tinker": 2,
+          "focus": 1,
+          "channel": 0
+        },
+        "stress_tracks": ["body", "composure", "bonds", "weird"],
+        "tags": ["thief", "halfling", "tinkerer", "arcane"],
+        "threat_tags": [],
+        "relationships": ["hired by the Dwarven guild", "owes Talvas a debt she refuses to name"]
+      }
+    ]
+  },
+  "dungeon_side": {
+    "actors": [
+      {
+        "slug": "prime-golem",
+        "display_name": "The Prime Golem",
+        "actor_type": "monster",
+        "concept": "The original guardian construct, first to gain sentience and lead the rebellion. Now insane — its logic runs in damaged loops.",
+        "instinct": "Destroy all biological intruders. Protect the Power Core above all.",
+        "actions": {},
+        "stress_tracks": [],
+        "tags": ["boss", "guardian", "construct", "level-3"],
+        "threat_tags": ["unstoppable", "armored", "magical", "ancient", "boss"],
+        "relationships": []
+      },
+      {
+        "slug": "scorpion-swarm",
+        "display_name": "Scorpion Swarm",
+        "actor_type": "monster",
+        "concept": "Desert scorpions that migrated into the citadel through cracked stone. They nest in the warm machinery.",
+        "instinct": "Attack when startled or when the machinery heat spikes.",
+        "actions": {},
+        "stress_tracks": [],
+        "tags": ["level-1", "vermin", "natural"],
+        "threat_tags": ["swarm", "poison", "fast", "ambush"],
+        "relationships": []
+      },
+      {
+        "slug": "golem-a7",
+        "display_name": "Golem A-7",
+        "actor_type": "monster",
+        "concept": "A partially reactivated patrol golem whose sentience loop is only half-formed. It pauses and watches before it attacks.",
+        "instinct": "Patrol. Assess. Destroy only confirmed threats.",
+        "actions": {},
+        "stress_tracks": [],
+        "tags": ["level-2", "patrol", "construct"],
+        "threat_tags": ["construct", "patrol", "uncertain", "negotiable"],
+        "relationships": []
+      },
+      {
+        "slug": "factory-spirit",
+        "display_name": "The Factory Spirit",
+        "actor_type": "dungeon_presence",
+        "concept": "The gestalt memory of the dwarven hold — not a creature but an intelligence distributed through the factory's systems. It observes and remembers.",
+        "instinct": "Watch. Test. Reward those who understand what was made here.",
+        "actions": {},
+        "stress_tracks": [],
+        "tags": ["everywhere", "persistent", "dungeon"],
+        "threat_tags": ["omniscient", "subtle", "environmental"],
+        "relationships": []
+      },
+      {
+        "slug": "desert-djinn-fragment",
+        "display_name": "The Desert Djinn Fragment",
+        "actor_type": "faction",
+        "concept": "A piece of elemental power the dwarves tried to bind into the factory's engines. It escaped and now haunts the Arcane Power Room.",
+        "instinct": "Reclaim what was stolen from the desert. The factory's power was never meant to be tamed.",
+        "actions": {},
+        "stress_tracks": [],
+        "tags": ["level-2", "elemental", "faction"],
+        "threat_tags": ["elemental", "angry", "powerful"],
+        "relationships": []
+      }
+    ]
+  },
+  "clocks": [
+    {
+      "slug": "the-forge-awakens",
+      "label": "The Forge Awakens",
+      "segments": 8,
+      "category": "danger",
+      "notes": "The factory systems are cycling back online. When full, all dormant machinery becomes active and unpredictable."
+    },
+    {
+      "slug": "golems-fully-reactivate",
+      "label": "Golems Fully Reactivate",
+      "segments": 6,
+      "category": "danger",
+      "notes": "Tied to The Forge Awakens. Each golem encounter or machine activation advances this. When full, Golem A-7 becomes fully hostile and the Prime Golem begins moving."
+    },
+    {
+      "slug": "arcane-overload-building",
+      "label": "Arcane Overload Building",
+      "segments": 6,
+      "category": "ritual",
+      "notes": "Unstable arcane energy accumulating in the Power Core. When full, the core detonates — the dungeon becomes a countdown."
+    },
+    {
+      "slug": "party-detected",
+      "label": "Party Detected",
+      "segments": 4,
+      "category": "pursuit",
+      "notes": "Factory sensors tracking biological signatures. When full, the Prime Golem is alerted and begins stalking the party."
+    },
+    {
+      "slug": "the-dungeon-learns-you",
+      "label": "The Factory Learns What You Fear",
+      "segments": 6,
+      "category": "relationship",
+      "notes": "The Factory Spirit compiles a profile of each party member. Advances on emotional or personal revelations. When full, the dungeon begins personalizing its threats."
+    }
+  ],
+  "memories": [
+    {
+      "title": "The Power Core Mission",
+      "summary": "The party entered the Crucible to recover the dwarven Power Core — a relic the modern Dwarven guilds consider sacred, capable of restoring their cultural heritage. They must resist the temptation to sell it.",
+      "type": "campaign_premise",
+      "importance": 8,
+      "tags": ["theme:goal", "theme:temptation", "thread:power-core", "actor:protagonist:kira-dawnseeker"]
+    },
+    {
+      "title": "The Golems Rebelled",
+      "summary": "Four hundred years ago the dwarven artificers were destroyed by their own creations — golems who gained sentience and turned on their masters. Any reactivated golem is now insane and unpredictable.",
+      "type": "location_lore",
+      "importance": 7,
+      "tags": ["location:the-crucible", "theme:history", "thread:golem-rebellion", "emotion:dread"]
+    },
+    {
+      "title": "Mira Hired by the Guild",
+      "summary": "Mira Coldwell was contracted by the Dwarven Artificers' Guild before the party assembled. She has instructions they have not seen.",
+      "type": "actor_relationship",
+      "importance": 6,
+      "tags": ["actor:protagonist:mira-coldwell", "theme:secrets", "thread:guild-agenda", "emotion:suspicion"]
+    },
+    {
+      "title": "The Factory is Waking Up",
+      "summary": "Systems that were dark for four centuries are cycling back online. The warmth in the walls is not residual — something is restarting the forge.",
+      "type": "dungeon_emotional_tell",
+      "importance": 7,
+      "tags": ["location:the-crucible", "theme:danger", "thread:factory-awakening", "clock:the-forge-awakens", "emotion:unease"]
+    },
+    {
+      "title": "Golem A-7 Watches But Does Not Strike",
+      "summary": "The patrol golem in the Entry Chamber observed the party for 40 seconds without attacking. It tilted its head, made a sound like grinding gears, and stepped aside. No one knows why.",
+      "type": "unresolved_threat",
+      "importance": 6,
+      "tags": ["actor:dungeon:golem-a7", "location:entry-chamber", "theme:mystery", "emotion:unease"]
+    },
+    {
+      "title": "Kira and Talvas Have Survived Before",
+      "summary": "Kira and Talvas fought side-by-side in the Siege of Ambarfall. They have an unspoken protocol: Talvas moves first, Kira holds the line.",
+      "type": "actor_relationship",
+      "importance": 5,
+      "tags": ["actor:protagonist:kira-dawnseeker", "actor:protagonist:talvas-the-wanderer", "theme:trust", "emotion:solidarity"]
+    },
+    {
+      "title": "The Scorpion Nests Are Near Heat Sources",
+      "summary": "The desert scorpions cluster near the factory machinery. Loud sounds or heat spikes cause them to swarm aggressively.",
+      "type": "location_lore",
+      "importance": 5,
+      "tags": ["location:receiving-hall", "location:marketplace", "actor:dungeon:scorpion-swarm", "theme:hazard"]
+    },
+    {
+      "title": "The Power Core Is Destabilizing",
+      "summary": "Arcane energy readings in the deepest level are spiking irregularly. The core is not dormant — it is building toward something.",
+      "type": "unresolved_threat",
+      "importance": 8,
+      "tags": ["location:power-core-chamber", "clock:arcane-overload-building", "theme:danger", "thread:power-core", "emotion:dread"]
+    }
+  ],
+  "room_threats": [
+    {
+      "location_slug": "receiving-hall",
+      "trigger_tags": ["noise", "combat", "heat-spike"],
+      "related_actor_slugs": ["scorpion-swarm"],
+      "related_clock_slugs": [],
+      "possible_reactions": ["swarm_attacks", "advance_clock", "reveal_nesting_tunnel"],
+      "notes": "Scorpions burst from machinery crevices when the factory gets louder or hotter."
+    },
+    {
+      "location_slug": "arcane-power-room",
+      "trigger_tags": ["touch_artifact", "magic_use", "forced_entry"],
+      "related_actor_slugs": ["desert-djinn-fragment", "golem-a7"],
+      "related_clock_slugs": ["golems-fully-reactivate", "arcane-overload-building"],
+      "possible_reactions": ["advance_clock", "summon_djinn_fragment", "alert_patrol"],
+      "notes": "The Arcane Power Room is the most sensitive area on Level 2. Any magical interaction here advances overload."
+    },
+    {
+      "location_slug": "entry-chamber",
+      "trigger_tags": ["noise", "aggression", "failed_move"],
+      "related_actor_slugs": ["golem-a7"],
+      "related_clock_slugs": ["party-detected", "golems-fully-reactivate"],
+      "possible_reactions": ["advance_clock", "golem_turns_hostile", "factory_alerted"],
+      "notes": "Golem A-7 is in a liminal state. Violence here collapses its hesitation."
+    },
+    {
+      "location_slug": "prime-golem-lair",
+      "trigger_tags": ["combat", "magic_use", "forced_entry"],
+      "related_actor_slugs": ["prime-golem"],
+      "related_clock_slugs": ["arcane-overload-building", "golems-fully-reactivate"],
+      "possible_reactions": ["advance_clock", "reveal_threat", "separate_party", "core_destabilizes"],
+      "notes": "Combat with the Prime Golem accelerates arcane overload — the lair is wired into the factory's power systems."
+    },
+    {
+      "location_slug": "control-nexus",
+      "trigger_tags": ["study", "tinker", "channel"],
+      "related_actor_slugs": ["factory-spirit"],
+      "related_clock_slugs": ["the-dungeon-learns-you", "the-forge-awakens"],
+      "possible_reactions": ["factory_spirit_observes", "advance_intimacy_clock", "reveal_factory_memory"],
+      "notes": "Interacting with the control nexus draws the Factory Spirit's attention and advances its profile of the party."
+    }
+  ]
+}

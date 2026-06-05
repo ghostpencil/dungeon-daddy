@@ -14,6 +14,7 @@ class PlayerActionPanel:
         self._momentum_spend: int = 0
         self._all_widgets: list = []
         self._action_btn_refs: dict[str, object] = {}
+        self._widget_params: tuple | None = None  # (manager, x, y, w, h)
 
     def set_actors(self, actors: list[ActorState]) -> None:
         self._actors = actors
@@ -60,6 +61,7 @@ class PlayerActionPanel:
             BG_2, BG_3, BG_HI, FONT_UI, FONT_UI_MED, FONT_MONO, INK_1, INK_2, INK_3, INK_4,
             LINE, LINE_HI, PAD_MD, TEXT_SM, TEAL,
         )
+        self._widget_params = (manager, x, y, w, h)
         self.teardown_widget(manager)
 
         _ACTION_KEYS = ["fight", "move", "tinker", "study", "focus", "sway", "sense", "channel", "endure"]
@@ -92,6 +94,41 @@ class PlayerActionPanel:
             }
 
         cur_y = y + h - PAD_MD
+
+        # Actor prev/next buttons (sit on the actor name row)
+        _NAV_W = 18
+        _NAV_H = 16
+        prev_btn = arcade.gui.UIFlatButton(
+            x=int(x + w - PAD_MD - _NAV_W * 2 - 2), y=int(cur_y - _NAV_H),
+            width=_NAV_W, height=_NAV_H,
+            text="<",
+            style=_btn_style(False),
+        )
+        next_btn = arcade.gui.UIFlatButton(
+            x=int(x + w - PAD_MD - _NAV_W), y=int(cur_y - _NAV_H),
+            width=_NAV_W, height=_NAV_H,
+            text=">",
+            style=_btn_style(False),
+        )
+
+        @prev_btn.event
+        def on_click(event) -> None:
+            if self._actors:
+                self._actor_idx = (self._actor_idx - 1) % len(self._actors)
+                if self._widget_params:
+                    self.setup_widget(*self._widget_params)
+
+        @next_btn.event
+        def on_click(event) -> None:  # type: ignore[no-redef]
+            if self._actors:
+                self._actor_idx = (self._actor_idx + 1) % len(self._actors)
+                if self._widget_params:
+                    self.setup_widget(*self._widget_params)
+
+        manager.add(prev_btn)  # type: ignore[union-attr]
+        manager.add(next_btn)  # type: ignore[union-attr]
+        self._all_widgets.extend([prev_btn, next_btn])
+
         cur_y -= 18  # actor name row matches draw()
 
         # Intent input
@@ -114,16 +151,19 @@ class PlayerActionPanel:
         cur_y -= PAD_MD + 16
 
         # Action key grid (3 columns)
+        current_actor = self._actors[min(self._actor_idx, len(self._actors) - 1)] if self._actors else None
+        ratings = current_actor.actions if current_actor else {}
         col_gap = 2
         for i, key in enumerate(_ACTION_KEYS):
             col = i % 3
             row = i // 3
             bx = x + PAD_MD + col * (_BTN_W + col_gap)
             by = cur_y - row * (_BTN_H + 2)
+            rating = ratings.get(key, 0)
             btn = arcade.gui.UIFlatButton(
                 x=int(bx), y=int(by),
                 width=_BTN_W, height=_BTN_H,
-                text=key.upper(),
+                text=f"{key.upper()} {rating}",
                 style=_btn_style(key == self._action_key),
             )
             _key = key
@@ -211,11 +251,14 @@ class PlayerActionPanel:
         cur_y = y + height - PAD_MD
 
         # Actor name
-        actor_name = "No actors" if not self._actors else self._actors[
-            min(self._actor_idx, len(self._actors) - 1)
-        ].display_name
+        if not self._actors:
+            actor_label = "Actor: No actors"
+        else:
+            idx = min(self._actor_idx, len(self._actors) - 1)
+            name = self._actors[idx].display_name
+            actor_label = f"Actor: {name}  ({idx + 1}/{len(self._actors)})"
         arcade.draw_text(
-            f"Actor: {actor_name}", x + PAD_MD, cur_y,
+            actor_label, x + PAD_MD, cur_y,
             INK_3, font_size=TEXT_SM, font_name=FONT_UI, anchor_y="top",
         )
         cur_y -= 18

@@ -2,8 +2,8 @@
 
 ## Phase
 
-Phase: 34 — Campaign RPG Data Deepening
-Status: **Ready to begin**
+Phase: 35 — Deterministic World Reaction Service
+Status: **Not Started**
 
 ---
 
@@ -26,13 +26,15 @@ Status: **Ready to begin**
 | 36 | LLM-Proposed Reaction Drafts | Allow the LLM to propose structured reactions, but validate and apply them through deterministic services only. |
 | 37 | Memory Approval and Playtest Curation | Add curated approval/edit/reject workflows for LLM-drafted memories and run an alpha playtest scenario across seeded campaigns. |
 
-See `spec/PHASE_33_PLAYER_CONTROLLED_ACTION_LOOP.md` for Phase 33 detail. Full phase specs in `spec/IMPLEMENTATION_PHASES.md`.
+Full phase specs in `spec/IMPLEMENTATION_PHASES.md`.
 
 ---
 
-## Next Steps — Phase 34
+## Next Steps — Phase 35
 
-See `spec/PHASE_34_CAMPAIGN_RPG_DATA_DEEPENING.md` for detail.
+Spec: `spec/IMPLEMENTATION_PHASES.md` (Phase 35 section)
+
+Add `WorldReactionService`: turns player action outcomes into dungeon/NPC/monster reactions, clock advances, stress, fallout, and memory events. Show reaction summary in Debug tab.
 
 ## Known Failures
 
@@ -51,6 +53,11 @@ _None._
 | 2026-06-04 | ACTION key buttons permanently selected — button styles fixed at creation, never refreshed on click. Added `_action_btn_refs` dict; `on_click` now updates all button styles via `btn.style = _btn_style(...)`. |
 | 2026-06-04 | RESOLVE crash — `RpgService.resolve_action` returns `tuple[ActionResolution, DomainEvent]` but `_format_result` received the tuple directly. Fixed tuple unpacking in `_on_resolve_action`. 1761 passing. |
 | 2026-06-04 | RESOLVE produced no narration — `_on_resolve_action` stored result but never appended to DM history or spawned narration thread. Added history append + `_spawn_dm_thread` call after successful resolution. |
+| 2026-06-05 | ACTION tab had no actor cycling UI — `_actor_idx` field existed but no prev/next buttons were built. Added `<`/`>` arcade GUI buttons at the actor name row in `setup_widget`; click handlers cycle `_actor_idx` and rebuild widgets. Actor count shown as `(N/total)` in label. |
+| 2026-06-05 | ACTION tab buttons showed no action ratings — `_load_player_actors` built `ActorState` without fetching ratings from DB (`get_actor_action_ratings` never called). Fixed in `play_view.py`; button labels in `setup_widget` now read from `current_actor.actions` and display e.g. `FIGHT 2`. Widgets rebuild on actor switch so ratings refresh. 1787 passing (2 pre-existing UI-harness integration failures unrelated). |
+| 2026-06-05 | DEBUG tab showed no context bundle or clocks — `_draw_debug_tab` never rendered bundle data. Added `clock_section_lines()` to `DebugControls` and called it in the draw method. Bundle now built eagerly when DBG tab is clicked. |
+| 2026-06-05 | MEM tab search showed no results — `_rpg_memory.set_entries()` was never called; panel was always empty. Added `_load_memory_entries()` to `PlayView`; triggered on MEM tab click. Also fixed `entry.id` → `entry.memory_id` crash in `memory_inspector_panel.py`. |
+| 2026-06-05 | DM narrated wrong actor after RESOLVE — action message to DM history had no actor name, so LLM defaulted to the first listed actor (Kira). Fixed in `_on_resolve_action`: actor display name now prefixed to the message (e.g. `Talvas the Wanderer [SENSE] ...`). |
 
 ---
 
@@ -58,6 +65,7 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 34 — Campaign RPG Data Deepening | **Complete** (2026-06-05) | 1802 passing |
 | Phase 33 — Player-Controlled Action Loop | **Complete** (2026-06-04) | 1761 passing; live-app verified end-to-end |
 | Phase 32 — Closeout pass | **Complete** (2026-06-03) | 1704 passing (excl. evals); see `docs/PHASE_32_CLOSEOUT.md` |
 | Phase 32 step 32-6 — Smoke test + full pipeline test | **Complete** (2026-06-03) | 1708 passing |
@@ -92,7 +100,7 @@ _Full session history in `spec/HISTORY.md`._
 - Player controls the player side: one or more player-controlled actors.
 - Dungeon Daddy controls the dungeon, monsters, NPCs, factions, clocks, secrets, and consequences.
 - The LLM is advisory. It may narrate or propose, but deterministic services apply authoritative state.
-- World reactions are deferred to Phase 35 via `WorldReactionService`.
+- World reactions implemented in Phase 35 via `WorldReactionService`.
 - Provider is OpenAI (`gpt-4o`); `OPENAI_API_KEY` must be set in environment.
 - `AnthropicProvider` still exists and is tested — not removed, just not the active provider.
 - Spec loading rules and skills are in `CLAUDE.md` (canonical source).

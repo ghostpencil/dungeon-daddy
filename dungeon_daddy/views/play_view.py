@@ -16,6 +16,7 @@ from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
 from dungeon_daddy.llm.provider import LLMMessage
 from dungeon_daddy.map.grid_renderer import GridRenderer
 from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
+from dungeon_daddy.memory.models import MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.actor_control import filter_player_actors
 from dungeon_daddy.rpg.models import ActorState
@@ -229,6 +230,15 @@ class _RpgSidePanel:
             INK_3, font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="top",
         )
         cur_y -= 20
+        for line in self._debug.clock_section_lines():
+            if cur_y < y + PAD_MD:
+                break
+            arcade.draw_text(
+                line, x + PAD_MD, cur_y,
+                INK_3, font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="top",
+            )
+            cur_y -= 14
+        cur_y -= 6
         res = self._debug._last_resolution
         if res is not None:
             arcade.draw_text(
@@ -391,6 +401,10 @@ class PlayView(arcade.View):
                 tab_idx = self._rpg_side.hit_tab(x, y)
                 if tab_idx is not None:
                     self._rpg_side.set_active(tab_idx)
+                    if tab_idx == _TAB_MEM:
+                        self._load_memory_entries()
+                    elif tab_idx == _TAB_DBG:
+                        self._build_context_bundle()
                 return
         # Edit Memory button
         if (self._dungeon is not None and self._edit_memory_rect
@@ -558,18 +572,46 @@ class PlayView(arcade.View):
             return
         campaign_id = getattr(self, "_rpg_campaign_id", None) or self._state.dungeon_id
         raw = self._mem_repo.get_actors_by_campaign(campaign_id)
-        actor_states = [
-            ActorState(
+        actor_states = []
+        for a in raw:
+            ratings = {
+                r["action_key"]: r["rating"]
+                for r in self._mem_repo.get_actor_action_ratings(a["actor_id"])
+            }
+            actor_states.append(ActorState(
                 actor_id=a["actor_id"],
                 campaign_id=a["campaign_id"],
                 actor_type=a["actor_type"],
                 slug=a["slug"],
                 display_name=a["display_name"],
                 status=a["status"],
-            )
-            for a in raw
-        ]
+                actions=ratings,
+            ))
         self._rpg_action.set_actors(filter_player_actors(actor_states))
+
+    def _load_memory_entries(self) -> None:
+        if self._mem_repo is None:
+            return
+        campaign_id = self._rpg_campaign_id or (self._state.dungeon_id if self._state else None)
+        if campaign_id is None:
+            return
+        raw = self._mem_repo.get_memory_entries_by_campaign(campaign_id)
+        entries = []
+        for r in raw:
+            tags = self._mem_repo.get_memory_tags(r["memory_id"])
+            entries.append(MemoryEntry(
+                memory_id=r["memory_id"],
+                campaign_id=r["campaign_id"],
+                type=r["type"],
+                title=r["title"],
+                summary=r["summary"],
+                status=r["status"],
+                importance=r["importance"],
+                markdown_path=r["markdown_path"],
+                checksum=r["checksum"],
+                tags=tags,
+            ))
+        self._rpg_memory.set_entries(entries)
 
     def _on_resolve_action(
         self,
@@ -607,8 +649,12 @@ class PlayView(arcade.View):
                 else:
                     outcome = summary.get("outcome", "?").upper()
                     dice = summary.get("dice", [])
+                    actor_name = next(
+                        (a.display_name for a in self._rpg_action._actors if a.actor_id == actor_id),
+                        actor_id,
+                    )
                     msg = (
-                        f"[{action_key.upper()}] {intent or '(no intent)'}"
+                        f"{actor_name} [{action_key.upper()}] {intent or '(no intent)'}"
                         f" — {outcome}  dice={dice}"
                     )
                     self._compact_history()

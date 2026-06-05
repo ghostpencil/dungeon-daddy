@@ -26,6 +26,12 @@ class TestIsPlayerControlled:
     def test_dungeon_is_not_player_controlled(self):
         assert is_player_controlled("dungeon") is False
 
+    def test_faction_is_not_player_controlled(self):
+        assert is_player_controlled("faction") is False
+
+    def test_dungeon_presence_is_not_player_controlled(self):
+        assert is_player_controlled("dungeon_presence") is False
+
 
 class TestFilterPlayerActors:
     def test_returns_active_pc_actors(self):
