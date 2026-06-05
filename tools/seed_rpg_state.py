@@ -1,8 +1,10 @@
-"""Seed RPG-ready data into existing campaign folders for Phase 33 testing.
+"""Seed RPG-ready data into existing campaign folders for Phase 33/34 testing.
 
 Usage:
     python tools/seed_rpg_state.py --campaign "The Crucible" [--dry-run]
     python tools/seed_rpg_state.py --all-existing-campaigns [--dry-run]
+    python tools/seed_rpg_state.py --campaign "The Crucible" --seed-pack seed_data/campaigns/the-crucible/rpg_seed.json
+    python tools/seed_rpg_state.py --campaign "The Crucible" --seed-pack ... --force
 """
 from __future__ import annotations
 
@@ -329,6 +331,119 @@ def _upsert_memory(
 
 
 # ---------------------------------------------------------------------------
+# Seed-pack applier (34-4)
+# ---------------------------------------------------------------------------
+
+
+def seed_campaign_with_pack(
+    campaign_dir: Path,
+    seed_pack_path: Path,
+    dry_run: bool = False,
+    force: bool = False,
+) -> SeedResult:
+    """Apply a JSON seed pack to a campaign folder.
+
+    Without --force, existing records are skipped.  With --force, they are
+    overwritten.  Dry-run prints intended changes without writing.
+    """
+    result = SeedResult()
+
+    if not campaign_dir.exists():
+        result.warnings.append(f"Campaign folder not found: {campaign_dir}")
+        return result
+
+    from dungeon_daddy.rpg.seed_pack import load_seed_pack
+
+    pack = load_seed_pack(seed_pack_path)
+    campaign_slug = _slugify(campaign_dir.name)
+    campaign_id = f"campaign:{campaign_slug}"
+
+    if dry_run:
+        all_actors = pack.player_side.actors + pack.dungeon_side.actors
+        print(f"[dry-run] Campaign: {campaign_dir.name} ({campaign_slug})")
+        print(
+            f"[dry-run] Seed pack: {seed_pack_path.name} — "
+            f"{len(all_actors)} actor(s), {len(pack.clocks)} clock(s), "
+            f"{len(pack.memories)} memory entry(ies)"
+        )
+        return result
+
+    from dungeon_daddy.memory.repository import MemoryRepository
+
+    db_path = campaign_dir / "campaign.duckdb"
+    repo = MemoryRepository(db_path)
+    repo.initialize_schema(_MIGRATIONS_DIR)
+
+    _upsert_campaign(repo, campaign_id, campaign_slug, campaign_dir.name, campaign_dir, result)
+    _upsert_session(repo, campaign_id, campaign_slug, result)
+    _upsert_scene(repo, campaign_id, campaign_slug, result)
+
+    all_actors = pack.player_side.actors + pack.dungeon_side.actors
+    for actor in all_actors:
+        from dungeon_daddy.rpg.seed_pack import derive_actor_id
+
+        actor_id = derive_actor_id(pack.campaign_slug, actor.slug)
+        existing = repo.get_actor(actor_id)
+        if existing is None:
+            repo.save_actor(actor_id, campaign_id, actor.actor_type, actor.slug, actor.display_name)
+            for action_key, rating in actor.actions.items():
+                repo.save_actor_action_rating(actor_id, action_key, rating)
+            for track_key in actor.stress_tracks:
+                repo.save_actor_stress_track(actor_id, track_key, capacity=6, filled=0)
+            result.created += 1
+        elif force:
+            repo.save_actor(actor_id, campaign_id, actor.actor_type, actor.slug, actor.display_name)
+            for action_key, rating in actor.actions.items():
+                repo.save_actor_action_rating(actor_id, action_key, rating)
+            for track_key in actor.stress_tracks:
+                repo.save_actor_stress_track(actor_id, track_key, capacity=6, filled=0)
+            result.updated += 1
+        else:
+            result.skipped += 1
+
+    for clock in pack.clocks:
+        from dungeon_daddy.rpg.seed_pack import derive_clock_id
+
+        clock_id = derive_clock_id(pack.campaign_slug, clock.slug)
+        existing_clocks = {c["clock_id"] for c in repo.get_clocks(campaign_id)}
+        if clock_id not in existing_clocks:
+            repo.save_clock(clock_id, campaign_id, clock.label, clock.segments)
+            result.created += 1
+        elif force:
+            repo.save_clock(clock_id, campaign_id, clock.label, clock.segments)
+            result.updated += 1
+        else:
+            result.skipped += 1
+
+    for memory in pack.memories:
+        from dungeon_daddy.rpg.seed_pack import derive_memory_id
+
+        memory_id = derive_memory_id(pack.campaign_slug, memory.title)
+        existing = repo.get_memory_entry(memory_id)
+        if existing is None:
+            repo.save_memory_entry(
+                memory_id, campaign_id, memory.type, memory.title, memory.summary,
+                importance=memory.importance,
+            )
+            for tag in memory.tags:
+                repo.add_memory_tag(memory_id, tag)
+            result.created += 1
+        elif force:
+            repo.save_memory_entry(
+                memory_id, campaign_id, memory.type, memory.title, memory.summary,
+                importance=memory.importance,
+            )
+            for tag in memory.tags:
+                repo.add_memory_tag(memory_id, tag)
+            result.updated += 1
+        else:
+            result.skipped += 1
+
+    repo.close()
+    return result
+
+
+# ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------
 
@@ -347,6 +462,10 @@ def main() -> None:
                        help="Seed all existing campaign folders")
     parser.add_argument("--dry-run", action="store_true",
                         help="Print intended changes without writing")
+    parser.add_argument("--seed-pack", metavar="PATH",
+                        help="Path to a JSON seed pack file to apply")
+    parser.add_argument("--force", action="store_true",
+                        help="Overwrite existing records (requires --seed-pack)")
     parser.add_argument("--campaigns-dir", metavar="PATH",
                         help="Override the campaigns directory path")
     args = parser.parse_args()
@@ -358,9 +477,16 @@ def main() -> None:
     else:
         folders = [p for p in campaigns_dir.iterdir() if p.is_dir()]
 
+    seed_pack_path = Path(args.seed_pack) if args.seed_pack else None
+
     for folder in folders:
         print(f"\n{'[dry-run] ' if args.dry_run else ''}Seeding: {folder.name}")
-        result = seed_campaign(folder, dry_run=args.dry_run)
+        if seed_pack_path is not None:
+            result = seed_campaign_with_pack(
+                folder, seed_pack_path, dry_run=args.dry_run, force=args.force
+            )
+        else:
+            result = seed_campaign(folder, dry_run=args.dry_run)
         result.print_summary()
 
 

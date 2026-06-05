@@ -6,6 +6,12 @@ import pytest
 
 from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
 from dungeon_daddy.memory.repository import MemoryRepository
+from dungeon_daddy.rpg.seed_pack import (
+    SeedPack,
+    apply_seed_pack,
+    derive_clock_id,
+    derive_memory_id,
+)
 
 MIGRATIONS_DIR = (
     Path(__file__).parent.parent.parent.parent
@@ -266,3 +272,62 @@ class TestContextBundleBuilder:
         # the card still appears in memory_cards
         card_ids = {c["memory_id"] for c in bundle.memory_cards}
         assert "mem_must" in card_ids
+
+
+_SEED_PACK_DATA = {
+    "campaign_slug": "test-campaign",
+    "player_side": {"label": "The Party", "actors": []},
+    "dungeon_side": {"actors": []},
+    "clocks": [
+        {
+            "slug": "bone-warden-stirs",
+            "label": "The Bone Warden Stirs",
+            "segments": 6,
+            "category": "danger",
+        }
+    ],
+    "memories": [
+        {
+            "title": "The Expedition's Purpose",
+            "summary": "The party seeks the Shattered Seal.",
+            "type": "campaign_premise",
+            "importance": 8,
+            "tags": ["thread:main-quest"],
+        }
+    ],
+    "room_threats": [],
+}
+
+
+class TestSeededDataInContextBundle:
+    def test_seeded_clock_appears_in_open_clocks(self, repo: MemoryRepository) -> None:
+        pack = SeedPack.model_validate(_SEED_PACK_DATA)
+        apply_seed_pack(pack, "camp_001", repo, MIGRATIONS_DIR)
+
+        bundle = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+        ).build(repo)
+
+        expected_clock_id = derive_clock_id("test-campaign", "bone-warden-stirs")
+        clock_ids = {c["clock_id"] for c in bundle.open_clocks}
+        assert expected_clock_id in clock_ids
+
+    def test_seeded_memory_appears_in_memory_cards(self, repo: MemoryRepository) -> None:
+        pack = SeedPack.model_validate(_SEED_PACK_DATA)
+        apply_seed_pack(pack, "camp_001", repo, MIGRATIONS_DIR)
+
+        bundle = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+        ).build(repo)
+
+        expected_memory_id = derive_memory_id("test-campaign", "The Expedition's Purpose")
+        card_ids = {c["memory_id"] for c in bundle.memory_cards}
+        assert expected_memory_id in card_ids

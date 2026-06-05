@@ -1,0 +1,286 @@
+{
+  "campaign_slug": "tomb-of-the-forgotten-king",
+  "player_side": {
+    "label": "The Crown-Seekers",
+    "actors": [
+      {
+        "slug": "brother-aldric",
+        "display_name": "Brother Aldric",
+        "actor_type": "pc",
+        "concept": "Half-elf cleric of the Veiled Sun, sent to recover the Crown before the new moon allows the lich to reclaim it.",
+        "actions": {
+          "fight": 0,
+          "endure": 2,
+          "move": 0,
+          "sense": 1,
+          "sway": 1,
+          "study": 1,
+          "tinker": 0,
+          "focus": 1,
+          "channel": 2
+        },
+        "stress_tracks": ["body", "composure", "bonds", "weird"],
+        "tags": ["cleric", "half-elf", "holy", "healer"],
+        "threat_tags": [],
+        "relationships": ["order bond with the Veiled Sun temple", "protective of Seraphine despite disapproving of her methods"]
+      },
+      {
+        "slug": "seraphine-vex",
+        "display_name": "Seraphine Vex",
+        "actor_type": "pc",
+        "concept": "Human necromancer who believes the lich-king's power can be studied and contained — not just destroyed.",
+        "actions": {
+          "fight": 0,
+          "endure": 0,
+          "move": 0,
+          "sense": 1,
+          "sway": 1,
+          "study": 2,
+          "tinker": 0,
+          "focus": 2,
+          "channel": 1
+        },
+        "stress_tracks": ["body", "composure", "bonds", "weird"],
+        "tags": ["wizard", "human", "necromancer", "scholar"],
+        "threat_tags": [],
+        "relationships": ["the Spectral Advisor may know her by name", "Aldric distrusts her interest in the lich's power"]
+      },
+      {
+        "slug": "dax",
+        "display_name": "Dax",
+        "actor_type": "pc",
+        "concept": "Halfling tomb-delver hired by the temple. Has been in this ziggurat before — and came back alone.",
+        "actions": {
+          "fight": 1,
+          "endure": 0,
+          "move": 2,
+          "sense": 2,
+          "sway": 0,
+          "study": 0,
+          "tinker": 1,
+          "focus": 0,
+          "channel": 0
+        },
+        "stress_tracks": ["body", "composure", "bonds", "weird"],
+        "tags": ["rogue", "halfling", "thief", "scout", "survivor"],
+        "threat_tags": [],
+        "relationships": ["lost his previous party in this tomb", "owes the temple a debt he refuses to name"]
+      }
+    ]
+  },
+  "dungeon_side": {
+    "actors": [
+      {
+        "slug": "the-lich-king",
+        "display_name": "The Lich-King",
+        "actor_type": "monster",
+        "concept": "The Forgotten King, risen as a lich four centuries ago. Sealed below his own throne. On the new moon, the seals break and he fully reawakens.",
+        "instinct": "Reclaim the Sundered Crown and complete his ascension. Let nothing that breathes leave the tomb.",
+        "actions": {},
+        "stress_tracks": [],
+        "tags": ["boss", "level-3", "undead", "lich"],
+        "threat_tags": ["undead", "spellcaster", "boss", "lich", "sealed"],
+        "relationships": []
+      },
+      {
+        "slug": "wraith-steward",
+        "display_name": "The Wraith-Steward",
+        "actor_type": "npc",
+        "concept": "The king's most loyal servant, bound to the tomb in death. Negotiation is possible — he values ritual propriety over bloodshed.",
+        "instinct": "Assess the party's worthiness. Destroy the unworthy. Bargain with those who understand the old ways.",
+        "actions": {},
+        "stress_tracks": [],
+        "tags": ["level-2", "undead", "npc", "negotiable"],
+        "threat_tags": ["undead", "negotiable", "powerful", "gatekeeper"],
+        "relationships": []
+      },
+      {
+        "slug": "bone-warden",
+        "display_name": "The Bone Warden",
+        "actor_type": "monster",
+        "concept": "A massive construct of fused bone, animated by the lich's residual will. Patrols the ossuary approach.",
+        "instinct": "Crush all who disturb the king's remains. It does not negotiate.",
+        "actions": {},
+        "stress_tracks": [],
+        "tags": ["level-3", "undead", "construct", "patrol"],
+        "threat_tags": ["undead", "relentless", "construct", "overwhelming"],
+        "relationships": []
+      },
+      {
+        "slug": "spectral-advisor",
+        "display_name": "The Spectral Advisor",
+        "actor_type": "npc",
+        "concept": "The king's former court wizard, trapped as a spirit. He knows the lich's true weakness and will share it — for a price the party may not be willing to pay.",
+        "instinct": "Guide worthy souls toward the lich's binding. Test them first.",
+        "actions": {},
+        "stress_tracks": [],
+        "tags": ["level-3", "spectral", "npc", "helpful"],
+        "threat_tags": ["spectral", "cryptic", "demanding"],
+        "relationships": []
+      },
+      {
+        "slug": "skeleton-guardians",
+        "display_name": "Ceremonial Skeleton Guardians",
+        "actor_type": "monster",
+        "concept": "Twelve skeletons standing in ceremonial posture in the Servants' Hall. Dormant unless the king commands — or the hall is desecrated.",
+        "instinct": "Remain still. Obey the king's last command. Strike when the hall is dishonored.",
+        "actions": {},
+        "stress_tracks": [],
+        "tags": ["level-2", "undead", "dormant", "numerous"],
+        "threat_tags": ["undead", "disciplined", "numerous", "triggered"],
+        "relationships": []
+      }
+    ]
+  },
+  "clocks": [
+    {
+      "slug": "the-new-moon-approaches",
+      "label": "The New Moon Approaches",
+      "segments": 8,
+      "category": "danger",
+      "notes": "When full, the lich's seals break and he fully reawakens. Each scene spent in the tomb advances this. The deadline is structural."
+    },
+    {
+      "slug": "the-bone-warden-stirs",
+      "label": "The Bone Warden Stirs",
+      "segments": 6,
+      "category": "danger",
+      "notes": "Advances with noise, combat, or disturbance of remains. When full, the Bone Warden abandons its patrol pattern and hunts the party."
+    },
+    {
+      "slug": "the-lich-senses-intruders",
+      "label": "The Lich Senses Intruders",
+      "segments": 4,
+      "category": "pursuit",
+      "notes": "Advances when sanctified areas are disturbed, undead are destroyed, or magic is used within the tomb. When full, the lich begins exerting direct influence over the dungeon."
+    },
+    {
+      "slug": "the-crown-calls-to-the-king",
+      "label": "The Crown Calls to the King",
+      "segments": 6,
+      "category": "ritual",
+      "notes": "The Sundered Crown resonates with the lich's awakening. Advances when the crown is handled, when the lich is invoked, or when necrotic magic is used. When full, the crown begins moving toward the throne on its own."
+    },
+    {
+      "slug": "the-dungeon-learns-what-comforts-you",
+      "label": "The Dungeon Learns What Comforts You",
+      "segments": 6,
+      "category": "relationship",
+      "notes": "The tomb has been inhabited by death for 400 years. It develops an eerie emotional awareness of the party. Advances on fear, grief, or revealed vulnerabilities. When full, the dungeon begins exploiting personal weaknesses."
+    }
+  ],
+  "memories": [
+    {
+      "title": "The New Moon Deadline",
+      "summary": "The party must recover the Sundered Crown before the new moon, when the lich-king fully reawakens. The temple's seers gave them a narrow window — perhaps three days.",
+      "type": "campaign_premise",
+      "importance": 9,
+      "tags": ["theme:urgency", "thread:sundered-crown", "clock:the-new-moon-approaches", "emotion:pressure"]
+    },
+    {
+      "title": "The King Rose as a Lich",
+      "summary": "Four centuries ago, the Forgotten King performed the Rite of Undying to cheat death. His own court sealed him below the ziggurat rather than face him in open war. The seals hold — for now.",
+      "type": "location_lore",
+      "importance": 8,
+      "tags": ["location:tomb-of-the-forgotten-king", "theme:history", "thread:lich-king", "actor:dungeon:the-lich-king", "emotion:dread"]
+    },
+    {
+      "title": "Dax Came Back Alone",
+      "summary": "Dax entered this tomb once before with a party of four. He left alone and has never explained what happened to the others. He knows passages and dangers the others do not.",
+      "type": "actor_relationship",
+      "importance": 7,
+      "tags": ["actor:protagonist:dax", "theme:secrets", "thread:prior-expedition", "emotion:guilt"]
+    },
+    {
+      "title": "The Wraith-Steward Can Be Bargained With",
+      "summary": "Temple records suggest the Wraith-Steward values ritual propriety above violence. Those who approach him with the correct forms of address may negotiate passage rather than fight.",
+      "type": "location_lore",
+      "importance": 6,
+      "tags": ["actor:dungeon:wraith-steward", "location:wrath-study", "theme:negotiation", "thread:passage-to-level-3"]
+    },
+    {
+      "title": "The Drowned Shrine Is Still Active",
+      "summary": "The Shrine of Mythrax on Level 1 still conducts necromantic energy. The silver dust on the floor responds to living footsteps — disturbing it may alert something below.",
+      "type": "dungeon_emotional_tell",
+      "importance": 6,
+      "tags": ["location:drowned-shrine", "theme:danger", "clock:the-lich-senses-intruders", "emotion:unease"]
+    },
+    {
+      "title": "Seraphine Wants to Study the Lich",
+      "summary": "Seraphine believes the lich-king's binding ritual contains secrets about undeath that could revolutionize magical theory. Her interest in the crown is academic as much as practical — and Aldric suspects she is not committed to destroying it.",
+      "type": "actor_relationship",
+      "importance": 7,
+      "tags": ["actor:protagonist:seraphine-vex", "actor:protagonist:brother-aldric", "theme:secrets", "thread:seraphine-agenda", "emotion:tension"]
+    },
+    {
+      "title": "The Bone Warden Patrols the Ossuary",
+      "summary": "The massive bone construct is the primary active threat on Level 3. Noise on the approach advances its alertness. It cannot be destroyed by conventional means — only dispersed temporarily.",
+      "type": "unresolved_threat",
+      "importance": 7,
+      "tags": ["actor:dungeon:bone-warden", "location:ossuary-approach", "clock:the-bone-warden-stirs", "theme:danger", "emotion:dread"]
+    },
+    {
+      "title": "Aldric's Order Sent Him Alone",
+      "summary": "The Veiled Sun temple dispatched Aldric without backup because the other priests refused the mission — they believe the tomb cannot be safely entered. Aldric is the only one who volunteered.",
+      "type": "actor_relationship",
+      "importance": 5,
+      "tags": ["actor:protagonist:brother-aldric", "theme:isolation", "thread:temple-politics", "emotion:loneliness"]
+    },
+    {
+      "title": "The Spectral Advisor Knows the Binding",
+      "summary": "The court wizard's spirit in the Advisor's Nook claims to know a method to permanently bind the lich rather than dispel him temporarily. The cost of this knowledge is not yet known.",
+      "type": "unresolved_threat",
+      "importance": 6,
+      "tags": ["actor:dungeon:spectral-advisor", "location:advisors-nook", "thread:lich-binding", "theme:bargain", "emotion:hope"]
+    },
+    {
+      "title": "The Tomb Breathes",
+      "summary": "The basalt walls of the ziggurat exhale cold air in slow, rhythmic pulses — not wind, not vents. As if something immense is sleeping below and dreaming of the party's presence.",
+      "type": "dungeon_emotional_tell",
+      "importance": 5,
+      "tags": ["location:tomb-of-the-forgotten-king", "clock:the-dungeon-learns-what-comforts-you", "theme:horror", "emotion:dread"]
+    }
+  ],
+  "room_threats": [
+    {
+      "location_slug": "drowned-shrine",
+      "trigger_tags": ["touch_altar", "magic_use", "step_on_silver_dust"],
+      "related_actor_slugs": ["the-lich-king"],
+      "related_clock_slugs": ["the-lich-senses-intruders"],
+      "possible_reactions": ["advance_clock", "shrine_activates", "necrotic_pulse"],
+      "notes": "The shrine of Mythrax is the most spiritually active room on Level 1. Any interaction advances the lich's awareness."
+    },
+    {
+      "location_slug": "servants-hall",
+      "trigger_tags": ["noise", "combat", "desecration"],
+      "related_actor_slugs": ["skeleton-guardians"],
+      "related_clock_slugs": ["the-bone-warden-stirs", "the-lich-senses-intruders"],
+      "possible_reactions": ["advance_clock", "skeletons_animate", "reveal_threat"],
+      "notes": "The twelve ceremonial skeletons are dormant unless the hall is dishonored by violence or loud noise. A failed stealth roll is enough."
+    },
+    {
+      "location_slug": "ossuary-approach",
+      "trigger_tags": ["noise", "forced_entry", "failed_move", "disturb_skulls"],
+      "related_actor_slugs": ["bone-warden"],
+      "related_clock_slugs": ["the-bone-warden-stirs"],
+      "possible_reactions": ["advance_clock", "reveal_threat", "separate_party", "bone_warden_charges"],
+      "notes": "The walls of stacked skulls amplify sound. Even quiet movement has risk here. The Bone Warden pauses when a whisper reaches it."
+    },
+    {
+      "location_slug": "wrath-study",
+      "trigger_tags": ["aggression", "failed_sway", "desecration"],
+      "related_actor_slugs": ["wraith-steward"],
+      "related_clock_slugs": ["the-lich-senses-intruders"],
+      "possible_reactions": ["advance_clock", "wraith_attacks", "seal_descent"],
+      "notes": "Attacking the Wraith-Steward without attempting negotiation seals the Descent Chamber and alerts the lich. The signet is lost."
+    },
+    {
+      "location_slug": "throne-of-bone",
+      "trigger_tags": ["combat", "touch_crown", "channel", "magic_use"],
+      "related_actor_slugs": ["the-lich-king"],
+      "related_clock_slugs": ["the-crown-calls-to-the-king", "the-new-moon-approaches"],
+      "possible_reactions": ["advance_clock", "lich_reanimates", "crown_flies_to_throne", "dungeon_seals"],
+      "notes": "The climax room. Any magical action accelerates both the crown and the moon clocks. Handle the crown carefully."
+    }
+  ]
+}

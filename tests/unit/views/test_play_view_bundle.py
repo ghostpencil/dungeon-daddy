@@ -174,6 +174,27 @@ def test_load_player_actors_no_op_without_rpg(tmp_path: Path):
 
 
 # ---------------------------------------------------------------------------
+# Slice 34-6 — dungeon actor types (faction, dungeon_presence) excluded from panel
+# ---------------------------------------------------------------------------
+
+def test_load_player_actors_excludes_faction_and_dungeon_presence(tmp_path: Path):
+    """After seeding pc + monster + faction + dungeon_presence, only pc reaches panel."""
+    from unittest.mock import MagicMock
+    view, _, _ = _make_view(tmp_path, with_rpg=True)
+    view._mem_repo.save_actor("a-pc",       "camp-1", "pc",               "hero",    "Elara")
+    view._mem_repo.save_actor("a-monster",  "camp-1", "monster",          "warden",  "Bone Warden")
+    view._mem_repo.save_actor("a-faction",  "camp-1", "faction",          "cult",    "The Cult")
+    view._mem_repo.save_actor("a-presence", "camp-1", "dungeon_presence", "spirit",  "The Spirit")
+    action_panel = MagicMock()
+    view._rpg_action = action_panel
+    view._load_player_actors()
+    action_panel.set_actors.assert_called_once()
+    actors = action_panel.set_actors.call_args[0][0]
+    assert len(actors) == 1
+    assert actors[0].actor_id == "a-pc"
+
+
+# ---------------------------------------------------------------------------
 # Slice 9 — _on_resolve_action calls service and stores result
 # ---------------------------------------------------------------------------
 
@@ -224,6 +245,30 @@ def test_on_resolve_action_spawns_dm_narration(tmp_path: Path):
         )
     mock_spawn.assert_called_once_with(room, level)
     assert any("SENSE" in m.content for m in view._dm_history)
+
+
+def test_on_resolve_action_dm_message_includes_actor_name(tmp_path: Path):
+    from unittest.mock import MagicMock, patch
+    from dungeon_daddy.rpg.models import ActionResolution, ActorState
+    view, room, level = _make_view(tmp_path, with_rpg=True)
+    resolution = ActionResolution(
+        resolution_id="r5", campaign_id="camp-1", actor_id="a-talvas",
+        action_key="sense", dice_rolled=[6], outcome="full", stress_cost=0,
+    )
+    view._rpg_service.resolve_action.return_value = (resolution, MagicMock())
+    action_panel = MagicMock()
+    action_panel._format_result.return_value = {"outcome": "full", "dice": [6], "stress_cost": 0, "notes": None}
+    action_panel._actors = [
+        ActorState(actor_id="a-talvas", campaign_id="camp-1", actor_type="pc",
+                   slug="talvas", display_name="Talvas the Wanderer"),
+    ]
+    view._rpg_action = action_panel
+    with patch.object(view, "_spawn_dm_thread"):
+        view._on_resolve_action(
+            campaign_id="camp-1", actor_id="a-talvas", intent="look for threats",
+            action_key="sense", push_yourself=False, momentum_spend=0, dice_pool=1,
+        )
+    assert any("Talvas the Wanderer" in m.content for m in view._dm_history)
 
 
 def test_on_resolve_action_no_room_adds_system_message(tmp_path: Path):
@@ -285,3 +330,51 @@ def test_dm_agent_receives_no_bundle_when_rpg_unavailable(tmp_path: Path):
 
     call_kwargs = view._dm_agent.respond.call_args.kwargs
     assert call_kwargs.get("context_bundle") is None
+
+
+# ---------------------------------------------------------------------------
+# _load_memory_entries — populates the MEM panel from mem_repo
+# ---------------------------------------------------------------------------
+
+def test_load_memory_entries_populates_panel(tmp_path: Path):
+    from unittest.mock import MagicMock
+    view, _, _ = _make_view(tmp_path, with_rpg=True)
+    view._rpg_campaign_id = "camp-1"
+    view._mem_repo.save_memory_entry(
+        memory_id="m1", campaign_id="camp-1", entry_type="event",
+        title="The Factory is Waking Up", summary="Something stirs.",
+    )
+    memory_panel = MagicMock()
+    view._rpg_memory = memory_panel
+    view._load_memory_entries()
+    memory_panel.set_entries.assert_called_once()
+    entries = memory_panel.set_entries.call_args[0][0]
+    assert any(e.title == "The Factory is Waking Up" for e in entries)
+
+
+def test_load_memory_entries_includes_tags(tmp_path: Path):
+    from unittest.mock import MagicMock
+    view, _, _ = _make_view(tmp_path, with_rpg=True)
+    view._rpg_campaign_id = "camp-1"
+    view._mem_repo.save_memory_entry(
+        memory_id="m2", campaign_id="camp-1", entry_type="npc",
+        title="Golem A-7", summary="Watching.",
+    )
+    view._mem_repo.add_memory_tag("m2", "golem")
+    view._mem_repo.add_memory_tag("m2", "factory")
+    memory_panel = MagicMock()
+    view._rpg_memory = memory_panel
+    view._load_memory_entries()
+    entries = memory_panel.set_entries.call_args[0][0]
+    golem_entry = next(e for e in entries if e.memory_id == "m2")
+    assert "golem" in golem_entry.tags
+    assert "factory" in golem_entry.tags
+
+
+def test_load_memory_entries_no_op_without_mem_repo(tmp_path: Path):
+    from unittest.mock import MagicMock
+    view, _, _ = _make_view(tmp_path, with_rpg=False)
+    memory_panel = MagicMock()
+    view._rpg_memory = memory_panel
+    view._load_memory_entries()
+    memory_panel.set_entries.assert_not_called()

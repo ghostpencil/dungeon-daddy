@@ -209,3 +209,42 @@ def test_bundle_section_lines_no_bundle():
     ctrl = _controls()
     lines = ctrl.bundle_section_lines()
     assert any("No bundle built yet" in line for line in lines)
+
+
+# ---------------------------------------------------------------------------
+# clock_section_lines — shows clock labels from the active bundle
+# ---------------------------------------------------------------------------
+
+def test_clock_section_lines_shows_clock_labels():
+    ctrl = _controls()
+    b = _bundle(
+        open_clocks=[
+            {"clock_id": "ck1", "label": "The Forge Awakens", "filled": 2, "segments": 6, "status": "active"},
+            {"clock_id": "ck2", "label": "Party Detected", "filled": 1, "segments": 4, "status": "active"},
+        ],
+    )
+    ctrl.set_bundle(b)
+    lines = ctrl.clock_section_lines()
+    text = "\n".join(lines)
+    assert "The Forge Awakens" in text
+    assert "Party Detected" in text
+
+
+def test_clock_section_lines_no_bundle():
+    ctrl = _controls()
+    lines = ctrl.clock_section_lines()
+    assert any("No bundle" in line for line in lines)
+
+
+def test_clock_section_lines_filled_and_segments_shown():
+    ctrl = _controls()
+    b = _bundle(
+        open_clocks=[
+            {"clock_id": "ck1", "label": "Alarm", "filled": 3, "segments": 6, "status": "active"},
+        ],
+    )
+    ctrl.set_bundle(b)
+    lines = ctrl.clock_section_lines()
+    text = "\n".join(lines)
+    assert "3" in text
+    assert "6" in text

@@ -43,6 +43,20 @@ class DebugControls:
             lines.append(f"  - {card['title']} [{reason}]")
         return lines
 
+    def clock_section_lines(self) -> list[str]:
+        if self._last_bundle is None:
+            return ["No bundle built yet"]
+        clocks = self._last_bundle.open_clocks
+        if not clocks:
+            return ["Clocks: (none)"]
+        lines = [f"Clocks: {len(clocks)} active"]
+        for c in clocks:
+            label = c.get("label", "?")
+            filled = c.get("filled", 0)
+            segments = c.get("segments", 0)
+            lines.append(f"  [{filled}/{segments}] {label}")
+        return lines
+
     def resolve_sample_action(
         self,
         request: ActionRequest,

@@ -1724,17 +1724,57 @@ Major work:
 
 ## Phase 34 — Campaign RPG Data Deepening
 
-Make the existing campaigns meaningful RPG testbeds.
+**Status: Complete (2026-06-05) — 1802 passing**
 
-Major work:
+Make the existing campaigns meaningful RPG testbeds. Phase 33 proved a player action can be resolved; Phase 34 makes the campaigns interesting enough that those actions matter.
 
-- Add seed-pack format.
-- Add richer player-controlled actors.
-- Add dungeon-controlled NPCs, monsters, factions, and dungeon presence.
-- Add campaign clocks.
-- Add room threat hooks.
-- Add starter memories and controlled tags.
-- Improve seeder idempotency and reporting.
+Spec: `spec/PHASE_34_CAMPAIGN_RPG_DATA_DEEPENING.md`
+
+### Modules
+
+| Module / File | Notes |
+|---|---|
+| `seed_data/campaigns/<slug>/rpg_seed.json` (new) | Readable seed-pack format per campaign |
+| `dungeon_daddy/rpg/seed_pack.py` (new) | Seed-pack schema (Pydantic), parser, stable ID derivation |
+| `tools/seed_rpg_state.py` (update) | Apply seed packs; `--dry-run`, `--seed-pack`, `--all-existing-campaigns`, `--force` |
+| `tests/unit/rpg/test_seed_pack.py` (new) | Schema parse, stable ID, idempotency, actor filtering |
+| `tests/integration/test_seed_pack_integration.py` (new) | Apply + re-apply to temp campaign DB; context bundle retrieval |
+
+### Implementation Steps
+
+| Step | Task | Status |
+|---|---|---|
+| 34-1 | Seed-pack schema (`rpg_seed.py`): Pydantic models for `PlayerActor`, `DungeonActor`, `SeedClock`, `RoomThreat`, `StarterMemory`; parse + validate from JSON | Complete |
+| 34-2 | Stable ID derivation: deterministic `actor_id` / `clock_id` from campaign slug + name slug | Complete |
+| 34-3 | Apply seed pack to campaign DB: insert/update actors, clocks, memories; idempotent by stable ID | Complete |
+| 34-4 | Seeder CLI upgrade: `--dry-run`, `--campaign`, `--all-existing-campaigns`, `--seed-pack`, `--force`; create/update/skip summary | Complete |
+| 34-5 | Write seed packs for both existing campaigns (player actors, dungeon actors, clocks, room threats, starter memories) | Complete |
+| 34-6 | Verify player-controlled actor filter and dungeon-actor exclusion from Player Action UI | Complete |
+| 34-7 | Verify seeded clocks and memories appear in context bundle | Complete |
+
+### TDD Slices
+
+1. Seed pack schema parse test.
+2. Stable ID generation test.
+3. Apply seed pack to temp campaign DB.
+4. Re-apply seed pack; verify no duplicates.
+5. Player-controlled actor filter test.
+6. Dungeon-controlled actors excluded from player UI.
+7. Seeded clocks appear in context bundle.
+8. Seeded memories appear by retrieval rules.
+
+### Exit Criteria
+
+- [x] Both existing campaigns have RPG seed packs in `seed_data/campaigns/<slug>/rpg_seed.json`
+- [x] Both campaigns have at least one player-controlled actor
+- [x] Both campaigns have dungeon-controlled actors (NPCs/monsters)
+- [x] Both campaigns have 3–6 clocks connected to threats
+- [x] Both campaigns have 5–10 starter memories retrievable by context bundle
+- [x] Seeder applies seed packs idempotently (`--dry-run` + `--force` both work)
+- [x] Player Action UI shows meaningful actor choices after seeding
+- [x] Context bundle includes actor state, memories, clocks, and fallout after seeding
+- [x] Tests cover schema parse, stable ID, idempotency, and context bundle retrieval
+- [x] `pytest tests/unit/` + `tests/integration/` green
 
 ## Phase 35 — Deterministic World Reaction Service
 

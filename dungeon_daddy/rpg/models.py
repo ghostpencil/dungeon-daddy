@@ -55,7 +55,7 @@ class ActionRating(BaseModel):
 class ActorState(BaseModel):
     actor_id: str
     campaign_id: str
-    actor_type: Literal["pc", "npc", "monster", "dungeon"]
+    actor_type: Literal["pc", "npc", "monster", "dungeon", "faction", "dungeon_presence"]
     slug: str
     display_name: str
     concept: str | None = None

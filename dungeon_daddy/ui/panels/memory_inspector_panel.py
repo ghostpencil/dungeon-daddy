@@ -121,7 +121,7 @@ class MemoryInspectorPanel:
 
         cur_y = list_top
         for entry in results:
-            warning = " ⚠" if self.has_sync_warning(entry.id) else ""
+            warning = " ⚠" if self.has_sync_warning(entry.memory_id) else ""
             arcade.draw_text(
                 f"{entry.title}{warning}", x + PAD_MD, cur_y,
                 INK_3, font_size=TEXT_SM, font_name=FONT_UI, anchor_y="top",
