@@ -43,5 +43,8 @@ def make_play_view():
         view._rpg_open = False
         view._rpg_scene = MagicMock()
         view._rpg_side = MagicMock()
+        view._rpg_debug = None
+        view._rpg_service = None
+        view._mem_repo = None
         return view
     return _factory

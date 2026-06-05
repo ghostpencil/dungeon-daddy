@@ -1,0 +1,42 @@
+{
+  "campaign_id": "camp-33",
+  "pc_actor_id": "actor-lyra",
+  "actor_filtering": {
+    "total_actors": 3,
+    "pc_actors": 1,
+    "excluded_types": [
+      "dungeon",
+      "npc"
+    ]
+  },
+  "action_request": {
+    "action_key": "tinker",
+    "dice_pool": 3,
+    "push_yourself": false
+  },
+  "resolution": {
+    "outcome": "full",
+    "dice_rolled": [
+      5,
+      5,
+      6
+    ],
+    "stress_cost": 0
+  },
+  "bundle": {
+    "bundle_id": "6c7b670a-7fbb-4e39-a4ba-5fc3ea8104a9",
+    "memory_cards": 2,
+    "open_clocks": 1,
+    "active_fallout": 0,
+    "mechanical_state_actors": [
+      "actor-lyra"
+    ],
+    "provenance": {
+      "retrieved": 2,
+      "omitted": 0,
+      "focus_actor_ids": [
+        "actor-lyra"
+      ]
+    }
+  }
+}

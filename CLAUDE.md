@@ -173,6 +173,20 @@ Only if:
 - implementing memory storage, retrieval, context bundles, or Markdown sync
 - checking memory types, creation triggers, retrieval ranking, or LLM boundary rules
 
+## BALANCE_NOTES.md
+Only if:
+- adjusting RPG constants, stress/clock/fallout thresholds, or game balance parameters
+
+## SEED_RPG_STATE_REQUIREMENTS.md
+Only if:
+- implementing or modifying `tools/seed_rpg_state.py`
+- seeding campaigns with RPG data
+
+## docs/LLM_AUTHORITY_BOUNDARY.md
+Only if:
+- implementing LLM-facing interfaces or proposal validation
+- checking what the LLM may or must not do
+
 ---
 
 # Workflow (TDD)

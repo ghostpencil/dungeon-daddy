@@ -1,0 +1,368 @@
+"""Seed RPG-ready data into existing campaign folders for Phase 33 testing.
+
+Usage:
+    python tools/seed_rpg_state.py --campaign "The Crucible" [--dry-run]
+    python tools/seed_rpg_state.py --all-existing-campaigns [--dry-run]
+"""
+from __future__ import annotations
+
+import argparse
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+
+# Allow running directly as `python tools/seed_rpg_state.py`
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+
+@dataclass
+class SeedResult:
+    created: int = 0
+    updated: int = 0
+    skipped: int = 0
+    warnings: list[str] = field(default_factory=list)
+
+    def print_summary(self) -> None:
+        print(f"Created:  {self.created}")
+        print(f"Updated:  {self.updated}")
+        print(f"Skipped:  {self.skipped}")
+        if self.warnings:
+            print("Warnings:")
+            for w in self.warnings:
+                print(f"  - {w}")
+
+
+def seed_campaign(campaign_dir: Path, dry_run: bool = False) -> SeedResult:
+    """Seed RPG data into a single campaign folder.
+
+    Idempotent — safe to run multiple times. Dry-run mode prints intended
+    changes without writing any files or database rows.
+    """
+    result = SeedResult()
+
+    if not campaign_dir.exists():
+        result.warnings.append(f"Campaign folder not found: {campaign_dir}")
+        return result
+
+    if dry_run:
+        _dry_run_report(campaign_dir, result)
+        return result
+
+    _apply_seed(campaign_dir, result)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+_MIGRATIONS_DIR = Path(__file__).parent.parent / "dungeon_daddy" / "data" / "migrations"
+
+_ACTIONS = ["fight", "move", "tinker", "study", "focus", "sway", "sense", "channel", "endure"]
+_STRESS_TRACKS = ["body", "composure", "bonds", "weird"]
+
+
+def _slugify(name: str) -> str:
+    return name.lower().replace(" ", "-").replace("'", "").replace(",", "")
+
+
+def _campaign_id(campaign_dir: Path) -> str:
+    return f"campaign:{_slugify(campaign_dir.name)}"
+
+
+def _actor_id(campaign_slug: str, actor_slug: str) -> str:
+    return f"actor:{campaign_slug}:{actor_slug}"
+
+
+def _clock_id(campaign_slug: str, clock_slug: str) -> str:
+    return f"clock:{campaign_slug}:{clock_slug}"
+
+
+def _memory_id(campaign_slug: str, memory_slug: str) -> str:
+    return f"memory:{campaign_slug}:{memory_slug}"
+
+
+def _scene_id(campaign_slug: str, location_slug: str) -> str:
+    return f"scene:{campaign_slug}:{location_slug}"
+
+
+def _session_id(campaign_slug: str) -> str:
+    return f"session:{campaign_slug}:1"
+
+
+def _load_seed_spec(campaign_dir: Path) -> _CampaignSeedSpec:
+    """Build a seed spec from campaign folder content and generic defaults."""
+    slug = _slugify(campaign_dir.name)
+    title = campaign_dir.name
+    return _CampaignSeedSpec(slug=slug, title=title)
+
+
+class _CampaignSeedSpec:
+    """Holds the seed entities for one campaign."""
+
+    def __init__(self, slug: str, title: str) -> None:
+        self.slug = slug
+        self.title = title
+        self.campaign_id = f"campaign:{slug}"
+
+        self.pc_actors = [
+            {"slug": "protagonist", "display_name": "Protagonist", "concept": "[seed] player-controlled actor"},
+        ]
+        self.npc_actors = [
+            {"slug": "dungeon-presence", "display_name": "Dungeon Presence", "actor_type": "dungeon",
+             "concept": "[seed] dungeon-controlled presence"},
+            {"slug": "wandering-threat", "display_name": "Wandering Threat", "actor_type": "monster",
+             "concept": "[seed] wandering monster"},
+        ]
+        self.clocks = [
+            {"slug": "heat", "label": "Heat Rising", "segments": 6},
+            {"slug": "ruin", "label": "Dungeon Ruin", "segments": 8},
+            {"slug": "escape", "label": "Escape Route Open", "segments": 4},
+        ]
+        self.memories = [
+            {"slug": "arrival", "type": "event", "title": "[seed] Party arrived at the dungeon",
+             "summary": "The party entered the dungeon for the first time.", "importance": 6,
+             "tags": ["actor:protagonist", "location:entrance", "theme:arrival"]},
+            {"slug": "first-threat", "type": "threat", "title": "[seed] First danger encountered",
+             "summary": "The party encountered the first sign of danger.", "importance": 5,
+             "tags": ["actor:dungeon-presence", "theme:danger"]},
+            {"slug": "party-goal", "type": "faction", "title": "[seed] Party objective established",
+             "summary": "The party's goal for this dungeon run is clear.", "importance": 7,
+             "tags": ["actor:protagonist", "theme:goal"]},
+        ]
+
+
+def _dry_run_report(campaign_dir: Path, result: SeedResult) -> None:
+    spec = _load_seed_spec(campaign_dir)
+    slug = spec.slug
+    print(f"[dry-run] Campaign: {campaign_dir.name} ({slug})")
+    print(f"[dry-run] Would seed {len(spec.pc_actors)} PC actor(s), "
+          f"{len(spec.npc_actors)} NPC/dungeon actor(s), "
+          f"{len(spec.clocks)} clock(s), "
+          f"{len(spec.memories)} memory entry(ies)")
+
+
+def _apply_seed(campaign_dir: Path, result: SeedResult) -> None:
+    import duckdb
+    from dungeon_daddy.memory.repository import MemoryRepository
+
+    db_path = campaign_dir / "campaign.duckdb"
+    repo = MemoryRepository(db_path)
+    repo.initialize_schema(_MIGRATIONS_DIR)
+
+    spec = _load_seed_spec(campaign_dir)
+    slug = spec.slug
+    campaign_id = spec.campaign_id
+
+    # Campaign row
+    _upsert_campaign(repo, campaign_id, slug, spec.title, campaign_dir, result)
+
+    # Session row
+    _upsert_session(repo, campaign_id, slug, result)
+
+    # Scene row
+    _upsert_scene(repo, campaign_id, slug, result)
+
+    # PC actors
+    for actor_spec in spec.pc_actors:
+        _upsert_actor(repo, campaign_id, slug, actor_spec["slug"],
+                      actor_spec["display_name"], "pc", actor_spec.get("concept"), result)
+
+    # NPC/dungeon actors
+    for actor_spec in spec.npc_actors:
+        _upsert_actor(repo, campaign_id, slug, actor_spec["slug"],
+                      actor_spec["display_name"], actor_spec["actor_type"],
+                      actor_spec.get("concept"), result)
+
+    # Action ratings for PC actors only
+    for actor_spec in spec.pc_actors:
+        actor_id = _actor_id(slug, actor_spec["slug"])
+        for action_key in _ACTIONS:
+            _upsert_action_rating(repo, actor_id, action_key, result)
+
+    # Stress tracks for PC actors only
+    for actor_spec in spec.pc_actors:
+        actor_id = _actor_id(slug, actor_spec["slug"])
+        for track_key in _STRESS_TRACKS:
+            _upsert_stress_track(repo, actor_id, track_key, result)
+
+    # Clocks
+    for clock_spec in spec.clocks:
+        _upsert_clock(repo, campaign_id, slug, clock_spec, result)
+
+    # Memories
+    for mem_spec in spec.memories:
+        _upsert_memory(repo, campaign_id, slug, mem_spec, result)
+
+    repo.close()
+
+    if result.warnings:
+        pass  # already accumulated
+
+
+# ---------------------------------------------------------------------------
+# Upsert helpers — each returns True if created, False if already existed
+# ---------------------------------------------------------------------------
+
+
+def _upsert_campaign(
+    repo: object, campaign_id: str, slug: str, title: str,
+    campaign_dir: Path, result: SeedResult
+) -> None:
+    from dungeon_daddy.memory.repository import MemoryRepository
+    assert isinstance(repo, MemoryRepository)
+    existing = repo.get_campaign(campaign_id)
+    if existing is None:
+        repo.save_campaign(campaign_id, slug, title)
+        result.created += 1
+    else:
+        result.skipped += 1
+
+
+def _upsert_session(
+    repo: object, campaign_id: str, slug: str, result: SeedResult
+) -> None:
+    from dungeon_daddy.memory.repository import MemoryRepository
+    assert isinstance(repo, MemoryRepository)
+    session_id = _session_id(slug)
+    existing = repo.get_session(session_id)
+    if existing is None:
+        repo.save_session(session_id, campaign_id, session_number=1)
+        result.created += 1
+    else:
+        result.skipped += 1
+
+
+def _upsert_scene(
+    repo: object, campaign_id: str, slug: str, result: SeedResult
+) -> None:
+    from dungeon_daddy.memory.repository import MemoryRepository
+    assert isinstance(repo, MemoryRepository)
+    scene_id_val = _scene_id(slug, "entrance")
+    existing = repo.get_scene(scene_id_val)
+    if existing is None:
+        repo.save_scene(scene_id_val, campaign_id, location_slug="entrance")
+        result.created += 1
+    else:
+        result.skipped += 1
+
+
+def _upsert_actor(
+    repo: object, campaign_id: str, campaign_slug: str,
+    actor_slug: str, display_name: str, actor_type: str,
+    concept: str | None, result: SeedResult
+) -> None:
+    from dungeon_daddy.memory.repository import MemoryRepository
+    assert isinstance(repo, MemoryRepository)
+    actor_id = _actor_id(campaign_slug, actor_slug)
+    existing = repo.get_actor(actor_id)
+    if existing is None:
+        repo.save_actor(actor_id, campaign_id, actor_type, actor_slug, display_name)
+        result.created += 1
+    else:
+        result.skipped += 1
+
+
+def _upsert_action_rating(
+    repo: object, actor_id: str, action_key: str, result: SeedResult
+) -> None:
+    from dungeon_daddy.memory.repository import MemoryRepository
+    assert isinstance(repo, MemoryRepository)
+    existing = repo.get_actor_action_ratings(actor_id)
+    existing_keys = {r["action_key"] for r in existing}
+    if action_key not in existing_keys:
+        repo.save_actor_action_rating(actor_id, action_key, rating=0)
+        result.created += 1
+    else:
+        result.skipped += 1
+
+
+def _upsert_stress_track(
+    repo: object, actor_id: str, track_key: str, result: SeedResult
+) -> None:
+    from dungeon_daddy.memory.repository import MemoryRepository
+    assert isinstance(repo, MemoryRepository)
+    existing = repo.get_actor_stress_tracks(actor_id)
+    existing_keys = {r["track_key"] for r in existing}
+    if track_key not in existing_keys:
+        repo.save_actor_stress_track(actor_id, track_key, capacity=6, filled=0)
+        result.created += 1
+    else:
+        result.skipped += 1
+
+
+def _upsert_clock(
+    repo: object, campaign_id: str, campaign_slug: str,
+    clock_spec: dict, result: SeedResult
+) -> None:
+    from dungeon_daddy.memory.repository import MemoryRepository
+    assert isinstance(repo, MemoryRepository)
+    clock_id = _clock_id(campaign_slug, clock_spec["slug"])
+    existing = repo.get_clocks(campaign_id)
+    existing_ids = {c["clock_id"] for c in existing}
+    if clock_id not in existing_ids:
+        repo.save_clock(clock_id, campaign_id, clock_spec["label"], clock_spec["segments"])
+        result.created += 1
+    else:
+        result.skipped += 1
+
+
+def _upsert_memory(
+    repo: object, campaign_id: str, campaign_slug: str,
+    mem_spec: dict, result: SeedResult
+) -> None:
+    from dungeon_daddy.memory.repository import MemoryRepository
+    assert isinstance(repo, MemoryRepository)
+    memory_id = _memory_id(campaign_slug, mem_spec["slug"])
+    existing = repo.get_memory_entry(memory_id)
+    if existing is None:
+        repo.save_memory_entry(
+            memory_id, campaign_id, mem_spec["type"],
+            mem_spec["title"], mem_spec["summary"],
+            importance=mem_spec.get("importance", 5),
+        )
+        for tag in mem_spec.get("tags", []):
+            repo.add_memory_tag(memory_id, tag)
+        result.created += 1
+    else:
+        result.skipped += 1
+
+
+# ---------------------------------------------------------------------------
+# CLI entry point
+# ---------------------------------------------------------------------------
+
+
+def _find_campaigns_dir() -> Path:
+    from platformdirs import user_data_path
+    return user_data_path("DungeonDaddy", appauthor=False) / "campaigns"
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Seed RPG data into campaign folders.")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--campaign", metavar="FOLDER_NAME",
+                       help="Name of the campaign folder to seed")
+    group.add_argument("--all-existing-campaigns", action="store_true",
+                       help="Seed all existing campaign folders")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Print intended changes without writing")
+    parser.add_argument("--campaigns-dir", metavar="PATH",
+                        help="Override the campaigns directory path")
+    args = parser.parse_args()
+
+    campaigns_dir = Path(args.campaigns_dir) if args.campaigns_dir else _find_campaigns_dir()
+
+    if args.campaign:
+        folders = [campaigns_dir / args.campaign]
+    else:
+        folders = [p for p in campaigns_dir.iterdir() if p.is_dir()]
+
+    for folder in folders:
+        print(f"\n{'[dry-run] ' if args.dry_run else ''}Seeding: {folder.name}")
+        result = seed_campaign(folder, dry_run=args.dry_run)
+        result.print_summary()
+
+
+if __name__ == "__main__":
+    main()

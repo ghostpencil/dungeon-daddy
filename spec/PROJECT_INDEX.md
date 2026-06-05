@@ -2,20 +2,37 @@
 
 ## Phase
 
-Phase: 33 — (not yet defined)
-Status: **Ready to plan** — Phase 32 closed out 2026-06-03. See `docs/PHASE_32_CLOSEOUT.md`.
+Phase: 34 — Campaign RPG Data Deepening
+Status: **Ready to begin**
 
 ---
 
-## Next Steps
+## Product Direction
 
-Phase 33 not yet scoped. Top deferred items from Phase 32 closeout:
+> Dungeon Daddy controls the world, dungeon, monsters, NPCs, secrets, clocks, consequences, and narration.
+> The human player controls the player side: one or more player-controlled actors and the actions they attempt.
 
-| Priority | Item | Notes |
+**Core authority rule:** The RPG engine and memory layer are authoritative. The LLM is advisory. The LLM may narrate, frame choices, interpret tone, and eventually propose structured world reactions. It must not directly mutate authoritative state.
+
+---
+
+## Phase 33–37 Roadmap
+
+| Phase | Name | Goal |
 |---|---|---|
-| 1 | Wire `ContextBundleBuilder` into `PlayView._spawn_dm_thread` | Bundle built but never passed to `agent.respond()` — DM still uses room-memory-only path during live play |
-| 2 | Memory provenance in Debug tab | `bundle.provenance` data available; UI not wired |
-| 3 | LLM-drafted memory entry approval flow | `[DRAFT]` label renders in prompt; persist/approve logic not implemented |
+| **33** | Player-Controlled Action Loop | Make Play Mode resolve player-controlled actor actions through the RPG service and narrate with live context bundles. |
+| 34 | Campaign RPG Data Deepening | Patch the two existing campaigns with RPG-ready player actors, NPCs, monsters, clocks, memories, and room threat hooks. |
+| 35 | Deterministic World Reaction Service | Add a deterministic service that turns player outcomes into dungeon/NPC/monster reactions, clocks, stress, fallout, and memory events. |
+| 36 | LLM-Proposed Reaction Drafts | Allow the LLM to propose structured reactions, but validate and apply them through deterministic services only. |
+| 37 | Memory Approval and Playtest Curation | Add curated approval/edit/reject workflows for LLM-drafted memories and run an alpha playtest scenario across seeded campaigns. |
+
+See `spec/PHASE_33_PLAYER_CONTROLLED_ACTION_LOOP.md` for Phase 33 detail. Full phase specs in `spec/IMPLEMENTATION_PHASES.md`.
+
+---
+
+## Next Steps — Phase 34
+
+See `spec/PHASE_34_CAMPAIGN_RPG_DATA_DEEPENING.md` for detail.
 
 ## Known Failures
 
@@ -30,6 +47,10 @@ _None._
 | 2026-06-03 | MEM search input placeholder text lost when widget present — added manual placeholder draw in `draw()` when widget text is empty. |
 | 2026-06-03 | Map keyboard shortcuts (D=debug, R=recenter) fired while typing in MEM search — fixed `on_key_press` in `PlayView` to return early when `self._rpg_open and self._rpg_side._active == 3`. |
 | 2026-06-03 | "Edit Memory" button unclickable when RPG panel open — RPG panel click absorption (`if x >= rpg_x`) had no y-bound, swallowing title-bar clicks. Added `and y < content_h` guard. 1639 passing. |
+| 2026-06-04 | ACTION tab intent label overlapped widget — `setup_widget` missing 18px actor-name row offset; `draw()` was rendering "Intent:" inside the widget bounds. Fixed by adding `cur_y -= 18` in `setup_widget`. |
+| 2026-06-04 | ACTION key buttons permanently selected — button styles fixed at creation, never refreshed on click. Added `_action_btn_refs` dict; `on_click` now updates all button styles via `btn.style = _btn_style(...)`. |
+| 2026-06-04 | RESOLVE crash — `RpgService.resolve_action` returns `tuple[ActionResolution, DomainEvent]` but `_format_result` received the tuple directly. Fixed tuple unpacking in `_on_resolve_action`. 1761 passing. |
+| 2026-06-04 | RESOLVE produced no narration — `_on_resolve_action` stored result but never appended to DM history or spawned narration thread. Added history append + `_spawn_dm_thread` call after successful resolution. |
 
 ---
 
@@ -37,6 +58,7 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 33 — Player-Controlled Action Loop | **Complete** (2026-06-04) | 1761 passing; live-app verified end-to-end |
 | Phase 32 — Closeout pass | **Complete** (2026-06-03) | 1704 passing (excl. evals); see `docs/PHASE_32_CLOSEOUT.md` |
 | Phase 32 step 32-6 — Smoke test + full pipeline test | **Complete** (2026-06-03) | 1708 passing |
 | Phase 32 step 32-5 — Documentation | **Complete** (2026-06-03) | 1698 passing |
@@ -67,6 +89,10 @@ _Full session history in `spec/HISTORY.md`._
 
 ## Notes
 
+- Player controls the player side: one or more player-controlled actors.
+- Dungeon Daddy controls the dungeon, monsters, NPCs, factions, clocks, secrets, and consequences.
+- The LLM is advisory. It may narrate or propose, but deterministic services apply authoritative state.
+- World reactions are deferred to Phase 35 via `WorldReactionService`.
 - Provider is OpenAI (`gpt-4o`); `OPENAI_API_KEY` must be set in environment.
 - `AnthropicProvider` still exists and is tested — not removed, just not the active provider.
 - Spec loading rules and skills are in `CLAUDE.md` (canonical source).

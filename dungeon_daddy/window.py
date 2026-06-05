@@ -25,7 +25,14 @@ import arcade
 
 from dungeon_daddy.config import AppConfig
 from dungeon_daddy.data.repository import DungeonRepository
+from dungeon_daddy.rpg.service import RpgService
 from dungeon_daddy.ui.chrome import MenuAction, MenuBar
+
+_MIGRATIONS_DIR = Path(__file__).parent / "data" / "migrations"
+
+
+def _slugify(name: str) -> str:
+    return name.lower().replace(" ", "-").replace("'", "").replace(",", "")
 
 _log = logging.getLogger(__name__)
 
@@ -146,7 +153,7 @@ class DungeonDaddyWindow(arcade.Window):
             title=config.window_title,
             resizable=True,
         )
-        self._config = config
+        self._app_config = config
         self._mode: str = "design"
 
         # Repository — None-dir is fine for load_sample()
@@ -171,7 +178,8 @@ class DungeonDaddyWindow(arcade.Window):
             generator_agent=generator_agent,
             design_agent=design_agent,
         )
-        self._play_view = PlayView(self._repo, self._menu_bar, dm_agent=dm_agent)
+        rpg_service = RpgService()
+        self._play_view = PlayView(self._repo, self._menu_bar, dm_agent=dm_agent, rpg_service=rpg_service)
         self.show_view(self._design_view)
 
     def _build_menu(self) -> dict[str, list[MenuAction]]:
@@ -243,6 +251,7 @@ class DungeonDaddyWindow(arcade.Window):
                 dungeon.meta.save_name = name
             self._design_view.load_dungeon(dungeon)
             self._play_view.load_dungeon(dungeon)
+            self._attach_rpg_context(name)
             self.switch_mode("design")
         except FileNotFoundError:
             msg = f"No dungeon file found in '{name}'.\nThe folder exists but contains no dungeon data."
@@ -291,7 +300,7 @@ class DungeonDaddyWindow(arcade.Window):
         root = self._make_tk_root()
         path = filedialog.askdirectory(
             title="Open Dungeon",
-            initialdir=str(self._config.campaigns_dir),
+            initialdir=str(self._repo._dir or Path.home()),
         )
         root.destroy()
         if not path:
@@ -304,6 +313,7 @@ class DungeonDaddyWindow(arcade.Window):
             dungeon = sample_repo.load_sample()
             self._design_view.load_dungeon(dungeon)
             self._play_view.load_dungeon(dungeon)
+            self._attach_rpg_context(None)  # sample dungeon has no campaign folder
             self.switch_mode("design")
         except Exception as exc:
             _log.error("Failed to load sample dungeon: %s", exc)
@@ -410,12 +420,27 @@ class DungeonDaddyWindow(arcade.Window):
         elif key == arcade.key.N and modifiers & arcade.key.MOD_CTRL:
             self.new_dungeon()
 
+    def _attach_rpg_context(self, save_name: str | None) -> None:
+        """Open campaign.duckdb for save_name (if it exists) and wire it into PlayView."""
+        from dungeon_daddy.memory.repository import MemoryRepository
+        mem_repo = None
+        campaign_id = None
+        if save_name and self._repo._dir is not None:
+            db_path = self._repo._dir / save_name / "campaign.duckdb"
+            if db_path.exists():
+                mem_repo = MemoryRepository(db_path)
+                mem_repo.initialize_schema(_MIGRATIONS_DIR)
+                campaign_id = f"campaign:{_slugify(save_name)}"
+        self._play_view.set_rpg_context(mem_repo, campaign_id)
+
     def launch_test_drive(self, dungeon: Dungeon) -> None:
         self._play_view.load_dungeon(dungeon)
+        self._attach_rpg_context(dungeon.meta.save_name)
         self.switch_to_play()
 
     def launch_play_session(self, dungeon: Dungeon) -> None:
         self._play_view.load_dungeon_session(dungeon)
+        self._attach_rpg_context(dungeon.meta.save_name)
         self.switch_to_play()
 
     def set_switch_to_play_enabled(self, enabled: bool) -> None:

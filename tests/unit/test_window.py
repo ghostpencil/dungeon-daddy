@@ -19,6 +19,7 @@ def _make_window(dungeon: Dungeon):
     from dungeon_daddy.window import DungeonDaddyWindow
     win = DungeonDaddyWindow.__new__(DungeonDaddyWindow)
     win._repo = MagicMock()
+    win._repo._dir = None
     win._play_view = MagicMock()
     win._play_view._dungeon = None
     win._play_view._state = None
