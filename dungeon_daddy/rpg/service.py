@@ -6,6 +6,7 @@ from typing import Literal
 from dungeon_daddy.rpg.actions import resolve_action
 from dungeon_daddy.rpg.clocks import advance_clock, create_clock
 from dungeon_daddy.rpg.stress import create_default_stress_tracks, is_track_filled, mark_stress
+from dungeon_daddy.rpg.world_reaction import compute_world_reaction
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.rpg.models import (
     ActionRequest,
@@ -13,6 +14,7 @@ from dungeon_daddy.rpg.models import (
     ActorState,
     ClockState,
     StressTrack,
+    WorldReaction,
 )
 
 
@@ -63,6 +65,21 @@ class RpgService:
             payload=updated.model_dump(),
         )
         return updated, event
+
+    def react_to_resolution(
+        self,
+        resolution: ActionResolution,
+        threat_clocks: list[ClockState],
+        pc_actors: list[tuple[ActorState, dict[str, StressTrack]]],
+    ) -> tuple[WorldReaction, DomainEvent]:
+        reaction = compute_world_reaction(resolution, threat_clocks, pc_actors)
+        event = DomainEvent(
+            event_id=str(uuid.uuid4()),
+            campaign_id=resolution.campaign_id,
+            event_type="world.reacted",
+            payload=reaction.model_dump(),
+        )
+        return reaction, event
 
     def apply_stress(
         self,

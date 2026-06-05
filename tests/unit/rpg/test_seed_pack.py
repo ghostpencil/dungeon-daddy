@@ -305,3 +305,25 @@ class TestApplySeedPack:
         assert len(repo.get_actors_by_campaign("campaign-123")) == 2
         assert len(repo.get_clocks("campaign-123")) == 1
         assert len(repo.get_memory_entries_by_campaign("campaign-123")) == 1
+
+    def test_apply_sets_clock_scope_from_room_threat(self, repo: MemoryRepository) -> None:
+        data = {
+            **_MINIMAL_PACK,
+            "clocks": [
+                {"slug": "trap-primed", "label": "Trap Primed", "segments": 4, "category": "danger"}
+            ],
+            "room_threats": [
+                {
+                    "location_slug": "room_boiler",
+                    "trigger_tags": ["fight", "move"],
+                    "related_clock_slugs": ["trap-primed"],
+                }
+            ],
+        }
+        pack = SeedPack.model_validate(data)
+        apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR)
+        clock_id = derive_clock_id("test-campaign", "trap-primed")
+        clocks = {c["clock_id"]: c for c in repo.get_clocks("campaign-123")}
+        assert clock_id in clocks
+        assert clocks[clock_id]["scope_room_id"] == "room_boiler"
+        assert clocks[clock_id]["action_tags"] == ["fight", "move"]

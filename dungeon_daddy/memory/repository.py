@@ -464,26 +464,46 @@ class MemoryRepository:
         segments: int,
         filled: int = 0,
         status: str = "active",
+        scope_room_id: str | None = None,
+        action_tags: list[str] | None = None,
     ) -> None:
         assert self._conn is not None
         self._conn.execute(
             """
-            INSERT INTO clocks (clock_id, campaign_id, label, segments, filled, status)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO clocks (clock_id, campaign_id, label, segments, filled, status, scope_room_id, action_tags)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (clock_id) DO UPDATE SET
-                label    = excluded.label,
-                segments = excluded.segments,
-                filled   = excluded.filled,
-                status   = excluded.status
+                label         = excluded.label,
+                segments      = excluded.segments,
+                filled        = excluded.filled,
+                status        = excluded.status,
+                scope_room_id = excluded.scope_room_id,
+                action_tags   = excluded.action_tags
             """,
-            [clock_id, campaign_id, label, segments, filled, status],
+            [clock_id, campaign_id, label, segments, filled, status,
+             scope_room_id, json.dumps(action_tags or [])],
+        )
+
+    def update_clock_scope(
+        self,
+        clock_id: str,
+        scope_room_id: str | None,
+        action_tags: list[str],
+    ) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            UPDATE clocks SET scope_room_id = ?, action_tags = ?
+            WHERE clock_id = ?
+            """,
+            [scope_room_id, json.dumps(action_tags), clock_id],
         )
 
     def get_clocks(self, campaign_id: str) -> list[dict]:
         assert self._conn is not None
         rows = self._conn.execute(
             """
-            SELECT clock_id, campaign_id, label, segments, filled, status
+            SELECT clock_id, campaign_id, label, segments, filled, status, scope_room_id, action_tags
             FROM clocks WHERE campaign_id = ?
             """,
             [campaign_id],
@@ -496,6 +516,8 @@ class MemoryRepository:
                 "segments": r[3],
                 "filled": r[4],
                 "status": r[5],
+                "scope_room_id": r[6],
+                "action_tags": json.loads(r[7]) if r[7] else [],
             }
             for r in rows
         ]

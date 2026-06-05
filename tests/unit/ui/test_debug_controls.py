@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from dungeon_daddy.rpg.models import ActionRequest, ActorState, ClockState, StressTrack
+from dungeon_daddy.rpg.models import ActionRequest, ActorState, ClockState, ReactionClockLine, ReactionStressLine, StressTrack, WorldReaction
 from dungeon_daddy.rpg.service import RpgService
 
 
@@ -209,6 +209,52 @@ def test_bundle_section_lines_no_bundle():
     ctrl = _controls()
     lines = ctrl.bundle_section_lines()
     assert any("No bundle built yet" in line for line in lines)
+
+
+# ---------------------------------------------------------------------------
+# Bullet — set_reaction / reaction_section_lines
+# ---------------------------------------------------------------------------
+
+def _world_reaction(outcome: str = "miss") -> WorldReaction:
+    clock_line = ReactionClockLine(
+        clock_id="ck1", label="Heat Rising", ticks=2,
+        new_filled=3, new_status="active", reason="miss",
+    )
+    stress_line = ReactionStressLine(
+        actor_id="a1", display_name="Hero", track_key="body",
+        amount=2, new_filled=2, reason="miss consequence",
+    )
+    return WorldReaction(
+        reaction_id="r1",
+        campaign_id="c1",
+        source_resolution_id="res1",
+        outcome=outcome,  # type: ignore[arg-type]
+        clock_lines=[clock_line],
+        stress_lines=[stress_line],
+        summary_lines=["World reaction (MISS):", "  Clock [Heat Rising]: 1→3 (+2)"],
+    )
+
+
+def test_set_reaction_stores_last_reaction():
+    ctrl = _controls()
+    wr = _world_reaction()
+    ctrl.set_reaction(wr)
+    assert ctrl._last_reaction is wr
+
+
+def test_reaction_section_lines_no_reaction():
+    ctrl = _controls()
+    lines = ctrl.reaction_section_lines()
+    assert any("No reaction" in line for line in lines)
+
+
+def test_reaction_section_lines_shows_summary():
+    ctrl = _controls()
+    ctrl.set_reaction(_world_reaction("miss"))
+    lines = ctrl.reaction_section_lines()
+    text = "\n".join(lines)
+    assert "MISS" in text or "miss" in text.lower()
+    assert "Heat Rising" in text
 
 
 # ---------------------------------------------------------------------------

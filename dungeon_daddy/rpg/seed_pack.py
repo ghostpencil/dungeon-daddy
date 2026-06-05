@@ -130,6 +130,15 @@ def apply_seed_pack(
         for tag in memory.tags:
             repo.add_memory_tag(memory_id, tag)
 
+    for threat in pack.room_threats:
+        for clock_slug in threat.related_clock_slugs:
+            clock_id = derive_clock_id(pack.campaign_slug, clock_slug)
+            repo.update_clock_scope(
+                clock_id,
+                scope_room_id=threat.location_slug,
+                action_tags=threat.trigger_tags,
+            )
+
     return ApplyResult(
         actors_applied=len(all_actors),
         clocks_applied=len(pack.clocks),

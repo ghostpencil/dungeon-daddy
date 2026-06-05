@@ -1,5 +1,5 @@
 from dungeon_daddy.rpg.service import RpgService
-from dungeon_daddy.rpg.models import ActorState, ActionRequest, ActionResolution, ClockState, StressTrack
+from dungeon_daddy.rpg.models import ActorState, ActionRequest, ActionResolution, ClockState, StressTrack, WorldReaction
 from dungeon_daddy.memory.models import DomainEvent
 
 
@@ -30,6 +30,29 @@ def test_apply_stress_emits_domain_event() -> None:
     assert updated.filled == 1
     assert event.event_type == "stress.marked"
     assert event.campaign_id == "c1"
+
+
+def test_react_to_resolution_returns_world_reaction_and_event() -> None:
+    svc = RpgService()
+    req = ActionRequest(campaign_id="c1", actor_id="a1", action_key="fight", dice_pool=1)
+    resolution, _ = svc.resolve_action(req, fixed=[2])
+    assert resolution.outcome == "miss"
+    clock = ClockState(clock_id="ck1", campaign_id="c1", label="Heat", segments=6, filled=1)
+    actor = ActorState(
+        actor_id="a1", campaign_id="c1", actor_type="pc",
+        slug="hero", display_name="Hero",
+    )
+    tracks = {
+        "body": StressTrack(track_key="body", capacity=4, filled=0),
+    }
+    reaction, event = svc.react_to_resolution(resolution, [clock], [(actor, tracks)])
+    assert isinstance(reaction, WorldReaction)
+    assert reaction.outcome == "miss"
+    assert len(reaction.clock_lines) == 1
+    assert reaction.clock_lines[0].ticks == 2
+    assert len(reaction.stress_lines) == 1
+    assert isinstance(event, DomainEvent)
+    assert event.event_type == "world.reacted"
 
 
 def test_create_actor_returns_actor_state_with_default_stress() -> None:

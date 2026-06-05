@@ -76,6 +76,23 @@ _RPG_TAB_LABELS = ["CHAR", "SCENE", "FALLOUT", "MEM", "ACTION", "DBG"]
 _TAB_MEM = 3
 _TAB_ACTION = 4
 _TAB_DBG = 5
+_DBG_LINE_MAX = 36
+
+
+def _wrap_debug_line(line: str, max_chars: int = _DBG_LINE_MAX) -> list[str]:
+    if len(line) <= max_chars:
+        return [line]
+    indent = len(line) - len(line.lstrip())
+    cont = " " * (indent + 2)
+    result: list[str] = []
+    while len(line) > max_chars:
+        cut = line.rfind(" ", indent, max_chars)
+        if cut <= indent:
+            cut = max_chars
+        result.append(line[:cut])
+        line = cont + line[cut:].lstrip()
+    result.append(line)
+    return result
 
 
 def _overlay_btn_style(variant: str) -> dict[str, arcade.gui.UIFlatButton.UIStyle]:
@@ -230,14 +247,25 @@ class _RpgSidePanel:
             INK_3, font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="top",
         )
         cur_y -= 20
-        for line in self._debug.clock_section_lines():
-            if cur_y < y + PAD_MD:
-                break
-            arcade.draw_text(
-                line, x + PAD_MD, cur_y,
-                INK_3, font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="top",
-            )
-            cur_y -= 14
+        for raw in self._debug.clock_section_lines():
+            for line in _wrap_debug_line(raw):
+                if cur_y < y + PAD_MD:
+                    break
+                arcade.draw_text(
+                    line, x + PAD_MD, cur_y,
+                    INK_3, font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="top",
+                )
+                cur_y -= 14
+        cur_y -= 6
+        for raw in self._debug.reaction_section_lines():
+            for line in _wrap_debug_line(raw):
+                if cur_y < y + PAD_MD:
+                    break
+                arcade.draw_text(
+                    line, x + PAD_MD, cur_y,
+                    INK_3, font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="top",
+                )
+                cur_y -= 14
         cur_y -= 6
         res = self._debug._last_resolution
         if res is not None:
@@ -638,6 +666,7 @@ class PlayView(arcade.View):
             resolution, _event = self._rpg_service.resolve_action(request)
             summary = self._rpg_action._format_result(resolution)
             self._rpg_action.store_result(summary)
+            self._apply_world_reaction(resolution)
             if self._dungeon is not None and self._state is not None:
                 level = self._dungeon.levels[self._state.current_level_idx]
                 room = None
@@ -663,6 +692,72 @@ class PlayView(arcade.View):
                     self._spawn_dm_thread(room, level)
         except Exception:
             _log.exception("resolve_action failed")
+
+    def _apply_world_reaction(self, resolution) -> None:
+        if self._rpg_service is None or self._mem_repo is None:
+            return
+        campaign_id = self._rpg_campaign_id
+        if campaign_id is None:
+            return
+        from dungeon_daddy.rpg.models import ClockState, StressTrack
+        raw_clocks = self._mem_repo.get_clocks(campaign_id)
+        threat_clocks = [
+            ClockState(
+                clock_id=r["clock_id"],
+                campaign_id=r["campaign_id"],
+                label=r["label"],
+                segments=r["segments"],
+                filled=r["filled"],
+                status=r["status"],
+            )
+            for r in raw_clocks
+        ]
+        pc_pairs = []
+        for actor in self._rpg_action._actors:
+            raw_tracks = self._mem_repo.get_actor_stress_tracks(actor.actor_id)
+            tracks = {
+                t["track_key"]: StressTrack(
+                    track_key=t["track_key"],
+                    capacity=t["capacity"],
+                    filled=t["filled"],
+                )
+                for t in raw_tracks
+            }
+            pc_pairs.append((actor, tracks))
+        try:
+            reaction, _evt = self._rpg_service.react_to_resolution(
+                resolution, threat_clocks, pc_pairs
+            )
+            for cl in reaction.clock_lines:
+                self._mem_repo.save_clock(
+                    clock_id=cl.clock_id,
+                    campaign_id=campaign_id,
+                    label=cl.label,
+                    segments=next(
+                        (c.segments for c in threat_clocks if c.clock_id == cl.clock_id),
+                        cl.new_filled,
+                    ),
+                    filled=cl.new_filled,
+                    status=cl.new_status,
+                )
+            for sl in reaction.stress_lines:
+                self._mem_repo.save_actor_stress_track(
+                    actor_id=sl.actor_id,
+                    track_key=sl.track_key,
+                    capacity=next(
+                        (
+                            tracks["body"].capacity
+                            for actor, tracks in pc_pairs
+                            if actor.actor_id == sl.actor_id and "body" in tracks
+                        ),
+                        4,
+                    ),
+                    filled=sl.new_filled,
+                )
+            if self._rpg_debug is not None:
+                self._rpg_debug.set_reaction(reaction)
+        except Exception:
+            _log.exception("world_reaction failed")
 
     # ------------------------------------------------------------------
     # Map variant switching

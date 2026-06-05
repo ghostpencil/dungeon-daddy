@@ -31,6 +31,8 @@ class ClockState(BaseModel):
     segments: int
     filled: int = 0
     status: Literal["active", "completed", "abandoned"] = "active"
+    scope_room_id: str | None = None
+    action_tags: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def filled_within_segments(self) -> "ClockState":
@@ -92,6 +94,35 @@ class ActionResolution(BaseModel):
     outcome: Literal["critical", "full", "partial", "miss"]
     stress_cost: int = 0
     notes: str | None = None
+
+
+class ReactionClockLine(BaseModel):
+    clock_id: str
+    label: str
+    ticks: int
+    new_filled: int
+    new_status: str
+    reason: str
+
+
+class ReactionStressLine(BaseModel):
+    actor_id: str
+    display_name: str
+    track_key: str
+    amount: int
+    new_filled: int
+    triggered_fallout: bool = False
+    reason: str
+
+
+class WorldReaction(BaseModel):
+    reaction_id: str
+    campaign_id: str
+    source_resolution_id: str
+    outcome: Literal["critical", "full", "partial", "miss"]
+    clock_lines: list["ReactionClockLine"] = Field(default_factory=list)
+    stress_lines: list["ReactionStressLine"] = Field(default_factory=list)
+    summary_lines: list[str] = Field(default_factory=list)
 
 
 class FalloutRecord(BaseModel):

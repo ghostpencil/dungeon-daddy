@@ -5,7 +5,7 @@ import uuid
 
 from dungeon_daddy.memory.models import ContextBundle, MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.rpg.models import ActionRequest, ActionResolution, ClockState, StressTrack
+from dungeon_daddy.rpg.models import ActionRequest, ActionResolution, ClockState, StressTrack, WorldReaction
 from dungeon_daddy.rpg.service import RpgService
 
 
@@ -25,6 +25,15 @@ class DebugControls:
         self._last_sync_issues: list | None = None
         self._last_memory_note: MemoryEntry | None = None
         self._last_bundle: ContextBundle | None = None
+        self._last_reaction: WorldReaction | None = None
+
+    def set_reaction(self, reaction: WorldReaction) -> None:
+        self._last_reaction = reaction
+
+    def reaction_section_lines(self) -> list[str]:
+        if self._last_reaction is None:
+            return ["No reaction yet"]
+        return list(self._last_reaction.summary_lines)
 
     def set_bundle(self, bundle: ContextBundle) -> None:
         self._last_bundle = bundle

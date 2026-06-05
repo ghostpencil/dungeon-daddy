@@ -2,7 +2,7 @@
 
 ## Phase
 
-Phase: 35 — Deterministic World Reaction Service
+Phase: 36 — LLM-Proposed Reaction Drafts
 Status: **Not Started**
 
 ---
@@ -30,11 +30,24 @@ Full phase specs in `spec/IMPLEMENTATION_PHASES.md`.
 
 ---
 
-## Next Steps — Phase 35
+## Next Steps — Clock Scoping (pre-Phase 36)
 
-Spec: `spec/IMPLEMENTATION_PHASES.md` (Phase 35 section)
+Spec: `spec/FEATURE_CLOCK_SCOPING.md`
 
-Add `WorldReactionService`: turns player action outcomes into dungeon/NPC/monster reactions, clock advances, stress, fallout, and memory events. Show reaction summary in Debug tab.
+Implement room-scoped and action-tagged clocks before moving to Phase 36.
+Currently all active clocks advance on every failed roll. The feature adds:
+- `scope_room_id` — clock only advances when the action occurs in that room
+- `action_tags` — clock only advances when the action key matches
+
+Requires: DB migration, `ClockState` model update, `save_clock`/`get_clocks`
+update, `compute_world_reaction` signature change, `apply_seed_pack` finally
+using `room_threats` data, and 8 new TDD slices. See spec for full detail.
+
+## Next Steps — Phase 36 (after clock scoping)
+
+Spec: `spec/IMPLEMENTATION_PHASES.md` (Phase 36 section)
+
+Allow the LLM to propose structured world reactions, but validate and apply them through deterministic services only. Add a structured proposal format, validate proposed changes, reject invalid/unsafe proposals, and show proposal provenance in the Debug tab.
 
 ## Known Failures
 
@@ -58,6 +71,8 @@ _None._
 | 2026-06-05 | DEBUG tab showed no context bundle or clocks — `_draw_debug_tab` never rendered bundle data. Added `clock_section_lines()` to `DebugControls` and called it in the draw method. Bundle now built eagerly when DBG tab is clicked. |
 | 2026-06-05 | MEM tab search showed no results — `_rpg_memory.set_entries()` was never called; panel was always empty. Added `_load_memory_entries()` to `PlayView`; triggered on MEM tab click. Also fixed `entry.id` → `entry.memory_id` crash in `memory_inspector_panel.py`. |
 | 2026-06-05 | DM narrated wrong actor after RESOLVE — action message to DM history had no actor name, so LLM defaulted to the first listed actor (Kira). Fixed in `_on_resolve_action`: actor display name now prefixed to the message (e.g. `Talvas the Wanderer [SENSE] ...`). |
+| 2026-06-05 | World reaction applied body stress to all PC actors on miss/partial — `compute_world_reaction` iterated all `pc_actors` with no filter. Fixed by skipping actors whose `actor_id != resolution.actor_id`. 1688 passing (unit). |
+| 2026-06-05 | DBG tab clock/reaction lines cut off at ~36 chars — `arcade.draw_text` has no max-width. Added `_wrap_debug_line()` helper in `play_view.py`; long lines wrap with preserved indentation. |
 
 ---
 
@@ -65,6 +80,7 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 35 — Deterministic World Reaction Service | **Complete** (2026-06-05) | 1818 passing |
 | Phase 34 — Campaign RPG Data Deepening | **Complete** (2026-06-05) | 1802 passing |
 | Phase 33 — Player-Controlled Action Loop | **Complete** (2026-06-04) | 1761 passing; live-app verified end-to-end |
 | Phase 32 — Closeout pass | **Complete** (2026-06-03) | 1704 passing (excl. evals); see `docs/PHASE_32_CLOSEOUT.md` |
