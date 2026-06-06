@@ -8,8 +8,95 @@ from dungeon_daddy.rpg.models import (
     ActorState,
     ClockState,
     FalloutRecord,
+    ReactionClockLine,
+    ReactionStressLine,
     StressTrack,
+    WorldReaction,
 )
+
+
+class TestReactionClockLine:
+    def test_constructs_with_required_fields(self) -> None:
+        line = ReactionClockLine(
+            clock_id="ck1",
+            label="Heat Rising",
+            ticks=2,
+            new_filled=3,
+            new_status="active",
+            reason="miss",
+        )
+        assert line.clock_id == "ck1"
+        assert line.ticks == 2
+
+
+class TestReactionStressLine:
+    def test_constructs_with_required_fields(self) -> None:
+        line = ReactionStressLine(
+            actor_id="a1",
+            display_name="Kira",
+            track_key="body",
+            amount=2,
+            new_filled=2,
+            reason="miss consequence",
+        )
+        assert line.actor_id == "a1"
+        assert line.triggered_fallout is False
+
+    def test_triggered_fallout_can_be_set(self) -> None:
+        line = ReactionStressLine(
+            actor_id="a1",
+            display_name="Kira",
+            track_key="body",
+            amount=2,
+            new_filled=4,
+            triggered_fallout=True,
+            reason="track filled",
+        )
+        assert line.triggered_fallout is True
+
+
+class TestWorldReaction:
+    def test_constructs_with_empty_lines(self) -> None:
+        wr = WorldReaction(
+            reaction_id="r1",
+            campaign_id="c1",
+            source_resolution_id="res1",
+            outcome="miss",
+        )
+        assert wr.clock_lines == []
+        assert wr.stress_lines == []
+        assert wr.summary_lines == []
+
+    def test_invalid_outcome_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            WorldReaction(
+                reaction_id="r1",
+                campaign_id="c1",
+                source_resolution_id="res1",
+                outcome="great",
+            )
+
+    def test_holds_clock_and_stress_lines(self) -> None:
+        clock_line = ReactionClockLine(
+            clock_id="ck1", label="Heat", ticks=2,
+            new_filled=3, new_status="active", reason="miss",
+        )
+        stress_line = ReactionStressLine(
+            actor_id="a1", display_name="Kira", track_key="body",
+            amount=2, new_filled=2, reason="miss",
+        )
+        wr = WorldReaction(
+            reaction_id="r1",
+            campaign_id="c1",
+            source_resolution_id="res1",
+            outcome="miss",
+            clock_lines=[clock_line],
+            stress_lines=[stress_line],
+            summary_lines=["Heat Rising: 1→3", "Kira takes 2 body stress"],
+        )
+        assert len(wr.clock_lines) == 1
+        assert len(wr.stress_lines) == 1
+        assert len(wr.summary_lines) == 2
 
 
 class TestActorState:
@@ -107,6 +194,36 @@ class TestClockState:
         for s in ("active", "completed", "abandoned"):
             c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4, status=s)
             assert c.status == s
+
+    def test_clock_level_defaults_to_dungeon(self) -> None:
+        c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4)
+        assert c.clock_level == "dungeon"
+
+    def test_clock_level_accepts_all_valid_values(self) -> None:
+        for level in ("room", "level", "dungeon", "quest", "character", "faction"):
+            c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4, clock_level=level)
+            assert c.clock_level == level
+
+    def test_clock_level_rejects_invalid_value(self) -> None:
+        with pytest.raises(ValidationError):
+            ClockState(clock_id="c", campaign_id="x", label="L", segments=4, clock_level="bad")
+
+    def test_stakes_and_completion_effect_stored(self) -> None:
+        c = ClockState(
+            clock_id="c", campaign_id="x", label="L", segments=4,
+            stakes="The room floods.", completion_effect="All future rolls here are harder.",
+        )
+        assert c.stakes == "The room floods."
+        assert c.completion_effect == "All future rolls here are harder."
+
+    def test_optional_level_metadata_defaults(self) -> None:
+        c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4)
+        assert c.category is None
+        assert c.level_id is None
+        assert c.owner_actor_id is None
+        assert c.stakes is None
+        assert c.completion_effect is None
+        assert c.visible_to_player is True
 
 
 class TestActionRating:

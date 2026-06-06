@@ -138,6 +138,11 @@
       "label": "The Forge Awakens",
       "segments": 8,
       "category": "danger",
+      "clock_level": "level",
+      "level_id": "level-2",
+      "action_tags": ["fight", "tinker", "move"],
+      "stakes": "The ancient factory systems are cycling back to full operational power.",
+      "completion_effect": "All dormant machinery on Level 2 becomes active and hazardous; movement actions here gain an automatic complication.",
       "notes": "The factory systems are cycling back online. When full, all dormant machinery becomes active and unpredictable."
     },
     {
@@ -145,6 +150,11 @@
       "label": "Golems Fully Reactivate",
       "segments": 6,
       "category": "danger",
+      "clock_level": "level",
+      "level_id": "level-2",
+      "action_tags": ["fight", "move"],
+      "stakes": "The patrol golems are completing their sentience loops and rebooting combat protocols.",
+      "completion_effect": "Golem A-7 becomes fully hostile. The Prime Golem begins moving and can appear in any room on Level 2.",
       "notes": "Tied to The Forge Awakens. Each golem encounter or machine activation advances this. When full, Golem A-7 becomes fully hostile and the Prime Golem begins moving."
     },
     {
@@ -152,6 +162,10 @@
       "label": "Arcane Overload Building",
       "segments": 6,
       "category": "ritual",
+      "clock_level": "dungeon",
+      "action_tags": ["channel", "focus", "tinker"],
+      "stakes": "Unstable arcane energy is building in the Power Core as the party interacts with the factory systems.",
+      "completion_effect": "The Power Core detonates — every room in the dungeon takes structural damage, and the party has one hour to escape before total collapse.",
       "notes": "Unstable arcane energy accumulating in the Power Core. When full, the core detonates — the dungeon becomes a countdown."
     },
     {
@@ -159,14 +173,76 @@
       "label": "Party Detected",
       "segments": 4,
       "category": "pursuit",
+      "clock_level": "dungeon",
+      "action_tags": ["move", "fight", "sense"],
+      "stakes": "The factory's biological signature sensors are triangulating the party's position.",
+      "completion_effect": "The Prime Golem receives a confirmed location and begins stalking the party with full combat protocols active.",
       "notes": "Factory sensors tracking biological signatures. When full, the Prime Golem is alerted and begins stalking the party."
     },
     {
       "slug": "the-dungeon-learns-you",
       "label": "The Factory Learns What You Fear",
       "segments": 6,
-      "category": "relationship",
+      "category": "dungeon_intimacy",
+      "clock_level": "dungeon",
+      "action_tags": ["sense", "sway", "channel", "study"],
+      "stakes": "The Factory Spirit compiles a deep profile of each party member's fears, loyalties, and desires.",
+      "completion_effect": "The dungeon begins crafting personalized threats and comfort spaces tailored to each party member's vulnerabilities.",
       "notes": "The Factory Spirit compiles a profile of each party member. Advances on emotional or personal revelations. When full, the dungeon begins personalizing its threats."
+    },
+    {
+      "slug": "scorpion-swarm-agitated",
+      "label": "Scorpion Nest Agitated",
+      "segments": 4,
+      "category": "danger",
+      "clock_level": "room",
+      "scope_room_id": "R1",
+      "action_tags": ["fight", "move", "endure"],
+      "stakes": "The desert scorpions in the receiving hall machinery are responding to heat and vibration.",
+      "completion_effect": "The nest erupts — a full swarm attack triggers automatically against everyone in the receiving hall."
+    },
+    {
+      "slug": "golem-a7-lockdown",
+      "label": "Golem A-7 Locks On",
+      "segments": 4,
+      "category": "danger",
+      "clock_level": "room",
+      "scope_room_id": "r01",
+      "action_tags": ["fight", "move"],
+      "stakes": "Golem A-7's hesitation is resolving into a threat classification as failures accumulate in its field of view.",
+      "completion_effect": "Golem A-7 completes its threat assessment and attacks without warning. It broadcasts an alert that brings factory backup within one turn."
+    },
+    {
+      "slug": "restore-the-power-core",
+      "label": "Restore the Power Core",
+      "segments": 6,
+      "category": "objective",
+      "clock_level": "quest",
+      "action_tags": ["tinker", "study", "channel"],
+      "stakes": "The Power Core cannot be safely extracted until its volatile arcane systems are stabilized.",
+      "completion_effect": "The Power Core is stabilized and can be safely removed. The party can fulfill their mission — or choose otherwise."
+    },
+    {
+      "slug": "mira-guild-agenda-surfaces",
+      "label": "Mira's Guild Agenda Surfaces",
+      "segments": 6,
+      "category": "relationship",
+      "clock_level": "character",
+      "owner_actor_slug": "mira-coldwell",
+      "action_tags": ["sway", "sense", "study"],
+      "stakes": "The party grows increasingly aware that Mira has concealed instructions from the Dwarven Artificers' Guild.",
+      "completion_effect": "Mira's secret is revealed: the Guild wants the Power Core delivered to them alone. She must choose between the party and her contract."
+    },
+    {
+      "slug": "djinn-reclaims-the-engines",
+      "label": "The Djinn Reclaims the Engines",
+      "segments": 8,
+      "category": "faction_pressure",
+      "clock_level": "faction",
+      "owner_actor_slug": "desert-djinn-fragment",
+      "action_tags": ["channel", "focus", "tinker"],
+      "stakes": "The desert djinn fragment is gradually re-binding to the factory's arcane power grid.",
+      "completion_effect": "The djinn fully integrates with the factory systems. The Arcane Power Room becomes inaccessible without its permission, and it can route power to attack anywhere in the dungeon."
     }
   ],
   "memories": [
@@ -229,44 +305,44 @@
   ],
   "room_threats": [
     {
-      "location_slug": "receiving-hall",
+      "location_slug": "R1",
       "trigger_tags": ["noise", "combat", "heat-spike"],
       "related_actor_slugs": ["scorpion-swarm"],
       "related_clock_slugs": [],
       "possible_reactions": ["swarm_attacks", "advance_clock", "reveal_nesting_tunnel"],
-      "notes": "Scorpions burst from machinery crevices when the factory gets louder or hotter."
+      "notes": "Scorpions burst from machinery crevices when the factory gets louder or hotter. Advances scorpion-swarm-agitated clock."
     },
     {
-      "location_slug": "arcane-power-room",
+      "location_slug": "r04",
       "trigger_tags": ["touch_artifact", "magic_use", "forced_entry"],
       "related_actor_slugs": ["desert-djinn-fragment", "golem-a7"],
-      "related_clock_slugs": ["golems-fully-reactivate", "arcane-overload-building"],
+      "related_clock_slugs": [],
       "possible_reactions": ["advance_clock", "summon_djinn_fragment", "alert_patrol"],
-      "notes": "The Arcane Power Room is the most sensitive area on Level 2. Any magical interaction here advances overload."
+      "notes": "The Arcane Power Room is the most sensitive area on Level 2. Any magical interaction here advances arcane-overload-building and golems-fully-reactivate."
     },
     {
-      "location_slug": "entry-chamber",
+      "location_slug": "r01",
       "trigger_tags": ["noise", "aggression", "failed_move"],
       "related_actor_slugs": ["golem-a7"],
-      "related_clock_slugs": ["party-detected", "golems-fully-reactivate"],
+      "related_clock_slugs": [],
       "possible_reactions": ["advance_clock", "golem_turns_hostile", "factory_alerted"],
-      "notes": "Golem A-7 is in a liminal state. Violence here collapses its hesitation."
+      "notes": "Golem A-7 is in a liminal state. Violence here advances golem-a7-lockdown and party-detected clocks."
     },
     {
-      "location_slug": "prime-golem-lair",
+      "location_slug": "r7",
       "trigger_tags": ["combat", "magic_use", "forced_entry"],
       "related_actor_slugs": ["prime-golem"],
-      "related_clock_slugs": ["arcane-overload-building", "golems-fully-reactivate"],
+      "related_clock_slugs": [],
       "possible_reactions": ["advance_clock", "reveal_threat", "separate_party", "core_destabilizes"],
       "notes": "Combat with the Prime Golem accelerates arcane overload — the lair is wired into the factory's power systems."
     },
     {
-      "location_slug": "control-nexus",
+      "location_slug": "r1",
       "trigger_tags": ["study", "tinker", "channel"],
       "related_actor_slugs": ["factory-spirit"],
-      "related_clock_slugs": ["the-dungeon-learns-you", "the-forge-awakens"],
+      "related_clock_slugs": [],
       "possible_reactions": ["factory_spirit_observes", "advance_intimacy_clock", "reveal_factory_memory"],
-      "notes": "Interacting with the control nexus draws the Factory Spirit's attention and advances its profile of the party."
+      "notes": "Interacting with the control nexus draws the Factory Spirit's attention and advances the-dungeon-learns-you and the-forge-awakens clocks."
     }
   ]
 }

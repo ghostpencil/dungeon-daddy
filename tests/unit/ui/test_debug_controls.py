@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from dungeon_daddy.rpg.models import ActionRequest, ActorState, ClockState, StressTrack
+from dungeon_daddy.rpg.models import ActionRequest, ActorState, ClockState, ReactionClockLine, ReactionStressLine, StressTrack, WorldReaction
 from dungeon_daddy.rpg.service import RpgService
 
 
@@ -212,6 +212,52 @@ def test_bundle_section_lines_no_bundle():
 
 
 # ---------------------------------------------------------------------------
+# Bullet — set_reaction / reaction_section_lines
+# ---------------------------------------------------------------------------
+
+def _world_reaction(outcome: str = "miss") -> WorldReaction:
+    clock_line = ReactionClockLine(
+        clock_id="ck1", label="Heat Rising", ticks=2,
+        new_filled=3, new_status="active", reason="miss",
+    )
+    stress_line = ReactionStressLine(
+        actor_id="a1", display_name="Hero", track_key="body",
+        amount=2, new_filled=2, reason="miss consequence",
+    )
+    return WorldReaction(
+        reaction_id="r1",
+        campaign_id="c1",
+        source_resolution_id="res1",
+        outcome=outcome,  # type: ignore[arg-type]
+        clock_lines=[clock_line],
+        stress_lines=[stress_line],
+        summary_lines=["World reaction (MISS):", "  Clock [Heat Rising]: 1→3 (+2)"],
+    )
+
+
+def test_set_reaction_stores_last_reaction():
+    ctrl = _controls()
+    wr = _world_reaction()
+    ctrl.set_reaction(wr)
+    assert ctrl._last_reaction is wr
+
+
+def test_reaction_section_lines_no_reaction():
+    ctrl = _controls()
+    lines = ctrl.reaction_section_lines()
+    assert any("No reaction" in line for line in lines)
+
+
+def test_reaction_section_lines_shows_summary():
+    ctrl = _controls()
+    ctrl.set_reaction(_world_reaction("miss"))
+    lines = ctrl.reaction_section_lines()
+    text = "\n".join(lines)
+    assert "MISS" in text or "miss" in text.lower()
+    assert "Heat Rising" in text
+
+
+# ---------------------------------------------------------------------------
 # clock_section_lines — shows clock labels from the active bundle
 # ---------------------------------------------------------------------------
 
@@ -248,3 +294,124 @@ def test_clock_section_lines_filled_and_segments_shown():
     text = "\n".join(lines)
     assert "3" in text
     assert "6" in text
+
+
+# ---------------------------------------------------------------------------
+# clock_section_lines — Phase 35.5 level/scope metadata
+# ---------------------------------------------------------------------------
+
+def _clock_dict(**kwargs) -> dict:
+    defaults = {
+        "clock_id": "ck1", "label": "Test Clock", "filled": 1,
+        "segments": 6, "status": "active", "clock_level": "dungeon",
+        "category": None, "scope_room_id": None, "action_tags": [],
+        "level_id": None, "owner_actor_id": None,
+        "stakes": None, "completion_effect": None, "visible_to_player": True,
+    }
+    defaults.update(kwargs)
+    return defaults
+
+
+def test_clock_section_lines_shows_clock_level():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[_clock_dict(clock_level="quest")])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "quest" in text
+
+
+def test_clock_section_lines_shows_category():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[_clock_dict(category="danger")])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "danger" in text
+
+
+def test_clock_section_lines_room_clock_shows_scope_room_id():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[_clock_dict(clock_level="room", scope_room_id="boiler_room")])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "room:boiler_room" in text
+
+
+def test_clock_section_lines_level_clock_shows_level_id():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[_clock_dict(clock_level="level", level_id="level_2")])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "level:level_2" in text
+
+
+def test_clock_section_lines_shows_action_tags():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[_clock_dict(action_tags=["move", "tinker"])])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "actions:" in text
+    assert "move" in text
+    assert "tinker" in text
+
+
+def test_clock_section_lines_no_action_tags_omits_actions_label():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[_clock_dict(action_tags=[])])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "actions:" not in text
+
+
+def test_clock_section_lines_minimal_clock_still_renders():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[
+        {"clock_id": "ck1", "label": "Old Clock", "filled": 0, "segments": 4, "status": "active"},
+    ])
+    ctrl.set_bundle(b)
+    lines = ctrl.clock_section_lines()
+    text = "\n".join(lines)
+    assert "Old Clock" in text
+    assert "[0/4]" in text
+
+
+def test_clock_section_lines_character_clock_shows_display_name():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[
+        _clock_dict(
+            clock_level="character",
+            owner_actor_id="some-uuid-1234",
+            owner_display_name="Mira Coldwell",
+        ),
+    ])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "character:Mira Coldwell" in text
+    assert "some-uuid-1234" not in text
+
+
+def test_clock_section_lines_faction_clock_shows_display_name():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[
+        _clock_dict(
+            clock_level="faction",
+            owner_actor_id="some-uuid-5678",
+            owner_display_name="The Desert Djinn",
+        ),
+    ])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "faction:The Desert Djinn" in text
+    assert "some-uuid-5678" not in text
+
+
+def test_clock_section_lines_character_clock_falls_back_to_id_when_no_display_name():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[
+        _clock_dict(
+            clock_level="character",
+            owner_actor_id="fallback-id",
+        ),
+    ])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "character:fallback-id" in text

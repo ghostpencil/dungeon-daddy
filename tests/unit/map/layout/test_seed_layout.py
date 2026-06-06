@@ -3,39 +3,7 @@ from __future__ import annotations
 
 from dungeon_daddy.data.models import Connection, LayoutMetadata, Level, Room
 from dungeon_daddy.map.dungeon_layout.seed_layout import compute_critical_path, compute_seed_layout
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-def _make_room(room_id: str, name: str = "") -> Room:
-    return Room(
-        id=room_id,
-        num=0,
-        name=name or room_id,
-        x=0, y=0, w=10, h=10,
-        type="room",
-        note="",
-    )
-
-
-def _make_conn(from_id: str, to_id: str) -> Connection:
-    return Connection(**{"from": from_id, "to": to_id, "type": "door"})
-
-
-def _make_level(rooms: list[Room], connections: list[Connection]) -> Level:
-    return Level(
-        id=1,
-        name="Test Level",
-        summary="",
-        ecology="",
-        loop="",
-        width=100,
-        height=100,
-        entries=[],
-        rooms=rooms,
-        connections=connections,
-    )
+from tests.unit.map.layout._factories import _conn as _make_conn, _level as _make_level, _room as _make_room
 
 
 # ---------------------------------------------------------------------------

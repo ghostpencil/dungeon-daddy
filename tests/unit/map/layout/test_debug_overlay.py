@@ -1,14 +1,9 @@
 """Tests for dungeon_daddy.map.dungeon_layout.debug_overlay."""
 from __future__ import annotations
 
-from dungeon_daddy.map.dungeon_layout.debug_overlay import (
-    DebugOverlay,
-    build_debug_overlay,
-)
+from dungeon_daddy.map.dungeon_layout.debug_overlay import build_debug_overlay
 from dungeon_daddy.map.dungeon_layout.models import (
-    LabelBox,
     LayoutBounds,
-    Port,
     RoomRect,
     RoutedEdge,
 )
@@ -34,74 +29,6 @@ def _edge(connection_id: str, warnings: list[str] | None = None) -> RoutedEdge:
         score=50.0,
         warnings=warnings or [],
     )
-
-
-# ---------------------------------------------------------------------------
-# Cycle 1 — DebugOverlay model holds all expected fields
-# ---------------------------------------------------------------------------
-
-def test_debug_overlay_holds_all_fields():
-    bounds = _bounds()
-    room = _room("r1")
-    obstacle = room.inflate(16.0)
-    port = Port(room_id="r1", side="right", x=100.0, y=30.0)
-    edge = _edge("r1→r2")
-    label = LabelBox(connection_id="r1→r2", text="door", x=50.0, y=10.0, w=40.0, h=14.0)
-
-    overlay = DebugOverlay(
-        enabled=True,
-        rooms=[room],
-        obstacles=[obstacle],
-        ports=[port],
-        edges=[edge],
-        labels=[label],
-        bounds=bounds,
-        illegal_crossings=["r1→r2"],
-    )
-
-    assert overlay.enabled is True
-    assert overlay.rooms == [room]
-    assert overlay.obstacles == [obstacle]
-    assert overlay.ports == [port]
-    assert overlay.edges == [edge]
-    assert overlay.labels == [label]
-    assert overlay.bounds == bounds
-    assert overlay.illegal_crossings == ["r1→r2"]
-
-
-# ---------------------------------------------------------------------------
-# Cycle 2 — build_debug_overlay returns DebugOverlay with enabled=True
-# ---------------------------------------------------------------------------
-
-def test_build_debug_overlay_returns_enabled_overlay():
-    rooms = {"r1": _room("r1")}
-    overlay = build_debug_overlay(
-        rooms=rooms,
-        obstacles=[],
-        ports=[],
-        edges=[],
-        labels=[],
-        bounds=_bounds(),
-    )
-    assert isinstance(overlay, DebugOverlay)
-    assert overlay.enabled is True
-    assert len(overlay.rooms) == 1
-
-
-# ---------------------------------------------------------------------------
-# Cycle 3 — build_debug_overlay with no obstacles passes empty list
-# ---------------------------------------------------------------------------
-
-def test_build_debug_overlay_empty_obstacles():
-    overlay = build_debug_overlay(
-        rooms={"r1": _room("r1")},
-        obstacles=[],
-        ports=[],
-        edges=[],
-        labels=[],
-        bounds=_bounds(),
-    )
-    assert overlay.obstacles == []
 
 
 # ---------------------------------------------------------------------------

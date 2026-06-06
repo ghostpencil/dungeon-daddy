@@ -42,6 +42,14 @@ class SeedClock(BaseModel):
     segments: int
     category: str
     notes: str | None = None
+    scope_room_id: str | None = None
+    action_tags: list[str] = Field(default_factory=list)
+    clock_level: Literal["room", "level", "dungeon", "quest", "character", "faction"] = "dungeon"
+    level_id: str | None = None
+    owner_actor_slug: str | None = None
+    stakes: str | None = None
+    completion_effect: str | None = None
+    visible_to_player: bool = True
 
 
 class SeedRoomThreat(BaseModel):
@@ -119,7 +127,23 @@ def apply_seed_pack(
 
     for clock in pack.clocks:
         clock_id = derive_clock_id(pack.campaign_slug, clock.slug)
-        repo.save_clock(clock_id, campaign_id, clock.label, clock.segments)
+        owner_actor_id = (
+            derive_actor_id(pack.campaign_slug, clock.owner_actor_slug)
+            if clock.owner_actor_slug
+            else None
+        )
+        repo.save_clock(
+            clock_id, campaign_id, clock.label, clock.segments,
+            scope_room_id=clock.scope_room_id,
+            action_tags=clock.action_tags,
+            clock_level=clock.clock_level,
+            category=clock.category,
+            level_id=clock.level_id,
+            owner_actor_id=owner_actor_id,
+            stakes=clock.stakes,
+            completion_effect=clock.completion_effect,
+            visible_to_player=clock.visible_to_player,
+        )
 
     for memory in pack.memories:
         memory_id = derive_memory_id(pack.campaign_slug, memory.title)
@@ -129,6 +153,15 @@ def apply_seed_pack(
         )
         for tag in memory.tags:
             repo.add_memory_tag(memory_id, tag)
+
+    for threat in pack.room_threats:
+        for clock_slug in threat.related_clock_slugs:
+            clock_id = derive_clock_id(pack.campaign_slug, clock_slug)
+            repo.update_clock_scope(
+                clock_id,
+                scope_room_id=threat.location_slug,
+                action_tags=threat.trigger_tags,
+            )
 
     return ApplyResult(
         actors_applied=len(all_actors),

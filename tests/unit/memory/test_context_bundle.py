@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
 from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.seed_pack import (
@@ -12,21 +8,7 @@ from dungeon_daddy.rpg.seed_pack import (
     derive_clock_id,
     derive_memory_id,
 )
-
-MIGRATIONS_DIR = (
-    Path(__file__).parent.parent.parent.parent
-    / "dungeon_daddy"
-    / "data"
-    / "migrations"
-)
-
-
-@pytest.fixture
-def repo(tmp_path: Path) -> MemoryRepository:
-    r = MemoryRepository(db_path=tmp_path / "test.duckdb")
-    r.initialize_schema(MIGRATIONS_DIR)
-    yield r
-    r.close()
+from tests.unit.memory.conftest import MIGRATIONS_DIR
 
 
 class TestContextBundleBuilder:
@@ -200,6 +182,38 @@ class TestContextBundleBuilder:
         assert "clk_001" in clock_ids
         assert "clk_002" not in clock_ids
 
+    def test_build_open_clocks_includes_all_metadata_fields(
+        self, repo: MemoryRepository
+    ) -> None:
+        repo.save_clock(
+            "clk_meta", "camp_001", "Boiler Trap Primes", 4, 1, "active",
+            scope_room_id="boiler_room",
+            action_tags=["move", "tinker"],
+            clock_level="room",
+            category="danger",
+            level_id=None,
+            owner_actor_id=None,
+            stakes="Room becomes dangerous.",
+            completion_effect="Steam erupts.",
+            visible_to_player=True,
+        )
+        builder = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+        )
+        bundle = builder.build(repo)
+
+        clock = next(c for c in bundle.open_clocks if c["clock_id"] == "clk_meta")
+        assert clock["clock_level"] == "room"
+        assert clock["category"] == "danger"
+        assert clock["scope_room_id"] == "boiler_room"
+        assert clock["action_tags"] == ["move", "tinker"]
+        assert clock["stakes"] == "Room becomes dangerous."
+        assert clock["completion_effect"] == "Steam erupts."
+
     def test_build_memory_cards_trimmed_to_token_budget(
         self, repo: MemoryRepository
     ) -> None:
@@ -331,3 +345,39 @@ class TestSeededDataInContextBundle:
         expected_memory_id = derive_memory_id("test-campaign", "The Expedition's Purpose")
         card_ids = {c["memory_id"] for c in bundle.memory_cards}
         assert expected_memory_id in card_ids
+
+
+class TestOpenClocksOwnerDisplayName:
+    def test_character_clock_owner_display_name_resolved(
+        self, repo: MemoryRepository
+    ) -> None:
+        actor_id = "actor:camp:mara"
+        repo.save_actor(actor_id, "camp_001", "pc", "mara", "Mara Coldwell")
+        repo.save_clock(
+            "clk_char", "camp_001", "Mara Trusts", 6, 0, "active",
+            clock_level="character",
+            owner_actor_id=actor_id,
+        )
+        bundle = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+        ).build(repo)
+        clock = next(c for c in bundle.open_clocks if c["clock_id"] == "clk_char")
+        assert clock.get("owner_display_name") == "Mara Coldwell"
+
+    def test_clock_without_owner_has_no_display_name(
+        self, repo: MemoryRepository
+    ) -> None:
+        repo.save_clock("clk_no_owner", "camp_001", "Dungeon Stirs", 8, 0, "active")
+        bundle = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+        ).build(repo)
+        clock = next(c for c in bundle.open_clocks if c["clock_id"] == "clk_no_owner")
+        assert clock.get("owner_display_name") is None

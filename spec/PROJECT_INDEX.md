@@ -2,8 +2,12 @@
 
 ## Phase
 
-Phase: 35 — Deterministic World Reaction Service
-Status: **Not Started**
+Phase: 36 — LLM-Proposed Reaction Drafts
+Status: **Not started**
+
+Branch: `phase-35.5-clock-scoping` (pending PR merge → new branch for Phase 36)
+
+_Phase 35.5 complete (2026-06-06). All steps done: room scoping + action tags, wiring, clock-level fields, context bundle pass-through, debug display with level/scope/action metadata, campaign seed upgrades (10 multi-level clocks per campaign), and full TDD coverage. Post-release manual testing revealed 6 additional bugs, all fixed, plus 10 manual UI behavior tests all passing. 1698 unit tests passing._
 
 ---
 
@@ -23,6 +27,7 @@ Status: **Not Started**
 | **33** | Player-Controlled Action Loop | Make Play Mode resolve player-controlled actor actions through the RPG service and narrate with live context bundles. |
 | 34 | Campaign RPG Data Deepening | Patch the two existing campaigns with RPG-ready player actors, NPCs, monsters, clocks, memories, and room threat hooks. |
 | 35 | Deterministic World Reaction Service | Add a deterministic service that turns player outcomes into dungeon/NPC/monster reactions, clocks, stress, fallout, and memory events. |
+| 35.5 | Clock Scoping | Make clocks room-scoped and action-tagged so they only advance when contextually relevant. |
 | 36 | LLM-Proposed Reaction Drafts | Allow the LLM to propose structured reactions, but validate and apply them through deterministic services only. |
 | 37 | Memory Approval and Playtest Curation | Add curated approval/edit/reject workflows for LLM-drafted memories and run an alpha playtest scenario across seeded campaigns. |
 
@@ -30,11 +35,9 @@ Full phase specs in `spec/IMPLEMENTATION_PHASES.md`.
 
 ---
 
-## Next Steps — Phase 35
+## Next Steps — Phase 36
 
-Spec: `spec/IMPLEMENTATION_PHASES.md` (Phase 35 section)
-
-Add `WorldReactionService`: turns player action outcomes into dungeon/NPC/monster reactions, clock advances, stress, fallout, and memory events. Show reaction summary in Debug tab.
+Spec: `spec/IMPLEMENTATION_PHASES.md` (Phase 36 — LLM-Proposed Reaction Drafts)
 
 ## Known Failures
 
@@ -58,6 +61,14 @@ _None._
 | 2026-06-05 | DEBUG tab showed no context bundle or clocks — `_draw_debug_tab` never rendered bundle data. Added `clock_section_lines()` to `DebugControls` and called it in the draw method. Bundle now built eagerly when DBG tab is clicked. |
 | 2026-06-05 | MEM tab search showed no results — `_rpg_memory.set_entries()` was never called; panel was always empty. Added `_load_memory_entries()` to `PlayView`; triggered on MEM tab click. Also fixed `entry.id` → `entry.memory_id` crash in `memory_inspector_panel.py`. |
 | 2026-06-05 | DM narrated wrong actor after RESOLVE — action message to DM history had no actor name, so LLM defaulted to the first listed actor (Kira). Fixed in `_on_resolve_action`: actor display name now prefixed to the message (e.g. `Talvas the Wanderer [SENSE] ...`). |
+| 2026-06-05 | World reaction applied body stress to all PC actors on miss/partial — `compute_world_reaction` iterated all `pc_actors` with no filter. Fixed by skipping actors whose `actor_id != resolution.actor_id`. 1688 passing (unit). |
+| 2026-06-05 | DBG tab clock/reaction lines cut off at ~36 chars — `arcade.draw_text` has no max-width. Added `_wrap_debug_line()` helper in `play_view.py`; long lines wrap with preserved indentation. |
+| 2026-06-06 | `seed_campaign_with_pack` saved clocks without metadata — `save_clock` was called with only `label`+`segments`, all Phase 35.5 fields (clock_level, scope_room_id, action_tags, etc.) were dropped. Fixed clock section in `seed_campaign_with_pack`; added `delete_clock` to repo and stale-clock cleanup on `--force`. 2 new tests. |
+| 2026-06-06 | DBG tab froze app on clock display — `_wrap_debug_line` entered infinite loop when continuation indent spaces were found by `rfind`, producing the same string each iteration. Fixed by tracking `cur_min` and bumping it to `len(cont)` after first wrap. 7 new tests. |
+| 2026-06-06 | Character/faction clock display showed UUID instead of actor name — `owner_actor_id` is a UUID5 with no reverse mapping. Fixed `ContextBundleBuilder._fetch_open_clocks` to enrich each clock dict with `owner_display_name` via `repo.get_actor()`; `debug_controls.clock_section_lines` prefers `owner_display_name`. 3 new tests. |
+| 2026-06-06 | Seed file `scope_room_id` / `location_slug` used human slugs, not dungeon room IDs — `scope_room_id: "receiving-hall"` never matched `current_room_id: "R1"`, so room clocks were silently never scoped. Fixed both campaign seed files with actual room IDs (`R1`, `r01`, `3-A`, `2-B`, etc.). |
+| 2026-06-06 | Level clocks advanced on wrong dungeon level — `compute_world_reaction` had no `level_id` filter; level-2 clocks advanced on level-1 actions. Added `current_level_id` param (derived as `f"level-{idx+1}"`) to `compute_world_reaction` and `react_to_resolution`; threaded through `PlayView._apply_world_reaction`. 5 new tests. |
+| 2026-06-06 | `ClockState` in `_apply_world_reaction` missing `level_id` and other metadata — construction only passed `scope_room_id`+`action_tags`, so `clock.level_id` was always `None` and the new level filter never fired. Fixed by passing all metadata fields from the DB row. |
 
 ---
 
@@ -65,6 +76,8 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 35.5 — Clock Scoping, Clock Levels, Campaign Seed Upgrades | **Complete** (2026-06-06) | 1698 unit passing (post-bugfix) |
+| Phase 35 — Deterministic World Reaction Service | **Complete** (2026-06-05) | 1818 passing |
 | Phase 34 — Campaign RPG Data Deepening | **Complete** (2026-06-05) | 1802 passing |
 | Phase 33 — Player-Controlled Action Loop | **Complete** (2026-06-04) | 1761 passing; live-app verified end-to-end |
 | Phase 32 — Closeout pass | **Complete** (2026-06-03) | 1704 passing (excl. evals); see `docs/PHASE_32_CLOSEOUT.md` |

@@ -1778,6 +1778,8 @@ Spec: `spec/PHASE_34_CAMPAIGN_RPG_DATA_DEEPENING.md`
 
 ## Phase 35 — Deterministic World Reaction Service
 
+**Status: Complete** (2026-06-05) — 1818 unit tests passing.
+
 Make the dungeon push back through deterministic state changes.
 
 Major work:
@@ -1789,6 +1791,29 @@ Major work:
 - Write domain events.
 - Update context bundle after reactions.
 - Show reaction summary in Debug tab.
+
+Full spec: `spec/PHASE_35_WORLD_REACTION_SERVICE.md`
+
+## Phase 35.5 — Clock Scoping
+
+**Status: Complete** (2026-06-06) — 1698 unit tests passing. All 10 manual UI behavior tests passing.
+
+Make clock advancement contextually meaningful so clocks only tick when
+the triggering action is relevant to them.
+
+Major work:
+
+- Add `scope_room_id` and `action_tags` fields to `ClockState` and `SeedClock`.
+- DB migration: add `scope_room_id` and `action_tags` columns to the `clocks` table.
+- Update `save_clock` / `get_clocks` in `MemoryRepository` to persist and load new fields.
+- Add `update_clock_scope` to `MemoryRepository` for targeted scope backfill.
+- Update `apply_seed_pack` to read `room_threats` and set scope/action_tags on saved clocks.
+- Add `current_room_id` parameter to `compute_world_reaction`; apply room + action filters before ticking.
+- Pass `current_room_id` through `RpgService.react_to_resolution` from `PlayView`.
+- Show `scope_room_id` and `action_tags` in Debug tab clock section when non-default.
+- 8 TDD slices (see `spec/FEATURE_CLOCK_SCOPING.md`).
+
+Spec: `spec/FEATURE_CLOCK_SCOPING.md`
 
 ## Phase 36 — LLM-Proposed Reaction Drafts
 
