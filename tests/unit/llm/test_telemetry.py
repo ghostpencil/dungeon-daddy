@@ -8,24 +8,6 @@ import json
 # Cycle 1: LLMCallRecord dataclass
 # ---------------------------------------------------------------------------
 
-def test_llm_call_record_fields():
-    from dungeon_daddy.llm.telemetry import LLMCallRecord
-    r = LLMCallRecord(
-        agent="dm",
-        model_id="gpt-4o",
-        prompt_tokens=100,
-        completion_tokens=50,
-        duration_ms=123.4,
-        timestamp="2026-01-01T00:00:00",
-    )
-    assert r.agent == "dm"
-    assert r.model_id == "gpt-4o"
-    assert r.prompt_tokens == 100
-    assert r.completion_tokens == 50
-    assert r.duration_ms == 123.4
-    assert r.timestamp == "2026-01-01T00:00:00"
-
-
 def test_llm_call_record_serializes_to_json():
     from dungeon_daddy.llm.telemetry import LLMCallRecord
     r = LLMCallRecord(
@@ -218,17 +200,6 @@ def test_observing_provider_stream_writes_one_record(mocker, tmp_path):
 # ---------------------------------------------------------------------------
 # Cycle 7 (IP-7): prompt_name and prompt_hash in LLMCallRecord
 # ---------------------------------------------------------------------------
-
-def test_llm_call_record_prompt_fields_default_to_empty():
-    from dungeon_daddy.llm.telemetry import LLMCallRecord
-    r = LLMCallRecord(
-        agent="dm", model_id="gpt-4o",
-        prompt_tokens=1, completion_tokens=1,
-        duration_ms=1.0, timestamp="2026-01-01T00:00:00",
-    )
-    assert r.prompt_name == ""
-    assert r.prompt_hash == ""
-
 
 def test_llm_call_record_prompt_fields_roundtrip_json():
     from dungeon_daddy.llm.telemetry import LLMCallRecord

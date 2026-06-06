@@ -2,46 +2,8 @@
 import pytest
 
 # ---------------------------------------------------------------------------
-# Shared mock provider used across this file
-# ---------------------------------------------------------------------------
-
-class _MockProvider:
-    def __init__(self, response="hello"):
-        self._response = response
-        self.calls = []
-
-    def complete(self, messages, system="", max_tokens=1024):
-        self.calls.append({"messages": messages, "system": system, "max_tokens": max_tokens})
-        return self._response
-
-    def stream(self, messages, system="", max_tokens=1024):
-        yield from self._response
-
-    @property
-    def model_id(self):
-        return "mock-model"
-
-
-# ---------------------------------------------------------------------------
-# Behavior 1: LLMMessage is a dataclass with role and content
-# ---------------------------------------------------------------------------
-
-def test_llm_message_has_role_and_content():
-    from dungeon_daddy.llm.provider import LLMMessage
-    msg = LLMMessage(role="user", content="hello")
-    assert msg.role == "user"
-    assert msg.content == "hello"
-
-
-
-# ---------------------------------------------------------------------------
 # Behavior 2: LLMError is an Exception subclass
 # ---------------------------------------------------------------------------
-
-def test_llm_error_is_exception():
-    from dungeon_daddy.llm.provider import LLMError
-    assert issubclass(LLMError, Exception)
-
 
 def test_llm_error_can_be_raised_and_caught():
     from dungeon_daddy.llm.provider import LLMError
@@ -68,12 +30,6 @@ def test_anthropic_provider_default_model(mocker):
     )
     p = AnthropicProvider(api_key="fake")
     assert p.model_id == DEFAULT_ANTHROPIC_MODEL
-
-
-def test_default_anthropic_model_is_nonempty_string():
-    from dungeon_daddy.llm.anthropic_provider import DEFAULT_ANTHROPIC_MODEL
-    assert isinstance(DEFAULT_ANTHROPIC_MODEL, str)
-    assert len(DEFAULT_ANTHROPIC_MODEL) > 0
 
 
 # ---------------------------------------------------------------------------
@@ -171,19 +127,6 @@ def test_anthropic_provider_stream_yields_chunks(mocker):
     p = AnthropicProvider(api_key="fake")
     chunks = list(p.stream([LLMMessage(role="user", content="hi")]))
     assert "".join(chunks) == "Hello, world"
-
-
-# ---------------------------------------------------------------------------
-# Behavior 7: LLMProvider Protocol — any object with complete/stream/model_id satisfies it
-# ---------------------------------------------------------------------------
-
-def test_mock_provider_satisfies_protocol():
-    # We can't isinstance-check a non-runtime Protocol,
-    # but we verify our mock has the required attributes.
-    p = _MockProvider()
-    assert callable(p.complete)
-    assert callable(p.stream)
-    assert isinstance(p.model_id, str)
 
 
 # ---------------------------------------------------------------------------

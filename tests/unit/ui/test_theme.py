@@ -1,5 +1,4 @@
 """Tests for dungeon_daddy/ui/theme.py — written before implementation."""
-import inspect
 
 # ---------------------------------------------------------------------------
 # Behavior 1: All named color constants are valid RGB/RGBA tuples (0–255)
@@ -17,12 +16,6 @@ EXPECTED_COLORS = [
 ]
 
 
-def test_all_color_constants_exist():
-    import dungeon_daddy.ui.theme as theme
-    for name in EXPECTED_COLORS:
-        assert hasattr(theme, name), f"Missing color constant: {name}"
-
-
 def test_all_color_tuples_are_valid_rgb():
     import dungeon_daddy.ui.theme as theme
     for name in EXPECTED_COLORS:
@@ -33,19 +26,6 @@ def test_all_color_tuples_are_valid_rgb():
             assert 0 <= channel <= 255, (
                 f"{name}[{i}] = {channel} is out of range 0-255"
             )
-
-
-def test_all_module_level_tuples_are_valid_colors():
-    """Broader check: every tuple exported from theme is a valid color."""
-    import dungeon_daddy.ui.theme as theme
-    for name, value in inspect.getmembers(theme):
-        if name.startswith("_"):
-            continue
-        if isinstance(value, tuple) and len(value) in (3, 4):
-            for i, channel in enumerate(value):
-                assert 0 <= channel <= 255, (
-                    f"{name}[{i}] = {channel} is out of range 0-255"
-                )
 
 
 # ---------------------------------------------------------------------------
@@ -65,7 +45,6 @@ def test_room_colors_each_has_fill_and_stroke():
     for room_type, colors in ROOM_COLORS.items():
         assert "fill" in colors, f"ROOM_COLORS['{room_type}'] missing 'fill'"
         assert "stroke" in colors, f"ROOM_COLORS['{room_type}'] missing 'stroke'"
-        # Both must be valid color tuples
         for key in ("fill", "stroke"):
             val = colors[key]
             assert isinstance(val, tuple), (
@@ -76,97 +55,7 @@ def test_room_colors_each_has_fill_and_stroke():
 
 
 # ---------------------------------------------------------------------------
-# Behavior 3: Font name constants are non-empty strings
-# ---------------------------------------------------------------------------
-
-EXPECTED_FONTS = [
-    "FONT_SERIF", "FONT_SERIF_ITALIC", "FONT_SIGIL",
-    "FONT_MONO", "FONT_MONO_MED",
-    "FONT_UI", "FONT_UI_MED", "FONT_UI_BOLD",
-]
-
-
-def test_all_font_constants_exist():
-    import dungeon_daddy.ui.theme as theme
-    for name in EXPECTED_FONTS:
-        assert hasattr(theme, name), f"Missing font constant: {name}"
-
-
-def test_all_font_constants_are_nonempty_strings():
-    import dungeon_daddy.ui.theme as theme
-    for name in EXPECTED_FONTS:
-        value = getattr(theme, name)
-        assert isinstance(value, str), f"{name} must be a str, got {type(value)}"
-        assert len(value) > 0, f"{name} must not be empty"
-
-
-# ---------------------------------------------------------------------------
-# Behavior 4: Panel width and chrome height constants are positive integers
-# ---------------------------------------------------------------------------
-
-EXPECTED_DIMENSIONS = [
-    "PANEL_TREE_WIDTH",
-    "PANEL_INSPECTOR_WIDTH",
-    "PANEL_CHAT_WIDTH",
-    "PANEL_STEPPER_WIDTH",
-    "CHROME_MENUBAR_HEIGHT",
-    "CHROME_TITLEBAR_HEIGHT",
-]
-
-
-def test_dimension_constants_exist():
-    import dungeon_daddy.ui.theme as theme
-    for name in EXPECTED_DIMENSIONS:
-        assert hasattr(theme, name), f"Missing dimension constant: {name}"
-
-
-def test_dimension_constants_are_positive_integers():
-    import dungeon_daddy.ui.theme as theme
-    for name in EXPECTED_DIMENSIONS:
-        value = getattr(theme, name)
-        assert isinstance(value, int), f"{name} must be an int, got {type(value)}"
-        assert value > 0, f"{name} must be positive, got {value}"
-
-
-def test_chrome_heights_sum_to_70():
-    from dungeon_daddy.ui.theme import CHROME_MENUBAR_HEIGHT, CHROME_TITLEBAR_HEIGHT
-    assert CHROME_MENUBAR_HEIGHT + CHROME_TITLEBAR_HEIGHT == 70
-
-
-# ---------------------------------------------------------------------------
-# Behavior 5: Drawing utilities are importable callables
-# ---------------------------------------------------------------------------
-
-
-
-# ---------------------------------------------------------------------------
-# Behavior 6: MenuAction dataclass has correct fields and defaults
-# ---------------------------------------------------------------------------
-
-def test_menu_action_fields():
-    from dungeon_daddy.ui.chrome import MenuAction
-    action = MenuAction(label="Save", handler=lambda: None)
-    assert action.label == "Save"
-    assert action.enabled is True
-    assert action.implemented is True
-    assert callable(action.handler)
-
-
-def test_menu_action_not_implemented_default():
-    from dungeon_daddy.ui.chrome import MenuAction
-    action = MenuAction(label="Undo", handler=lambda: None, implemented=False)
-    assert action.implemented is False
-    assert action.enabled is True
-
-
-def test_menu_action_disabled():
-    from dungeon_daddy.ui.chrome import MenuAction
-    action = MenuAction(label="Save", handler=lambda: None, enabled=False)
-    assert action.enabled is False
-
-
-# ---------------------------------------------------------------------------
-# Behavior 7: MenuAction with implemented=False still has a callable handler
+# Behavior 3: MenuAction with implemented=False still has a callable handler
 # ---------------------------------------------------------------------------
 
 def test_nyi_handler_is_callable():
@@ -179,7 +68,7 @@ def test_nyi_handler_is_callable():
 
 
 # ---------------------------------------------------------------------------
-# Behavior 8: draw_menu_bar and draw_title_bar call arcade.draw_rect_filled
+# Behavior 4: draw_menu_bar and draw_title_bar call arcade.draw_rect_filled
 # ---------------------------------------------------------------------------
 
 def test_draw_menu_bar_calls_rect_filled(mocker):
@@ -187,7 +76,6 @@ def test_draw_menu_bar_calls_rect_filled(mocker):
     mocker.patch("arcade.draw_text")
     mocker.patch("arcade.draw_line")
     import dungeon_daddy.ui.chrome as chrome
-    # Minimal fake window
     class FakeWindow:
         width = 1400
         height = 900

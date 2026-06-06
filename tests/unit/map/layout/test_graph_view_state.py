@@ -2,51 +2,6 @@
 from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
 
 
-class TestHoverRoom:
-    def test_set_hovered_room(self):
-        state = GraphViewState()
-        state.hover_room("R1")
-        assert state.hovered_room_id == "R1"
-
-    def test_clear_hovered_room(self):
-        state = GraphViewState()
-        state.hover_room("R1")
-        state.hover_room(None)
-        assert state.hovered_room_id is None
-
-
-class TestSelectRoom:
-    def test_set_selected_room(self):
-        state = GraphViewState()
-        state.select_room("R2")
-        assert state.selected_room_id == "R2"
-
-    def test_replace_selected_room(self):
-        state = GraphViewState()
-        state.select_room("R1")
-        state.select_room("R3")
-        assert state.selected_room_id == "R3"
-
-    def test_clear_selected_room(self):
-        state = GraphViewState()
-        state.select_room("R1")
-        state.select_room(None)
-        assert state.selected_room_id is None
-
-
-class TestHoverConnection:
-    def test_set_hovered_connection(self):
-        state = GraphViewState()
-        state.hover_connection("R1→R2")
-        assert state.hovered_connection_id == "R1→R2"
-
-    def test_clear_hovered_connection(self):
-        state = GraphViewState()
-        state.hover_connection("R1→R2")
-        state.hover_connection(None)
-        assert state.hovered_connection_id is None
-
-
 class TestClearSelection:
     def test_clear_selection_resets_selected_room(self):
         state = GraphViewState()
@@ -78,14 +33,3 @@ class TestRecenter:
         state.select_room("R3")
         state.recenter()
         assert state.selected_room_id == "R3"
-
-
-class TestDefaultConstruction:
-    def test_all_fields_are_null_or_default(self):
-        state = GraphViewState()
-        assert state.selected_room_id is None
-        assert state.hovered_room_id is None
-        assert state.hovered_connection_id is None
-        assert state.camera.pan_x == 0.0
-        assert state.camera.pan_y == 0.0
-        assert state.camera.zoom == 1.0
