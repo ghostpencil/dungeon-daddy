@@ -2,22 +2,11 @@ import pytest
 
 from dungeon_daddy.rpg.fallout import evaluate_fallout, get_catalog_entry
 from dungeon_daddy.rpg.models import ActorState, FalloutRecord, StressTrack
+from tests.unit.rpg._factories import make_pc as _pc_factory
 
 
 def _pc(actor_id: str = "pc_1", campaign_id: str = "camp_1") -> ActorState:
-    return ActorState(
-        actor_id=actor_id,
-        campaign_id=campaign_id,
-        actor_type="pc",
-        slug="hero",
-        display_name="Hero",
-        stress={
-            "body": StressTrack(track_key="body", capacity=4, filled=4),
-            "composure": StressTrack(track_key="composure", capacity=4, filled=0),
-            "bonds": StressTrack(track_key="bonds", capacity=4, filled=0),
-            "weird": StressTrack(track_key="weird", capacity=4, filled=0),
-        },
-    )
+    return _pc_factory(actor_id, campaign_id, body=4)
 
 
 def test_evaluate_fallout_returns_fallout_record_for_filled_body_track() -> None:

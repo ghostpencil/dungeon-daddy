@@ -1,21 +1,10 @@
 from dungeon_daddy.rpg.fallout import apply_intimacy_risk
 from dungeon_daddy.rpg.models import ActorState, StressTrack
+from tests.unit.rpg._factories import make_pc
 
 
 def _pc(weird_filled: int = 0) -> ActorState:
-    return ActorState(
-        actor_id="pc_1",
-        campaign_id="camp_1",
-        actor_type="pc",
-        slug="hero",
-        display_name="Hero",
-        stress={
-            "body": StressTrack(track_key="body", capacity=4, filled=0),
-            "composure": StressTrack(track_key="composure", capacity=4, filled=0),
-            "bonds": StressTrack(track_key="bonds", capacity=4, filled=0),
-            "weird": StressTrack(track_key="weird", capacity=4, filled=weird_filled),
-        },
-    )
+    return make_pc(weird=weird_filled)
 
 
 def test_apply_intimacy_risk_adds_one_weird_stress() -> None:

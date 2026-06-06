@@ -9,9 +9,10 @@ from dungeon_daddy.data.models import (
     SessionState,
 )
 from dungeon_daddy.views.play_view import DMResult
+from tests.unit.views._factories import _dungeon, _state
 
 # ---------------------------------------------------------------------------
-# Factories
+# Factories (local — room/level helpers)
 # ---------------------------------------------------------------------------
 
 def _room(id: str, name: str | None = None) -> Room:
@@ -22,20 +23,6 @@ def _level(rooms: list[Room], level_id: int = 1) -> Level:
     return Level(
         id=level_id, name="L1", summary="", ecology="", loop="",
         loops=[], width=20, height=20, entries=[], rooms=rooms, connections=[],
-    )
-
-
-def _dungeon(levels: list[Level]) -> Dungeon:
-    return Dungeon(
-        meta=DungeonMeta(title="Test", theme="t", setting="s", party="p", quest="q"),
-        levels=levels,
-    )
-
-
-def _state(room_id: str | None = None) -> SessionState:
-    return SessionState(
-        dungeon_id="test", current_level_idx=0,
-        visited_rooms=[], current_room_id=room_id,
     )
 
 
