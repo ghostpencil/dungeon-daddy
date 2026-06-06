@@ -195,6 +195,36 @@ class TestClockState:
             c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4, status=s)
             assert c.status == s
 
+    def test_clock_level_defaults_to_dungeon(self) -> None:
+        c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4)
+        assert c.clock_level == "dungeon"
+
+    def test_clock_level_accepts_all_valid_values(self) -> None:
+        for level in ("room", "level", "dungeon", "quest", "character", "faction"):
+            c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4, clock_level=level)
+            assert c.clock_level == level
+
+    def test_clock_level_rejects_invalid_value(self) -> None:
+        with pytest.raises(ValidationError):
+            ClockState(clock_id="c", campaign_id="x", label="L", segments=4, clock_level="bad")
+
+    def test_stakes_and_completion_effect_stored(self) -> None:
+        c = ClockState(
+            clock_id="c", campaign_id="x", label="L", segments=4,
+            stakes="The room floods.", completion_effect="All future rolls here are harder.",
+        )
+        assert c.stakes == "The room floods."
+        assert c.completion_effect == "All future rolls here are harder."
+
+    def test_optional_level_metadata_defaults(self) -> None:
+        c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4)
+        assert c.category is None
+        assert c.level_id is None
+        assert c.owner_actor_id is None
+        assert c.stakes is None
+        assert c.completion_effect is None
+        assert c.visible_to_player is True
+
 
 class TestActionRating:
     def test_constructs(self) -> None:

@@ -294,3 +294,124 @@ def test_clock_section_lines_filled_and_segments_shown():
     text = "\n".join(lines)
     assert "3" in text
     assert "6" in text
+
+
+# ---------------------------------------------------------------------------
+# clock_section_lines — Phase 35.5 level/scope metadata
+# ---------------------------------------------------------------------------
+
+def _clock_dict(**kwargs) -> dict:
+    defaults = {
+        "clock_id": "ck1", "label": "Test Clock", "filled": 1,
+        "segments": 6, "status": "active", "clock_level": "dungeon",
+        "category": None, "scope_room_id": None, "action_tags": [],
+        "level_id": None, "owner_actor_id": None,
+        "stakes": None, "completion_effect": None, "visible_to_player": True,
+    }
+    defaults.update(kwargs)
+    return defaults
+
+
+def test_clock_section_lines_shows_clock_level():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[_clock_dict(clock_level="quest")])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "quest" in text
+
+
+def test_clock_section_lines_shows_category():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[_clock_dict(category="danger")])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "danger" in text
+
+
+def test_clock_section_lines_room_clock_shows_scope_room_id():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[_clock_dict(clock_level="room", scope_room_id="boiler_room")])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "room:boiler_room" in text
+
+
+def test_clock_section_lines_level_clock_shows_level_id():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[_clock_dict(clock_level="level", level_id="level_2")])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "level:level_2" in text
+
+
+def test_clock_section_lines_shows_action_tags():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[_clock_dict(action_tags=["move", "tinker"])])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "actions:" in text
+    assert "move" in text
+    assert "tinker" in text
+
+
+def test_clock_section_lines_no_action_tags_omits_actions_label():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[_clock_dict(action_tags=[])])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "actions:" not in text
+
+
+def test_clock_section_lines_minimal_clock_still_renders():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[
+        {"clock_id": "ck1", "label": "Old Clock", "filled": 0, "segments": 4, "status": "active"},
+    ])
+    ctrl.set_bundle(b)
+    lines = ctrl.clock_section_lines()
+    text = "\n".join(lines)
+    assert "Old Clock" in text
+    assert "[0/4]" in text
+
+
+def test_clock_section_lines_character_clock_shows_display_name():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[
+        _clock_dict(
+            clock_level="character",
+            owner_actor_id="some-uuid-1234",
+            owner_display_name="Mira Coldwell",
+        ),
+    ])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "character:Mira Coldwell" in text
+    assert "some-uuid-1234" not in text
+
+
+def test_clock_section_lines_faction_clock_shows_display_name():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[
+        _clock_dict(
+            clock_level="faction",
+            owner_actor_id="some-uuid-5678",
+            owner_display_name="The Desert Djinn",
+        ),
+    ])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "faction:The Desert Djinn" in text
+    assert "some-uuid-5678" not in text
+
+
+def test_clock_section_lines_character_clock_falls_back_to_id_when_no_display_name():
+    ctrl = _controls()
+    b = _bundle(open_clocks=[
+        _clock_dict(
+            clock_level="character",
+            owner_actor_id="fallback-id",
+        ),
+    ])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "character:fallback-id" in text

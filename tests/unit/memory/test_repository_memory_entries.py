@@ -132,6 +132,74 @@ class TestClockPersistence:
         assert len(repo.get_clocks("camp_a")) == 1
         assert repo.get_clocks("camp_a")[0]["clock_id"] == "clk_a"
 
+    def test_update_clock_progress_changes_only_filled_and_status(self, repo: MemoryRepository) -> None:
+        repo.save_clock(
+            "clk_sc", "camp_sc", "Scoped", 6, 1,
+            scope_room_id="room_boiler", action_tags=["fight", "move"],
+        )
+        repo.update_clock_progress("clk_sc", filled=3, status="active")
+        clocks = repo.get_clocks("camp_sc")
+        assert clocks[0]["filled"] == 3
+        assert clocks[0]["scope_room_id"] == "room_boiler"
+        assert clocks[0]["action_tags"] == ["fight", "move"]
+
+    def test_update_clock_progress_can_complete_a_clock(self, repo: MemoryRepository) -> None:
+        repo.save_clock("clk_sc2", "camp_sc2", "Trap", 4, 3, scope_room_id="room_x")
+        repo.update_clock_progress("clk_sc2", filled=4, status="completed")
+        clocks = repo.get_clocks("camp_sc2")
+        assert clocks[0]["status"] == "completed"
+        assert clocks[0]["scope_room_id"] == "room_x"
+
+    def test_save_clock_persists_level_metadata(self, repo: MemoryRepository) -> None:
+        repo.save_clock(
+            "clk_lv", "camp_lv", "Boiler Trap", 4, 0,
+            clock_level="room", category="danger",
+            owner_actor_id="actor_xyz", stakes="Room floods.",
+            completion_effect="Harder rolls.", visible_to_player=False,
+        )
+        clocks = repo.get_clocks("camp_lv")
+        c = clocks[0]
+        assert c["clock_level"] == "room"
+        assert c["category"] == "danger"
+        assert c["owner_actor_id"] == "actor_xyz"
+        assert c["stakes"] == "Room floods."
+        assert c["completion_effect"] == "Harder rolls."
+        assert c["visible_to_player"] is False
+
+    def test_save_clock_persists_level_id(self, repo: MemoryRepository) -> None:
+        repo.save_clock(
+            "clk_li", "camp_li", "Factory Alert", 8, 0,
+            clock_level="level", level_id="level_2",
+        )
+        clocks = repo.get_clocks("camp_li")
+        assert clocks[0]["level_id"] == "level_2"
+        assert clocks[0]["clock_level"] == "level"
+
+    def test_update_clock_progress_preserves_level_metadata(self, repo: MemoryRepository) -> None:
+        repo.save_clock(
+            "clk_meta", "camp_meta", "Quest", 6, 1,
+            clock_level="quest", category="objective",
+            stakes="Find the key.", completion_effect="Gate opens.",
+        )
+        repo.update_clock_progress("clk_meta", filled=3, status="active")
+        clocks = repo.get_clocks("camp_meta")
+        assert clocks[0]["clock_level"] == "quest"
+        assert clocks[0]["category"] == "objective"
+        assert clocks[0]["stakes"] == "Find the key."
+        assert clocks[0]["completion_effect"] == "Gate opens."
+
+    def test_update_clock_scope_does_not_erase_level_metadata(self, repo: MemoryRepository) -> None:
+        repo.save_clock(
+            "clk_scope", "camp_scope", "Level Alert", 8, 0,
+            clock_level="level", level_id="level_2",
+            stakes="Factory activates.", completion_effect="Golems patrol.",
+        )
+        repo.update_clock_scope("clk_scope", scope_room_id="room_control", action_tags=["tinker"])
+        clocks = repo.get_clocks("camp_scope")
+        assert clocks[0]["clock_level"] == "level"
+        assert clocks[0]["stakes"] == "Factory activates."
+        assert clocks[0]["scope_room_id"] == "room_control"
+
 
 # ---------------------------------------------------------------------------
 # Action resolution persistence

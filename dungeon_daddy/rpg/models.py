@@ -33,6 +33,13 @@ class ClockState(BaseModel):
     status: Literal["active", "completed", "abandoned"] = "active"
     scope_room_id: str | None = None
     action_tags: list[str] = Field(default_factory=list)
+    clock_level: Literal["room", "level", "dungeon", "quest", "character", "faction"] = "dungeon"
+    category: str | None = None
+    level_id: str | None = None
+    owner_actor_id: str | None = None
+    stakes: str | None = None
+    completion_effect: str | None = None
+    visible_to_player: bool = True
 
     @model_validator(mode="after")
     def filled_within_segments(self) -> "ClockState":

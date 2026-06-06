@@ -314,3 +314,93 @@ def test_composed_scope_and_tags_both_must_match():
         res_match, [clock], [(actor, tracks)], current_room_id="room_other"
     )
     assert result3.clock_lines == []
+
+
+# ---------------------------------------------------------------------------
+# Phase 35.5 — Clock scoping: level filter
+# ---------------------------------------------------------------------------
+
+def test_level_clock_advances_on_matching_level():
+    resolution = _resolution("miss")
+    actor, tracks = _pc()
+    clock = ClockState(
+        clock_id="ck1", campaign_id="c1", label="Factory Reawakens",
+        segments=8, filled=0, clock_level="level", level_id="level-2",
+    )
+    result = compute_world_reaction(
+        resolution, [clock], [(actor, tracks)], current_level_id="level-2"
+    )
+    assert len(result.clock_lines) == 1
+
+
+def test_level_clock_skipped_on_wrong_level():
+    resolution = _resolution("miss")
+    actor, tracks = _pc()
+    clock = ClockState(
+        clock_id="ck1", campaign_id="c1", label="Factory Reawakens",
+        segments=8, filled=0, clock_level="level", level_id="level-2",
+    )
+    result = compute_world_reaction(
+        resolution, [clock], [(actor, tracks)], current_level_id="level-1"
+    )
+    assert result.clock_lines == []
+
+
+def test_clock_without_level_id_advances_on_any_level():
+    resolution = _resolution("miss")
+    actor, tracks = _pc()
+    clock = ClockState(
+        clock_id="ck1", campaign_id="c1", label="Dungeon Stirs",
+        segments=6, filled=0, clock_level="dungeon",
+    )
+    result = compute_world_reaction(
+        resolution, [clock], [(actor, tracks)], current_level_id="level-1"
+    )
+    assert len(result.clock_lines) == 1
+
+
+def test_level_clock_advances_when_current_level_unknown():
+    # Fail open — don't suppress a clock if we can't determine the level
+    resolution = _resolution("miss")
+    actor, tracks = _pc()
+    clock = ClockState(
+        clock_id="ck1", campaign_id="c1", label="Factory Reawakens",
+        segments=8, filled=0, clock_level="level", level_id="level-2",
+    )
+    result = compute_world_reaction(
+        resolution, [clock], [(actor, tracks)], current_level_id=None
+    )
+    assert len(result.clock_lines) == 1
+
+
+def test_level_and_room_filters_compose():
+    # Clock has both scope_room_id and level_id — both must match
+    actor, tracks = _pc()
+    clock = ClockState(
+        clock_id="ck1", campaign_id="c1", label="Control Room Alert",
+        segments=6, filled=0,
+        clock_level="level", level_id="level-2",
+        scope_room_id="control_room",
+    )
+    res = _resolution("miss")
+
+    # both match
+    r1 = compute_world_reaction(
+        res, [clock], [(actor, tracks)],
+        current_room_id="control_room", current_level_id="level-2"
+    )
+    assert len(r1.clock_lines) == 1
+
+    # right room, wrong level
+    r2 = compute_world_reaction(
+        res, [clock], [(actor, tracks)],
+        current_room_id="control_room", current_level_id="level-1"
+    )
+    assert r2.clock_lines == []
+
+    # right level, wrong room
+    r3 = compute_world_reaction(
+        res, [clock], [(actor, tracks)],
+        current_room_id="other_room", current_level_id="level-2"
+    )
+    assert r3.clock_lines == []

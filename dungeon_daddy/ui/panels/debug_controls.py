@@ -63,7 +63,31 @@ class DebugControls:
             label = c.get("label", "?")
             filled = c.get("filled", 0)
             segments = c.get("segments", 0)
-            lines.append(f"  [{filled}/{segments}] {label}")
+            clock_level = c.get("clock_level", "dungeon") or "dungeon"
+            category = c.get("category")
+            scope_room_id = c.get("scope_room_id")
+            level_id = c.get("level_id")
+            owner_actor_id = c.get("owner_actor_id")
+            action_tags = c.get("action_tags") or []
+
+            if clock_level == "room" and scope_room_id:
+                level_part = f"room:{scope_room_id}"
+            elif clock_level == "level" and level_id:
+                level_part = f"level:{level_id}"
+            elif clock_level in ("character", "faction") and owner_actor_id:
+                display = c.get("owner_display_name") or owner_actor_id
+                level_part = f"{clock_level}:{display}"
+            else:
+                level_part = clock_level
+
+            parts = [level_part]
+            if category:
+                parts.append(category)
+            if action_tags:
+                parts.append(f"actions: {','.join(action_tags)}")
+
+            meta = " | ".join(parts)
+            lines.append(f"  [{filled}/{segments}] {label} {{{meta}}}")
         return lines
 
     def resolve_sample_action(

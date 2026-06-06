@@ -55,6 +55,27 @@ def test_react_to_resolution_returns_world_reaction_and_event() -> None:
     assert event.event_type == "world.reacted"
 
 
+def test_react_to_resolution_respects_current_room_id() -> None:
+    svc = RpgService()
+    req = ActionRequest(campaign_id="c1", actor_id="a1", action_key="fight", dice_pool=1)
+    resolution, _ = svc.resolve_action(req, fixed=[2])
+    assert resolution.outcome == "miss"
+    clock = ClockState(
+        clock_id="ck_scoped", campaign_id="c1", label="Scoped",
+        segments=4, filled=0, scope_room_id="room_a",
+    )
+    actor = ActorState(actor_id="a1", campaign_id="c1", actor_type="pc", slug="h", display_name="H")
+    tracks = {"body": StressTrack(track_key="body", capacity=4, filled=0)}
+    reaction_wrong_room, _ = svc.react_to_resolution(
+        resolution, [clock], [(actor, tracks)], current_room_id="room_b"
+    )
+    assert len(reaction_wrong_room.clock_lines) == 0
+    reaction_right_room, _ = svc.react_to_resolution(
+        resolution, [clock], [(actor, tracks)], current_room_id="room_a"
+    )
+    assert len(reaction_right_room.clock_lines) == 1
+
+
 def test_create_actor_returns_actor_state_with_default_stress() -> None:
     svc = RpgService()
     actor = svc.create_actor(

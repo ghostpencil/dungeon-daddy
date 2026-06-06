@@ -33,6 +33,7 @@ def compute_world_reaction(
     threat_clocks: list[ClockState],
     pc_actors: list[tuple[ActorState, dict[str, StressTrack]]],
     current_room_id: str | None = None,
+    current_level_id: str | None = None,
 ) -> WorldReaction:
     """Map an action resolution to deterministic world consequences."""
     outcome = resolution.outcome
@@ -44,6 +45,9 @@ def compute_world_reaction(
         if clock.status != "active":
             continue
         if clock.scope_room_id is not None and clock.scope_room_id != current_room_id:
+            continue
+        if (clock.level_id is not None and current_level_id is not None
+                and clock.level_id != current_level_id):
             continue
         if clock.action_tags and resolution.action_key not in clock.action_tags:
             continue

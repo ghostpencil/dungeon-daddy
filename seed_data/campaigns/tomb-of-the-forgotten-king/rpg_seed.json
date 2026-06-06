@@ -138,6 +138,10 @@
       "label": "The New Moon Approaches",
       "segments": 8,
       "category": "danger",
+      "clock_level": "dungeon",
+      "action_tags": [],
+      "stakes": "The new moon marks the moment the lich's seals break and he fully reawakens.",
+      "completion_effect": "The lich-king rises in full power. The tomb becomes his domain entirely — the party fights for survival, not objective.",
       "notes": "When full, the lich's seals break and he fully reawakens. Each scene spent in the tomb advances this. The deadline is structural."
     },
     {
@@ -145,6 +149,11 @@
       "label": "The Bone Warden Stirs",
       "segments": 6,
       "category": "danger",
+      "clock_level": "room",
+      "scope_room_id": "3-A",
+      "action_tags": ["fight", "move", "endure"],
+      "stakes": "The Bone Warden's patrols are becoming more alert as sound carries through the ossuary.",
+      "completion_effect": "The Bone Warden abandons its patrol pattern and charges. It will not stop until the party leaves the ossuary level.",
       "notes": "Advances with noise, combat, or disturbance of remains. When full, the Bone Warden abandons its patrol pattern and hunts the party."
     },
     {
@@ -152,6 +161,10 @@
       "label": "The Lich Senses Intruders",
       "segments": 4,
       "category": "pursuit",
+      "clock_level": "dungeon",
+      "action_tags": ["channel", "focus", "sense", "study"],
+      "stakes": "Each use of magic or arcane study deepens the lich's awareness of living presences in his tomb.",
+      "completion_effect": "The lich begins exerting direct will over the dungeon — doors seal, skeletons animate on command, and temperature drops to a killing cold.",
       "notes": "Advances when sanctified areas are disturbed, undead are destroyed, or magic is used within the tomb. When full, the lich begins exerting direct influence over the dungeon."
     },
     {
@@ -159,14 +172,76 @@
       "label": "The Crown Calls to the King",
       "segments": 6,
       "category": "ritual",
+      "clock_level": "dungeon",
+      "action_tags": ["channel", "focus", "study"],
+      "stakes": "The Sundered Crown resonates with the lich's rising power each time magic is wielded near it.",
+      "completion_effect": "The crown begins moving toward the throne on its own. Anyone carrying it feels the pull as a mounting compulsion.",
       "notes": "The Sundered Crown resonates with the lich's awakening. Advances when the crown is handled, when the lich is invoked, or when necrotic magic is used. When full, the crown begins moving toward the throne on its own."
     },
     {
       "slug": "the-dungeon-learns-what-comforts-you",
       "label": "The Dungeon Learns What Comforts You",
       "segments": 6,
-      "category": "relationship",
+      "category": "dungeon_intimacy",
+      "clock_level": "dungeon",
+      "action_tags": ["sense", "sway", "channel", "focus"],
+      "stakes": "Four centuries of death have made the tomb sensitive to the living's fears and consolations.",
+      "completion_effect": "The dungeon begins weaving personalized visions: refuge that is a trap, comfort that is poison. Each party member faces a tailored horror.",
       "notes": "The tomb has been inhabited by death for 400 years. It develops an eerie emotional awareness of the party. Advances on fear, grief, or revealed vulnerabilities. When full, the dungeon begins exploiting personal weaknesses."
+    },
+    {
+      "slug": "servants-hall-silence-breaks",
+      "label": "The Servants' Hall Silence Breaks",
+      "segments": 4,
+      "category": "danger",
+      "clock_level": "room",
+      "scope_room_id": "2-B",
+      "action_tags": ["fight", "move", "endure", "sway"],
+      "stakes": "The ceremonial silence required to keep the skeleton guardians dormant is becoming precarious.",
+      "completion_effect": "The twelve skeleton guardians animate simultaneously. Combat in the Servants' Hall is now unavoidable."
+    },
+    {
+      "slug": "upper-tomb-patrols-mobilize",
+      "label": "The Upper Tomb Patrols Mobilize",
+      "segments": 6,
+      "category": "danger",
+      "clock_level": "level",
+      "level_id": "level-1",
+      "action_tags": ["fight", "move", "endure"],
+      "stakes": "The undead patrols scattered through the ziggurat's upper level are responding to disturbances below.",
+      "completion_effect": "Ambushes become possible in every room on Level 1. The party can no longer safely rest or regroup on the upper level."
+    },
+    {
+      "slug": "recover-the-sundered-crown",
+      "label": "Recover the Sundered Crown",
+      "segments": 6,
+      "category": "objective",
+      "clock_level": "quest",
+      "action_tags": ["study", "sense", "tinker"],
+      "stakes": "Each failure narrows the window to locate and retrieve the Crown before the lich reawakens.",
+      "completion_effect": "The Sundered Crown is secured. The party can attempt to flee or use it to bind the lich permanently."
+    },
+    {
+      "slug": "dax-remembers-the-truth",
+      "label": "Dax Remembers the Truth",
+      "segments": 6,
+      "category": "relationship",
+      "clock_level": "character",
+      "owner_actor_slug": "dax",
+      "action_tags": ["sense", "move", "study"],
+      "stakes": "Each time Dax navigates the tomb, fragments of his previous expedition surface unbidden.",
+      "completion_effect": "Dax finally remembers: he didn't just escape — he sealed the door behind him while his companions were still inside. The guilt becomes a wound that costs composure on failed rolls."
+    },
+    {
+      "slug": "wraith-steward-seals-the-passages",
+      "label": "The Wraith-Steward Seals the Passages",
+      "segments": 6,
+      "category": "faction_pressure",
+      "clock_level": "faction",
+      "owner_actor_slug": "wraith-steward",
+      "action_tags": ["fight", "channel", "sway"],
+      "stakes": "The Wraith-Steward is methodically closing off passage routes deeper into the tomb as he assesses the party's intent.",
+      "completion_effect": "The main descent to Level 3 is sealed by the Wraith-Steward's power. The party must negotiate with him or find an alternative passage."
     }
   ],
   "memories": [
@@ -243,44 +318,44 @@
   ],
   "room_threats": [
     {
-      "location_slug": "drowned-shrine",
+      "location_slug": "1-B",
       "trigger_tags": ["touch_altar", "magic_use", "step_on_silver_dust"],
       "related_actor_slugs": ["the-lich-king"],
-      "related_clock_slugs": ["the-lich-senses-intruders"],
+      "related_clock_slugs": [],
       "possible_reactions": ["advance_clock", "shrine_activates", "necrotic_pulse"],
-      "notes": "The shrine of Mythrax is the most spiritually active room on Level 1. Any interaction advances the lich's awareness."
+      "notes": "The shrine of Mythrax is the most spiritually active room on Level 1. Any interaction advances the-lich-senses-intruders clock."
     },
     {
-      "location_slug": "servants-hall",
+      "location_slug": "2-B",
       "trigger_tags": ["noise", "combat", "desecration"],
       "related_actor_slugs": ["skeleton-guardians"],
-      "related_clock_slugs": ["the-bone-warden-stirs", "the-lich-senses-intruders"],
+      "related_clock_slugs": [],
       "possible_reactions": ["advance_clock", "skeletons_animate", "reveal_threat"],
-      "notes": "The twelve ceremonial skeletons are dormant unless the hall is dishonored by violence or loud noise. A failed stealth roll is enough."
+      "notes": "The twelve ceremonial skeletons are dormant unless the hall is dishonored. Advances servants-hall-silence-breaks and the-lich-senses-intruders clocks."
     },
     {
-      "location_slug": "ossuary-approach",
+      "location_slug": "3-A",
       "trigger_tags": ["noise", "forced_entry", "failed_move", "disturb_skulls"],
       "related_actor_slugs": ["bone-warden"],
-      "related_clock_slugs": ["the-bone-warden-stirs"],
+      "related_clock_slugs": [],
       "possible_reactions": ["advance_clock", "reveal_threat", "separate_party", "bone_warden_charges"],
-      "notes": "The walls of stacked skulls amplify sound. Even quiet movement has risk here. The Bone Warden pauses when a whisper reaches it."
+      "notes": "The walls of stacked skulls amplify sound. Advances the-bone-warden-stirs clock, which is scoped to this room."
     },
     {
-      "location_slug": "wrath-study",
+      "location_slug": "2-E",
       "trigger_tags": ["aggression", "failed_sway", "desecration"],
       "related_actor_slugs": ["wraith-steward"],
-      "related_clock_slugs": ["the-lich-senses-intruders"],
+      "related_clock_slugs": [],
       "possible_reactions": ["advance_clock", "wraith_attacks", "seal_descent"],
-      "notes": "Attacking the Wraith-Steward without attempting negotiation seals the Descent Chamber and alerts the lich. The signet is lost."
+      "notes": "Attacking the Wraith-Steward without attempting negotiation seals the Descent Chamber and alerts the lich. Advances the-lich-senses-intruders."
     },
     {
-      "location_slug": "throne-of-bone",
+      "location_slug": "3-E",
       "trigger_tags": ["combat", "touch_crown", "channel", "magic_use"],
       "related_actor_slugs": ["the-lich-king"],
-      "related_clock_slugs": ["the-crown-calls-to-the-king", "the-new-moon-approaches"],
+      "related_clock_slugs": [],
       "possible_reactions": ["advance_clock", "lich_reanimates", "crown_flies_to_throne", "dungeon_seals"],
-      "notes": "The climax room. Any magical action accelerates both the crown and the moon clocks. Handle the crown carefully."
+      "notes": "The climax room. Any magical action accelerates the-crown-calls-to-the-king and the-new-moon-approaches clocks."
     }
   ]
 }

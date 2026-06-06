@@ -85,12 +85,14 @@ def _wrap_debug_line(line: str, max_chars: int = _DBG_LINE_MAX) -> list[str]:
     indent = len(line) - len(line.lstrip())
     cont = " " * (indent + 2)
     result: list[str] = []
+    cur_min = indent
     while len(line) > max_chars:
-        cut = line.rfind(" ", indent, max_chars)
-        if cut <= indent:
+        cut = line.rfind(" ", cur_min, max_chars)
+        if cut <= cur_min:
             cut = max_chars
         result.append(line[:cut])
         line = cont + line[cut:].lstrip()
+        cur_min = len(cont)
     result.append(line)
     return result
 
@@ -709,6 +711,15 @@ class PlayView(arcade.View):
                 segments=r["segments"],
                 filled=r["filled"],
                 status=r["status"],
+                scope_room_id=r.get("scope_room_id"),
+                action_tags=r.get("action_tags", []),
+                clock_level=r.get("clock_level", "dungeon"),
+                category=r.get("category"),
+                level_id=r.get("level_id"),
+                owner_actor_id=r.get("owner_actor_id"),
+                stakes=r.get("stakes"),
+                completion_effect=r.get("completion_effect"),
+                visible_to_player=r.get("visible_to_player", True),
             )
             for r in raw_clocks
         ]
@@ -724,19 +735,19 @@ class PlayView(arcade.View):
                 for t in raw_tracks
             }
             pc_pairs.append((actor, tracks))
+        current_room_id = self._state.current_room_id if self._state else None
+        current_level_id = (
+            f"level-{self._state.current_level_idx + 1}" if self._state else None
+        )
         try:
             reaction, _evt = self._rpg_service.react_to_resolution(
-                resolution, threat_clocks, pc_pairs
+                resolution, threat_clocks, pc_pairs,
+                current_room_id=current_room_id,
+                current_level_id=current_level_id,
             )
             for cl in reaction.clock_lines:
-                self._mem_repo.save_clock(
+                self._mem_repo.update_clock_progress(
                     clock_id=cl.clock_id,
-                    campaign_id=campaign_id,
-                    label=cl.label,
-                    segments=next(
-                        (c.segments for c in threat_clocks if c.clock_id == cl.clock_id),
-                        cl.new_filled,
-                    ),
                     filled=cl.new_filled,
                     status=cl.new_status,
                 )

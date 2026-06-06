@@ -466,22 +466,59 @@ class MemoryRepository:
         status: str = "active",
         scope_room_id: str | None = None,
         action_tags: list[str] | None = None,
+        clock_level: str = "dungeon",
+        category: str | None = None,
+        level_id: str | None = None,
+        owner_actor_id: str | None = None,
+        stakes: str | None = None,
+        completion_effect: str | None = None,
+        visible_to_player: bool = True,
     ) -> None:
         assert self._conn is not None
         self._conn.execute(
             """
-            INSERT INTO clocks (clock_id, campaign_id, label, segments, filled, status, scope_room_id, action_tags)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO clocks (
+                clock_id, campaign_id, label, segments, filled, status,
+                scope_room_id, action_tags,
+                clock_level, category, level_id, owner_actor_id,
+                stakes, completion_effect, visible_to_player
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (clock_id) DO UPDATE SET
-                label         = excluded.label,
-                segments      = excluded.segments,
-                filled        = excluded.filled,
-                status        = excluded.status,
-                scope_room_id = excluded.scope_room_id,
-                action_tags   = excluded.action_tags
+                label             = excluded.label,
+                segments          = excluded.segments,
+                filled            = excluded.filled,
+                status            = excluded.status,
+                scope_room_id     = excluded.scope_room_id,
+                action_tags       = excluded.action_tags,
+                clock_level       = excluded.clock_level,
+                category          = excluded.category,
+                level_id          = excluded.level_id,
+                owner_actor_id    = excluded.owner_actor_id,
+                stakes            = excluded.stakes,
+                completion_effect = excluded.completion_effect,
+                visible_to_player = excluded.visible_to_player
             """,
             [clock_id, campaign_id, label, segments, filled, status,
-             scope_room_id, json.dumps(action_tags or [])],
+             scope_room_id, json.dumps(action_tags or []),
+             clock_level, category, level_id, owner_actor_id,
+             stakes, completion_effect, visible_to_player],
+        )
+
+    def delete_clock(self, clock_id: str) -> None:
+        assert self._conn is not None
+        self._conn.execute("DELETE FROM clocks WHERE clock_id = ?", [clock_id])
+
+    def update_clock_progress(
+        self,
+        clock_id: str,
+        filled: int,
+        status: str,
+    ) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            "UPDATE clocks SET filled = ?, status = ? WHERE clock_id = ?",
+            [filled, status, clock_id],
         )
 
     def update_clock_scope(
@@ -503,7 +540,10 @@ class MemoryRepository:
         assert self._conn is not None
         rows = self._conn.execute(
             """
-            SELECT clock_id, campaign_id, label, segments, filled, status, scope_room_id, action_tags
+            SELECT clock_id, campaign_id, label, segments, filled, status,
+                   scope_room_id, action_tags,
+                   clock_level, category, level_id, owner_actor_id,
+                   stakes, completion_effect, visible_to_player
             FROM clocks WHERE campaign_id = ?
             """,
             [campaign_id],
@@ -518,6 +558,13 @@ class MemoryRepository:
                 "status": r[5],
                 "scope_room_id": r[6],
                 "action_tags": json.loads(r[7]) if r[7] else [],
+                "clock_level": r[8] if r[8] else "dungeon",
+                "category": r[9],
+                "level_id": r[10],
+                "owner_actor_id": r[11],
+                "stakes": r[12],
+                "completion_effect": r[13],
+                "visible_to_player": bool(r[14]) if r[14] is not None else True,
             }
             for r in rows
         ]

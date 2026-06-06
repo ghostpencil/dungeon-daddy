@@ -7,6 +7,7 @@ from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.seed_pack import (
     ApplyResult,
     SeedActor,
+    SeedClock,
     SeedPack,
     apply_seed_pack,
     derive_actor_id,
@@ -230,6 +231,46 @@ _RICH_PACK = {
 }
 
 
+class TestSeedClockModel:
+    def test_clock_level_defaults_to_dungeon(self) -> None:
+        c = SeedClock(slug="trap", label="Trap", segments=4, category="danger")
+        assert c.clock_level == "dungeon"
+
+    def test_clock_level_accepted(self) -> None:
+        c = SeedClock(slug="trap", label="Trap", segments=4, category="danger", clock_level="room")
+        assert c.clock_level == "room"
+
+    def test_optional_fields_default_to_none(self) -> None:
+        c = SeedClock(slug="trap", label="Trap", segments=4, category="danger")
+        assert c.scope_room_id is None
+        assert c.action_tags == []
+        assert c.level_id is None
+        assert c.owner_actor_slug is None
+        assert c.stakes is None
+        assert c.completion_effect is None
+        assert c.visible_to_player is True
+
+    def test_parses_all_clock_level_fields(self) -> None:
+        c = SeedClock(
+            slug="mara-arc", label="Mara Arc", segments=6, category="relationship",
+            clock_level="character", owner_actor_slug="mara",
+            stakes="Mara begins to trust.", completion_effect="Mara gains a tag.",
+            visible_to_player=False,
+        )
+        assert c.owner_actor_slug == "mara"
+        assert c.stakes == "Mara begins to trust."
+        assert c.completion_effect == "Mara gains a tag."
+        assert c.visible_to_player is False
+
+    def test_parses_scope_fields(self) -> None:
+        c = SeedClock(
+            slug="trap", label="Trap", segments=4, category="danger",
+            scope_room_id="room_boiler", action_tags=["fight", "move"],
+        )
+        assert c.scope_room_id == "room_boiler"
+        assert c.action_tags == ["fight", "move"]
+
+
 class TestApplySeedPack:
     @pytest.fixture
     def repo(self, tmp_path: Path) -> MemoryRepository:
@@ -327,3 +368,100 @@ class TestApplySeedPack:
         assert clock_id in clocks
         assert clocks[clock_id]["scope_room_id"] == "room_boiler"
         assert clocks[clock_id]["action_tags"] == ["fight", "move"]
+
+    def test_apply_persists_clock_level_metadata(self, repo: MemoryRepository) -> None:
+        data = {
+            **_MINIMAL_PACK,
+            "clocks": [
+                {
+                    "slug": "quest-clock",
+                    "label": "Restore the Elevator",
+                    "segments": 6,
+                    "category": "objective",
+                    "clock_level": "quest",
+                    "stakes": "Elevator needed to descend.",
+                    "completion_effect": "Elevator operational.",
+                }
+            ],
+        }
+        pack = SeedPack.model_validate(data)
+        apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR)
+        clock_id = derive_clock_id("test-campaign", "quest-clock")
+        clocks = {c["clock_id"]: c for c in repo.get_clocks("campaign-123")}
+        assert clocks[clock_id]["clock_level"] == "quest"
+        assert clocks[clock_id]["category"] == "objective"
+        assert clocks[clock_id]["stakes"] == "Elevator needed to descend."
+        assert clocks[clock_id]["completion_effect"] == "Elevator operational."
+
+    def test_apply_derives_owner_actor_id_from_slug(self, repo: MemoryRepository) -> None:
+        data = {
+            **_MINIMAL_PACK,
+            "player_side": {
+                "label": "The Party",
+                "actors": [
+                    {
+                        "slug": "mara",
+                        "display_name": "Mara",
+                        "actor_type": "pc",
+                    }
+                ],
+            },
+            "clocks": [
+                {
+                    "slug": "mara-arc",
+                    "label": "Mara Begins to Trust",
+                    "segments": 6,
+                    "category": "relationship",
+                    "clock_level": "character",
+                    "owner_actor_slug": "mara",
+                }
+            ],
+        }
+        pack = SeedPack.model_validate(data)
+        apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR)
+        clock_id = derive_clock_id("test-campaign", "mara-arc")
+        clocks = {c["clock_id"]: c for c in repo.get_clocks("campaign-123")}
+        expected_actor_id = derive_actor_id("test-campaign", "mara")
+        assert clocks[clock_id]["owner_actor_id"] == expected_actor_id
+
+
+_SEED_DATA_DIR = (
+    Path(__file__).parent.parent.parent.parent / "seed_data" / "campaigns"
+)
+
+
+class TestCampaignSeedFilesValidate:
+    @pytest.mark.parametrize("campaign_dir", list(_SEED_DATA_DIR.iterdir()) if _SEED_DATA_DIR.exists() else [])
+    def test_campaign_rpg_seed_parses_against_schema(self, campaign_dir: Path) -> None:
+        seed_file = campaign_dir / "rpg_seed.json"
+        if not seed_file.exists():
+            pytest.skip(f"No rpg_seed.json in {campaign_dir.name}")
+        pack = load_seed_pack(seed_file)
+        assert pack.campaign_slug == campaign_dir.name
+        for clock in pack.clocks:
+            assert clock.clock_level in ("room", "level", "dungeon", "quest", "character", "faction")
+            assert clock.stakes is not None, f"Clock {clock.slug!r} missing stakes"
+            assert clock.completion_effect is not None, f"Clock {clock.slug!r} missing completion_effect"
+
+    @pytest.mark.parametrize("campaign_dir", list(_SEED_DATA_DIR.iterdir()) if _SEED_DATA_DIR.exists() else [])
+    def test_campaign_has_required_clock_levels(self, campaign_dir: Path) -> None:
+        seed_file = campaign_dir / "rpg_seed.json"
+        if not seed_file.exists():
+            pytest.skip(f"No rpg_seed.json in {campaign_dir.name}")
+        pack = load_seed_pack(seed_file)
+        levels = {c.clock_level for c in pack.clocks}
+        assert "room" in levels, f"{campaign_dir.name}: missing room clock"
+        assert "dungeon" in levels, f"{campaign_dir.name}: missing dungeon clock"
+        assert "quest" in levels, f"{campaign_dir.name}: missing quest clock"
+
+    @pytest.mark.parametrize("campaign_dir", list(_SEED_DATA_DIR.iterdir()) if _SEED_DATA_DIR.exists() else [])
+    def test_campaign_room_clocks_have_scope_room_id(self, campaign_dir: Path) -> None:
+        seed_file = campaign_dir / "rpg_seed.json"
+        if not seed_file.exists():
+            pytest.skip(f"No rpg_seed.json in {campaign_dir.name}")
+        pack = load_seed_pack(seed_file)
+        for clock in pack.clocks:
+            if clock.clock_level == "room":
+                assert clock.scope_room_id is not None, (
+                    f"{campaign_dir.name}: room clock {clock.slug!r} missing scope_room_id"
+                )

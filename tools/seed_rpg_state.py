@@ -401,19 +401,42 @@ def seed_campaign_with_pack(
         else:
             result.skipped += 1
 
-    for clock in pack.clocks:
-        from dungeon_daddy.rpg.seed_pack import derive_clock_id
+    from dungeon_daddy.rpg.seed_pack import derive_clock_id, derive_actor_id as _derive_actor_id
 
+    existing_clock_ids = {c["clock_id"] for c in repo.get_clocks(campaign_id)}
+    seed_clock_ids: set[str] = set()
+
+    for clock in pack.clocks:
         clock_id = derive_clock_id(pack.campaign_slug, clock.slug)
-        existing_clocks = {c["clock_id"] for c in repo.get_clocks(campaign_id)}
-        if clock_id not in existing_clocks:
-            repo.save_clock(clock_id, campaign_id, clock.label, clock.segments)
-            result.created += 1
-        elif force:
-            repo.save_clock(clock_id, campaign_id, clock.label, clock.segments)
-            result.updated += 1
+        seed_clock_ids.add(clock_id)
+        owner_actor_id = (
+            _derive_actor_id(pack.campaign_slug, clock.owner_actor_slug)
+            if clock.owner_actor_slug else None
+        )
+        is_new = clock_id not in existing_clock_ids
+        if is_new or force:
+            repo.save_clock(
+                clock_id, campaign_id, clock.label, clock.segments,
+                scope_room_id=clock.scope_room_id,
+                action_tags=clock.action_tags,
+                clock_level=clock.clock_level,
+                category=clock.category,
+                level_id=clock.level_id,
+                owner_actor_id=owner_actor_id,
+                stakes=clock.stakes,
+                completion_effect=clock.completion_effect,
+                visible_to_player=clock.visible_to_player,
+            )
+            if is_new:
+                result.created += 1
+            else:
+                result.updated += 1
         else:
             result.skipped += 1
+
+    if force:
+        for stale_id in existing_clock_ids - seed_clock_ids:
+            repo.delete_clock(stale_id)
 
     for memory in pack.memories:
         from dungeon_daddy.rpg.seed_pack import derive_memory_id

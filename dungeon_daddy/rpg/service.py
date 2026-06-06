@@ -71,8 +71,14 @@ class RpgService:
         resolution: ActionResolution,
         threat_clocks: list[ClockState],
         pc_actors: list[tuple[ActorState, dict[str, StressTrack]]],
+        current_room_id: str | None = None,
+        current_level_id: str | None = None,
     ) -> tuple[WorldReaction, DomainEvent]:
-        reaction = compute_world_reaction(resolution, threat_clocks, pc_actors)
+        reaction = compute_world_reaction(
+            resolution, threat_clocks, pc_actors,
+            current_room_id=current_room_id,
+            current_level_id=current_level_id,
+        )
         event = DomainEvent(
             event_id=str(uuid.uuid4()),
             campaign_id=resolution.campaign_id,

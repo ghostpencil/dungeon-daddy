@@ -290,3 +290,73 @@ class TestSeedCampaignWithPack:
         pack_path = _write_pack(tmp_path)
         result = seed_campaign_with_pack(campaign_dir, pack_path, dry_run=True)
         assert isinstance(result, SeedResult)
+
+    def test_force_reseed_persists_clock_metadata(self, tmp_path: Path) -> None:
+        pack_data = {
+            **_PACK_DATA,
+            "clocks": [
+                {
+                    "slug": "bone-warden-stirs",
+                    "label": "The Bone Warden Stirs",
+                    "segments": 6,
+                    "category": "danger",
+                    "clock_level": "room",
+                    "scope_room_id": "bone-vault",
+                    "action_tags": ["fight", "move"],
+                    "stakes": "The warden's bones rattle.",
+                    "completion_effect": "The warden rises.",
+                }
+            ],
+        }
+        campaign_dir = _make_campaign_dir(tmp_path)
+        pack_path = _write_pack(tmp_path, pack_data)
+        seed_campaign_with_pack(campaign_dir, pack_path, force=True)
+        repo = _open_repo(campaign_dir)
+        clocks = repo.get_clocks("campaign:test-campaign")
+        repo.close()
+        clock = next(c for c in clocks if c["label"] == "The Bone Warden Stirs")
+        assert clock["clock_level"] == "room"
+        assert clock["scope_room_id"] == "bone-vault"
+        assert clock["action_tags"] == ["fight", "move"]
+        assert clock["category"] == "danger"
+        assert clock["stakes"] == "The warden's bones rattle."
+
+    def test_force_reseed_removes_stale_clocks(self, tmp_path: Path) -> None:
+        # First seed with a clock that won't be in the second seed pack
+        stale_pack = {
+            **_PACK_DATA,
+            "clocks": [
+                {
+                    "slug": "old-clock",
+                    "label": "Old Stale Clock",
+                    "segments": 4,
+                    "category": "danger",
+                }
+            ],
+        }
+        new_pack = {
+            **_PACK_DATA,
+            "clocks": [
+                {
+                    "slug": "new-clock",
+                    "label": "New Clock",
+                    "segments": 6,
+                    "category": "ritual",
+                }
+            ],
+        }
+        campaign_dir = _make_campaign_dir(tmp_path)
+        stale_path = tmp_path / "stale.json"
+        stale_path.write_text(json.dumps(stale_pack), encoding="utf-8")
+        new_path = tmp_path / "new.json"
+        new_path.write_text(json.dumps(new_pack), encoding="utf-8")
+
+        seed_campaign_with_pack(campaign_dir, stale_path)
+        seed_campaign_with_pack(campaign_dir, new_path, force=True)
+
+        repo = _open_repo(campaign_dir)
+        clocks = repo.get_clocks("campaign:test-campaign")
+        repo.close()
+        labels = {c["label"] for c in clocks}
+        assert "New Clock" in labels
+        assert "Old Stale Clock" not in labels

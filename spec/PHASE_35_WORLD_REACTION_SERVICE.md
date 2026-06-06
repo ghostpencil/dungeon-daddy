@@ -1,5 +1,7 @@
 # Phase 35 — Deterministic World Reaction Service
 
+**Status: Complete** (2026-06-05) — 1818 unit tests passing. All acceptance criteria met. Post-release bugs tracked in `spec/PROJECT_INDEX.md`.
+
 ## Goal
 
 Make Dungeon Daddy respond mechanically to player choices.

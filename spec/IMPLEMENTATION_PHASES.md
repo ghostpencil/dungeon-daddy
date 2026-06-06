@@ -1778,6 +1778,8 @@ Spec: `spec/PHASE_34_CAMPAIGN_RPG_DATA_DEEPENING.md`
 
 ## Phase 35 — Deterministic World Reaction Service
 
+**Status: Complete** (2026-06-05) — 1818 unit tests passing.
+
 Make the dungeon push back through deterministic state changes.
 
 Major work:
@@ -1790,7 +1792,11 @@ Major work:
 - Update context bundle after reactions.
 - Show reaction summary in Debug tab.
 
+Full spec: `spec/PHASE_35_WORLD_REACTION_SERVICE.md`
+
 ## Phase 35.5 — Clock Scoping
+
+**Status: Complete** (2026-06-06) — 1698 unit tests passing. All 10 manual UI behavior tests passing.
 
 Make clock advancement contextually meaningful so clocks only tick when
 the triggering action is relevant to them.

@@ -66,7 +66,13 @@ class ContextBundleBuilder:
         return cards, must_remember, provenance
 
     def _fetch_open_clocks(self, repo: MemoryRepository) -> list[dict]:
-        return [c for c in repo.get_clocks(self._campaign_id) if c["status"] == "active"]
+        clocks = [c for c in repo.get_clocks(self._campaign_id) if c["status"] == "active"]
+        for c in clocks:
+            owner_id = c.get("owner_actor_id")
+            if owner_id:
+                actor = repo.get_actor(owner_id)
+                c["owner_display_name"] = actor["display_name"] if actor else None
+        return clocks
 
     def _fetch_active_fallout(self, repo: MemoryRepository) -> list[dict]:
         result: list[dict] = []
