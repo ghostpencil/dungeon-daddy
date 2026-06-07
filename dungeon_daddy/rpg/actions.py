@@ -21,4 +21,5 @@ def resolve_action(
         dice_rolled=result.dice,
         outcome=result.outcome,
         stress_cost=push_die,
+        intent=request.intent,
     )

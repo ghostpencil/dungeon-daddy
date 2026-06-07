@@ -378,3 +378,56 @@ def test_load_memory_entries_no_op_without_mem_repo(tmp_path: Path):
     view._rpg_memory = memory_panel
     view._load_memory_entries()
     memory_panel.set_entries.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Phase 35.6 — _apply_world_reaction uses correct track capacity
+# ---------------------------------------------------------------------------
+
+def test_apply_world_reaction_persists_weird_track_with_correct_capacity(tmp_path: Path):
+    """A ReactionStressLine(track_key='weird') must be saved with weird capacity, not body."""
+    from unittest.mock import MagicMock
+    from dungeon_daddy.rpg.models import (
+        ActionResolution, ActorState, ReactionStressLine, WorldReaction,
+    )
+    view, _, _ = _make_view(tmp_path, with_rpg=True)
+
+    # Seed actor with body cap=4 and weird cap=6
+    actor_id = "a-pc"
+    view._mem_repo.save_actor(actor_id, "camp-1", "pc", "hero", "Elara")
+    view._mem_repo.save_actor_stress_track(actor_id, "body",  capacity=4, filled=0)
+    view._mem_repo.save_actor_stress_track(actor_id, "weird", capacity=6, filled=1)
+    view._rpg_campaign_id = "camp-1"
+
+    actor = ActorState(
+        actor_id=actor_id, campaign_id="camp-1", actor_type="pc",
+        slug="hero", display_name="Elara",
+    )
+    action_panel = MagicMock()
+    action_panel._actors = [actor]
+    view._rpg_action = action_panel
+
+    resolution = ActionResolution(
+        resolution_id="r1", campaign_id="camp-1", actor_id=actor_id,
+        action_key="channel", dice_rolled=[2], outcome="miss",
+    )
+
+    # Stub service to return a WorldReaction with weird stress
+    stress_line = ReactionStressLine(
+        actor_id=actor_id, display_name="Elara",
+        track_key="weird", amount=2, new_filled=3,
+        triggered_fallout=False, reason="miss consequence — weird",
+    )
+    fake_reaction = WorldReaction(
+        reaction_id="rx1", campaign_id="camp-1",
+        source_resolution_id="r1", outcome="miss",
+        stress_lines=[stress_line],
+    )
+    view._rpg_service.react_to_resolution.return_value = (fake_reaction, MagicMock())
+
+    view._apply_world_reaction(resolution)
+
+    tracks_after = {t["track_key"]: t for t in view._mem_repo.get_actor_stress_tracks(actor_id)}
+    assert "weird" in tracks_after, "weird track should be persisted"
+    assert tracks_after["weird"]["filled"] == 3
+    assert tracks_after["weird"]["capacity"] == 6, "must use weird capacity, not body capacity"

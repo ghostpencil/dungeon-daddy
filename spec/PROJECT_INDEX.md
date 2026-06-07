@@ -2,12 +2,12 @@
 
 ## Phase
 
-Phase: 36 — LLM-Proposed Reaction Drafts
-Status: **Not started**
+Phase: 35.6 — Stress Routing by Action Intent
+Status: **Complete (2026-06-06)**
 
-Branch: `phase-35.5-clock-scoping` (pending PR merge → new branch for Phase 36)
+Branch: `phase-35.6-stress-routing`
 
-_Phase 35.5 complete (2026-06-06). All steps done: room scoping + action tags, wiring, clock-level fields, context bundle pass-through, debug display with level/scope/action metadata, campaign seed upgrades (10 multi-level clocks per campaign), and full TDD coverage. Post-release manual testing revealed 6 additional bugs, all fixed, plus 10 manual UI behavior tests all passing. 1698 unit tests passing._
+_Phase 35.6 complete (2026-06-06). All 8 TDD slices done: `intent` field on ActionRequest/ActionResolution, `stress_routing.py` with `choose_stress_track()`, routing wired into `compute_world_reaction()`, clock category/level mapping, intent keyword mapping, PlayView capacity fix, non-body stress world-reaction tests. 1738 unit tests passing. Existing campaign seeds already have the right category/clock_level metadata — no seed changes needed._
 
 ---
 
@@ -28,6 +28,7 @@ _Phase 35.5 complete (2026-06-06). All steps done: room scoping + action tags, w
 | 34 | Campaign RPG Data Deepening | Patch the two existing campaigns with RPG-ready player actors, NPCs, monsters, clocks, memories, and room threat hooks. |
 | 35 | Deterministic World Reaction Service | Add a deterministic service that turns player outcomes into dungeon/NPC/monster reactions, clocks, stress, fallout, and memory events. |
 | 35.5 | Clock Scoping | Make clocks room-scoped and action-tagged so they only advance when contextually relevant. |
+| **35.6** | Stress Routing by Action Intent | Replace hard-coded body stress with deterministic track selection driven by clock category, action key, and intent keywords. |
 | 36 | LLM-Proposed Reaction Drafts | Allow the LLM to propose structured reactions, but validate and apply them through deterministic services only. |
 | 37 | Memory Approval and Playtest Curation | Add curated approval/edit/reject workflows for LLM-drafted memories and run an alpha playtest scenario across seeded campaigns. |
 
@@ -38,6 +39,8 @@ Full phase specs in `spec/IMPLEMENTATION_PHASES.md`.
 ## Next Steps — Phase 36
 
 Spec: `spec/IMPLEMENTATION_PHASES.md` (Phase 36 — LLM-Proposed Reaction Drafts)
+
+Allow the LLM to propose structured reactions, but validate and apply them through deterministic services only.
 
 ## Known Failures
 
@@ -76,6 +79,7 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 35.6 — Stress Routing by Action Intent | **Complete** (2026-06-06) | 1738 unit passing |
 | Phase 35.5 — Clock Scoping, Clock Levels, Campaign Seed Upgrades | **Complete** (2026-06-06) | 1698 unit passing (post-bugfix) |
 | Phase 35 — Deterministic World Reaction Service | **Complete** (2026-06-05) | 1818 passing |
 | Phase 34 — Campaign RPG Data Deepening | **Complete** (2026-06-05) | 1802 passing |

@@ -244,6 +244,22 @@ class TestActionRating:
             ActionRating(actor_id="x", action_key="fight", rating=-1)
 
 
+class TestActionRequest:
+    def test_intent_defaults_to_none(self) -> None:
+        r = ActionRequest(
+            campaign_id="c", scene_id=None, actor_id="a",
+            action_key="fight",
+        )
+        assert r.intent is None
+
+    def test_intent_can_be_set(self) -> None:
+        r = ActionRequest(
+            campaign_id="c", actor_id="a", action_key="sway",
+            intent="convince the guard to stand down",
+        )
+        assert r.intent == "convince the guard to stand down"
+
+
 class TestActionResolution:
     def test_constructs_with_outcome(self) -> None:
         r = ActionResolution(
@@ -289,6 +305,21 @@ class TestActionResolution:
             outcome="partial",
         )
         assert r.stress_cost == 0
+
+    def test_intent_defaults_to_none(self) -> None:
+        r = ActionResolution(
+            resolution_id="r", campaign_id="c", actor_id="a",
+            action_key="fight", dice_rolled=[3], outcome="miss",
+        )
+        assert r.intent is None
+
+    def test_intent_survives_construction(self) -> None:
+        r = ActionResolution(
+            resolution_id="r", campaign_id="c", actor_id="a",
+            action_key="sway", dice_rolled=[4], outcome="partial",
+            intent="forge a bond with the warden",
+        )
+        assert r.intent == "forge a bond with the warden"
 
 
 class TestFalloutRecord:

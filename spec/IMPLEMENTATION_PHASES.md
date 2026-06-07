@@ -1815,6 +1815,29 @@ Major work:
 
 Spec: `spec/FEATURE_CLOCK_SCOPING.md`
 
+## Phase 35.6 — Stress Routing by Action Intent
+
+**Status: Complete (2026-06-06) — 1738 unit tests passing**
+
+Replace hard-coded `body` stress in `compute_world_reaction()` with deterministic
+stress-track selection driven by clock category, clock level, action key, and
+intent keywords.
+
+Major work:
+
+- Add `intent: str | None` to `ActionRequest` and `ActionResolution`.
+- Update UI request builder to populate intent from the submitted intent text.
+- Create `dungeon_daddy/rpg/stress_routing.py` with `choose_stress_track()`.
+- Clock category mapping: `danger`/`hazard` → body; `horror`/`fear` → composure; `relationship`/`betrayal` → bonds; `ritual`/`occult`/`dungeon_intimacy` → weird.
+- Clock level mapping (weaker signal): `room`/`level` → body; `dungeon` → weird; `quest` → composure; `character`/`faction` → bonds.
+- Action key mapping: `fight`/`move`/`endure`/`tinker` → body; `study`/`focus`/`sense` → composure; `sway` → bonds; `channel` → weird.
+- Intent keyword mapping (lowest priority): weird > bonds > composure > body when multiple groups match.
+- Wire `choose_stress_track()` into `compute_world_reaction()`, passing matched clocks.
+- Fix `PlayView._apply_world_reaction()` to read capacity from the actual stress track, not hard-coded `body`.
+- 8 TDD slices (see `spec/FEATURE_STRESS_ROUTING_BY_ACTION_INTENT.md`).
+
+Spec: `spec/FEATURE_STRESS_ROUTING_BY_ACTION_INTENT.md`
+
 ## Phase 36 — LLM-Proposed Reaction Drafts
 
 Allow LLM creativity without giving it authority.

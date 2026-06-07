@@ -757,9 +757,9 @@ class PlayView(arcade.View):
                     track_key=sl.track_key,
                     capacity=next(
                         (
-                            tracks["body"].capacity
+                            tracks[sl.track_key].capacity
                             for actor, tracks in pc_pairs
-                            if actor.actor_id == sl.actor_id and "body" in tracks
+                            if actor.actor_id == sl.actor_id and sl.track_key in tracks
                         ),
                         4,
                     ),

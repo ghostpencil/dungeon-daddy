@@ -90,6 +90,7 @@ class ActionRequest(BaseModel):
     dice_pool: int = 1
     momentum_spend: int = 0
     push_yourself: bool = False
+    intent: str | None = None
 
 
 class ActionResolution(BaseModel):
@@ -101,6 +102,7 @@ class ActionResolution(BaseModel):
     outcome: Literal["critical", "full", "partial", "miss"]
     stress_cost: int = 0
     notes: str | None = None
+    intent: str | None = None
 
 
 class ReactionClockLine(BaseModel):
