@@ -35,3 +35,15 @@ def test_momentum_spend_adds_dice() -> None:
     result = resolve_action(req, fixed=[6, 3, 4])  # 3 dice = 1 base + 2 momentum
     assert len(result.dice_rolled) == 3
     assert result.outcome == "full"
+
+
+def test_intent_passes_through_to_resolution() -> None:
+    req = _request(intent="convince the warden to stand down")
+    result = resolve_action(req, fixed=[4])
+    assert result.intent == "convince the warden to stand down"
+
+
+def test_none_intent_passes_through() -> None:
+    req = _request()
+    result = resolve_action(req, fixed=[4])
+    assert result.intent is None

@@ -28,6 +28,8 @@ def _clock(clock_id: str = "ck1", filled: int = 1, segments: int = 6) -> ClockSt
         label="Heat Rising",
         segments=segments,
         filled=filled,
+        clock_level="room",
+        category="danger",
     )
 
 
@@ -371,6 +373,97 @@ def test_level_clock_advances_when_current_level_unknown():
         resolution, [clock], [(actor, tracks)], current_level_id=None
     )
     assert len(result.clock_lines) == 1
+
+
+# ---------------------------------------------------------------------------
+# Phase 35.6 — Stress routing by action key
+# ---------------------------------------------------------------------------
+
+def test_channel_miss_applies_weird_stress():
+    resolution = ActionResolution(
+        resolution_id="r1", campaign_id="c1", actor_id="a1",
+        action_key="channel", dice_rolled=[2], outcome="miss",
+    )
+    actor, tracks = _pc()
+    tracks["weird"] = StressTrack(track_key="weird", capacity=4, filled=0)
+    result = compute_world_reaction(resolution, [], [(actor, tracks)])
+    assert len(result.stress_lines) == 1
+    assert result.stress_lines[0].track_key == "weird"
+
+
+def test_sway_partial_applies_bonds_stress():
+    resolution = ActionResolution(
+        resolution_id="r1", campaign_id="c1", actor_id="a1",
+        action_key="sway", dice_rolled=[4], outcome="partial",
+    )
+    actor, tracks = _pc()
+    tracks["bonds"] = StressTrack(track_key="bonds", capacity=4, filled=0)
+    result = compute_world_reaction(resolution, [], [(actor, tracks)])
+    assert len(result.stress_lines) == 1
+    assert result.stress_lines[0].track_key == "bonds"
+
+
+def test_sense_miss_with_dungeon_intimacy_clock_applies_weird_stress():
+    resolution = ActionResolution(
+        resolution_id="r1", campaign_id="c1", actor_id="a1",
+        action_key="sense", dice_rolled=[2], outcome="miss",
+    )
+    actor, tracks = _pc()
+    tracks["weird"] = StressTrack(track_key="weird", capacity=4, filled=0)
+    clock = ClockState(
+        clock_id="ck1", campaign_id="c1", label="Dungeon Learns You",
+        segments=6, filled=0, category="dungeon_intimacy",
+        action_tags=["sense"],
+    )
+    result = compute_world_reaction(resolution, [clock], [(actor, tracks)])
+    assert result.stress_lines[0].track_key == "weird"
+
+
+def test_fight_miss_with_relationship_clock_applies_bonds_stress():
+    # Category has priority over action key: relationship → bonds beats fight → body
+    resolution = ActionResolution(
+        resolution_id="r1", campaign_id="c1", actor_id="a1",
+        action_key="fight", dice_rolled=[1], outcome="miss",
+    )
+    actor, tracks = _pc()
+    tracks["bonds"] = StressTrack(track_key="bonds", capacity=4, filled=0)
+    clock = ClockState(
+        clock_id="ck1", campaign_id="c1", label="Dax Remembers",
+        segments=6, filled=0, category="relationship",
+        clock_level="character",
+    )
+    result = compute_world_reaction(resolution, [clock], [(actor, tracks)])
+    assert result.stress_lines[0].track_key == "bonds"
+
+
+def test_weird_stress_overflow_flags_fallout():
+    resolution = ActionResolution(
+        resolution_id="r1", campaign_id="c1", actor_id="a1",
+        action_key="channel", dice_rolled=[2], outcome="miss",
+    )
+    actor, tracks = _pc()
+    tracks["weird"] = StressTrack(track_key="weird", capacity=4, filled=3)
+    result = compute_world_reaction(resolution, [], [(actor, tracks)])
+    assert result.stress_lines[0].track_key == "weird"
+    assert result.stress_lines[0].triggered_fallout is True
+    assert result.stress_lines[0].new_filled == 4
+
+
+def test_non_body_stress_only_applied_to_acting_actor():
+    resolution = ActionResolution(
+        resolution_id="r1", campaign_id="c1", actor_id="a1",
+        action_key="sway", dice_rolled=[2], outcome="miss",
+    )
+    actor1, tracks1 = _pc(actor_id="a1")
+    tracks1["bonds"] = StressTrack(track_key="bonds", capacity=4, filled=0)
+    actor2, tracks2 = _pc(actor_id="a2")
+    tracks2["bonds"] = StressTrack(track_key="bonds", capacity=4, filled=0)
+    result = compute_world_reaction(
+        resolution, [], [(actor1, tracks1), (actor2, tracks2)]
+    )
+    assert len(result.stress_lines) == 1
+    assert result.stress_lines[0].actor_id == "a1"
+    assert result.stress_lines[0].track_key == "bonds"
 
 
 def test_level_and_room_filters_compose():

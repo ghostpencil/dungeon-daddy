@@ -12,6 +12,7 @@ from dungeon_daddy.rpg.models import (
     StressTrack,
     WorldReaction,
 )
+from dungeon_daddy.rpg.stress_routing import choose_stress_track
 
 _CLOCK_TICKS: dict[str, int] = {
     "miss": 2,
@@ -41,6 +42,7 @@ def compute_world_reaction(
     stress_amount = _STRESS_AMOUNT[outcome]
 
     clock_lines: list[ReactionClockLine] = []
+    matched_clocks: list[ClockState] = []
     for clock in threat_clocks:
         if clock.status != "active":
             continue
@@ -55,6 +57,7 @@ def compute_world_reaction(
         new_status = "completed" if new_filled >= clock.segments else "active"
         if clock_ticks == 0:
             continue
+        matched_clocks.append(clock)
         clock_lines.append(ReactionClockLine(
             clock_id=clock.clock_id,
             label=clock.label,
@@ -66,20 +69,25 @@ def compute_world_reaction(
 
     stress_lines: list[ReactionStressLine] = []
     if stress_amount > 0:
+        track_key = choose_stress_track(
+            action_key=resolution.action_key,
+            intent=resolution.intent,
+            matched_clocks=matched_clocks,
+        )
         for actor, tracks in pc_actors:
             if actor.actor_id != resolution.actor_id:
                 continue
-            track = tracks.get("body", StressTrack(track_key="body"))
+            track = tracks.get(track_key, StressTrack(track_key=track_key))
             new_filled = min(track.capacity, track.filled + stress_amount)
             triggered_fallout = new_filled >= track.capacity
             stress_lines.append(ReactionStressLine(
                 actor_id=actor.actor_id,
                 display_name=actor.display_name,
-                track_key="body",
+                track_key=track_key,
                 amount=stress_amount,
                 new_filled=new_filled,
                 triggered_fallout=triggered_fallout,
-                reason=f"{outcome} consequence",
+                reason=f"{outcome} consequence — {track_key}",
             ))
 
     summary_lines = _build_summary(outcome, clock_lines, stress_lines)
