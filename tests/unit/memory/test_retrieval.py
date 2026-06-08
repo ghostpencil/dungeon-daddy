@@ -12,13 +12,13 @@ class TestMemoryRetriever:
     def test_query_ranked_by_importance_desc_then_recency(self, repo: MemoryRepository) -> None:
         from datetime import datetime, timezone, timedelta
         base = datetime(2026, 1, 1, tzinfo=timezone.utc)
-        repo.save_memory_entry("mem_lo", "camp_001", "event", "Low", importance=2)
+        repo.save_memory_entry("mem_lo", "camp_001", "event", "Low", importance=2, status="approved")
         repo.add_memory_tag("mem_lo", "theme:guilt")
-        repo.save_memory_entry("mem_hi", "camp_001", "event", "High", importance=9)
+        repo.save_memory_entry("mem_hi", "camp_001", "event", "High", importance=9, status="approved")
         repo.add_memory_tag("mem_hi", "theme:guilt")
-        repo.save_memory_entry("mem_mid_old", "camp_001", "event", "MidOld", importance=5)
+        repo.save_memory_entry("mem_mid_old", "camp_001", "event", "MidOld", importance=5, status="approved")
         repo.add_memory_tag("mem_mid_old", "theme:guilt")
-        repo.save_memory_entry("mem_mid_new", "camp_001", "event", "MidNew", importance=5)
+        repo.save_memory_entry("mem_mid_new", "camp_001", "event", "MidNew", importance=5, status="approved")
         repo.add_memory_tag("mem_mid_new", "theme:guilt")
         # Set created_at manually so recency is deterministic
         conn = repo._conn
@@ -32,34 +32,37 @@ class TestMemoryRetriever:
         assert ids.index("mem_mid_new") < ids.index("mem_mid_old")
         assert ids.index("mem_mid_old") < ids.index("mem_lo")
 
-    def test_query_no_filters_returns_all_active_for_campaign(self, repo: MemoryRepository) -> None:
-        repo.save_memory_entry("mem_a", "camp_001", "event", "A", importance=5)
-        repo.save_memory_entry("mem_b", "camp_001", "event", "B", importance=3)
-        repo.save_memory_entry("mem_other", "camp_999", "event", "Other", importance=7)
+    def test_query_no_filters_returns_only_approved_for_campaign(self, repo: MemoryRepository) -> None:
+        repo.save_memory_entry("mem_a", "camp_001", "event", "A", importance=5, status="approved")
+        repo.save_memory_entry("mem_b", "camp_001", "event", "B", importance=3, status="draft")
+        repo.save_memory_entry("mem_other", "camp_999", "event", "Other", importance=7, status="approved")
 
         results = MemoryRetriever(repo, "camp_001").query()
 
         ids = {r.memory_id for r in results}
-        assert ids == {"mem_a", "mem_b"}
+        assert ids == {"mem_a"}
 
-    def test_query_excludes_archived_by_default(self, repo: MemoryRepository) -> None:
-        repo.save_memory_entry("mem_active", "camp_001", "event", "Active", status="active")
+    def test_query_returns_only_approved_by_default(self, repo: MemoryRepository) -> None:
+        repo.save_memory_entry("mem_approved", "camp_001", "event", "Approved", status="approved")
+        repo.save_memory_entry("mem_draft", "camp_001", "event", "Draft", status="draft")
+        repo.save_memory_entry("mem_rejected", "camp_001", "event", "Rejected", status="rejected")
         repo.save_memory_entry("mem_archived", "camp_001", "event", "Archived", status="archived")
 
         results = MemoryRetriever(repo, "camp_001").query()
 
         ids = {r.memory_id for r in results}
-        assert "mem_active" in ids
-        assert "mem_archived" not in ids
+        assert ids == {"mem_approved"}
 
-    def test_query_include_archived_flag_includes_archived(self, repo: MemoryRepository) -> None:
-        repo.save_memory_entry("mem_active", "camp_001", "event", "Active", status="active")
+    def test_query_include_archived_returns_all_statuses(self, repo: MemoryRepository) -> None:
+        repo.save_memory_entry("mem_approved", "camp_001", "event", "Approved", status="approved")
+        repo.save_memory_entry("mem_draft", "camp_001", "event", "Draft", status="draft")
         repo.save_memory_entry("mem_archived", "camp_001", "event", "Archived", status="archived")
 
         results = MemoryRetriever(repo, "camp_001").query(include_archived=True)
 
         ids = {r.memory_id for r in results}
-        assert "mem_active" in ids
+        assert "mem_approved" in ids
+        assert "mem_draft" in ids
         assert "mem_archived" in ids
 
     def test_trim_to_budget_returns_prefix_within_tokens(self, repo: MemoryRepository) -> None:
@@ -86,9 +89,9 @@ class TestMemoryRetriever:
         assert omitted == 0
 
     def test_query_by_tag_returns_memory_entries(self, repo: MemoryRepository) -> None:
-        repo.save_memory_entry("mem_001", "camp_001", "event", "Mara fights", importance=7)
+        repo.save_memory_entry("mem_001", "camp_001", "event", "Mara fights", importance=7, status="approved")
         repo.add_memory_tag("mem_001", "actor:pc:mara")
-        repo.save_memory_entry("mem_002", "camp_001", "event", "Unrelated", importance=5)
+        repo.save_memory_entry("mem_002", "camp_001", "event", "Unrelated", importance=5, status="approved")
 
         results = MemoryRetriever(repo, "camp_001").query(tags=["actor:pc:mara"])
 
@@ -140,12 +143,12 @@ class TestRetrievalByTag:
     def test_by_tag_active_fallout_type(self, repo: MemoryRepository) -> None:
         repo.save_memory_entry(
             "mem_001", "camp_001", "fallout", "Mara's fallout",
-            status="active", importance=9,
+            status="approved", importance=9,
         )
         repo.add_memory_tag("mem_001", "fallout:active")
         repo.save_memory_entry(
             "mem_002", "camp_001", "fallout", "Old fallout",
-            status="resolved", importance=4,
+            status="archived", importance=4,
         )
         repo.add_memory_tag("mem_002", "fallout:resolved")
 

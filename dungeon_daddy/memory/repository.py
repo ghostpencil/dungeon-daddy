@@ -255,7 +255,7 @@ class MemoryRepository:
         entry_type: str,
         title: str,
         summary: str = "",
-        status: str = "active",
+        status: str = "draft",
         importance: int = 5,
         markdown_path: str | None = None,
         checksum: str | None = None,
@@ -340,6 +340,25 @@ class MemoryRepository:
             [from_id],
         ).fetchall()
         return [{"from_id": r[0], "to_id": r[1], "link_type": r[2]} for r in rows]
+
+    def count_by_status(self, campaign_id: str) -> dict[str, int]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT status, COUNT(*) FROM memory_entries
+            WHERE campaign_id = ?
+            GROUP BY status
+            """,
+            [campaign_id],
+        ).fetchall()
+        return {row[0]: row[1] for row in rows}
+
+    def update_memory_status(self, memory_id: str, status: str) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            "UPDATE memory_entries SET status = ? WHERE memory_id = ?",
+            [status, memory_id],
+        )
 
     def update_memory_checksum(
         self, memory_id: str, checksum: str, markdown_path: str

@@ -1,5 +1,7 @@
 # Phase 37 — Memory Approval and Campaign Curation
 
+**Status: Complete (2026-06-08) — 1814 unit passing; all manual UI tests passing**
+
 ## Goal
 
 Turn LLM-drafted memories and proposed reactions into a manageable campaign curation workflow.
@@ -131,15 +133,15 @@ For each campaign, test:
 
 ## Acceptance criteria
 
-- Draft memories can be approved.
-- Draft memories can be edited before approval.
-- Draft memories can be rejected.
-- Rejected memories do not appear in normal context bundles.
-- Approved memories appear in future retrieval when relevant.
-- Curation report identifies pending drafts and obvious drift issues.
-- Alpha playtest scenario can run in both seeded campaigns.
-- Screenshots are captured after visible UI actions.
-- Tests cover status transitions and retrieval behavior.
+- [x] Draft memories can be approved.
+- [x] Draft memories can be edited before approval.
+- [x] Draft memories can be rejected.
+- [x] Rejected memories do not appear in normal context bundles.
+- [x] Approved memories appear in future retrieval when relevant.
+- [x] Curation report identifies pending drafts and obvious drift issues.
+- [x] Alpha playtest scenario can run in both seeded campaigns.
+- [x] Screenshots are captured after visible UI actions.
+- [x] Tests cover status transitions and retrieval behavior.
 
 ## Suggested TDD slices
 

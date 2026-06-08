@@ -3,9 +3,9 @@
 ## Phase
 
 Phase: 37 — Memory Approval and Playtest Curation
-Status: **Not started**
+Status: **Complete** (2026-06-08)
 
-Branch: `main`
+Branch: `phase-37-memory-approval`
 
 ---
 
@@ -34,19 +34,26 @@ Full phase specs in `spec/IMPLEMENTATION_PHASES.md`.
 
 ---
 
-## Next Steps — Phase 37
+## Phase 37 — Completed Work
 
-Spec: `spec/IMPLEMENTATION_PHASES.md` (Phase 37 section)
+### Completed behaviors (2026-06-08)
 
-Improve long-term play quality by controlling memory drift. Add approve/edit/reject workflows for LLM-drafted memories and run an alpha playtest scenario across seeded campaigns.
+- [x] `MemoryEntry.status` → `Literal["draft", "approved", "rejected", "archived"]`, default `"draft"`.
+- [x] `MemoryRepository.save_memory_entry()` defaults to `"draft"`.
+- [x] `MemoryRetriever.query()` returns only `approved` by default (`include_archived=True` returns all).
+- [x] `MemoryRepository.update_memory_status(memory_id, status)` method added.
+- [x] Migration `006_memory_approval_status.sql` converts `active`→`approved`, `resolved`→`archived`.
+- [x] Seed pack saves seeded memories as `approved` (curated data).
+- [x] All affected tests updated (1781 unit passing).
+- [x] Curation report: `MemoryRepository.count_by_status(campaign_id)` + `build_curation_report(repo, campaign_ids)` in `dungeon_daddy/memory/curation.py`. 7 new tests in `tests/unit/memory/test_curation_report.py` (1788 unit passing).
+- [x] `MemoryInspectorPanel.approve_selected()`, `reject_selected()`, `edit_selected_summary(text)`, `pop_pending_commit()` added. 11 new tests in `tests/unit/ui/test_memory_inspector_panel.py` (1799 unit passing).
+- [x] Alpha playtest smoke test `tools/smoke_test_phase37.py` — 16 behaviors verified across both seeded campaigns (The Crucible + Tomb of the Forgotten King). All pass.
+- [x] MEM tab APPROVE/REJECT buttons surfaced in live UI: `MemoryInspectorPanel._update_layout`, `hit_entry`, `hit_button`, `_draw_action_buttons`; `PlayView._handle_mem_click`, `_persist_pending_memory_commit`. 15 new tests (1814 unit passing).
+- [x] MEM tab UI polish (post-phase, 2026-06-08): title truncation with "…" in entry rows; chip width/position fixed to fully contain "approved"/"rejected"; dynamic-height detail pane with `_word_wrap_lines` — title and summary fully word-wrapped, pane grows with content. All 31 panel tests still passing.
 
-### Planned work
+### Remaining work
 
-- Add memory statuses: `draft` / `approved` / `rejected` / `archived`.
-- Add approve/edit/reject UI in the MEM tab.
-- Define retrieval behavior per memory status (approved only in context bundles by default).
-- Add curation report surfacing stale or conflicting memories.
-- Run alpha playtest scenario across both seeded campaigns (The Crucible, one other).
+_None — phase complete._
 
 ## Known Failures
 
@@ -58,6 +65,7 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 37 — Memory Approval and Playtest Curation | **Complete** (2026-06-08) | 1814 unit passing; smoke_test_phase37 all pass; MEM tab APPROVE/REJECT buttons live; detail pane word-wrap polish |
 | Phase 36 — LLM-Proposed Reaction Drafts | **Complete** (2026-06-07) | ~1810 unit passing; live-app verified; merged to main PR #40 |
 | Phase 35.6 — Stress Routing by Action Intent | **Complete** (2026-06-06) | 1738 unit passing |
 | Phase 35.5 — Clock Scoping, Clock Levels, Campaign Seed Upgrades | **Complete** (2026-06-06) | 1698 unit passing (post-bugfix) |

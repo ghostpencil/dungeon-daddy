@@ -149,7 +149,7 @@ def apply_seed_pack(
         memory_id = derive_memory_id(pack.campaign_slug, memory.title)
         repo.save_memory_entry(
             memory_id, campaign_id, memory.type, memory.title, memory.summary,
-            importance=memory.importance,
+            importance=memory.importance, status="approved",
         )
         for tag in memory.tags:
             repo.add_memory_tag(memory_id, tag)

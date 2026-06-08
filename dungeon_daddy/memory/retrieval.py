@@ -24,7 +24,7 @@ class MemoryRetriever:
             tag_filters.append(f"location:{location_slug}")
 
         status_clause = (
-            "AND e.status != 'archived'"
+            "AND e.status = 'approved'"
             if not include_archived
             else ""
         )

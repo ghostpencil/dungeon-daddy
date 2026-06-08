@@ -139,6 +139,55 @@ class TestMemoryRepository:
         assert repo.get_actors_by_campaign("nonexistent") == []
         repo.close()
 
+    def test_migration_006_converts_old_memory_statuses(self, tmp_path: Path) -> None:
+        import duckdb
+        # Apply migrations 001-005 first, then insert rows with old status values
+        migrations_up_to_005 = sorted(
+            p for p in MIGRATIONS_DIR.glob("*.sql")
+            if p.name < "006"
+        )
+        db_path = tmp_path / "test.duckdb"
+        conn = duckdb.connect(str(db_path))
+        from dungeon_daddy.memory.repository import _apply_migrations, _ensure_migration_table
+        _ensure_migration_table(conn)
+        for sql_file in migrations_up_to_005:
+            sql = sql_file.read_text(encoding="utf-8")
+            for stmt in sql.split(";"):
+                stmt = stmt.strip()
+                if stmt and not stmt.startswith("--"):
+                    conn.execute(stmt)
+            conn.execute("INSERT INTO schema_migration (name) VALUES (?)", [sql_file.name])
+        # Insert rows using old status values (bypassing Pydantic)
+        conn.execute(
+            "INSERT INTO memory_entries (memory_id, campaign_id, type, title, status)"
+            " VALUES ('m1', 'c1', 'event', 'T1', 'active'),"
+            "        ('m2', 'c1', 'event', 'T2', 'resolved'),"
+            "        ('m3', 'c1', 'event', 'T3', 'archived')"
+        )
+        conn.close()
+        # Apply migration 006
+        migration_006 = MIGRATIONS_DIR / "006_memory_approval_status.sql"
+        conn2 = duckdb.connect(str(db_path))
+        _ensure_migration_table(conn2)
+        sql = migration_006.read_text(encoding="utf-8")
+        for stmt in sql.split(";"):
+            stmt = stmt.strip()
+            if stmt and not stmt.startswith("--"):
+                conn2.execute(stmt)
+        conn2.close()
+        # Verify the conversion
+        conn3 = duckdb.connect(str(db_path))
+        rows = {
+            r[0]: r[1]
+            for r in conn3.execute(
+                "SELECT memory_id, status FROM memory_entries ORDER BY memory_id"
+            ).fetchall()
+        }
+        conn3.close()
+        assert rows["m1"] == "approved"
+        assert rows["m2"] == "archived"
+        assert rows["m3"] == "archived"
+
     def test_campaigns_table_has_dungeon_slug_column(self, tmp_path: Path) -> None:
         repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
         repo.initialize_schema(MIGRATIONS_DIR)

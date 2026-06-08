@@ -12,7 +12,7 @@ class MemoryEntry(BaseModel):
     type: str
     title: str
     summary: str = ""
-    status: Literal["active", "archived", "resolved"] = "active"
+    status: Literal["draft", "approved", "rejected", "archived"] = "draft"
     importance: int = 5
     markdown_path: str | None = None
     checksum: str | None = None
