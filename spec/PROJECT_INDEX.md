@@ -2,20 +2,10 @@
 
 ## Phase
 
-Phase: 36 — LLM-Proposed Reaction Drafts
-Status: **Complete (2026-06-07) — All 9 slices done + post-merge bug fixes**
+Phase: 37 — Memory Approval and Playtest Curation
+Status: **Not started**
 
-Branch: `phase-36-llm-reaction-proposals`
-
-_Slice 9 done (2026-06-07). 1772 unit tests passing. Proposal pipeline wired into live action loop: `DmAgent.request_proposal()` added, `PlayView._run_proposal_pipeline()` fires after each action, debug tab always shows proposal provenance._
-
-**Post-merge fixes (2026-06-07):**
-- `_draw_debug_tab()` now calls `proposal_section_lines()` — proposal provenance was stored but never rendered.
-- `DebugControls` now filters level-scoped clocks to current level only (`set_current_level_id` + `_sync_debug_level_id()`).
-- `DebugControls` now filters room-scoped clocks to rooms on the current level only (`set_current_level_room_ids`).
-- `_sync_debug_level_id()` is called at campaign load and level change (not just after actions) so the filter is correct from first open.
-- `request_proposal` signature changed: `known_clock_ids`/`known_actor_ids` replaced with `known_clocks`/`known_actors` (dicts with labels and display names); `room_name`/`room_note` added. Prompt restructured to system + user message so the LLM gets named, concrete context instead of opaque UUIDs — fixes the "Accepted: 0 Rejected: 0" empty proposal problem.
-- 1802 unit tests passing.
+Branch: `main`
 
 ---
 
@@ -44,66 +34,19 @@ Full phase specs in `spec/IMPLEMENTATION_PHASES.md`.
 
 ---
 
-## Next Steps — Phase 36
+## Next Steps — Phase 37
 
-Spec: `spec/PHASE_36_LLM_REACTION_PROPOSALS.md`
+Spec: `spec/IMPLEMENTATION_PHASES.md` (Phase 37 section)
 
-Allow the LLM to propose structured reactions, but validate and apply them through deterministic services only. Full spec including pre-build notes is in the spec file above.
+Improve long-term play quality by controlling memory drift. Add approve/edit/reject workflows for LLM-drafted memories and run an alpha playtest scenario across seeded campaigns.
 
-### 8 TDD slices
+### Planned work
 
-1. Proposal model parse tests — `LLMReactionProposal`, `ProposedChange` subtypes ✓
-2. Validation rejects unknown clock reference ✓
-3. Validation rejects unknown actor reference ✓
-4. Validation rejects player actor intent control ✓
-5. Low-risk `create_memory` proposal auto-applies ✓
-6. Medium-risk `apply_consequence` (stress) stays draft unless explicitly permitted ✓
-7. Malformed JSON from LLM does not crash Play Mode ✓
-8. Debug tab shows proposal provenance (accepted / rejected / source label) ✓
-9. Wire proposal pipeline into live action loop — proposal fires after each action, debug tab shows real results ✓
-
-### Slice 9 wiring notes
-
-The entire proposal pipeline exists as tested standalone modules but is not called from the live app. Slice 9 connects them.
-
-**Hook point:** `play_view.PlayView._on_resolve_action()` (`dungeon_daddy/views/play_view.py` ~line 671), right after `self._apply_world_reaction(resolution)`.
-
-**New method needed:** `DmAgent.request_proposal(resolution, context_bundle, known_clock_ids, known_actor_ids, player_actor_ids)` in `dungeon_daddy/llm/agents/dm_agent.py`.
-- Builds a proposal-request prompt (player intent, action result, deterministic consequences, known clocks/actors, schema instructions, authority boundary reminder).
-- Calls `self._provider.complete(...)` with `max_tokens=512`.
-- Returns the raw string (caller parses it).
-- Must not raise — return empty string on any provider error.
-
-**Wiring in `_on_resolve_action()`:**
-1. Call `dm_agent.request_proposal(...)` with resolution + context.
-2. `parse_proposal(raw)` → `LLMReactionProposal | None`.
-3. If not None: `validate_proposal(proposal, known_clock_ids, known_actor_ids, player_actor_ids)`.
-4. `apply_low_risk_proposals(validation_result, repo, campaign_id, action_key, intent, matched_clocks)`.
-5. `self._debug.set_proposal_result(validation_result, apply_result)`.
-6. If proposal is None (parse failed or DM agent absent): call `self._debug.set_proposal_result` with a no-op result so the tab always shows something.
-
-**`_debug` accessor:** `PlayView` already owns `DebugControls` — find the attribute name and use it directly.
-
-**Tests:** Add unit tests for `DmAgent.request_proposal()` (mock the provider); add an integration-style test for the wiring in `play_view` (use `__new__` + manual setup, mock provider, assert `_debug._last_validation` is set after `_on_resolve_action()`).
-
-### Key implementation notes (from 35.5/35.6 review)
-
-- **Clock validation**: fetch full `ClockState` from repo; reject proposals for clocks
-  out of scope (`scope_room_id`, `level_id`, `action_tags` filters from Phase 35.5)
-- **LLM prompt**: include `resolution.intent` in the proposal request context
-- **Stress validation**: call `choose_stress_track()` deterministically and compare;
-  matching proposal → low-risk auto-apply; divergent → medium-risk draft
-- **Service hook**: `choose_stress_track(explicit_track=...)` is already the correct
-  entry point when applying an approved stress proposal
-
-### New modules (expected)
-
-| Module | Purpose |
-|---|---|
-| `dungeon_daddy/rpg/proposal.py` | `LLMReactionProposal`, `ProposedChange` models |
-| `dungeon_daddy/rpg/proposal_validator.py` | Validation + risk classification |
-| `dungeon_daddy/rpg/proposal_applier.py` | Apply accepted low-risk changes |
-| `tests/unit/rpg/test_proposal*.py` | TDD test files |
+- Add memory statuses: `draft` / `approved` / `rejected` / `archived`.
+- Add approve/edit/reject UI in the MEM tab.
+- Define retrieval behavior per memory status (approved only in context bundles by default).
+- Add curation report surfacing stale or conflicting memories.
+- Run alpha playtest scenario across both seeded campaigns (The Crucible, one other).
 
 ## Known Failures
 
@@ -115,7 +58,7 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
-| Phase 36 — LLM-Proposed Reaction Drafts | **Complete** (2026-06-07) | 1802 unit passing (post-fix) |
+| Phase 36 — LLM-Proposed Reaction Drafts | **Complete** (2026-06-07) | ~1810 unit passing; live-app verified; merged to main PR #40 |
 | Phase 35.6 — Stress Routing by Action Intent | **Complete** (2026-06-06) | 1738 unit passing |
 | Phase 35.5 — Clock Scoping, Clock Levels, Campaign Seed Upgrades | **Complete** (2026-06-06) | 1698 unit passing (post-bugfix) |
 | Phase 35 — Deterministic World Reaction Service | **Complete** (2026-06-05) | 1818 passing |

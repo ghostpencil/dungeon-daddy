@@ -1838,18 +1838,22 @@ Major work:
 
 Spec: `spec/FEATURE_STRESS_ROUTING_BY_ACTION_INTENT.md`
 
-## Phase 36 — LLM-Proposed Reaction Drafts
+## Phase 36 — LLM-Proposed Reaction Drafts ✓ Complete (2026-06-07)
 
 Allow LLM creativity without giving it authority.
 
 Major work:
 
-- Add structured proposal format.
-- Validate proposed changes.
-- Reject invalid or unsafe proposals.
-- Auto-apply only low-risk validated proposals if appropriate.
-- Keep medium/high-risk proposals as draft.
-- Show proposal provenance in Debug tab.
+- Add structured proposal format (`LLMReactionProposal`, `ProposedChange` discriminated union).
+- Validate proposed changes — reject unknown clocks/actors, player-actor intent control.
+- Auto-apply low-risk proposals (`create_memory`); keep `advance_clock` / `npc_reaction` as draft.
+- `apply_consequence` auto-applies only when LLM track matches deterministic `choose_stress_track()`.
+- `request_proposal` uses `response_format: json_object` and explicit flat-object schema prompt.
+- Validator logs accepted/rejected changes at INFO level; debug panel shows kind + reason.
+- Proposal pipeline fires after every resolve action in Play Mode.
+- 9 TDD slices + post-merge live-app fixes. ~1810 unit tests passing.
+
+Spec: `spec/PHASE_36_LLM_REACTION_PROPOSALS.md`
 
 ## Phase 37 — Memory Approval and Campaign Curation
 

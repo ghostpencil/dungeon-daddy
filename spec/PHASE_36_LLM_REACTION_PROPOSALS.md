@@ -1,5 +1,16 @@
 # Phase 36 — LLM-Proposed Reaction Drafts
 
+**Status: Complete — 2026-06-07. Merged to `main` via PR #40.**
+
+Key implementation decisions:
+- `response_format: json_object` forces raw JSON from GPT-4o (prevents markdown-wrapped output).
+- Prompt shows concrete flat-object examples with `kind` as a sibling field (GPT-4o was nesting by kind name without this).
+- `advance_clock` proposals are accepted by the validator but skipped by the applier — clocks remain deterministic-only until Phase 37 approval UI.
+- Validator logs accepted/rejected changes at INFO level (`dungeon_daddy.rpg.proposal_validator`).
+- Debug panel shows `[ACCEPTED] kind` and `[REJECTED] kind: reason` for each change.
+
+---
+
 ## Goal
 
 Allow the LLM to help draft creative world reactions while preserving deterministic authority.
