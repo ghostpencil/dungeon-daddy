@@ -1855,14 +1855,21 @@ Major work:
 
 Spec: `spec/PHASE_36_LLM_REACTION_PROPOSALS.md`
 
-## Phase 37 — Memory Approval and Campaign Curation
+## Phase 37 — Memory Approval and Campaign Curation ✓ Complete (2026-06-08)
 
-Improve long-term play quality by controlling memory drift.
+Improve long-term play quality by controlling memory drift. 1814 unit tests passing; all manual UI tests passing.
 
 Major work:
 
-- Add memory statuses: draft/approved/rejected/archived.
-- Add approve/edit/reject UI.
-- Define retrieval behavior by memory status.
-- Add curation report.
-- Run alpha playtest scenario across both seeded campaigns.
+- `MemoryEntry.status` → `Literal["draft", "approved", "rejected", "archived"]`, default `"draft"`.
+- `MemoryRetriever.query()` returns only `approved` by default.
+- `MemoryRepository.update_memory_status()` + `count_by_status()` added.
+- Migration `006_memory_approval_status.sql` converts `active`→`approved`, `resolved`→`archived`.
+- Seed pack saves seeded memories as `approved`.
+- `build_curation_report()` in `dungeon_daddy/memory/curation.py`.
+- `MemoryInspectorPanel.approve_selected()`, `reject_selected()`, `edit_selected_summary()`, `pop_pending_commit()`.
+- `PlayView._handle_mem_click()` + `_persist_pending_memory_commit()` wired in live UI.
+- MEM tab APPROVE/REJECT buttons live; detail pane with title truncation, word-wrap, dynamic height.
+- Alpha playtest smoke test `tools/smoke_test_phase37.py` — 16 behaviors across both seeded campaigns.
+
+Spec: `spec/PHASE_37_MEMORY_APPROVAL_AND_CAMPAIGN_CURATION.md`

@@ -448,6 +448,8 @@ class PlayView(arcade.View):
                         self._load_memory_entries()
                     elif tab_idx == _TAB_DBG:
                         self._build_context_bundle()
+                elif self._rpg_side._active == _TAB_MEM:
+                    self._handle_mem_click(x, y)
                 return
         # Edit Memory button
         if (self._dungeon is not None and self._edit_memory_rect
@@ -1072,6 +1074,30 @@ class PlayView(arcade.View):
                 break
             self._dm_history.pop(0)
             self._dm_history.pop(0)
+
+    # ------------------------------------------------------------------
+    # MEM tab click routing
+    # ------------------------------------------------------------------
+
+    def _handle_mem_click(self, x: float, y: float) -> None:
+        action = self._rpg_memory.hit_button(x, y)
+        if action == "approve":
+            self._rpg_memory.approve_selected()
+            self._persist_pending_memory_commit()
+            return
+        if action == "reject":
+            self._rpg_memory.reject_selected()
+            self._persist_pending_memory_commit()
+            return
+        entry = self._rpg_memory.hit_entry(x, y)
+        if entry is not None:
+            self._rpg_memory.select_entry(entry)
+
+    def _persist_pending_memory_commit(self) -> None:
+        commit = self._rpg_memory.pop_pending_commit()
+        if commit is None or self._mem_repo is None:
+            return
+        self._mem_repo.update_memory_status(commit.memory_id, commit.status)
 
     # ------------------------------------------------------------------
     # Memory state cache

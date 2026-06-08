@@ -290,3 +290,15 @@ class TestMemoryEntryCRUD:
         entry = repo.get_memory_entry("mem_001")
         assert entry["checksum"] == "abc123"
         assert entry["markdown_path"] == "memory/camp/mem_001.md"
+
+    def test_update_memory_status_persists_change(self, repo: MemoryRepository) -> None:
+        repo.save_memory_entry("mem_001", "camp_001", "event", "Title")
+        assert repo.get_memory_entry("mem_001")["status"] == "draft"
+        repo.update_memory_status("mem_001", "approved")
+        assert repo.get_memory_entry("mem_001")["status"] == "approved"
+
+    def test_update_memory_status_all_valid_values(self, repo: MemoryRepository) -> None:
+        repo.save_memory_entry("mem_001", "camp_001", "event", "Title")
+        for status in ("approved", "rejected", "archived", "draft"):
+            repo.update_memory_status("mem_001", status)
+            assert repo.get_memory_entry("mem_001")["status"] == status

@@ -1,0 +1,34 @@
+{
+  "campaigns": {
+    "camp-crucible": {
+      "seeded_memories": 8,
+      "status_counts": {
+        "approved": 9,
+        "rejected": 1
+      },
+      "curation_report_drafts": 0
+    },
+    "camp-tomb": {
+      "seeded_memories": 10,
+      "status_counts": {
+        "approved": 10
+      },
+      "curation_report_drafts": 0
+    }
+  },
+  "retrieval": {
+    "default_returns_approved_only": true,
+    "approved_count_after_approve": 9,
+    "rejected_excluded": true,
+    "include_archived_all_statuses": [
+      "approved",
+      "rejected"
+    ]
+  },
+  "inspector_panel": {
+    "approve_selected": true,
+    "reject_selected": true,
+    "edit_summary": true,
+    "pop_clears_pending": true
+  }
+}

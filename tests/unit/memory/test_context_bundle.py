@@ -221,7 +221,7 @@ class TestContextBundleBuilder:
         for i in range(5):
             repo.save_memory_entry(
                 f"mem_{i:03d}", "camp_001", "event", "x" * 40,
-                summary="y" * 40, importance=5,
+                summary="y" * 40, importance=5, status="approved",
             )
 
         builder = ContextBundleBuilder(
@@ -241,7 +241,7 @@ class TestContextBundleBuilder:
         for i in range(5):
             repo.save_memory_entry(
                 f"mem_{i:03d}", "camp_001", "event", "x" * 40,
-                summary="y" * 40, importance=5,
+                summary="y" * 40, importance=5, status="approved",
             )
 
         builder = ContextBundleBuilder(
@@ -264,12 +264,12 @@ class TestContextBundleBuilder:
         for i in range(3):
             repo.save_memory_entry(
                 f"mem_{i:03d}", "camp_001", "event", "x" * 40,
-                summary="y" * 40, importance=5,
+                summary="y" * 40, importance=5, status="approved",
             )
         # A must-remember entry with importance >= 9
         repo.save_memory_entry(
             "mem_must", "camp_001", "event", "Critical Fact",
-            summary="Must know this", importance=9,
+            summary="Must know this", importance=9, status="approved",
         )
 
         builder = ContextBundleBuilder(

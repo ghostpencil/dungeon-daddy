@@ -8,11 +8,11 @@ class TestMemoryEntry:
     def test_constructs_with_required_fields(self) -> None:
         e = MemoryEntry(memory_id="mem_1", campaign_id="camp_1", type="fallout", title="Haunted")
         assert e.memory_id == "mem_1"
-        assert e.status == "active"
+        assert e.status == "draft"
 
-    def test_status_defaults_to_active(self) -> None:
+    def test_status_defaults_to_draft(self) -> None:
         e = MemoryEntry(memory_id="x", campaign_id="c", type="note", title="T")
-        assert e.status == "active"
+        assert e.status == "draft"
 
     def test_summary_defaults_to_empty(self) -> None:
         e = MemoryEntry(memory_id="x", campaign_id="c", type="note", title="T")
@@ -27,7 +27,7 @@ class TestMemoryEntry:
         assert e.tags == []
 
     def test_status_values(self) -> None:
-        for s in ("active", "archived", "resolved"):
+        for s in ("draft", "approved", "rejected", "archived"):
             e = MemoryEntry(memory_id="x", campaign_id="c", type="note", title="T", status=s)
             assert e.status == s
 
