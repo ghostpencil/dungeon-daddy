@@ -12,7 +12,7 @@ class _MockProvider:
         self.last_messages = []
         self.last_max_tokens = None
 
-    def complete(self, messages, system="", max_tokens=512):
+    def complete(self, messages, system="", max_tokens=512, response_format=None):
         self.last_system = system
         self.last_messages = messages
         self.last_max_tokens = max_tokens
@@ -302,3 +302,70 @@ def test_dm_respond_propagates_llm_error():
             level=_make_level(),
             dungeon=_make_dungeon(),
         )
+
+
+# ---------------------------------------------------------------------------
+# Helpers for request_proposal tests
+# ---------------------------------------------------------------------------
+
+def _make_resolution():
+    from dungeon_daddy.rpg.models import ActionResolution
+    return ActionResolution(
+        resolution_id="res-1",
+        campaign_id="camp-1",
+        actor_id="actor-1",
+        action_key="skirmish",
+        dice_rolled=[4, 5, 6],
+        outcome="full",
+        intent="disarm the guard",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Behavior: request_proposal() returns the raw provider string
+# ---------------------------------------------------------------------------
+
+def test_request_proposal_returns_provider_string():
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+
+    raw_json = '{"narration_hint": "Guard disarmed.", "proposed_changes": []}'
+    provider = _MockProvider(response=raw_json)
+    agent = DungeonMasterAgent(provider=provider)
+
+    result = agent.request_proposal(
+        resolution=_make_resolution(),
+        context_bundle=None,
+        known_clocks=[{"clock_id": "clk-1", "label": "Test Clock", "filled": 1, "segments": 4}],
+        known_actors=[{"actor_id": "actor-1", "display_name": "Test Actor"}],
+        player_actor_ids=["actor-1"],
+    )
+
+    assert result == raw_json
+    assert provider.last_max_tokens == 512
+
+
+# ---------------------------------------------------------------------------
+# Behavior: request_proposal() returns "" when provider raises
+# ---------------------------------------------------------------------------
+
+def test_request_proposal_returns_empty_string_on_provider_error():
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+
+    class _BoomProvider:
+        def complete(self, **_):
+            raise RuntimeError("network dead")
+
+        @property
+        def model_id(self):
+            return "boom"
+
+    agent = DungeonMasterAgent(provider=_BoomProvider())
+    result = agent.request_proposal(
+        resolution=_make_resolution(),
+        context_bundle=None,
+        known_clocks=[],
+        known_actors=[],
+        player_actor_ids=[],
+    )
+
+    assert result == ""

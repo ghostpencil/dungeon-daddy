@@ -20,6 +20,9 @@ from dungeon_daddy.memory.models import MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.actor_control import filter_player_actors
 from dungeon_daddy.rpg.models import ActorState
+from dungeon_daddy.rpg.proposal import parse_proposal
+from dungeon_daddy.rpg.proposal_applier import ApplyResult, apply_low_risk_proposals
+from dungeon_daddy.rpg.proposal_validator import ValidationResult, validate_proposal
 from dungeon_daddy.rpg.service import RpgService
 from dungeon_daddy.ui.chrome import MenuBar, draw_title_bar
 from dungeon_daddy.ui.panels.character_sheet_panel import CharacterSheetPanel
@@ -260,6 +263,16 @@ class _RpgSidePanel:
                 cur_y -= 14
         cur_y -= 6
         for raw in self._debug.reaction_section_lines():
+            for line in _wrap_debug_line(raw):
+                if cur_y < y + PAD_MD:
+                    break
+                arcade.draw_text(
+                    line, x + PAD_MD, cur_y,
+                    INK_3, font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="top",
+                )
+                cur_y -= 14
+        cur_y -= 6
+        for raw in self._debug.proposal_section_lines():
             for line in _wrap_debug_line(raw):
                 if cur_y < y + PAD_MD:
                     break
@@ -540,6 +553,7 @@ class PlayView(arcade.View):
         _log.info("PlayView: loaded dungeon=%s (test drive)", dungeon.meta.title)
         self._refresh_memory_state()
         self._load_player_actors()
+        self._sync_debug_level_id()
 
     def load_dungeon_session(self, dungeon: Dungeon) -> None:
         self._is_test_drive = False
@@ -570,6 +584,7 @@ class PlayView(arcade.View):
         _log.info("PlayView: loaded dungeon=%s (session)", dungeon.meta.title)
         self._refresh_memory_state()
         self._load_player_actors()
+        self._sync_debug_level_id()
 
     def load_dungeon(self, dungeon: Dungeon) -> None:
         """Alias for load_dungeon_transient — kept until window.py callers are updated."""
@@ -594,6 +609,15 @@ class PlayView(arcade.View):
         self._mem_repo = mem_repo
         self._rpg_campaign_id = campaign_id
         self._load_player_actors()
+
+    def _sync_debug_level_id(self) -> None:
+        if self._rpg_debug is None or self._state is None:
+            return
+        idx = self._state.current_level_idx
+        self._rpg_debug.set_current_level_id(f"level-{idx + 1}")
+        if self._dungeon is not None:
+            room_ids = {r.id for r in self._dungeon.levels[idx].rooms}
+            self._rpg_debug.set_current_level_room_ids(room_ids)
 
     def _load_player_actors(self) -> None:
         if not hasattr(self, "_mem_repo") or self._mem_repo is None:
@@ -669,6 +693,7 @@ class PlayView(arcade.View):
             summary = self._rpg_action._format_result(resolution)
             self._rpg_action.store_result(summary)
             self._apply_world_reaction(resolution)
+            self._run_proposal_pipeline(resolution, campaign_id)
             if self._dungeon is not None and self._state is not None:
                 level = self._dungeon.levels[self._state.current_level_idx]
                 room = None
@@ -694,6 +719,60 @@ class PlayView(arcade.View):
                     self._spawn_dm_thread(room, level)
         except Exception:
             _log.exception("resolve_action failed")
+
+    def _run_proposal_pipeline(self, resolution, campaign_id: str) -> None:
+        if self._dm_agent is None or self._mem_repo is None or self._rpg_debug is None:
+            return
+        raw_clocks = self._mem_repo.get_clocks(campaign_id)
+        known_clocks = [
+            {"clock_id": r["clock_id"], "label": r["label"],
+             "filled": r["filled"], "segments": r["segments"]}
+            for r in raw_clocks
+        ]
+        known_clock_ids = [c["clock_id"] for c in known_clocks]
+        all_actors = getattr(self._rpg_action, "_actors", []) or []
+        known_actors = [{"actor_id": a.actor_id, "display_name": a.display_name} for a in all_actors]
+        known_actor_ids = [a["actor_id"] for a in known_actors]
+        player_actor_ids = [a.actor_id for a in filter_player_actors(all_actors)]
+
+        room_name = ""
+        room_note = ""
+        if self._dungeon is not None and self._state is not None and self._state.current_room_id:
+            idx = self._state.current_level_idx
+            rooms = {r.id: r for r in self._dungeon.levels[idx].rooms}
+            room = rooms.get(self._state.current_room_id)
+            if room is not None:
+                room_name = room.name
+                room_note = room.note or ""
+
+        raw = self._dm_agent.request_proposal(
+            resolution=resolution,
+            context_bundle=None,
+            known_clocks=known_clocks,
+            known_actors=known_actors,
+            player_actor_ids=player_actor_ids,
+            room_name=room_name,
+            room_note=room_note,
+        )
+        proposal = parse_proposal(raw)
+        if proposal is not None:
+            validation_result = validate_proposal(
+                proposal,
+                known_clock_ids=set(known_clock_ids),
+                known_actor_ids=set(known_actor_ids),
+                player_actor_ids=set(player_actor_ids),
+            )
+            apply_result = apply_low_risk_proposals(
+                validation_result,
+                self._mem_repo,
+                campaign_id,
+                action_key=resolution.action_key,
+                intent=resolution.intent,
+            )
+        else:
+            validation_result = ValidationResult()
+            apply_result = ApplyResult()
+        self._rpg_debug.set_proposal_result(validation_result, apply_result)
 
     def _apply_world_reaction(self, resolution) -> None:
         if self._rpg_service is None or self._mem_repo is None:
@@ -915,6 +994,7 @@ class PlayView(arcade.View):
             self._chat.add_message("dm", f"Now on Level {new_idx + 1}: {level.name}.")
             self._rpg_scene.set_scene(None, None)
             self._refresh_memory_state()
+            self._sync_debug_level_id()
 
     def _on_chat_send(self, text: str) -> None:
         self._chat.add_message("gm", text)

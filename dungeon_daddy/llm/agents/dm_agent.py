@@ -126,6 +126,70 @@ class DungeonMasterAgent:
 
         return "\n".join(lines)
 
+    def request_proposal(
+        self,
+        resolution,
+        context_bundle,
+        known_clocks: list[dict],
+        known_actors: list[dict],
+        player_actor_ids: list[str],
+        room_name: str = "",
+        room_note: str = "",
+    ) -> str:
+        system = "\n".join([
+            "You are the Dungeon Daddy advisory engine.",
+            "After each player action you propose structured world reactions.",
+            "Rules: never control player actors; only use IDs from the lists provided; return ONLY valid JSON.",
+            "",
+            "Response schema:",
+            '{"narration_hint": "<string>", "proposed_changes": [...]}',
+            "",
+            "Each change is a FLAT object with a 'kind' field plus its own fields. Examples:",
+            '{"kind": "advance_clock", "clock_id": "<id>", "amount": 1, "reason": "<why>"}',
+            '{"kind": "apply_consequence", "actor_id": "<id>", "track_key": "<key>", "amount": 1, "reason": "<why>"}',
+            '{"kind": "create_memory", "title": "<title>", "summary": "<text>", "importance": 5, "tags": ["<tag>"]}',
+            '{"kind": "npc_reaction", "npc_id": "<id>", "reaction": "<text>", "reason": "<why>"}',
+            "Do NOT nest fields under the kind name — include 'kind' as a sibling field.",
+        ])
+
+        user_lines = [
+            f"Action: {resolution.action_key}",
+            f"Outcome: {resolution.outcome}",
+            f"Intent: {resolution.intent or '(none)'}",
+        ]
+        if room_name:
+            user_lines.append(f"Room: {room_name}" + (f" — {room_note}" if room_note else ""))
+        user_lines.append("")
+
+        if known_clocks:
+            user_lines.append("Known clocks (use exact IDs):")
+            for c in known_clocks:
+                user_lines.append(
+                    f"  - {c['clock_id']}: \"{c.get('label', '?')}\" "
+                    f"[{c.get('filled', 0)}/{c.get('segments', 0)}]"
+                )
+        else:
+            user_lines.append("Known clocks: (none)")
+        user_lines.append("")
+
+        if known_actors:
+            user_lines.append("Known actors (use exact IDs):")
+            for a in known_actors:
+                tag = " [player — do not control]" if a["actor_id"] in player_actor_ids else ""
+                user_lines.append(f"  - {a['actor_id']}: \"{a.get('display_name', a['actor_id'])}\"{tag}")
+        user_lines.append("")
+        user_lines.append("Propose 1-3 world reactions suited to the outcome.")
+
+        try:
+            return self._provider.complete(
+                messages=[LLMMessage(role="user", content="\n".join(user_lines))],
+                system=system,
+                max_tokens=512,
+                response_format={"type": "json_object"},
+            )
+        except Exception:
+            return ""
+
     def _build_loop_context(self, loop: Loop, room: Room, level: Level) -> str:
         room_names = {r.id: r.name for r in level.rooms}
         entry_name = room_names.get(loop.entry, loop.entry)

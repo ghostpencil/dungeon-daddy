@@ -415,3 +415,142 @@ def test_clock_section_lines_character_clock_falls_back_to_id_when_no_display_na
     ctrl.set_bundle(b)
     text = "\n".join(ctrl.clock_section_lines())
     assert "character:fallback-id" in text
+
+
+# ---------------------------------------------------------------------------
+# Level-scoped clock filtering
+# ---------------------------------------------------------------------------
+
+def test_clock_section_hides_level_clock_from_other_level():
+    ctrl = _controls()
+    ctrl.set_current_level_id("level-1")
+    b = _bundle(open_clocks=[
+        _clock_dict(clock_level="level", level_id="level-2"),
+    ])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "level-2" not in text
+
+
+def test_clock_section_shows_level_clock_matching_current_level():
+    ctrl = _controls()
+    ctrl.set_current_level_id("level-1")
+    b = _bundle(open_clocks=[
+        _clock_dict(clock_level="level", level_id="level-1"),
+    ])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "level-1" in text
+
+
+def test_clock_section_non_level_clocks_unaffected_by_level_filter():
+    ctrl = _controls()
+    ctrl.set_current_level_id("level-1")
+    b = _bundle(open_clocks=[
+        _clock_dict(clock_level="dungeon"),
+        _clock_dict(clock_level="room", scope_room_id="chapel"),
+    ])
+    ctrl.set_bundle(b)
+    lines = ctrl.clock_section_lines()
+    assert any("chapel" in l for l in lines)
+    assert "Clocks: 2 active" in lines[0]
+
+
+# ---------------------------------------------------------------------------
+# Room-scoped clock filtering
+# ---------------------------------------------------------------------------
+
+def test_clock_section_hides_room_clock_from_other_level():
+    ctrl = _controls()
+    ctrl.set_current_level_room_ids({"R1", "R2"})
+    b = _bundle(open_clocks=[
+        _clock_dict(clock_level="room", scope_room_id="R3"),
+    ])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "R3" not in text
+
+
+def test_clock_section_shows_room_clock_on_current_level():
+    ctrl = _controls()
+    ctrl.set_current_level_room_ids({"R1", "R2"})
+    b = _bundle(open_clocks=[
+        _clock_dict(clock_level="room", scope_room_id="R1"),
+    ])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "R1" in text
+
+
+def test_clock_section_room_clock_unfiltered_when_room_ids_unknown():
+    ctrl = _controls()
+    # no set_current_level_room_ids call — room_ids empty, filter disabled
+    b = _bundle(open_clocks=[
+        _clock_dict(clock_level="room", scope_room_id="R9"),
+    ])
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.clock_section_lines())
+    assert "R9" in text
+
+
+# ---------------------------------------------------------------------------
+# Slice 8 — proposal_section_lines provenance display
+# ---------------------------------------------------------------------------
+
+def _validation_result(**kwargs):
+    from dungeon_daddy.rpg.proposal_validator import ValidationResult
+    defaults = dict(source="llm_draft")
+    defaults.update(kwargs)
+    return ValidationResult(**defaults)
+
+
+def _apply_result(**kwargs):
+    from dungeon_daddy.rpg.proposal_applier import ApplyResult
+    defaults: dict = {}
+    defaults.update(kwargs)
+    return ApplyResult(**defaults)
+
+
+def test_proposal_section_lines_no_proposal():
+    ctrl = _controls()
+    lines = ctrl.proposal_section_lines()
+    assert any("No proposal" in line for line in lines)
+
+
+def test_proposal_section_lines_shows_source_label():
+    ctrl = _controls()
+    ctrl.set_proposal_result(_validation_result(source="llm_draft"))
+    text = "\n".join(ctrl.proposal_section_lines())
+    assert "llm_draft" in text
+
+
+def test_proposal_section_lines_shows_accepted_count():
+    from dungeon_daddy.rpg.proposal import CreateMemoryChange
+    change = CreateMemoryChange(title="Gate opened", summary="s", importance=5, tags=[])
+    ctrl = _controls()
+    ctrl.set_proposal_result(_validation_result(accepted=[change]))
+    text = "\n".join(ctrl.proposal_section_lines())
+    assert "Accepted: 1" in text
+
+
+def test_proposal_section_lines_shows_rejected_reason():
+    from dungeon_daddy.rpg.proposal import AdvanceClockChange
+    from dungeon_daddy.rpg.proposal_validator import RejectedChange
+    change = AdvanceClockChange(clock_id="ghost_clock", amount=1, reason="spooky")
+    rejected = RejectedChange(change=change, reason="Unknown clock reference: ghost_clock")
+    ctrl = _controls()
+    ctrl.set_proposal_result(_validation_result(rejected=[rejected]))
+    text = "\n".join(ctrl.proposal_section_lines())
+    assert "Unknown clock reference: ghost_clock" in text
+
+
+def test_proposal_section_lines_shows_applied_count():
+    from dungeon_daddy.rpg.proposal import CreateMemoryChange
+    change = CreateMemoryChange(title="Gate opened", summary="s", importance=5, tags=[])
+    ctrl = _controls()
+    ctrl.set_proposal_result(
+        _validation_result(accepted=[change]),
+        _apply_result(applied=[change]),
+    )
+    text = "\n".join(ctrl.proposal_section_lines())
+    assert "Applied: 1" in text

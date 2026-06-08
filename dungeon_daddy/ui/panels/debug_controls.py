@@ -26,6 +26,10 @@ class DebugControls:
         self._last_memory_note: MemoryEntry | None = None
         self._last_bundle: ContextBundle | None = None
         self._last_reaction: WorldReaction | None = None
+        self._last_validation = None
+        self._last_apply_result = None
+        self._current_level_id: str | None = None
+        self._current_level_room_ids: set[str] = set()
 
     def set_reaction(self, reaction: WorldReaction) -> None:
         self._last_reaction = reaction
@@ -34,6 +38,12 @@ class DebugControls:
         if self._last_reaction is None:
             return ["No reaction yet"]
         return list(self._last_reaction.summary_lines)
+
+    def set_current_level_id(self, level_id: str | None) -> None:
+        self._current_level_id = level_id
+
+    def set_current_level_room_ids(self, room_ids: set[str]) -> None:
+        self._current_level_room_ids = room_ids
 
     def set_bundle(self, bundle: ContextBundle) -> None:
         self._last_bundle = bundle
@@ -55,7 +65,20 @@ class DebugControls:
     def clock_section_lines(self) -> list[str]:
         if self._last_bundle is None:
             return ["No bundle built yet"]
-        clocks = self._last_bundle.open_clocks
+        all_clocks = self._last_bundle.open_clocks
+        clocks = [
+            c for c in all_clocks
+            if not (
+                c.get("clock_level") == "level"
+                and self._current_level_id is not None
+                and c.get("level_id") != self._current_level_id
+            )
+            and not (
+                c.get("clock_level") == "room"
+                and self._current_level_room_ids
+                and c.get("scope_room_id") not in self._current_level_room_ids
+            )
+        ]
         if not clocks:
             return ["Clocks: (none)"]
         lines = [f"Clocks: {len(clocks)} active"]
@@ -145,6 +168,24 @@ class DebugControls:
         issues = self._sync_reporter.check()
         self._last_sync_issues = issues
         return issues
+
+    def set_proposal_result(self, validation, apply_result=None) -> None:
+        self._last_validation = validation
+        self._last_apply_result = apply_result
+
+    def proposal_section_lines(self) -> list[str]:
+        if self._last_validation is None:
+            return ["No proposal yet"]
+        v = self._last_validation
+        ar = self._last_apply_result
+        applied_count = len(ar.applied) if ar is not None else 0
+        lines = [f"Proposal [source: {v.source}]"]
+        lines.append(f"  Accepted: {len(v.accepted)}  Rejected: {len(v.rejected)}  Applied: {applied_count}")
+        for rc in v.rejected:
+            lines.append(f"  [REJECTED] {rc.change.kind}: {rc.reason}")
+        for ac in v.accepted:
+            lines.append(f"  [ACCEPTED] {ac.kind}")
+        return lines
 
     def create_test_memory_note(self, campaign_id: str, title: str) -> MemoryEntry:
         entry = MemoryEntry(
