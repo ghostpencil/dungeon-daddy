@@ -2,12 +2,20 @@
 
 ## Phase
 
-Phase: 35.6 — Stress Routing by Action Intent
-Status: **Complete (2026-06-06)**
+Phase: 36 — LLM-Proposed Reaction Drafts
+Status: **Complete (2026-06-07) — All 9 slices done + post-merge bug fixes**
 
-Branch: `phase-35.6-stress-routing`
+Branch: `phase-36-llm-reaction-proposals`
 
-_Phase 35.6 complete (2026-06-06). All 8 TDD slices done: `intent` field on ActionRequest/ActionResolution, `stress_routing.py` with `choose_stress_track()`, routing wired into `compute_world_reaction()`, clock category/level mapping, intent keyword mapping, PlayView capacity fix, non-body stress world-reaction tests. 1738 unit tests passing. Existing campaign seeds already have the right category/clock_level metadata — no seed changes needed._
+_Slice 9 done (2026-06-07). 1772 unit tests passing. Proposal pipeline wired into live action loop: `DmAgent.request_proposal()` added, `PlayView._run_proposal_pipeline()` fires after each action, debug tab always shows proposal provenance._
+
+**Post-merge fixes (2026-06-07):**
+- `_draw_debug_tab()` now calls `proposal_section_lines()` — proposal provenance was stored but never rendered.
+- `DebugControls` now filters level-scoped clocks to current level only (`set_current_level_id` + `_sync_debug_level_id()`).
+- `DebugControls` now filters room-scoped clocks to rooms on the current level only (`set_current_level_room_ids`).
+- `_sync_debug_level_id()` is called at campaign load and level change (not just after actions) so the filter is correct from first open.
+- `request_proposal` signature changed: `known_clock_ids`/`known_actor_ids` replaced with `known_clocks`/`known_actors` (dicts with labels and display names); `room_name`/`room_note` added. Prompt restructured to system + user message so the LLM gets named, concrete context instead of opaque UUIDs — fixes the "Accepted: 0 Rejected: 0" empty proposal problem.
+- 1802 unit tests passing.
 
 ---
 
@@ -38,40 +46,68 @@ Full phase specs in `spec/IMPLEMENTATION_PHASES.md`.
 
 ## Next Steps — Phase 36
 
-Spec: `spec/IMPLEMENTATION_PHASES.md` (Phase 36 — LLM-Proposed Reaction Drafts)
+Spec: `spec/PHASE_36_LLM_REACTION_PROPOSALS.md`
 
-Allow the LLM to propose structured reactions, but validate and apply them through deterministic services only.
+Allow the LLM to propose structured reactions, but validate and apply them through deterministic services only. Full spec including pre-build notes is in the spec file above.
+
+### 8 TDD slices
+
+1. Proposal model parse tests — `LLMReactionProposal`, `ProposedChange` subtypes ✓
+2. Validation rejects unknown clock reference ✓
+3. Validation rejects unknown actor reference ✓
+4. Validation rejects player actor intent control ✓
+5. Low-risk `create_memory` proposal auto-applies ✓
+6. Medium-risk `apply_consequence` (stress) stays draft unless explicitly permitted ✓
+7. Malformed JSON from LLM does not crash Play Mode ✓
+8. Debug tab shows proposal provenance (accepted / rejected / source label) ✓
+9. Wire proposal pipeline into live action loop — proposal fires after each action, debug tab shows real results ✓
+
+### Slice 9 wiring notes
+
+The entire proposal pipeline exists as tested standalone modules but is not called from the live app. Slice 9 connects them.
+
+**Hook point:** `play_view.PlayView._on_resolve_action()` (`dungeon_daddy/views/play_view.py` ~line 671), right after `self._apply_world_reaction(resolution)`.
+
+**New method needed:** `DmAgent.request_proposal(resolution, context_bundle, known_clock_ids, known_actor_ids, player_actor_ids)` in `dungeon_daddy/llm/agents/dm_agent.py`.
+- Builds a proposal-request prompt (player intent, action result, deterministic consequences, known clocks/actors, schema instructions, authority boundary reminder).
+- Calls `self._provider.complete(...)` with `max_tokens=512`.
+- Returns the raw string (caller parses it).
+- Must not raise — return empty string on any provider error.
+
+**Wiring in `_on_resolve_action()`:**
+1. Call `dm_agent.request_proposal(...)` with resolution + context.
+2. `parse_proposal(raw)` → `LLMReactionProposal | None`.
+3. If not None: `validate_proposal(proposal, known_clock_ids, known_actor_ids, player_actor_ids)`.
+4. `apply_low_risk_proposals(validation_result, repo, campaign_id, action_key, intent, matched_clocks)`.
+5. `self._debug.set_proposal_result(validation_result, apply_result)`.
+6. If proposal is None (parse failed or DM agent absent): call `self._debug.set_proposal_result` with a no-op result so the tab always shows something.
+
+**`_debug` accessor:** `PlayView` already owns `DebugControls` — find the attribute name and use it directly.
+
+**Tests:** Add unit tests for `DmAgent.request_proposal()` (mock the provider); add an integration-style test for the wiring in `play_view` (use `__new__` + manual setup, mock provider, assert `_debug._last_validation` is set after `_on_resolve_action()`).
+
+### Key implementation notes (from 35.5/35.6 review)
+
+- **Clock validation**: fetch full `ClockState` from repo; reject proposals for clocks
+  out of scope (`scope_room_id`, `level_id`, `action_tags` filters from Phase 35.5)
+- **LLM prompt**: include `resolution.intent` in the proposal request context
+- **Stress validation**: call `choose_stress_track()` deterministically and compare;
+  matching proposal → low-risk auto-apply; divergent → medium-risk draft
+- **Service hook**: `choose_stress_track(explicit_track=...)` is already the correct
+  entry point when applying an approved stress proposal
+
+### New modules (expected)
+
+| Module | Purpose |
+|---|---|
+| `dungeon_daddy/rpg/proposal.py` | `LLMReactionProposal`, `ProposedChange` models |
+| `dungeon_daddy/rpg/proposal_validator.py` | Validation + risk classification |
+| `dungeon_daddy/rpg/proposal_applier.py` | Apply accepted low-risk changes |
+| `tests/unit/rpg/test_proposal*.py` | TDD test files |
 
 ## Known Failures
 
 _None._
-
-## Bug Fixes (post-Phase 24)
-
-| Date | Fix |
-|---|---|
-| 2026-06-02 | Atmosphere frame misalignment — `_draw_atmosphere` was centering on `(canvas_w/2, canvas_h/2)` instead of `(viewport_x + canvas_w/2, viewport_y + canvas_h/2)`, causing the frame to draw relative to screen origin rather than the map panel. Fixed in `layout_renderer.py:_draw_atmosphere`. 1395 passing. |
-| 2026-06-03 | MEM tab had no interactive search input — `MemoryInspectorPanel.draw()` only rendered a drawn box. Added `setup_widget`/`teardown_widget` to create a real `arcade.gui.UIInputText` via `_RpgSidePanel` (which now holds a `UIManager` ref). Widget lifecycle tied to tab switching and RPG panel open/close. |
-| 2026-06-03 | MEM search input placeholder text lost when widget present — added manual placeholder draw in `draw()` when widget text is empty. |
-| 2026-06-03 | Map keyboard shortcuts (D=debug, R=recenter) fired while typing in MEM search — fixed `on_key_press` in `PlayView` to return early when `self._rpg_open and self._rpg_side._active == 3`. |
-| 2026-06-03 | "Edit Memory" button unclickable when RPG panel open — RPG panel click absorption (`if x >= rpg_x`) had no y-bound, swallowing title-bar clicks. Added `and y < content_h` guard. 1639 passing. |
-| 2026-06-04 | ACTION tab intent label overlapped widget — `setup_widget` missing 18px actor-name row offset; `draw()` was rendering "Intent:" inside the widget bounds. Fixed by adding `cur_y -= 18` in `setup_widget`. |
-| 2026-06-04 | ACTION key buttons permanently selected — button styles fixed at creation, never refreshed on click. Added `_action_btn_refs` dict; `on_click` now updates all button styles via `btn.style = _btn_style(...)`. |
-| 2026-06-04 | RESOLVE crash — `RpgService.resolve_action` returns `tuple[ActionResolution, DomainEvent]` but `_format_result` received the tuple directly. Fixed tuple unpacking in `_on_resolve_action`. 1761 passing. |
-| 2026-06-04 | RESOLVE produced no narration — `_on_resolve_action` stored result but never appended to DM history or spawned narration thread. Added history append + `_spawn_dm_thread` call after successful resolution. |
-| 2026-06-05 | ACTION tab had no actor cycling UI — `_actor_idx` field existed but no prev/next buttons were built. Added `<`/`>` arcade GUI buttons at the actor name row in `setup_widget`; click handlers cycle `_actor_idx` and rebuild widgets. Actor count shown as `(N/total)` in label. |
-| 2026-06-05 | ACTION tab buttons showed no action ratings — `_load_player_actors` built `ActorState` without fetching ratings from DB (`get_actor_action_ratings` never called). Fixed in `play_view.py`; button labels in `setup_widget` now read from `current_actor.actions` and display e.g. `FIGHT 2`. Widgets rebuild on actor switch so ratings refresh. 1787 passing (2 pre-existing UI-harness integration failures unrelated). |
-| 2026-06-05 | DEBUG tab showed no context bundle or clocks — `_draw_debug_tab` never rendered bundle data. Added `clock_section_lines()` to `DebugControls` and called it in the draw method. Bundle now built eagerly when DBG tab is clicked. |
-| 2026-06-05 | MEM tab search showed no results — `_rpg_memory.set_entries()` was never called; panel was always empty. Added `_load_memory_entries()` to `PlayView`; triggered on MEM tab click. Also fixed `entry.id` → `entry.memory_id` crash in `memory_inspector_panel.py`. |
-| 2026-06-05 | DM narrated wrong actor after RESOLVE — action message to DM history had no actor name, so LLM defaulted to the first listed actor (Kira). Fixed in `_on_resolve_action`: actor display name now prefixed to the message (e.g. `Talvas the Wanderer [SENSE] ...`). |
-| 2026-06-05 | World reaction applied body stress to all PC actors on miss/partial — `compute_world_reaction` iterated all `pc_actors` with no filter. Fixed by skipping actors whose `actor_id != resolution.actor_id`. 1688 passing (unit). |
-| 2026-06-05 | DBG tab clock/reaction lines cut off at ~36 chars — `arcade.draw_text` has no max-width. Added `_wrap_debug_line()` helper in `play_view.py`; long lines wrap with preserved indentation. |
-| 2026-06-06 | `seed_campaign_with_pack` saved clocks without metadata — `save_clock` was called with only `label`+`segments`, all Phase 35.5 fields (clock_level, scope_room_id, action_tags, etc.) were dropped. Fixed clock section in `seed_campaign_with_pack`; added `delete_clock` to repo and stale-clock cleanup on `--force`. 2 new tests. |
-| 2026-06-06 | DBG tab froze app on clock display — `_wrap_debug_line` entered infinite loop when continuation indent spaces were found by `rfind`, producing the same string each iteration. Fixed by tracking `cur_min` and bumping it to `len(cont)` after first wrap. 7 new tests. |
-| 2026-06-06 | Character/faction clock display showed UUID instead of actor name — `owner_actor_id` is a UUID5 with no reverse mapping. Fixed `ContextBundleBuilder._fetch_open_clocks` to enrich each clock dict with `owner_display_name` via `repo.get_actor()`; `debug_controls.clock_section_lines` prefers `owner_display_name`. 3 new tests. |
-| 2026-06-06 | Seed file `scope_room_id` / `location_slug` used human slugs, not dungeon room IDs — `scope_room_id: "receiving-hall"` never matched `current_room_id: "R1"`, so room clocks were silently never scoped. Fixed both campaign seed files with actual room IDs (`R1`, `r01`, `3-A`, `2-B`, etc.). |
-| 2026-06-06 | Level clocks advanced on wrong dungeon level — `compute_world_reaction` had no `level_id` filter; level-2 clocks advanced on level-1 actions. Added `current_level_id` param (derived as `f"level-{idx+1}"`) to `compute_world_reaction` and `react_to_resolution`; threaded through `PlayView._apply_world_reaction`. 5 new tests. |
-| 2026-06-06 | `ClockState` in `_apply_world_reaction` missing `level_id` and other metadata — construction only passed `scope_room_id`+`action_tags`, so `clock.level_id` was always `None` and the new level filter never fired. Fixed by passing all metadata fields from the DB row. |
 
 ---
 
@@ -79,6 +115,7 @@ _None._
 
 | Phase | Status | Tests |
 |---|---|---|
+| Phase 36 — LLM-Proposed Reaction Drafts | **Complete** (2026-06-07) | 1802 unit passing (post-fix) |
 | Phase 35.6 — Stress Routing by Action Intent | **Complete** (2026-06-06) | 1738 unit passing |
 | Phase 35.5 — Clock Scoping, Clock Levels, Campaign Seed Upgrades | **Complete** (2026-06-06) | 1698 unit passing (post-bugfix) |
 | Phase 35 — Deterministic World Reaction Service | **Complete** (2026-06-05) | 1818 passing |

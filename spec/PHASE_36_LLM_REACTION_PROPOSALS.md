@@ -157,3 +157,46 @@ Whether anything was auto-applied
 6. Medium-risk stress proposal remains draft unless explicitly permitted.
 7. LLM malformed JSON fallback does not crash Play Mode.
 8. Debug provenance includes accepted/rejected proposal summary.
+
+---
+
+## Pre-build notes (reviewed 2026-06-06)
+
+Impact of Phase 35.5 (Clock Scoping) and Phase 35.6 (Stress Routing) on implementation.
+
+### Clock validation must enforce 35.5 scope constraints
+
+`ClockState` now carries `scope_room_id`, `level_id`, `action_tags`, and `clock_level`.
+A proposal to advance a clock must be rejected (or auto-rejected as out-of-scope) if:
+
+- `scope_room_id` is set and does not match the current room
+- `level_id` is set and does not match the current level
+- `action_tags` is non-empty and the resolution's `action_key` is not in the list
+
+The validator should fetch the full `ClockState` from repo and run the same filter
+logic used in `compute_world_reaction` before accepting an `advance_clock` proposal.
+
+### `resolution.intent` must be included in the LLM prompt
+
+`ActionResolution.intent` was added in Phase 35.6. The LLM proposal prompt (under
+Integration points) should include this field — it is the player's stated purpose and
+grounds the LLM's proposed narration and consequence framing.
+
+### Stress proposal validation: use `choose_stress_track()` as the reference
+
+When the LLM proposes `apply_consequence` with an explicit `track_key`:
+
+1. Call `choose_stress_track(action_key, intent, matched_clocks)` to get the
+   deterministic result.
+2. If the proposed track matches the deterministic result → low-risk, auto-apply.
+3. If the proposed track diverges → medium-risk, keep as draft.
+
+`choose_stress_track` already accepts `explicit_track: StressTrackKey | None` — this
+is the correct entry point when an approved proposal is applied by the service.
+
+### No structural blockers
+
+35.5 and 35.6 do not break the proposal interface described in `LLM_AUTHORITY_BOUNDARY.md`.
+They enrich what the validator must check (clock scope) and what context the LLM receives
+(intent). The four proposal kinds (`advance_clock`, `apply_consequence`, `create_memory`,
+`npc_reaction`) are unchanged.
