@@ -1,0 +1,39 @@
+{
+  "phase": "37.1",
+  "description": "Intent and consequence end-to-end trace",
+  "last_action": {
+    "actor_id": "actor-mira",
+    "actor_name": "Mira Coldwell",
+    "action_key": "hunt",
+    "intent": "tracking the cult leader through the dungeon",
+    "dice_rolled": [3, 4],
+    "outcome": "partial"
+  },
+  "deterministic_reaction": {
+    "outcome": "partial",
+    "stress_track_chosen": [
+      {
+        "actor_id": "actor-mira",
+        "track_key": "weird",
+        "amount": 1,
+        "triggered_fallout": false
+      }
+    ],
+    "clock_changes": [
+      {
+        "clock_id": "clock-heat",
+        "label": "Heat Rising",
+        "ticks": 1,
+        "new_filled": 2
+      }
+    ]
+  },
+  "llm_proposal": {
+    "parse_status": "ok",
+    "accepted": 2,
+    "rejected": 0,
+    "applied": 2,
+    "skipped": 0,
+    "rejected_reasons": []
+  }
+}

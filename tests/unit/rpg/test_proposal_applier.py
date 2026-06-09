@@ -27,6 +27,21 @@ def _repo(tmp_path: Path) -> MemoryRepository:
 
 
 class TestCreateMemoryAutoApplied:
+    def test_create_memory_saved_with_draft_status(self, tmp_path):
+        repo = _repo(tmp_path)
+        change = CreateMemoryChange(
+            title="Mara found the sigil",
+            summary="Hidden under the moss.",
+            importance=3,
+            tags=["actor:pc:mara"],
+        )
+        result = ValidationResult(accepted=[change], rejected=[], source="llm_draft")
+
+        apply_low_risk_proposals(result, repo=repo, campaign_id="campaign_1")
+
+        entries = repo.get_memory_entries_by_campaign("campaign_1")
+        assert entries[0]["status"] == "draft"
+
     def test_create_memory_entry_saved_to_repo(self, tmp_path):
         repo = _repo(tmp_path)
         change = CreateMemoryChange(
@@ -107,12 +122,15 @@ def _repo_with_actor(tmp_path: Path, actor_id: str = "actor_mara") -> MemoryRepo
     return repo
 
 
-class TestApplyConsequenceMatchingTrack:
-    def test_matching_track_stress_incremented_in_repo(self, tmp_path):
+class TestApplyConsequenceNoDuplication:
+    """Deterministic reaction is authoritative for stress; proposals must never double-apply."""
+
+    def test_matching_track_skipped_not_applied(self, tmp_path):
+        # deterministic "fight" → "body"; LLM re-proposes "body" → must be skipped
         repo = _repo_with_actor(tmp_path)
         change = ApplyConsequenceChange(
             actor_id="actor_mara",
-            track_key="body",  # matches choose_stress_track(action_key="fight") → "body"
+            track_key="body",
             amount=1,
             reason="hit by trap",
         )
@@ -122,12 +140,15 @@ class TestApplyConsequenceMatchingTrack:
             result, repo=repo, campaign_id="campaign_1", action_key="fight"
         )
 
-        assert len(apply_result.applied) == 1
+        assert apply_result.applied == []
+        assert len(apply_result.skipped) == 1
+        assert apply_result.skipped[0] is change
+        assert apply_result.events == []
         tracks = repo.get_actor_stress_tracks("actor_mara")
         body = next(t for t in tracks if t["track_key"] == "body")
-        assert body["filled"] == 1
+        assert body["filled"] == 0
 
-    def test_domain_event_stress_marked_emitted(self, tmp_path):
+    def test_no_stress_event_emitted_for_skipped_consequence(self, tmp_path):
         repo = _repo_with_actor(tmp_path)
         change = ApplyConsequenceChange(
             actor_id="actor_mara",
@@ -141,14 +162,8 @@ class TestApplyConsequenceMatchingTrack:
             result, repo=repo, campaign_id="campaign_1", action_key="fight"
         )
 
-        events = repo.get_domain_events("campaign_1")
-        assert len(events) == 1
-        assert events[0].event_type == "stress.marked"
-        assert events[0].payload["actor_id"] == "actor_mara"
-        assert events[0].payload["track_key"] == "body"
-        assert events[0].payload["filled"] == 2
-        assert events[0].payload["source"] == "llm_draft"
-        assert len(apply_result.events) == 1  # stress.marked
+        assert apply_result.events == []
+        assert repo.get_domain_events("campaign_1") == []
 
 
 class TestApplyConsequenceDivergingTrack:

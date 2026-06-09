@@ -252,43 +252,22 @@ class _RpgSidePanel:
             INK_3, font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="top",
         )
         cur_y -= 20
-        for raw in self._debug.clock_section_lines():
-            for line in _wrap_debug_line(raw):
-                if cur_y < y + PAD_MD:
-                    break
-                arcade.draw_text(
-                    line, x + PAD_MD, cur_y,
-                    INK_3, font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="top",
-                )
-                cur_y -= 14
-        cur_y -= 6
-        for raw in self._debug.reaction_section_lines():
-            for line in _wrap_debug_line(raw):
-                if cur_y < y + PAD_MD:
-                    break
-                arcade.draw_text(
-                    line, x + PAD_MD, cur_y,
-                    INK_3, font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="top",
-                )
-                cur_y -= 14
-        cur_y -= 6
-        for raw in self._debug.proposal_section_lines():
-            for line in _wrap_debug_line(raw):
-                if cur_y < y + PAD_MD:
-                    break
-                arcade.draw_text(
-                    line, x + PAD_MD, cur_y,
-                    INK_3, font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="top",
-                )
-                cur_y -= 14
-        cur_y -= 6
-        res = self._debug._last_resolution
-        if res is not None:
-            arcade.draw_text(
-                f"Last action: {res.outcome}", x + PAD_MD, cur_y,
-                INK_3, font_size=TEXT_SM, font_name=FONT_UI, anchor_y="top",
-            )
-            cur_y -= 16
+        for section in (
+            self._debug.last_action_section_lines(),
+            self._debug.clock_section_lines(),
+            self._debug.reaction_section_lines(),
+            self._debug.proposal_section_lines(),
+        ):
+            for raw in section:
+                for line in _wrap_debug_line(raw):
+                    if cur_y < y + PAD_MD:
+                        break
+                    arcade.draw_text(
+                        line, x + PAD_MD, cur_y,
+                        INK_3, font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="top",
+                    )
+                    cur_y -= 14
+            cur_y -= 6
         sync = self._debug._last_sync_issues
         if sync is not None:
             label = "Sync: OK" if not sync else f"Sync: {len(sync)} issue(s)"

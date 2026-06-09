@@ -391,6 +391,53 @@ def test_channel_miss_applies_weird_stress():
     assert result.stress_lines[0].track_key == "weird"
 
 
+# ---------------------------------------------------------------------------
+# Phase 37.1.2 — Intent-based stress routing through compute_world_reaction
+# ---------------------------------------------------------------------------
+
+def test_intent_routes_stress_when_no_clock_overrides():
+    # fight defaults to "body"; intent keyword "whisper" → "weird"
+    resolution = ActionResolution(
+        resolution_id="r1", campaign_id="c1", actor_id="a1",
+        action_key="fight", dice_rolled=[1, 2], outcome="miss",
+        intent="I listen to the dungeon's whisper",
+    )
+    actor = ActorState(
+        actor_id="a1", campaign_id="c1", actor_type="pc",
+        slug="hero", display_name="Hero",
+    )
+    tracks = {
+        "body": StressTrack(track_key="body", capacity=4, filled=0),
+        "weird": StressTrack(track_key="weird", capacity=4, filled=0),
+    }
+    result = compute_world_reaction(resolution, [], [(actor, tracks)])
+    assert len(result.stress_lines) == 1
+    assert result.stress_lines[0].track_key == "weird"
+
+
+def test_clock_category_wins_over_intent():
+    # danger clock → "body"; intent "whisper" would give "weird" — clock wins
+    resolution = ActionResolution(
+        resolution_id="r1", campaign_id="c1", actor_id="a1",
+        action_key="channel", dice_rolled=[1], outcome="miss",
+        intent="I listen to the dungeon's whisper",
+    )
+    actor = ActorState(
+        actor_id="a1", campaign_id="c1", actor_type="pc",
+        slug="hero", display_name="Hero",
+    )
+    tracks = {
+        "body": StressTrack(track_key="body", capacity=4, filled=0),
+        "weird": StressTrack(track_key="weird", capacity=4, filled=0),
+    }
+    clock = ClockState(
+        clock_id="ck1", campaign_id="c1", label="Danger Rising",
+        segments=6, filled=1, category="danger",
+    )
+    result = compute_world_reaction(resolution, [clock], [(actor, tracks)])
+    assert result.stress_lines[0].track_key == "body"
+
+
 def test_sway_partial_applies_bonds_stress():
     resolution = ActionResolution(
         resolution_id="r1", campaign_id="c1", actor_id="a1",

@@ -36,6 +36,7 @@ class PlayerActionPanel:
             dice_pool=dice_pool,
             push_yourself=push_yourself,
             momentum_spend=momentum_spend,
+            intent=intent,
         )
 
     def _format_result(self, resolution: ActionResolution) -> dict:
