@@ -1,0 +1,1022 @@
+# Dungeon Daddy — RPG System Stabilization and Chat-Centered Play Roadmap
+
+**Audience:** Claude Code working in the `ghostpencil/dungeon-daddy` repository  
+**Purpose:** Stabilize the post-Phase-37 RPG system, then guide the next development phases toward a more natural Dungeon Daddy play experience.  
+**Core product goal:** The RPG system should make player choices mechanically meaningful, visibly consequential, and narratively responsive without allowing the LLM to mutate authoritative game state directly.
+
+---
+
+## Current State Summary
+
+Dungeon Daddy has completed Phase 37. The RPG foundation is no longer theoretical. It now includes:
+
+- Player-controlled actors.
+- Action ratings.
+- Stress tracks: `body`, `composure`, `bonds`, `weird`.
+- Clocks with scope, level, category, room binding, action tags, and visibility.
+- Deterministic world reactions.
+- Stress routing by action, clock category, clock level, and intent keywords.
+- Context bundle handoff into live Dungeon Master narration.
+- LLM-proposed reaction drafts with structured parsing and validation.
+- Memory approval/curation workflow.
+- Seeded campaigns with enough RPG state to perform playtest scenarios.
+
+However, the system has reached a new design inflection point:
+
+> The RPG backend has become substantial enough that the current UI now feels like a development/testing interface rather than the final player-facing experience.
+
+The immediate priority is **not** to add more mechanics. The immediate priority is to ensure the mechanics are reliable, observable, and then move the player action loop into the Dungeon Chat experience where Dungeon Daddy actually feels alive.
+
+---
+
+## Non-Negotiable Authority Boundary
+
+This boundary must remain true in all future phases.
+
+```text
+The player controls the player side:
+- one or more player-controlled actors
+- intent declarations
+- selected or confirmed actions
+- strategic decisions
+
+Dungeon Daddy controls the world:
+- dungeon
+- monsters
+- NPCs
+- factions
+- hazards
+- secrets
+- clocks
+- consequences
+- narration
+
+The RPG service and memory layer are authoritative.
+The LLM is advisory.
+The LLM may narrate, summarize, interpret tone, or propose structured changes.
+The LLM must not directly mutate authoritative RPG or memory state.
+```
+
+The guiding phrase remains:
+
+```text
+The LLM may propose.
+The engine disposes.
+```
+
+---
+
+## Architectural Guardrails
+
+Preserve the existing dependency direction:
+
+```text
+views/play_view.py
+  -> rpg/service.py
+  -> memory/context_bundle.py
+  -> llm/agents/dm_agent.py
+
+rpg/service.py
+  -> rpg/actions.py
+  -> rpg/world_reaction.py
+  -> rpg/stress_routing.py
+  -> memory/repository.py only through explicit persistence/event boundaries
+
+llm/agents/dm_agent.py
+  -> receives ContextBundle and known IDs
+  -> does not query DuckDB
+  -> does not import RPGService
+```
+
+Do not let UI panels become repositories, rule engines, or LLM agents.
+
+Do not let the LLM choose and apply state changes without deterministic validation.
+
+Do not let the next UI work destroy the existing right-side RPG panel. It should be demoted into an inspector/debug/status surface, not deleted.
+
+---
+
+## Current Concern: Intent May Not Be Reaching the Mechanics
+
+Before new feature work, verify and fix the player intent path.
+
+Known likely issue:
+
+- `ActionRequest` supports `intent`.
+- `ActionResolution` supports `intent`.
+- `resolve_action()` copies `request.intent` into the resolution.
+- `choose_stress_track()` uses intent keywords.
+- `PlayerActionPanel._build_request()` appears to accept `intent` but may not currently pass it into `ActionRequest`.
+
+Expected correction:
+
+```python
+return ActionRequest(
+    campaign_id=campaign_id,
+    actor_id=actor_id,
+    action_key=action_key,
+    dice_pool=dice_pool,
+    push_yourself=push_yourself,
+    momentum_spend=momentum_spend,
+    intent=intent,
+)
+```
+
+This is small but important. Without it, the system cannot fully honor player-declared intent when routing stress or building reactions.
+
+---
+
+# Phase 37.1 — RPG Intent and Consequence Stabilization
+
+## Goal
+
+Ensure that the post-Phase-37 RPG system faithfully carries player intent through action resolution, world reaction, proposal validation, memory creation, debug display, and DM narration.
+
+This phase should be completed before any major UI refactor.
+
+## Desired System Behavior
+
+When the player resolves an action with an intent string:
+
+```text
+Actor: Mara Flint
+Action: Study
+Intent: I study the mural to resist the dungeon's seductive memory and understand what it wants from us.
+```
+
+The system should preserve that intent through:
+
+```text
+PlayerActionPanel -> ActionRequest -> RpgService.resolve_action -> ActionResolution -> WorldReactionService -> stress routing -> proposal pipeline -> context bundle -> DM narration/debug display
+```
+
+The intent should be visible or inspectable in debug/test artifacts.
+
+Stress should route using the best available deterministic information in this order:
+
+1. Explicit track override, if future systems provide one.
+2. Matched clock category.
+3. Matched clock level.
+4. Intent keywords.
+5. Action key fallback.
+6. Safe default.
+
+LLM proposals must not obscure deterministic consequences. The debug tab should clearly distinguish:
+
+```text
+Deterministic world reaction:
+- Clock advanced
+- Stress applied
+- Fallout triggered
+
+LLM proposal result:
+- Accepted proposal changes
+- Rejected proposal changes
+- Auto-applied low-risk changes
+- Skipped changes and reasons
+```
+
+## Development Tasks
+
+### 37.1.1 — Intent Plumbing Audit
+
+Inspect:
+
+- `dungeon_daddy/ui/panels/player_action_panel.py`
+- `dungeon_daddy/rpg/models.py`
+- `dungeon_daddy/rpg/actions.py`
+- `dungeon_daddy/views/play_view.py`
+- `dungeon_daddy/rpg/world_reaction.py`
+- `dungeon_daddy/rpg/stress_routing.py`
+
+Confirm that:
+
+- `PlayerActionPanel._build_request()` passes `intent` to `ActionRequest`.
+- `ActionResolution.intent` is populated.
+- `_apply_world_reaction()` receives a resolution with populated intent.
+- `_run_proposal_pipeline()` receives the same intent.
+- DM narration history includes the player intent.
+
+### 37.1.2 — Regression Tests for Intent Preservation
+
+Add or update unit tests covering:
+
+- `PlayerActionPanel._build_request()` preserves intent.
+- `resolve_action()` preserves intent from request to resolution.
+- `compute_world_reaction()` passes `resolution.intent` to stress routing.
+- A live-style PlayView action uses the typed intent in the resolution.
+
+### 37.1.3 — Intent-Sensitive Stress Routing Tests
+
+Add tests proving that intent affects stress when no stronger clock category/level applies.
+
+Suggested examples:
+
+```text
+Action: study
+Intent contains: "ritual", "dungeon", "voice"
+Expected stress: weird
+
+Action: move
+Intent contains: "protect", "ally", "promise"
+Expected stress: bonds
+
+Action: tinker
+Intent contains: "fear", "nightmare", "truth"
+Expected stress: composure
+```
+
+Also test precedence:
+
+```text
+Clock category: danger
+Intent contains: ritual
+Expected stress: body, because matched clock category wins.
+```
+
+### 37.1.4 — Proposal Application Audit
+
+Inspect:
+
+- `dungeon_daddy/rpg/proposal.py`
+- `dungeon_daddy/rpg/proposal_validator.py`
+- `dungeon_daddy/rpg/proposal_applier.py`
+- Debug display for proposals.
+
+Confirm that:
+
+- LLM-created memories are saved as draft unless explicitly approved.
+- LLM-proposed consequence application does not duplicate deterministic stress accidentally.
+- Skipped proposal changes are surfaced in debug output.
+- Rejected proposal changes are surfaced in debug output.
+
+Do not broaden proposal auto-application in this phase.
+
+### 37.1.5 — Debug Visibility
+
+Improve debug output if needed so a developer can understand one action end-to-end:
+
+```text
+Last action:
+- actor
+- action
+- intent
+- dice
+- outcome
+
+Deterministic reaction:
+- clocks changed
+- stress changed
+- fallout triggered
+
+LLM proposal:
+- raw parse status if available
+- accepted count
+- rejected count
+- applied count
+- skipped count
+- reasons
+```
+
+Avoid making the debug UI beautiful. Make it reliable and clear.
+
+## Test Guidance
+
+Run targeted tests after each slice:
+
+```bash
+pytest tests/unit/rpg -q
+pytest tests/unit/ui/test_player_action_panel.py -q
+pytest tests/unit/views -q
+```
+
+Then run the broader suite used in the current project workflow:
+
+```bash
+pytest tests/unit -q
+```
+
+Run existing smoke test(s):
+
+```bash
+python tools/smoke_test_phase37.py
+```
+
+Add a new smoke artifact if needed:
+
+```text
+artifacts/play_mode/phase37_1/intent_consequence_summary.json
+```
+
+The smoke artifact should show:
+
+- actor ID/name
+- action key
+- intent
+- outcome
+- deterministic stress track chosen
+- clock changes
+- proposal accepted/rejected/applied/skipped counts
+
+## Exit Criteria
+
+Phase 37.1 is complete when:
+
+- [ ] Player intent is preserved from UI to `ActionRequest`.
+- [ ] Player intent is preserved from `ActionRequest` to `ActionResolution`.
+- [ ] World reaction uses populated intent for stress routing.
+- [ ] Proposal pipeline receives populated intent.
+- [ ] Debug display distinguishes deterministic consequences from LLM proposals.
+- [ ] LLM-created memory remains draft by default.
+- [ ] No direct LLM mutation of authoritative state is introduced.
+- [ ] Unit tests cover intent preservation and stress routing precedence.
+- [ ] Existing Phase 37 smoke test still passes.
+- [ ] No known failures are introduced.
+
+---
+
+# Phase 38 — Chat-Centered RPG Interaction Refactor
+
+## Goal
+
+Move the primary player action loop from the right-side RPG panel into the Dungeon Chat experience while preserving the right panel as an RPG/memory/debug inspector.
+
+The player should feel like they are speaking to the dungeon, not operating a rules console.
+
+## Design Principle
+
+```text
+The dungeon filters player intent into meaningful risk.
+```
+
+The chat panel should become the primary place where the player:
+
+- selects or sees the active player-controlled actor,
+- declares intent,
+- receives action framing,
+- confirms or adjusts the action,
+- sees the mechanical result,
+- receives Dungeon Daddy narration.
+
+The right RPG panel should remain for:
+
+- character sheet,
+- stress/fallout,
+- clocks,
+- memory approval,
+- proposal/debug/provenance,
+- development inspection.
+
+## Desired System Behavior
+
+Minimum Phase 38 behavior:
+
+```text
+1. Player selects or cycles active player-controlled actor near the chat input.
+2. Player types an intent in chat.
+3. Player can either:
+   a. choose an action chip before sending, or
+   b. send intent as narration and receive a lightweight framing prompt.
+4. System resolves through RPGService, not through the LLM.
+5. WorldReactionService applies deterministic consequences.
+6. DM narration receives the updated context bundle.
+7. The right panel updates as an inspector.
+```
+
+Phase 38 should not require full natural language action detection yet. It should support explicit or semi-explicit action selection in the chat area.
+
+## Proposed UX
+
+Add a compact player-action strip to the left Dungeon Chat panel.
+
+Example:
+
+```text
+[Mara Flint]  Body 1/4  Composure 2/4  Bonds 0/4  Weird 1/4
+Actions: [FIGHT] [MOVE] [TINKER] [STUDY] [FOCUS] [SWAY] [SENSE] [CHANNEL] [ENDURE]
+Intent: existing chat input
+```
+
+Flow A — Explicit Action:
+
+```text
+Player selects: Mara
+Player clicks: STUDY
+Player types: I study the mural to understand what the dungeon wants.
+Player sends.
+System resolves STUDY using Mara's rating.
+Dungeon Daddy narrates outcome.
+```
+
+Flow B — Chat Intent with Action Confirmation Stub:
+
+```text
+Player types: Mara studies the mural to understand what the dungeon wants.
+System detects that no action chip was selected.
+System responds: Choose an action to resolve this intent.
+Buttons/chips: [STUDY] [SENSE] [FOCUS] [No roll]
+Player clicks STUDY.
+System resolves.
+```
+
+Flow B can be minimal and deterministic in Phase 38. Do not require LLM-based intent classification yet.
+
+## Development Tasks
+
+### 38.1 — Separate Player Action State from Right Panel
+
+Create a small view/controller model for pending player action state. Suggested name:
+
+```text
+dungeon_daddy/ui/player_action_state.py
+```
+
+It should track:
+
+- selected actor ID,
+- selected action key or `None`,
+- pending intent text,
+- whether action is awaiting confirmation,
+- last resolution summary.
+
+Do not store authoritative RPG state here.
+
+### 38.2 — Add Chat-Side Actor Mini-Card
+
+Add a compact selected-actor display in or near `ChatPanel`.
+
+It should show:
+
+- actor name,
+- compact stress track summary,
+- optional tiny status/fallout indicator,
+- previous/next actor controls if multiple player actors exist.
+
+Single-actor campaigns should not feel awkward. If there is only one player actor, actor selection controls may be hidden or disabled.
+
+### 38.3 — Add Chat-Side Action Chips
+
+Add action chips near the chat input:
+
+```text
+FIGHT MOVE TINKER STUDY FOCUS SWAY SENSE CHANNEL ENDURE
+```
+
+Each chip should display rating if available:
+
+```text
+STUDY 2
+TINKER 1
+```
+
+Selecting a chip should set the pending action but should not resolve immediately.
+
+### 38.4 — Send Intent Through Existing Chat Input
+
+When a player sends chat text while an action chip is selected:
+
+- treat the text as action intent,
+- build `ActionRequest`,
+- call `RpgService.resolve_action`,
+- call deterministic world reaction handling,
+- run proposal pipeline if enabled,
+- add mechanical summary to chat,
+- send DM narration request with updated context bundle.
+
+The same code path should be shared with the old right-panel action system where practical.
+
+Avoid duplicating world reaction logic in two places.
+
+### 38.5 — Preserve Right Panel as Inspector
+
+The right action tab can remain for now, but it should not be the only way to take actions.
+
+Right panel should update after chat-side actions.
+
+### 38.6 — Add Mechanical Result Chat Bubble
+
+Add a compact system/mechanical chat bubble before the DM narration:
+
+```text
+Mara rolls STUDY — Partial Success [4]
+World Reaction:
+- Bone Warden Stirs +1
+- Weird +1
+```
+
+This bubble should be clearly distinguishable from Dungeon Daddy narration.
+
+## Test Guidance
+
+Add tests for:
+
+- Chat-side selected actor state.
+- Action chip selection.
+- Sending chat with selected action creates `ActionRequest` with intent.
+- Chat-side action uses same resolution path as right-panel action.
+- Right panel reflects updated actor stress after chat-side action.
+- No room selected -> action cannot resolve and user gets a system message.
+- No RPG service -> fallback chat behavior remains stable.
+- Single actor campaign -> actor selector behaves cleanly.
+- Multiple actor campaign -> actor cycling changes selected actor.
+
+Suggested test files:
+
+```text
+tests/unit/ui/test_chat_action_controls.py
+tests/unit/views/test_play_view_chat_actions.py
+tests/integration/test_chat_centered_action_loop.py
+```
+
+Use existing testing rules. Prefer real service/model objects over mocks unless Arcade widgets or external LLM calls must be isolated.
+
+## Exit Criteria
+
+Phase 38 is complete when:
+
+- [ ] Player can resolve an RPG action from the chat area.
+- [ ] Player intent from chat becomes `ActionRequest.intent`.
+- [ ] Actor selection works for one or more player-controlled actors.
+- [ ] Action chips show available actions and ratings.
+- [ ] World reactions and stress routing still run deterministically.
+- [ ] DM narration receives updated context bundle after chat-side action.
+- [ ] Right RPG panel updates as inspector/debug/status.
+- [ ] Existing right-panel action flow still works or is intentionally deprecated with tests adjusted.
+- [ ] Legacy plain chat still works.
+- [ ] Unit/integration tests cover the new flow.
+- [ ] Manual smoke test demonstrates action -> consequence -> narration from chat.
+
+---
+
+# Phase 39 — Intent Framing and Player Confirmation
+
+## Goal
+
+Let Dungeon Daddy help frame player intent into an RPG action while preserving player agency and deterministic authority.
+
+This is the middle ground between pure buttons and pure natural language.
+
+## Design Principle
+
+```text
+The player declares intent.
+Dungeon Daddy frames the risk.
+The player confirms or changes the action.
+The engine resolves.
+```
+
+## Desired System Behavior
+
+When a player types a natural language intent without selecting an action, the system should not immediately let the LLM roll anything.
+
+Instead, it should propose a small deterministic or semi-deterministic framing:
+
+```text
+Mara studies the mural to understand what the dungeon wants.
+
+Suggested frame:
+- Actor: Mara
+- Action: Study
+- Alternative: Sense, Focus
+- Stakes: the mural may reveal truth, but the dungeon may notice Mara noticing it
+
+[Roll Study] [Use Sense] [Use Focus] [No Roll]
+```
+
+In Phase 39, this can start with deterministic heuristics. LLM assistance may be allowed only as advisory suggestion text, not direct resolution.
+
+## Development Tasks
+
+### 39.1 — Pending Intent Model
+
+Create a model for unresolved player intent:
+
+```text
+PendingIntent
+- actor_id
+- raw_text
+- suggested_action_keys
+- suggested_primary_action
+- stakes_text
+- status: awaiting_confirmation / resolved / cancelled
+```
+
+This is UI/session state, not authoritative campaign history until resolved.
+
+### 39.2 — Deterministic Intent Classifier
+
+Create a simple deterministic classifier first.
+
+Suggested mapping examples:
+
+```text
+fight keywords: attack, strike, block, duel, kill, smash
+move keywords: sneak, run, climb, dodge, leap, escape
+tinker keywords: open, repair, disable, mechanism, lock, device
+study keywords: read, inspect, analyze, research, mural, book, symbol
+focus keywords: resist, concentrate, calm, endure mentally
+sway keywords: persuade, lie, comfort, command, bargain
+sense keywords: listen, notice, feel, search, detect
+channel keywords: ritual, magic, ghost, spirit, voice, dream
+endure keywords: withstand, survive, hold, bear, take the hit
+```
+
+This classifier should return ranked suggestions, not a final command.
+
+### 39.3 — Framing UI in Chat
+
+When plain chat appears actionable:
+
+- create pending intent,
+- show suggested action chips,
+- do not call `RpgService.resolve_action` yet,
+- let player confirm.
+
+### 39.4 — Confirmation Path
+
+When player clicks a suggested action:
+
+- build `ActionRequest`,
+- resolve through RPG service,
+- apply deterministic world reaction,
+- update memory/proposal/debug as appropriate,
+- narrate outcome.
+
+### 39.5 — No-Roll Path
+
+Allow player or system to mark the intent as `No Roll`.
+
+No-roll intent should:
+
+- go to ordinary DM narration,
+- not create action resolution,
+- not trigger world reaction,
+- possibly allow room memory if `[REMEMBER]` is returned.
+
+## Test Guidance
+
+Add tests for:
+
+- Intent classifier keyword mapping.
+- Multi-suggestion ranking.
+- Unknown intent falls back to no automatic roll.
+- Pending intent is created but not resolved until confirmation.
+- Confirming suggested action resolves via same path as explicit action.
+- No-roll confirmation uses plain chat path.
+- Player actor cannot be changed by LLM suggestion without player confirmation.
+
+Suggested files:
+
+```text
+tests/unit/rpg/test_intent_classifier.py
+tests/unit/views/test_play_view_pending_intent.py
+tests/integration/test_intent_confirmation_loop.py
+```
+
+## Exit Criteria
+
+Phase 39 is complete when:
+
+- [ ] Natural language chat can create a pending intent.
+- [ ] System proposes action choices without resolving automatically.
+- [ ] Player confirmation is required before any RPG action roll.
+- [ ] Confirmed action uses the authoritative RPG/world reaction path.
+- [ ] No-roll path remains available.
+- [ ] LLM does not directly resolve player intent.
+- [ ] Tests cover classifier, confirmation, cancellation, and no-roll paths.
+- [ ] Smoke test shows a full natural-language intent -> suggested action -> confirmed roll -> consequence -> narration flow.
+
+---
+
+# Phase 40 — Campaign Authoring Foundation
+
+## Goal
+
+Begin building the tools needed to author playable campaigns that feed the RPG/world-reaction/memory system intentionally.
+
+This phase should not attempt a full visual campaign editor yet. Start with schemas, CLI tooling, validation, and seed/export support.
+
+## Why This Comes After the RPG UX Work
+
+The runtime model is now clearer:
+
+```text
+Playable campaign data must include:
+- player-controlled actors
+- dungeon-controlled actors
+- NPCs
+- monsters
+- factions
+- room threats
+- clocks
+- action tags
+- stress/fallout hooks
+- approved starter memories
+- draft memories when generated
+- setting/party/level design docs
+```
+
+Authoring tools should produce data that the current runtime can actually use.
+
+## Desired System Behavior
+
+A campaign author or developer should be able to run:
+
+```bash
+python tools/create_campaign.py --slug bone-cathedral --title "The Bone Cathedral"
+python tools/validate_campaign.py --campaign bone-cathedral
+python tools/seed_campaign_rpg.py --campaign bone-cathedral --from manifest.yaml
+```
+
+The system should create or patch a campaign folder containing:
+
+```text
+campaigns/<slug>/
+  dungeon.json
+  session.json
+  campaign.duckdb
+  memory/
+  rpg-memory/
+  setting.md
+  party.md or player_roster.md
+  level_N_design.md
+  campaign_manifest.yaml/json
+```
+
+Do not require the LLM for basic campaign authoring.
+
+## Development Tasks
+
+### 40.1 — Campaign Manifest Schema
+
+Define a manifest format. Start small.
+
+Suggested model:
+
+```text
+CampaignManifest
+- slug
+- title
+- premise
+- dungeon_slug
+- starting_level
+- player_side
+- world_actors
+- factions
+- clocks
+- memory_seeds
+- room_threats
+```
+
+Suggested actor fields:
+
+```text
+ActorManifest
+- slug
+- display_name
+- actor_type: pc / npc / monster / dungeon / faction / dungeon_presence
+- concept
+- status
+- action_ratings
+- stress_tracks
+- tags
+```
+
+Suggested clock fields:
+
+```text
+ClockManifest
+- slug/id
+- label
+- segments
+- filled
+- status
+- clock_level
+- category
+- scope_room_id
+- level_id
+- action_tags
+- visible_to_player
+- stakes
+- completion_effect
+```
+
+### 40.2 — Manifest Validator
+
+Create validation that catches:
+
+- duplicate IDs/slugs,
+- unknown room references,
+- invalid action keys,
+- invalid stress tracks,
+- invalid clock segments,
+- invalid actor types,
+- invalid memory status,
+- room threat references to missing actors/clocks,
+- empty player side.
+
+### 40.3 — Campaign Creation CLI
+
+Create or extend tools for:
+
+```text
+tools/create_campaign.py
+tools/seed_campaign_rpg.py
+tools/validate_campaign.py
+```
+
+The first implementation may be CLI-only.
+
+### 40.4 — Export Existing Campaign as Manifest
+
+Add export support that can generate a manifest-like view from an existing seeded campaign.
+
+This helps convert The Crucible and Tomb of the Forgotten King into reusable examples.
+
+### 40.5 — Example Campaign Manifest
+
+Add one example manifest under:
+
+```text
+examples/campaign_manifests/
+```
+
+The example should be small but complete enough to validate and seed.
+
+## Test Guidance
+
+Add tests for:
+
+- manifest parsing,
+- required fields,
+- invalid actor types,
+- invalid clock references,
+- duplicate IDs,
+- seed idempotency,
+- dry-run behavior,
+- create -> validate -> seed -> export round trip.
+
+Suggested files:
+
+```text
+tests/unit/campaign/test_campaign_manifest.py
+tests/unit/campaign/test_campaign_manifest_validator.py
+tests/integration/test_campaign_authoring_cli.py
+```
+
+Use temporary directories and temporary DuckDB files. Do not mutate real campaign data during tests.
+
+## Exit Criteria
+
+Phase 40 is complete when:
+
+- [ ] A campaign manifest schema exists.
+- [ ] A validator catches common authoring mistakes.
+- [ ] CLI can create or patch a campaign from a manifest.
+- [ ] CLI supports dry-run mode.
+- [ ] CLI is idempotent.
+- [ ] Existing seeded campaign data can be exported or summarized into manifest form.
+- [ ] At least one example manifest exists.
+- [ ] Tests cover manifest parsing, validation, seeding, and round trip.
+- [ ] No visual campaign editor is required yet.
+
+---
+
+# Future Phase Candidates
+
+These are not part of the immediate implementation request unless explicitly approved.
+
+## Phase 41 — AI-Assisted Campaign Drafting
+
+Let the LLM draft campaign manifest changes, but require validation and human approval before writing.
+
+Expected flow:
+
+```text
+User: Add an undead jailer to the ossuary.
+LLM drafts manifest patch.
+Validator checks it.
+User approves.
+Authoring service applies it.
+```
+
+## Phase 42 — Campaign Authoring UI
+
+Add a Design Mode interface for:
+
+- player side,
+- NPCs,
+- monsters,
+- factions,
+- clocks,
+- room threats,
+- memory seeds,
+- validation report.
+
+Do not begin this before the CLI and manifest validator are reliable.
+
+## Phase 43 — Playtest Telemetry and Balance Reports
+
+Generate reports from domain events:
+
+- most-used actions,
+- stress distribution,
+- clocks advanced too often/not enough,
+- fallout frequency,
+- proposal acceptance/rejection rates,
+- memories created/approved/rejected.
+
+---
+
+# Recommended Claude Code Start Prompt
+
+Use this prompt to start the next work session:
+
+```text
+We are starting Phase 37.1 only.
+
+Read:
+- CLAUDE.md
+- spec/PROJECT_INDEX.md
+- spec/TESTING.md
+- docs/ARCHITECTURE.md
+- docs/LLM_AUTHORITY_BOUNDARY.md
+- dungeon_daddy/ui/panels/player_action_panel.py
+- dungeon_daddy/rpg/models.py
+- dungeon_daddy/rpg/actions.py
+- dungeon_daddy/rpg/world_reaction.py
+- dungeon_daddy/rpg/stress_routing.py
+- dungeon_daddy/rpg/proposal.py
+- dungeon_daddy/rpg/proposal_validator.py
+- dungeon_daddy/rpg/proposal_applier.py
+- dungeon_daddy/views/play_view.py
+
+Task:
+Perform Phase 37.1 — RPG Intent and Consequence Stabilization.
+
+Do not implement Phase 38 yet.
+Do not redesign the UI yet.
+Do not add LLM tools.
+Do not allow the LLM to directly mutate authoritative RPG or memory state.
+
+Before coding:
+1. Produce a short TDD checklist for Phase 37.1.
+2. Identify the exact tests to add or update.
+3. Identify the smallest implementation slice.
+4. Wait for approval.
+```
+
+---
+
+# Development Sequence Recommendation
+
+Use this order:
+
+```text
+1. Phase 37.1 — stabilize intent/consequence/proposal visibility.
+2. Manual smoke test both seeded campaigns.
+3. Phase 38 — move primary action loop into chat.
+4. Manual playtest and UX review.
+5. Phase 39 — add intent framing and confirmation.
+6. Manual playtest and UX review.
+7. Phase 40 — authoring foundation.
+```
+
+Do not compress these phases. Each one changes a different risk surface:
+
+```text
+37.1: correctness
+38: UI interaction model
+39: player intent interpretation
+40: content pipeline
+```
+
+Keeping them separate gives the project the best chance of reaching the Dungeon Daddy vision without destabilizing the working RPG foundation.
+
+---
+
+# Final Product Vision Check
+
+A successful implementation should feel like this:
+
+```text
+Player:
+Mara studies the mural to understand what the dungeon wants from her.
+
+Dungeon Daddy:
+That sounds like STUDY. The risk is not physical harm — it is that the mural studies her back.
+[Roll Study] [Use Sense] [No Roll]
+
+Player confirms.
+
+System:
+Mara rolls STUDY — Partial Success.
+World Reaction:
+- The Dungeon Notices Mara +1
+- Weird +1
+
+Dungeon Daddy:
+The mural answers by remembering her before she was born. The painted woman turns her face toward Mara, and for one perfect second, Mara feels recognized.
+```
+
+That is the target: conversational, mechanically grounded, emotionally responsive, and still deterministic where it matters.

@@ -95,10 +95,22 @@ python tools/arcade_stop.py      # stop a manually-started app window
 # Spec Loading Rules
 
 ## IMPLEMENTATION_PHASES.md
-Only if:
+Index only — lists all split files. Do not load the index to read phase specs.
+
+Load the correct split file instead:
+
+| File | Phases |
+|---|---|
+| `spec/IMPLEMENTATION_PHASES_1_10.md` | 1–10 |
+| `spec/IMPLEMENTATION_PHASES_11_18.md` | 11–18 + Post-18 |
+| `spec/IMPLEMENTATION_PHASES_19_25.md` | 19–25 (Map Layout) |
+| `spec/IMPLEMENTATION_PHASES_26_32.md` | 26–32 (RPG Foundation) |
+| `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` | 33–40+ (current + future) |
+
+Load one of these only if:
 - phase is unknown
-- checking exit criteria
-- preparing next phase
+- checking exit criteria for the current phase
+- preparing the next phase
 
 Otherwise: do not open
 
