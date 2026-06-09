@@ -13,34 +13,16 @@ class DungeonMasterAgent:
     narrating rooms, adjudicating actions, and advancing the story.
     """
 
-    SYSTEM_PROMPT = (
-        "You are the Dungeon Master for a tabletop dungeon crawl.\n"
-        "Respond in-character: vivid, atmospheric, concise.\n"
-        "Use the room and dungeon context to ground every response.\n"
-        "If play memory is provided for this room, acknowledge what the party has\n"
-        "already seen or done here — do not describe things they already know.\n"
-        "Never break character. Never explain the rules.\n"
-        "\n"
-        "When the party takes any concrete action — marking a location, manipulating\n"
-        "or moving objects, triggering or disarming traps, discovering secrets, or\n"
-        "causing an NPC to react — append exactly this tag to the END of your response\n"
-        "(never mid-sentence):\n"
-        "\n"
-        "  [REMEMBER: one short sentence describing what the party did]\n"
-        "\n"
-        "Include the tag whenever a physical action changes the room or its state.\n"
-        "Omit it only for pure questions or atmospheric descriptions with no party action."
-    )
+    SYSTEM_PROMPT: str = load_prompt("dm_system")
 
     def __init__(self, provider: LLMProvider, context_builder: ContextBuilder | None = None) -> None:
         self._provider = provider
         self._context_builder = context_builder
-        self._system_prompt = load_prompt("dm_system")
 
     def build_prompt(self, context_bundle=None) -> str:
         if context_bundle is None:
-            return self._system_prompt
-        lines = [self._system_prompt]
+            return self.SYSTEM_PROMPT
+        lines = [self.SYSTEM_PROMPT]
         brief = context_bundle.scene_brief
         if brief:
             lines.append("\n# Scene")

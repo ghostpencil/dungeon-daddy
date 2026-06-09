@@ -1,0 +1,19 @@
+{
+  "roster_init": true,
+  "select_action": true,
+  "reset": true,
+  "single_actor": true,
+  "multi_actor": true,
+  "chips_with_ratings": true,
+  "chips_no_actor": true,
+  "mini_card_stress": true,
+  "mini_card_fallout": true,
+  "bubble_header": true,
+  "bubble_reaction": true,
+  "bubble_no_reaction": true,
+  "chat_action_bubble": true,
+  "chat_intent": true,
+  "state_reset": true,
+  "no_chip_plain": true,
+  "inspector_refresh": true
+}

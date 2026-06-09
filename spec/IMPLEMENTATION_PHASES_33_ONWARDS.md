@@ -510,6 +510,8 @@ Phase 37.1 is complete when:
 
 # Phase 38 â€” Chat-Centered RPG Interaction Refactor
 
+**Status: Complete (2026-06-09) â€” 1920 unit tests passing. Smoke test 18/18 behaviors passing.**
+
 ## Goal
 
 Move the primary player action loop from the right-side RPG panel into the Dungeon Chat experience while preserving the right panel as an RPG/memory/debug inspector.
@@ -1099,47 +1101,6 @@ Generate reports from domain events:
 - proposal acceptance/rejection rates,
 - memories created/approved/rejected.
 
----
-
-# Recommended Claude Code Start Prompt
-
-Use this prompt to start the next work session:
-
-```text
-We are starting Phase 37.1 only.
-
-Read:
-- CLAUDE.md
-- spec/PROJECT_INDEX.md
-- spec/TESTING.md
-- docs/ARCHITECTURE.md
-- docs/LLM_AUTHORITY_BOUNDARY.md
-- dungeon_daddy/ui/panels/player_action_panel.py
-- dungeon_daddy/rpg/models.py
-- dungeon_daddy/rpg/actions.py
-- dungeon_daddy/rpg/world_reaction.py
-- dungeon_daddy/rpg/stress_routing.py
-- dungeon_daddy/rpg/proposal.py
-- dungeon_daddy/rpg/proposal_validator.py
-- dungeon_daddy/rpg/proposal_applier.py
-- dungeon_daddy/views/play_view.py
-
-Task:
-Perform Phase 37.1 â€” RPG Intent and Consequence Stabilization.
-
-Do not implement Phase 38 yet.
-Do not redesign the UI yet.
-Do not add LLM tools.
-Do not allow the LLM to directly mutate authoritative RPG or memory state.
-
-Before coding:
-1. Produce a short TDD checklist for Phase 37.1.
-2. Identify the exact tests to add or update.
-3. Identify the smallest implementation slice.
-4. Wait for approval.
-```
-
----
 
 # Development Sequence Recommendation
 

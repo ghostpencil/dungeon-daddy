@@ -3,6 +3,14 @@ from __future__ import annotations
 
 from dungeon_daddy.rpg.models import ActorState, FalloutRecord
 
+_ACTION_ORDER = [
+    "fight", "move", "tinker", "study",
+    "focus", "sway", "sense", "channel", "endure",
+]
+_PIP_W = 10
+_PIP_H = 8
+_PIP_GAP = 3
+
 
 class CharacterSheetPanel:
     def __init__(self) -> None:
@@ -25,7 +33,12 @@ class CharacterSheetPanel:
 
     def draw(self) -> None:
         import arcade
-        from dungeon_daddy.ui.theme import BG_1, INK_3, FONT_UI, TEXT_SM, PAD_MD
+        from dungeon_daddy.ui.theme import (
+            BG_1, BG_2, BG_3,
+            EMBER, INK_1, INK_2, INK_3, INK_4,
+            TEAL, VIOLET,
+            FONT_UI, TEXT_SM, TEXT_MD, PAD_MD, PAD_SM,
+        )
 
         x, y, w, h = self._x, self._y, self._w, self._h
         arcade.draw_rect_filled(arcade.XYWH(x + w / 2, y + h / 2, w, h), BG_1)
@@ -38,8 +51,83 @@ class CharacterSheetPanel:
             return
 
         cur_y = y + h - PAD_MD
+
+        # --- Actor name + type ---
         arcade.draw_text(
-            f"{self._actor.display_name}  [{self._actor.actor_type}]",
+            self._actor.display_name,
+            x + PAD_MD, cur_y, INK_1,
+            font_size=TEXT_MD, font_name=FONT_UI, bold=True, anchor_y="top",
+        )
+        cur_y -= TEXT_MD + PAD_SM
+        arcade.draw_text(
+            f"[{self._actor.actor_type}]",
             x + PAD_MD, cur_y, INK_3,
             font_size=TEXT_SM, font_name=FONT_UI, anchor_y="top",
         )
+        cur_y -= TEXT_SM + PAD_MD
+
+        # --- Stress tracks ---
+        if self._actor.stress:
+            arcade.draw_text(
+                "STRESS", x + PAD_MD, cur_y, TEAL,
+                font_size=TEXT_SM, font_name=FONT_UI, bold=True, anchor_y="top",
+            )
+            cur_y -= TEXT_SM + PAD_SM
+
+            for track in self._actor.stress.values():
+                label = track.track_key.upper()
+                filled = track.filled
+                capacity = track.capacity
+                at_max = filled >= capacity
+
+                arcade.draw_text(
+                    f"{label}  {filled}/{capacity}",
+                    x + PAD_MD, cur_y, INK_2 if not at_max else EMBER,
+                    font_size=TEXT_SM, font_name=FONT_UI, anchor_y="top",
+                )
+                cur_y -= TEXT_SM + 2
+
+                # pip row
+                pip_x = x + PAD_MD
+                pip_y = cur_y - _PIP_H
+                for i in range(capacity):
+                    if i < filled:
+                        pip_color = EMBER if at_max else TEAL
+                    else:
+                        pip_color = BG_3
+                    arcade.draw_rect_filled(
+                        arcade.XYWH(pip_x + _PIP_W / 2, pip_y + _PIP_H / 2, _PIP_W, _PIP_H),
+                        pip_color,
+                    )
+                    pip_x += _PIP_W + _PIP_GAP
+
+                cur_y -= _PIP_H + PAD_SM
+
+        cur_y -= PAD_SM
+
+        # --- Action ratings ---
+        if self._actor.actions:
+            arcade.draw_text(
+                "ACTIONS", x + PAD_MD, cur_y, VIOLET,
+                font_size=TEXT_SM, font_name=FONT_UI, bold=True, anchor_y="top",
+            )
+            cur_y -= TEXT_SM + PAD_SM
+
+            col_w = (w - PAD_MD * 2) / 3
+            col = 0
+            row_x = x + PAD_MD
+            row_y = cur_y
+
+            for key in _ACTION_ORDER:
+                rating = self._actor.actions.get(key, 0)
+                color = INK_2 if rating > 0 else INK_4
+                label = f"{key.upper()[:3]}  {rating}"
+                ax = row_x + col * col_w
+                arcade.draw_text(
+                    label, ax, row_y, color,
+                    font_size=TEXT_SM, font_name=FONT_UI, anchor_y="top",
+                )
+                col += 1
+                if col >= 3:
+                    col = 0
+                    row_y -= TEXT_SM + PAD_SM

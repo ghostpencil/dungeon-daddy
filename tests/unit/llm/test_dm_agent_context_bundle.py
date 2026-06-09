@@ -195,4 +195,4 @@ def test_build_prompt_no_bundle_returns_system_prompt():
     from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
     agent = DungeonMasterAgent(provider=_MockProvider())
     result = agent.build_prompt(context_bundle=None)
-    assert result == agent._system_prompt
+    assert result == DungeonMasterAgent.SYSTEM_PROMPT
