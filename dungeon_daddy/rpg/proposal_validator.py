@@ -27,6 +27,7 @@ class ValidationResult:
     accepted: list[ProposedChange] = field(default_factory=list)
     rejected: list[RejectedChange] = field(default_factory=list)
     source: Literal["deterministic", "llm_draft", "human_approved"] = "llm_draft"
+    parse_status: str | None = None
 
 
 def validate_proposal(

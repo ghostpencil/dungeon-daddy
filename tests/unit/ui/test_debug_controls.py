@@ -554,3 +554,157 @@ def test_proposal_section_lines_shows_applied_count():
     )
     text = "\n".join(ctrl.proposal_section_lines())
     assert "Applied: 1" in text
+
+
+def test_proposal_section_lines_shows_skipped_count():
+    from dungeon_daddy.rpg.proposal import ApplyConsequenceChange
+    change = ApplyConsequenceChange(
+        actor_id="actor_mara", track_key="body", amount=1, reason="dup"
+    )
+    ctrl = _controls()
+    ctrl.set_proposal_result(
+        _validation_result(),
+        _apply_result(skipped=[change]),
+    )
+    text = "\n".join(ctrl.proposal_section_lines())
+    assert "Skipped: 1" in text
+
+
+def test_proposal_section_lines_shows_skipped_kind():
+    from dungeon_daddy.rpg.proposal import ApplyConsequenceChange
+    change = ApplyConsequenceChange(
+        actor_id="actor_mara", track_key="body", amount=1, reason="dup"
+    )
+    ctrl = _controls()
+    ctrl.set_proposal_result(
+        _validation_result(),
+        _apply_result(skipped=[change]),
+    )
+    text = "\n".join(ctrl.proposal_section_lines())
+    assert "[SKIPPED]" in text
+    assert "apply_consequence" in text
+
+
+# ---------------------------------------------------------------------------
+# Phase 37.1.5 — last_action_section_lines
+# ---------------------------------------------------------------------------
+
+def test_last_action_section_lines_no_resolution():
+    ctrl = _controls()
+    lines = ctrl.last_action_section_lines()
+    assert any("No action" in line for line in lines)
+
+
+def test_last_action_section_lines_shows_actor_and_action():
+    ctrl = _controls()
+    ctrl.resolve_sample_action(
+        ActionRequest(campaign_id="c1", actor_id="hero", action_key="hunt", dice_pool=2),
+        fixed=[5, 5],
+    )
+    text = "\n".join(ctrl.last_action_section_lines())
+    assert "hero" in text
+    assert "hunt" in text
+
+
+def test_last_action_section_lines_shows_intent():
+    ctrl = _controls()
+    ctrl.resolve_sample_action(
+        ActionRequest(campaign_id="c1", actor_id="a1", action_key="study", dice_pool=1, intent="ritual"),
+        fixed=[6],
+    )
+    text = "\n".join(ctrl.last_action_section_lines())
+    assert "ritual" in text
+
+
+def test_last_action_section_lines_shows_none_when_no_intent():
+    ctrl = _controls()
+    ctrl.resolve_sample_action(
+        ActionRequest(campaign_id="c1", actor_id="a1", action_key="hunt", dice_pool=1),
+        fixed=[3],
+    )
+    text = "\n".join(ctrl.last_action_section_lines())
+    assert "(none)" in text
+
+
+def test_last_action_section_lines_shows_dice_and_outcome():
+    ctrl = _controls()
+    ctrl.resolve_sample_action(
+        ActionRequest(campaign_id="c1", actor_id="a1", action_key="hunt", dice_pool=2),
+        fixed=[6, 6],
+    )
+    text = "\n".join(ctrl.last_action_section_lines())
+    assert "6" in text
+    assert "critical" in text
+
+
+# ---------------------------------------------------------------------------
+# Phase 37.1.5 — reaction_section_lines structured deterministic output
+# ---------------------------------------------------------------------------
+
+def test_reaction_section_lines_shows_deterministic_header():
+    ctrl = _controls()
+    ctrl.set_reaction(_world_reaction("miss"))
+    text = "\n".join(ctrl.reaction_section_lines())
+    assert "eterministic" in text  # "Deterministic" header present
+
+
+def test_reaction_section_lines_shows_clock_line_detail():
+    ctrl = _controls()
+    ctrl.set_reaction(_world_reaction("miss"))
+    text = "\n".join(ctrl.reaction_section_lines())
+    assert "Heat Rising" in text
+    assert "+2" in text
+
+
+def test_reaction_section_lines_shows_stress_line_detail():
+    ctrl = _controls()
+    ctrl.set_reaction(_world_reaction("miss"))
+    text = "\n".join(ctrl.reaction_section_lines())
+    assert "body" in text
+    assert "Hero" in text
+
+
+def test_reaction_section_lines_shows_fallout_when_triggered():
+    from dungeon_daddy.rpg.models import ReactionStressLine, WorldReaction
+    stress_line = ReactionStressLine(
+        actor_id="a1", display_name="Hero", track_key="composure",
+        amount=3, new_filled=6, triggered_fallout=True, reason="severe hit",
+    )
+    wr = WorldReaction(
+        reaction_id="r2", campaign_id="c1", source_resolution_id="res2",
+        outcome="miss", stress_lines=[stress_line],
+    )
+    ctrl = _controls()
+    ctrl.set_reaction(wr)
+    text = "\n".join(ctrl.reaction_section_lines())
+    assert "FALLOUT" in text.upper()
+
+
+def test_reaction_section_lines_no_clocks_no_stress_shows_nothing_changed():
+    from dungeon_daddy.rpg.models import WorldReaction
+    wr = WorldReaction(
+        reaction_id="r3", campaign_id="c1", source_resolution_id="res3",
+        outcome="full",
+    )
+    ctrl = _controls()
+    ctrl.set_reaction(wr)
+    text = "\n".join(ctrl.reaction_section_lines())
+    assert "nothing" in text.lower() or "none" in text.lower() or "0" in text
+
+
+# ---------------------------------------------------------------------------
+# Phase 37.1.5 — proposal parse_status display
+# ---------------------------------------------------------------------------
+
+def test_proposal_section_lines_shows_parse_status_when_present():
+    ctrl = _controls()
+    ctrl.set_proposal_result(_validation_result(parse_status="ok"))
+    text = "\n".join(ctrl.proposal_section_lines())
+    assert "ok" in text
+
+
+def test_proposal_section_lines_omits_parse_status_when_none():
+    ctrl = _controls()
+    ctrl.set_proposal_result(_validation_result())
+    text = "\n".join(ctrl.proposal_section_lines())
+    assert "parse_status" not in text

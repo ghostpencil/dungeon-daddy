@@ -31,13 +31,38 @@ class DebugControls:
         self._current_level_id: str | None = None
         self._current_level_room_ids: set[str] = set()
 
+    def last_action_section_lines(self) -> list[str]:
+        if self._last_resolution is None:
+            return ["No action yet"]
+        r = self._last_resolution
+        return [
+            "Last action:",
+            f"  Actor:   {r.actor_id}",
+            f"  Action:  {r.action_key}",
+            f"  Intent:  {r.intent if r.intent else '(none)'}",
+            f"  Dice:    {r.dice_rolled}",
+            f"  Outcome: {r.outcome}",
+        ]
+
     def set_reaction(self, reaction: WorldReaction) -> None:
         self._last_reaction = reaction
 
     def reaction_section_lines(self) -> list[str]:
         if self._last_reaction is None:
             return ["No reaction yet"]
-        return list(self._last_reaction.summary_lines)
+        r = self._last_reaction
+        lines = [f"Deterministic reaction ({r.outcome.upper()}):"]
+        if not r.clock_lines and not r.stress_lines:
+            lines.append("  (nothing changed)")
+            return lines
+        for cl in r.clock_lines:
+            lines.append(f"  Clock [{cl.label}]: +{cl.ticks} → {cl.new_filled}/{cl.new_status}")
+        for sl in r.stress_lines:
+            fallout = "  [FALLOUT]" if sl.triggered_fallout else ""
+            lines.append(
+                f"  Stress [{sl.display_name} / {sl.track_key}]: +{sl.amount} → {sl.new_filled}{fallout}"
+            )
+        return lines
 
     def set_current_level_id(self, level_id: str | None) -> None:
         self._current_level_id = level_id
@@ -179,12 +204,21 @@ class DebugControls:
         v = self._last_validation
         ar = self._last_apply_result
         applied_count = len(ar.applied) if ar is not None else 0
-        lines = [f"Proposal [source: {v.source}]"]
-        lines.append(f"  Accepted: {len(v.accepted)}  Rejected: {len(v.rejected)}  Applied: {applied_count}")
+        skipped_count = len(ar.skipped) if ar is not None else 0
+        lines = [f"LLM proposal [source: {v.source}]"]
+        if v.parse_status is not None:
+            lines.append(f"  Parse: {v.parse_status}")
+        lines.append(
+            f"  Accepted: {len(v.accepted)}  Rejected: {len(v.rejected)}"
+            f"  Applied: {applied_count}  Skipped: {skipped_count}"
+        )
         for rc in v.rejected:
             lines.append(f"  [REJECTED] {rc.change.kind}: {rc.reason}")
         for ac in v.accepted:
             lines.append(f"  [ACCEPTED] {ac.kind}")
+        if ar is not None:
+            for sk in ar.skipped:
+                lines.append(f"  [SKIPPED] {sk.kind}")
         return lines
 
     def create_test_memory_note(self, campaign_id: str, title: str) -> MemoryEntry:

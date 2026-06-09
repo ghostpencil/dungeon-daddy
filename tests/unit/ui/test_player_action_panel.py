@@ -118,6 +118,32 @@ class TestBuildRequest:
         )
         assert req.momentum_spend == 2
 
+    def test_intent_preserved_in_request(self):
+        panel = _panel()
+        req = panel._build_request(
+            campaign_id="c1",
+            actor_id="a1",
+            intent="I study the mural to resist the dungeon's seductive memory.",
+            action_key="study",
+            push_yourself=False,
+            momentum_spend=0,
+            dice_pool=1,
+        )
+        assert req.intent == "I study the mural to resist the dungeon's seductive memory."
+
+    def test_empty_intent_preserved(self):
+        panel = _panel()
+        req = panel._build_request(
+            campaign_id="c1",
+            actor_id="a1",
+            intent="",
+            action_key="fight",
+            push_yourself=False,
+            momentum_spend=0,
+            dice_pool=1,
+        )
+        assert req.intent == ""
+
 
 # ---------------------------------------------------------------------------
 # Slice 4 — _format_result summarises ActionResolution for display

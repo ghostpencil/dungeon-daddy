@@ -175,3 +175,36 @@ def test_intent_weird_beats_bonds_when_both_match():
 
 def test_no_intent_no_clocks_uses_action_key():
     assert choose_stress_track(action_key="sense", intent=None) == "composure"
+
+
+# ---------------------------------------------------------------------------
+# 37.1.3 — Intent overrides action-key default (no clocks)
+# ---------------------------------------------------------------------------
+
+def test_study_intent_ritual_dungeon_voice_routes_to_weird():
+    # "study" defaults to composure; intent keywords override to weird
+    assert choose_stress_track(
+        action_key="study", intent="I begin a ritual in the dungeon and hear a voice"
+    ) == "weird"
+
+
+def test_move_intent_protect_ally_promise_routes_to_bonds():
+    # "move" defaults to body; intent keywords override to bonds
+    assert choose_stress_track(
+        action_key="move", intent="I protect my ally and keep my promise"
+    ) == "bonds"
+
+
+def test_tinker_intent_fear_nightmare_truth_routes_to_composure():
+    # "tinker" defaults to body; intent keywords override to composure
+    assert choose_stress_track(
+        action_key="tinker", intent="I face a fear born of nightmare and truth"
+    ) == "composure"
+
+
+def test_clock_category_danger_beats_intent_ritual():
+    # clock category "danger" → body; intent "ritual" would give weird — category wins
+    clock = _clock_with_category("danger")
+    assert choose_stress_track(
+        action_key="study", intent="I perform a ritual", matched_clocks=[clock]
+    ) == "body"

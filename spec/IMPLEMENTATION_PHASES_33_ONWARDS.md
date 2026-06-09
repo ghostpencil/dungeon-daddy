@@ -493,16 +493,18 @@ The smoke artifact should show:
 
 Phase 37.1 is complete when:
 
-- [ ] Player intent is preserved from UI to `ActionRequest`.
-- [ ] Player intent is preserved from `ActionRequest` to `ActionResolution`.
-- [ ] World reaction uses populated intent for stress routing.
-- [ ] Proposal pipeline receives populated intent.
-- [ ] Debug display distinguishes deterministic consequences from LLM proposals.
-- [ ] LLM-created memory remains draft by default.
-- [ ] No direct LLM mutation of authoritative state is introduced.
-- [ ] Unit tests cover intent preservation and stress routing precedence.
-- [ ] Existing Phase 37 smoke test still passes.
-- [ ] No known failures are introduced.
+- [x] Player intent is preserved from UI to `ActionRequest`.
+- [x] Player intent is preserved from `ActionRequest` to `ActionResolution`.
+- [x] World reaction uses populated intent for stress routing.
+- [x] Proposal pipeline receives populated intent.
+- [x] Debug display distinguishes deterministic consequences from LLM proposals.
+- [x] LLM-created memory remains draft by default.
+- [x] No direct LLM mutation of authoritative state is introduced.
+- [x] Unit tests cover intent preservation and stress routing precedence.
+- [x] Existing Phase 37 smoke test still passes.
+- [x] No known failures are introduced.
+
+**Status: Complete — 2026-06-09. 1839 unit tests passing.**
 
 ---
 
