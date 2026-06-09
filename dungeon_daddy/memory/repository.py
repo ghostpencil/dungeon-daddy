@@ -743,7 +743,8 @@ class MemoryRepository:
         assert self._conn is not None
         rows = self._conn.execute(
             """
-            SELECT fallout_id, campaign_id, actor_id, track_key, severity, status
+            SELECT fallout_id, campaign_id, actor_id, track_key, severity,
+                   title, summary, status
             FROM fallout
             WHERE campaign_id = ? AND actor_id = ?
             ORDER BY fallout_id
@@ -757,7 +758,9 @@ class MemoryRepository:
                 "actor_id": r[2],
                 "track_key": r[3],
                 "severity": r[4],
-                "status": r[5],
+                "title": r[5],
+                "summary": r[6],
+                "status": r[7],
             }
             for r in rows
         ]

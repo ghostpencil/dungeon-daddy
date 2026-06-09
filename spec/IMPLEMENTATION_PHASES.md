@@ -9,10 +9,10 @@ Load only the file that covers the phase you are working on.
 | [IMPLEMENTATION_PHASES_11_18.md](IMPLEMENTATION_PHASES_11_18.md) | 11–18 + Post-18 | Complete |
 | [IMPLEMENTATION_PHASES_19_25.md](IMPLEMENTATION_PHASES_19_25.md) | 19–25 (Map Layout) | Complete |
 | [IMPLEMENTATION_PHASES_26_32.md](IMPLEMENTATION_PHASES_26_32.md) | 26–32 (RPG + Memory Foundation) | Complete |
-| [IMPLEMENTATION_PHASES_33_ONWARDS.md](IMPLEMENTATION_PHASES_33_ONWARDS.md) | 33–40+ (Active Play Loop + Future Roadmap) | 33–37.1 Complete; 38–40 Planned |
+| [IMPLEMENTATION_PHASES_33_ONWARDS.md](IMPLEMENTATION_PHASES_33_ONWARDS.md) | 33–40+ (Active Play Loop + Future Roadmap) | 33–38 Complete; 39–40 Planned |
 
 ## Current phase
 
-Phase 37.1 is complete. Next phase is **38 — Chat-Centered RPG Interaction Refactor**.
+Phase 38 is complete. Next phase is **39 — Intent Framing and Player Confirmation**.
 
 See `IMPLEMENTATION_PHASES_33_ONWARDS.md` for the full spec.

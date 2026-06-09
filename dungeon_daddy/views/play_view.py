@@ -19,12 +19,14 @@ from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
 from dungeon_daddy.memory.models import MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.actor_control import filter_player_actors
-from dungeon_daddy.rpg.models import ActorState
+from dungeon_daddy.rpg.models import ActorState, StressTrack
 from dungeon_daddy.rpg.proposal import parse_proposal
 from dungeon_daddy.rpg.proposal_applier import ApplyResult, apply_low_risk_proposals
 from dungeon_daddy.rpg.proposal_validator import ValidationResult, validate_proposal
 from dungeon_daddy.rpg.service import RpgService
 from dungeon_daddy.ui.chrome import MenuBar, draw_title_bar
+from dungeon_daddy.ui.mechanical_bubble import format_mechanical_bubble
+from dungeon_daddy.ui.player_action_state import PlayerActionState
 from dungeon_daddy.ui.panels.character_sheet_panel import CharacterSheetPanel
 from dungeon_daddy.ui.panels.chat_panel import ChatPanel
 from dungeon_daddy.ui.panels.debug_controls import DebugControls
@@ -343,6 +345,7 @@ class PlayView(arcade.View):
         self._rpg_toggle_rect: tuple[float, float, float, float] | None = None
         self._rpg_action.set_resolve_callback(self._on_resolve_action)
         self._rpg_campaign_id: str | None = None
+        self._action_state = PlayerActionState()
 
     # ------------------------------------------------------------------
     # View lifecycle
@@ -613,6 +616,14 @@ class PlayView(arcade.View):
                 r["action_key"]: r["rating"]
                 for r in self._mem_repo.get_actor_action_ratings(a["actor_id"])
             }
+            stress = {
+                t["track_key"]: StressTrack(
+                    track_key=t["track_key"],
+                    capacity=t["capacity"],
+                    filled=t["filled"],
+                )
+                for t in self._mem_repo.get_actor_stress_tracks(a["actor_id"])
+            }
             actor_states.append(ActorState(
                 actor_id=a["actor_id"],
                 campaign_id=a["campaign_id"],
@@ -621,6 +632,7 @@ class PlayView(arcade.View):
                 display_name=a["display_name"],
                 status=a["status"],
                 actions=ratings,
+                stress=stress,
             ))
         self._rpg_action.set_actors(filter_player_actors(actor_states))
 
@@ -647,6 +659,88 @@ class PlayView(arcade.View):
                 tags=tags,
             ))
         self._rpg_memory.set_entries(entries)
+
+    def _run_chat_action(
+        self,
+        campaign_id: str,
+        actor_id: str,
+        action_key: str,
+        intent: str,
+    ) -> None:
+        if self._rpg_service is None:
+            self._chat.add_message("system", "RPG service unavailable.")
+            return
+        actor = next(
+            (a for a in self._rpg_action._actors if a.actor_id == actor_id),
+            None,
+        )
+        dice_pool = (actor.actions.get(action_key) or 1) if actor else 1
+        actor_name = actor.display_name if actor else actor_id
+        request = self._rpg_action._build_request(
+            campaign_id=campaign_id,
+            actor_id=actor_id,
+            intent=intent,
+            action_key=action_key,
+            push_yourself=False,
+            momentum_spend=0,
+            dice_pool=dice_pool,
+        )
+        try:
+            resolution, _event = self._rpg_service.resolve_action(request)
+            summary = self._rpg_action._format_result(resolution)
+            self._rpg_action.store_result(summary)
+            reaction = self._apply_world_reaction(resolution)
+            self._run_proposal_pipeline(resolution, campaign_id)
+            self._chat.add_message(
+                "system",
+                format_mechanical_bubble(actor_name, action_key, resolution, reaction),
+            )
+            if self._dungeon is not None and self._state is not None:
+                level = self._dungeon.levels[self._state.current_level_idx]
+                room = None
+                if self._state.current_room_id:
+                    room_map = {r.id: r for r in level.rooms}
+                    room = room_map.get(self._state.current_room_id)
+                if room is None:
+                    self._chat.add_message("system", "Select a room to get DM narration.")
+                else:
+                    outcome = resolution.outcome.upper()
+                    msg = (
+                        f"{actor_name} [{action_key.upper()}] {intent or '(no intent)'}"
+                        f" — {outcome}"
+                    )
+                    self._compact_history()
+                    self._dm_history.append(LLMMessage(role="user", content=msg))
+                    self._chat.set_busy(True)
+                    self._spawn_dm_thread(room, level)
+            self._refresh_right_panel_from_actors(actor_id)
+        except Exception:
+            _log.exception("_run_chat_action failed")
+
+    def _refresh_right_panel_from_actors(self, actor_id: str) -> None:
+        """Sync right panel inspector with the actor who just acted."""
+        actors = getattr(self._rpg_action, "_actors", [])
+        if not actors:
+            return
+        actor = next((a for a in actors if a.actor_id == actor_id), actors[0])
+        self._rpg_char.set_actor(actor)
+        if self._mem_repo is not None and self._rpg_campaign_id:
+            from dungeon_daddy.rpg.models import FalloutRecord
+            raw = self._mem_repo.get_fallout_records(self._rpg_campaign_id, actor.actor_id)
+            entries = [
+                FalloutRecord(
+                    fallout_id=r["fallout_id"],
+                    campaign_id=r["campaign_id"],
+                    actor_id=r["actor_id"],
+                    track_key=r["track_key"],
+                    severity=r["severity"],
+                    title=r["title"],
+                    summary=r["summary"],
+                    status=r["status"],
+                )
+                for r in raw
+            ]
+            self._rpg_fallout.set_entries(entries)
 
     def _on_resolve_action(
         self,
@@ -698,6 +792,7 @@ class PlayView(arcade.View):
                     self._dm_history.append(LLMMessage(role="user", content=msg))
                     self._chat.set_busy(True)
                     self._spawn_dm_thread(room, level)
+            self._refresh_right_panel_from_actors(actor_id)
         except Exception:
             _log.exception("resolve_action failed")
 
@@ -755,13 +850,13 @@ class PlayView(arcade.View):
             apply_result = ApplyResult()
         self._rpg_debug.set_proposal_result(validation_result, apply_result)
 
-    def _apply_world_reaction(self, resolution) -> None:
+    def _apply_world_reaction(self, resolution):
         if self._rpg_service is None or self._mem_repo is None:
-            return
+            return None
         campaign_id = self._rpg_campaign_id
         if campaign_id is None:
-            return
-        from dungeon_daddy.rpg.models import ClockState, StressTrack
+            return None
+        from dungeon_daddy.rpg.models import ClockState
         raw_clocks = self._mem_repo.get_clocks(campaign_id)
         threat_clocks = [
             ClockState(
@@ -827,8 +922,10 @@ class PlayView(arcade.View):
                 )
             if self._rpg_debug is not None:
                 self._rpg_debug.set_reaction(reaction)
+            return reaction
         except Exception:
             _log.exception("world_reaction failed")
+        return None
 
     # ------------------------------------------------------------------
     # Map variant switching
@@ -988,6 +1085,19 @@ class PlayView(arcade.View):
             return
         if self._dungeon is None or self._state is None:
             self._chat.add_message("system", "No dungeon loaded.")
+            return
+        if self._action_state.action_key is not None:
+            campaign_id = self._rpg_campaign_id or self._state.dungeon_id
+            if not self._state.current_room_id:
+                self._chat.add_message("system", "Select a room to resolve an action.")
+                return
+            self._run_chat_action(
+                campaign_id,
+                self._action_state.actor_id or "",
+                self._action_state.action_key,
+                text,
+            )
+            self._action_state.reset()
             return
         level = self._dungeon.levels[self._state.current_level_idx]
         room = None
