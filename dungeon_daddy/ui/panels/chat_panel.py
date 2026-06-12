@@ -1,17 +1,20 @@
 """Chat panel — message history display and input area for Design Mode."""
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Callable
 
 import arcade
 import arcade.gui
 
 from dungeon_daddy.data.models import ChatMessage
+from dungeon_daddy.ui.actor_mini_card import ActorMiniCardData
 from dungeon_daddy.ui.theme import (
     BG_0,
     BG_1,
     BG_2,
     BG_3,
+    BG_HI,
     FONT_MONO,
     FONT_SERIF,
     FONT_UI,
@@ -41,10 +44,14 @@ from dungeon_daddy.ui.widgets.markdown_label import MarkdownLabel
 
 HEADER_H = 38
 ROOM_BANNER_H = 80   # play mode only: CURRENT ROOM banner below header
-INPUT_AREA_H = 104   # chips (20) + gap (6) + input (62) + padding (8+8)
+INPUT_AREA_H = 122   # design mode: chips (20) + gap (6) + input (62) + padding (8+8+16)
 INPUT_H = 62         # height of the editable input box (~3 lines)
 _INPUT_Y_OFF = 8     # distance from panel bottom to input box bottom
-_CHIP_CY_OFF = 86    # distance from panel bottom to chip row centre
+_CHIP_CY_OFF = 86    # distance from panel bottom to chip row centre (design mode)
+_PLAY_INPUT_AREA_H = 176  # play mode: char card (96) + gap (6) + input (70) + top pad (4)
+_CHAR_CARD_H = 96         # character card height
+_CHAR_CARD_Y_BOT = 76     # card bottom offset from panel bottom (_INPUT_Y_OFF + INPUT_H + 6)
+_PORTRAIT_W = 58          # width of portrait section including divider
 _LABEL_H = 20  # height reserved at top of each bubble for the role label
 _SCROLL_SPEED = 30  # pixels per mouse wheel click
 _CHIPS_DESIGN = [
@@ -53,12 +60,15 @@ _CHIPS_DESIGN = [
     "Rebalance loot",
     "Generate next level",
 ]
-_CHIPS_PLAY = [
-    "Describe room",
-    "Search for traps",
-    "Roll initiative",
-    "Listen at the door",
-]
+_ACTION_ORDER = ["fight", "move", "tinker", "study", "focus", "sway", "sense", "channel", "endure"]
+
+
+@dataclasses.dataclass
+class _ActionCardData:
+    actor_name: str
+    intent_text: str
+    action_keys: list[str]
+    resolved_label: str | None = None
 
 
 class ChatPanel:
@@ -97,6 +107,17 @@ class ChatPanel:
         self._chip_rects: list[tuple[float, float, float, float, str]] = []
         self._context_loaded: bool = False
         self._label_cache: dict[int, MarkdownLabel] = {}
+        self._pending_chips: list[str] | None = None
+        self._on_chip_click: Callable[[str], None] | None = None
+        self._actor_mini_card: ActorMiniCardData | None = None
+        self._has_multiple_actors: bool = False
+        self._actor_switch_callback: Callable[[str], None] | None = None
+        self._mini_card_prev_rect: tuple[float, float, float, float] | None = None
+        self._mini_card_next_rect: tuple[float, float, float, float] | None = None
+        self._action_cards: dict[int, _ActionCardData] = {}
+        self._active_card_index: int | None = None
+        self._active_card_button_rects: list[tuple[str, tuple[float, float, float, float]]] = []
+        self._hovered_card_button: str | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -250,6 +271,49 @@ class ChatPanel:
     def set_context_loaded(self, loaded: bool) -> None:
         self._context_loaded = loaded
 
+    def set_pending_chips(self, chips: list[str] | None) -> None:
+        self._pending_chips = chips
+
+    def set_chip_click_callback(self, fn: Callable[[str], None]) -> None:
+        self._on_chip_click = fn
+
+    def set_actor_mini_card(self, card: ActorMiniCardData | None) -> None:
+        self._actor_mini_card = card
+
+    def set_has_multiple_actors(self, flag: bool) -> None:
+        self._has_multiple_actors = flag
+
+    def set_actor_switch_callback(self, fn: Callable[[str], None]) -> None:
+        self._actor_switch_callback = fn
+
+    def add_action_card(
+        self,
+        actor_name: str,
+        intent_text: str,
+        action_keys: list[str],
+    ) -> None:
+        """Add an interactive action card as a chat message. Only one card is active."""
+        msg_index = len(self._messages)
+        self._messages.append(ChatMessage(role="action_card", content=""))  # type: ignore[arg-type]
+        truncated = intent_text[:60] if len(intent_text) > 60 else intent_text
+        self._action_cards[msg_index] = _ActionCardData(
+            actor_name=actor_name,
+            intent_text=truncated,
+            action_keys=action_keys,
+        )
+        self._active_card_index = msg_index
+        self._active_card_button_rects = []
+        self._scroll_to_bottom()
+
+    def resolve_active_card(self, chosen_label: str) -> None:
+        """Mark the active card resolved. Chosen label is highlighted; card becomes inert."""
+        if self._active_card_index is None:
+            return
+        card = self._action_cards.get(self._active_card_index)
+        if card is not None:
+            card.resolved_label = chosen_label
+        self._active_card_button_rects = []
+
     def set_current_room(self, name: str, note: str = "", room_id: str = "") -> None:
         self._current_room_name = name
         self._current_room_note = note
@@ -266,15 +330,59 @@ class ChatPanel:
     def on_mouse_press(self, x: float, y: float) -> bool:
         if self._busy:
             return False
+        if self._mini_card_prev_rect is not None:
+            left, bot, right, top = self._mini_card_prev_rect
+            if left <= x <= right and bot <= y <= top:
+                if self._actor_switch_callback is not None:
+                    self._actor_switch_callback("prev")
+                return True
+        if self._mini_card_next_rect is not None:
+            left, bot, right, top = self._mini_card_next_rect
+            if left <= x <= right and bot <= y <= top:
+                if self._actor_switch_callback is not None:
+                    self._actor_switch_callback("next")
+                return True
+        # Active action card buttons (only when card is not yet resolved)
+        if self._active_card_index is not None:
+            card = self._action_cards.get(self._active_card_index)
+            if card is not None and card.resolved_label is None:
+                for label, (bx, by, bw, bh) in self._active_card_button_rects:
+                    if bx <= x < bx + bw and by <= y < by + bh:
+                        if self._on_chip_click is not None:
+                            self._on_chip_click(label)
+                        return True
         for left, bot, right, top, text in self._chip_rects:
             if left <= x <= right and bot <= y <= top:
-                self._on_send(text)
+                if self._pending_chips is not None:
+                    if self._on_chip_click is not None:
+                        self._on_chip_click(text)
+                else:
+                    self._on_send(text)
                 return True
         return False
 
+    def on_mouse_motion(self, x: float, y: float) -> None:
+        """Update hover state for active action card buttons."""
+        if self._active_card_index is None:
+            self._hovered_card_button = None
+            return
+        card = self._action_cards.get(self._active_card_index)
+        if card is None or card.resolved_label is not None:
+            self._hovered_card_button = None
+            return
+        for label, (bx, by, bw, bh) in self._active_card_button_rects:
+            if bx <= x < bx + bw and by <= y < by + bh:
+                self._hovered_card_button = label
+                return
+        self._hovered_card_button = None
+
+    @property
+    def _input_area_h(self) -> float:
+        return _PLAY_INPUT_AREA_H if self._mode == "play" else INPUT_AREA_H
+
     def on_mouse_scroll(self, x: float, y: float, scroll_y: float) -> None:
         """Handle mouse wheel scroll over the message area."""
-        chat_y_bot = self._y + INPUT_AREA_H
+        chat_y_bot = self._y + self._input_area_h
         chat_y_top = self._y + self._h - HEADER_H
         if not (self._x <= x <= self._x + self._w and chat_y_bot <= y <= chat_y_top):
             return
@@ -300,7 +408,8 @@ class ChatPanel:
 
         # Chat messages drawn FIRST so header/input backgrounds clip any overflow
         _banner_h = ROOM_BANNER_H if self._mode == "play" else 0
-        self._draw_messages(x, y + INPUT_AREA_H, w, h - HEADER_H - _banner_h - INPUT_AREA_H)
+        iah = self._input_area_h
+        self._draw_messages(x, y + iah, w, h - HEADER_H - _banner_h - iah)
 
         # Header bar — drawn on top to hide any message overflow at the top
         arcade.draw_rect_filled(
@@ -349,22 +458,154 @@ class ChatPanel:
 
         # Input area — drawn on top to hide any message overflow at the bottom
         arcade.draw_rect_filled(
-            arcade.XYWH(x + w / 2, y + INPUT_AREA_H / 2, w, INPUT_AREA_H), BG_1
+            arcade.XYWH(x + w / 2, y + iah / 2, w, iah), BG_1
         )
-        arcade.draw_line(x, y + INPUT_AREA_H, x + w, y + INPUT_AREA_H, LINE, 1)
+        arcade.draw_line(x, y + iah, x + w, y + iah, LINE, 1)
 
-        # Quick chips (row above input field) — width sized to text
-        _CHIP_CHAR_W = 7  # approx px per char for FONT_MONO TEXT_SM
-        _CHIP_GAP = 8
+        # Quick chips — design mode always; play mode only when pending_chips is set
         self._chip_rects = []
-        chip_x = x + PAD_SM
-        _chips = _CHIPS_PLAY if self._mode == "play" else _CHIPS_DESIGN
-        for chip in _chips:
-            chip_w = len(chip) * _CHIP_CHAR_W + PAD_SM * 2
+        if self._mode == "design":
+            _chips: list[str] = self._pending_chips if self._pending_chips is not None else _CHIPS_DESIGN
+            _CHIP_CHAR_W = 7
+            _CHIP_GAP = 8
+            chip_x = x + PAD_SM
+            for chip in _chips:
+                chip_w = len(chip) * _CHIP_CHAR_W + PAD_SM * 2
+                cy = y + _CHIP_CY_OFF
+                draw_chip(chip, chip_x + chip_w / 2, cy, "default", width=chip_w)
+                self._chip_rects.append((chip_x, cy - 10, chip_x + chip_w, cy + 10, chip))
+                chip_x += chip_w + _CHIP_GAP
+        elif self._pending_chips is not None:
+            _CHIP_CHAR_W = 7
+            _CHIP_GAP = 8
+            chip_x = x + PAD_SM
             cy = y + _CHIP_CY_OFF
-            draw_chip(chip, chip_x + chip_w / 2, cy, "default", width=chip_w)
-            self._chip_rects.append((chip_x, cy - 10, chip_x + chip_w, cy + 10, chip))
-            chip_x += chip_w + _CHIP_GAP
+            for chip in self._pending_chips:
+                chip_w = len(chip) * _CHIP_CHAR_W + PAD_SM * 2
+                draw_chip(chip, chip_x + chip_w / 2, cy, "default", width=chip_w)
+                self._chip_rects.append((chip_x, cy - 10, chip_x + chip_w, cy + 10, chip))
+                chip_x += chip_w + _CHIP_GAP
+
+        # Character card (play mode only)
+        self._mini_card_prev_rect = None
+        self._mini_card_next_rect = None
+        if self._mode == "play" and self._actor_mini_card is not None:
+            self._draw_character_card(x, y, w)
+
+    def _draw_character_card(self, x: float, y: float, w: float) -> None:
+        """Render the character card above the input field (play mode only)."""
+        card = self._actor_mini_card
+        if card is None:
+            return
+
+        card_bot = y + _CHAR_CARD_Y_BOT
+        card_top = card_bot + _CHAR_CARD_H
+
+        # Card background + top border
+        arcade.draw_rect_filled(arcade.XYWH(x + w / 2, card_bot + _CHAR_CARD_H / 2, w, _CHAR_CARD_H), BG_2)
+        arcade.draw_line(x, card_top, x + w, card_top, LINE, 1)
+
+        # Portrait placeholder (left column)
+        _PORT_PAD = 5
+        port_inner_x = x + _PORT_PAD
+        port_inner_w = _PORTRAIT_W - _PORT_PAD * 2
+        port_inner_h = _CHAR_CARD_H - _PORT_PAD * 2
+        port_cx = port_inner_x + port_inner_w / 2
+        port_cy = card_bot + _CHAR_CARD_H / 2
+        arcade.draw_rect_filled(arcade.XYWH(port_cx, port_cy, port_inner_w, port_inner_h), BG_0)
+        arcade.draw_rect_outline(arcade.XYWH(port_cx, port_cy, port_inner_w, port_inner_h), LINE, 1)
+        arcade.draw_text(
+            "◆", port_cx, port_cy,
+            INK_4, font_size=TEXT_BASE, font_name=FONT_MONO,
+            anchor_x="center", anchor_y="center",
+        )
+
+        # Vertical divider
+        arcade.draw_line(x + _PORTRAIT_W, card_bot, x + _PORTRAIT_W, card_top, LINE, 1)
+
+        # Stats area
+        sx = x + _PORTRAIT_W + 6
+        stats_w = w - _PORTRAIT_W - 8
+
+        # Name row — carousel: < NAME > with fixed arrow positions
+        _ARROW_W = 14
+        name_cy = card_bot + _CHAR_CARD_H - 11
+        name_color = VIOLET if card.has_fallout else TEAL
+        display_name = card.actor_name[:22]
+
+        if self._has_multiple_actors:
+            # < fixed at left edge of stats area
+            arcade.draw_text(
+                "<", sx, name_cy,
+                INK_3, font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="center",
+            )
+            self._mini_card_prev_rect = (sx - 2, name_cy - 8, sx + _ARROW_W, name_cy + 8)
+
+            # > fixed at right edge of stats area
+            arrow_right_x = sx + stats_w - _ARROW_W
+            arcade.draw_text(
+                ">", arrow_right_x, name_cy,
+                INK_3, font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="center",
+            )
+            self._mini_card_next_rect = (arrow_right_x - 2, name_cy - 8, arrow_right_x + _ARROW_W, name_cy + 8)
+
+            # Name centered between the arrows
+            name_x = sx + _ARROW_W + 4
+            arcade.draw_text(
+                display_name, name_x, name_cy,
+                name_color, font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="center",
+            )
+        else:
+            arcade.draw_text(
+                display_name, sx, name_cy,
+                name_color, font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="center",
+            )
+
+        # Action ratings — 3 columns × 3 rows
+        _ROW_H = 13
+        _COL_W = stats_w / 3
+        actions_top_cy = name_cy - _ROW_H - 2
+        for row, group in enumerate([
+            _ACTION_ORDER[0:3],
+            _ACTION_ORDER[3:6],
+            _ACTION_ORDER[6:9],
+        ]):
+            row_cy = actions_top_cy - row * _ROW_H
+            for col, action_key in enumerate(group):
+                rating = card.actions.get(action_key, 0)
+                label = f"{action_key[:3].upper()} {rating}"
+                color = TEAL if rating > 0 else INK_4
+                arcade.draw_text(
+                    label, sx + col * _COL_W, row_cy,
+                    color, font_size=TEXT_XS, font_name=FONT_MONO, anchor_y="center",
+                )
+
+        # Stress tracks — 2 per row
+        _SQ = 6
+        _SQ_GAP = 2
+        _LBL_W = 30
+        stress_top_cy = actions_top_cy - 3 * _ROW_H - 3
+        half_w = stats_w / 2
+        for i, (track_key, filled, capacity) in enumerate(card.stress_summary):
+            row = i // 2
+            col = i % 2
+            track_cy = stress_top_cy - row * _ROW_H
+            tx = sx + col * half_w
+            lbl = track_key[:3].lower()
+            arcade.draw_text(
+                lbl, tx, track_cy,
+                INK_4, font_size=TEXT_XS, font_name=FONT_MONO, anchor_y="center",
+            )
+            sq_x = tx + _LBL_W
+            for j in range(capacity):
+                sq_color = TEAL if j < filled else BG_0
+                arcade.draw_rect_filled(
+                    arcade.XYWH(sq_x + j * (_SQ + _SQ_GAP), track_cy, _SQ, _SQ), sq_color
+                )
+                if j >= filled:
+                    arcade.draw_rect_outline(
+                        arcade.XYWH(sq_x + j * (_SQ + _SQ_GAP), track_cy, _SQ, _SQ), LINE, 1
+                    )
 
     def _draw_messages(self, x: float, y_bot: float, w: float, area_h: float) -> None:
         pad = PAD_SM
@@ -438,27 +679,105 @@ class ChatPanel:
                 break  # above viewport; older messages are even higher
 
             if draw_y + b_h > y_bot:  # at least partially in the viewport
-                is_gm = msg.role == "gm"
-                fill = (20, 50, 55) if is_gm else BG_2
-                stroke = TEAL if is_gm else VIOLET
+                msg_index = n - 1 - i
+                if msg.role == "action_card":
+                    self._draw_action_card(msg_index, bx, draw_y, bubble_w, b_h)
+                else:
+                    is_gm = msg.role == "gm"
+                    fill = (20, 50, 55) if is_gm else BG_2
+                    stroke = TEAL if is_gm else VIOLET
 
-                arcade.draw_rect_filled(
-                    arcade.XYWH(bx + bubble_w / 2, draw_y + b_h / 2, bubble_w, b_h), fill
-                )
-                arcade.draw_rect_outline(
-                    arcade.XYWH(bx + bubble_w / 2, draw_y + b_h / 2, bubble_w, b_h), stroke, 1
-                )
-                label_color = TEAL if is_gm else VIOLET
-                arcade.draw_text(
-                    "GM" if is_gm else "◆ Dungeon",
-                    bx + PAD_SM, draw_y + b_h - PAD_XS,
-                    label_color, font_size=TEXT_XS, font_name=FONT_MONO, anchor_y="top",
-                )
-                label = self._get_or_build_label(n - 1 - i, msg, bubble_w)
-                label.update_position(bx + PAD_SM, draw_y + b_h - _LABEL_H)
-                label.draw()
+                    arcade.draw_rect_filled(
+                        arcade.XYWH(bx + bubble_w / 2, draw_y + b_h / 2, bubble_w, b_h), fill
+                    )
+                    arcade.draw_rect_outline(
+                        arcade.XYWH(bx + bubble_w / 2, draw_y + b_h / 2, bubble_w, b_h), stroke, 1
+                    )
+                    label_color = TEAL if is_gm else VIOLET
+                    arcade.draw_text(
+                        "GM" if is_gm else "◆ Dungeon",
+                        bx + PAD_SM, draw_y + b_h - PAD_XS,
+                        label_color, font_size=TEXT_XS, font_name=FONT_MONO, anchor_y="top",
+                    )
+                    label = self._get_or_build_label(msg_index, msg, bubble_w)
+                    label.update_position(bx + PAD_SM, draw_y + b_h - _LABEL_H)
+                    label.draw()
 
             pos += b_h + pad
+
+    def _draw_action_card(
+        self, msg_index: int, bx: float, draw_y: float, bubble_w: float, b_h: float
+    ) -> None:
+        """Render an action card bubble and rebuild button hit rects if this is the active card."""
+        card = self._action_cards.get(msg_index)
+        if card is None:
+            return
+
+        arcade.draw_rect_filled(
+            arcade.XYWH(bx + bubble_w / 2, draw_y + b_h / 2, bubble_w, b_h), BG_2
+        )
+        arcade.draw_rect_outline(
+            arcade.XYWH(bx + bubble_w / 2, draw_y + b_h / 2, bubble_w, b_h), LINE, 1
+        )
+
+        # Actor name (teal, top row)
+        arcade.draw_text(
+            card.actor_name,
+            bx + PAD_SM, draw_y + b_h - PAD_XS,
+            TEAL, font_size=TEXT_XS, font_name=FONT_MONO, anchor_y="top",
+        )
+        # Intent echo (dimmed, second row)
+        arcade.draw_text(
+            card.intent_text,
+            bx + PAD_SM, draw_y + b_h - _LABEL_H - 2,
+            INK_3, font_size=TEXT_XS, font_name=FONT_UI, anchor_y="top",
+        )
+
+        # Button row — rebuild rects only for the active card
+        is_active = msg_index == self._active_card_index
+        resolved = card.resolved_label
+        if is_active and resolved is None:
+            self._active_card_button_rects = []
+
+        _BTN_H = 18
+        _BTN_PAD = 8   # horizontal padding inside each button
+        _BTN_GAP = 6
+        _BTN_CHAR_W = 7  # FONT_MONO at TEXT_XS — fixed-width, predictable
+        btn_y_bot = draw_y + PAD_SM
+        btn_x = bx + PAD_SM
+        for key in card.action_keys:
+            btn_w = len(key) * _BTN_CHAR_W + _BTN_PAD * 2
+            btn_right = btn_x + btn_w
+
+            if resolved is not None:
+                chosen = key == resolved
+                fill_col = BG_3
+                border_col = TEAL if chosen else LINE
+                text_col = TEAL if chosen else INK_4
+            else:
+                is_hovered = key == self._hovered_card_button
+                fill_col = BG_HI if is_hovered else BG_3
+                border_col = LINE_HI if is_hovered else LINE
+                text_col = INK_1 if is_hovered else (INK_4 if key == "No Roll" else INK_2)
+
+            arcade.draw_rect_filled(
+                arcade.XYWH(btn_x + btn_w / 2, btn_y_bot + _BTN_H / 2, btn_w, _BTN_H), fill_col
+            )
+            arcade.draw_rect_outline(
+                arcade.XYWH(btn_x + btn_w / 2, btn_y_bot + _BTN_H / 2, btn_w, _BTN_H), border_col, 1
+            )
+            arcade.draw_text(
+                key,
+                btn_x + btn_w / 2, btn_y_bot + _BTN_H / 2,
+                text_col, font_size=TEXT_XS, font_name=FONT_MONO,
+                anchor_x="center", anchor_y="center",
+            )
+
+            if is_active and resolved is None:
+                self._active_card_button_rects.append(
+                    (key, (btn_x, btn_y_bot, btn_w, _BTN_H))
+                )
+            btn_x = btn_right + _BTN_GAP
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -478,7 +797,11 @@ class ChatPanel:
             )
         return self._label_cache[index]
 
+    _ACTION_CARD_H = 96  # fixed height for action card bubbles
+
     def _bubble_height(self, index: int, msg: ChatMessage, bubble_w: float) -> int:
+        if msg.role == "action_card":
+            return self._ACTION_CARD_H
         label = self._get_or_build_label(index, msg, bubble_w)
         return max(40, label.content_height + int(PAD_SM) * 2 + _LABEL_H)
 

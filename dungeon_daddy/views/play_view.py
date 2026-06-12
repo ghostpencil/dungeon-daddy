@@ -19,6 +19,9 @@ from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
 from dungeon_daddy.memory.models import MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.actor_control import filter_player_actors
+from dungeon_daddy.rpg.classifier import classify_intent
+from dungeon_daddy.ui.actor_mini_card import build_actor_mini_card
+from dungeon_daddy.rpg.intent import PendingIntent
 from dungeon_daddy.rpg.models import ActorState, StressTrack
 from dungeon_daddy.rpg.proposal import parse_proposal
 from dungeon_daddy.rpg.proposal_applier import ApplyResult, apply_low_risk_proposals
@@ -82,6 +85,12 @@ _TAB_MEM = 3
 _TAB_ACTION = 4
 _TAB_DBG = 5
 _DBG_LINE_MAX = 36
+
+
+def _format_intent_framing(pending: PendingIntent, actor_name: str | None = None) -> str:
+    chips = " ".join(f"[{k.upper()}]" for k in pending.suggested_action_keys)
+    who = f"Acting as: {actor_name}\n" if actor_name else ""
+    return f"{who}Suggested: {chips}\nClick an action below, or send text to skip the roll."
 
 
 def _wrap_debug_line(line: str, max_chars: int = _DBG_LINE_MAX) -> list[str]:
@@ -344,8 +353,10 @@ class PlayView(arcade.View):
         self._rpg_open: bool = False
         self._rpg_toggle_rect: tuple[float, float, float, float] | None = None
         self._rpg_action.set_resolve_callback(self._on_resolve_action)
+        self._rpg_action.set_action_select_callback(self._on_action_key_selected)
         self._rpg_campaign_id: str | None = None
         self._action_state = PlayerActionState()
+        self._chat.set_actor_switch_callback(self._on_actor_switch)
 
     # ------------------------------------------------------------------
     # View lifecycle
@@ -494,6 +505,8 @@ class PlayView(arcade.View):
             _log.debug("Selected connection: %s → %s", conn.from_room, conn.to_room)
 
     def on_mouse_motion(self, x: float, y: float, dx: float, dy: float) -> None:
+        if x < PANEL_CHAT_WIDTH:
+            self._chat.on_mouse_motion(x, y)
         self._map.handle_mouse_motion(x, y)
 
     def on_mouse_drag(self, x: float, y: float, dx: float, dy: float, buttons: int, modifiers: int) -> None:
@@ -634,7 +647,12 @@ class PlayView(arcade.View):
                 actions=ratings,
                 stress=stress,
             ))
-        self._rpg_action.set_actors(filter_player_actors(actor_states))
+        pc_actors = filter_player_actors(actor_states)
+        self._rpg_action.set_actors(pc_actors)
+        pc_ids = [a.actor_id for a in pc_actors]
+        if pc_ids and hasattr(self, "_action_state"):
+            self._action_state.set_actor_roster(pc_ids)
+        self._refresh_chat_mini_card()
 
     def _load_memory_entries(self) -> None:
         if self._mem_repo is None:
@@ -724,6 +742,7 @@ class PlayView(arcade.View):
             return
         actor = next((a for a in actors if a.actor_id == actor_id), actors[0])
         self._rpg_char.set_actor(actor)
+        self._refresh_chat_mini_card()
         if self._mem_repo is not None and self._rpg_campaign_id:
             from dungeon_daddy.rpg.models import FalloutRecord
             raw = self._mem_repo.get_fallout_records(self._rpg_campaign_id, actor.actor_id)
@@ -741,6 +760,75 @@ class PlayView(arcade.View):
                 for r in raw
             ]
             self._rpg_fallout.set_entries(entries)
+
+    def _on_action_key_selected(self, action_key: str) -> None:
+        try:
+            self._action_state.select_action(action_key)
+        except ValueError:
+            pass
+
+    def _on_pending_chip_click(self, label: str) -> None:
+        if label == "No Roll":
+            self._do_no_roll_from_chip()
+        else:
+            self._do_action_from_chip(label.lower())
+
+    def _do_action_from_chip(self, action_key: str) -> None:
+        if not self._action_state.awaiting_confirmation:
+            return
+        pi = self._action_state.pending_intent
+        if pi is None:
+            return
+        intent_text = pi.raw_text
+        try:
+            self._action_state.select_action(action_key)
+        except ValueError:
+            return
+        campaign_id = self._rpg_campaign_id or (self._state.dungeon_id if self._state else "")
+        actor_id = self._action_state.actor_id or ""
+        self._chat.resolve_active_card(action_key.upper())
+        self._action_state.reset()
+        self._run_chat_action(campaign_id, actor_id, action_key, intent_text)
+
+    def _refresh_chat_mini_card(self) -> None:
+        if not hasattr(self, "_action_state"):
+            return
+        actor_id = self._action_state.actor_id
+        actors = getattr(self._rpg_action, "_actors", [])
+        actor = next((a for a in actors if a.actor_id == actor_id), None) if actor_id else None
+        self._chat.set_actor_mini_card(build_actor_mini_card(actor) if actor else None)
+        self._chat.set_has_multiple_actors(self._action_state.has_multiple_actors)
+
+    def _on_actor_switch(self, direction: str) -> None:
+        if self._action_state.awaiting_confirmation:
+            return
+        if direction == "prev":
+            self._action_state.select_prev_actor()
+        else:
+            self._action_state.select_next_actor()
+        self._refresh_chat_mini_card()
+
+    def _do_no_roll_from_chip(self) -> None:
+        if not self._action_state.awaiting_confirmation:
+            return
+        pi = self._action_state.pending_intent
+        narration_text = pi.raw_text if pi else ""
+        self._chat.resolve_active_card("No Roll")
+        self._action_state.reset()
+        if self._dungeon is None or self._state is None:
+            return
+        level = self._dungeon.levels[self._state.current_level_idx]
+        room = None
+        if self._state.current_room_id:
+            room_map = {r.id: r for r in level.rooms}
+            room = room_map.get(self._state.current_room_id)
+        if room is None:
+            self._chat.add_message("system", "Click a room first to give the DM context.")
+            return
+        self._compact_history()
+        self._dm_history.append(LLMMessage(role="user", content=narration_text))
+        self._chat.set_busy(True)
+        self._spawn_dm_thread(room, level)
 
     def _on_resolve_action(
         self,
@@ -920,6 +1008,11 @@ class PlayView(arcade.View):
                     ),
                     filled=sl.new_filled,
                 )
+            # Sync in-memory actors so _refresh_right_panel_from_actors sees new values
+            for sl in reaction.stress_lines:
+                for actor in self._rpg_action._actors:
+                    if actor.actor_id == sl.actor_id and sl.track_key in actor.stress:
+                        actor.stress[sl.track_key].filled = sl.new_filled
             if self._rpg_debug is not None:
                 self._rpg_debug.set_reaction(reaction)
             return reaction
@@ -1091,13 +1184,35 @@ class PlayView(arcade.View):
             if not self._state.current_room_id:
                 self._chat.add_message("system", "Select a room to resolve an action.")
                 return
+            pi = self._action_state.pending_intent
+            intent_text = pi.raw_text if (self._action_state.awaiting_confirmation and pi) else text
+            self._chat.resolve_active_card(self._action_state.action_key.upper())
             self._run_chat_action(
                 campaign_id,
                 self._action_state.actor_id or "",
                 self._action_state.action_key,
-                text,
+                intent_text,
             )
             self._action_state.reset()
+            return
+        # 39.5: no-roll path — pending intent exists but player sent without selecting a chip
+        if self._action_state.awaiting_confirmation:
+            pi = self._action_state.pending_intent
+            narration_text = pi.raw_text if pi else text
+            self._chat.resolve_active_card("No Roll")
+            self._action_state.reset()
+            level = self._dungeon.levels[self._state.current_level_idx]
+            room = None
+            if self._state.current_room_id:
+                room_map = {r.id: r for r in level.rooms}
+                room = room_map.get(self._state.current_room_id)
+            if room is None:
+                self._chat.add_message("system", "Click a room first to give the DM context.")
+                return
+            self._compact_history()
+            self._dm_history.append(LLMMessage(role="user", content=narration_text))
+            self._chat.set_busy(True)
+            self._spawn_dm_thread(room, level)
             return
         level = self._dungeon.levels[self._state.current_level_idx]
         room = None
@@ -1106,6 +1221,27 @@ class PlayView(arcade.View):
             room = room_map.get(self._state.current_room_id)
         if room is None:
             self._chat.add_message("system", "Click a room first to give the DM context.")
+            return
+        # 39.3: classify intent — show framing instead of immediate narration
+        suggestions = classify_intent(text)
+        if suggestions:
+            actor_id = self._action_state.actor_id or ""
+            actor = next((a for a in self._rpg_action._actors if a.actor_id == actor_id), None)
+            pending = PendingIntent(
+                actor_id=actor_id,
+                raw_text=text,
+                suggested_action_keys=suggestions[:3],
+                suggested_primary_action=suggestions[0],
+            )
+            self._action_state.set_pending_intent(pending)
+            self._action_state.set_awaiting_confirmation(True)
+            self._chat.add_message("system", _format_intent_framing(pending, actor.display_name if actor else None))
+            self._chat.set_chip_click_callback(self._on_pending_chip_click)
+            self._chat.add_action_card(
+                actor.display_name if actor else actor_id,
+                text,
+                [k.upper() for k in suggestions[:3]] + ["No Roll"],
+            )
             return
         self._compact_history()
         self._dm_history.append(LLMMessage(role="user", content=text))

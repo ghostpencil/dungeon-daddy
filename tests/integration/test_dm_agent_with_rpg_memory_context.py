@@ -49,7 +49,7 @@ def _seed(repo: MemoryRepository) -> None:
     )
     repo.save_memory_entry(
         "mem-1", "camp-1", "event", "The Vault Door",
-        summary="Party found the vault door sealed.", importance=7,
+        summary="Party found the vault door sealed.", status="approved", importance=7,
     )
 
 
@@ -107,7 +107,7 @@ def test_build_prompt_with_real_bundle_contains_memory_card_title(real_bundle):
 def test_build_prompt_fallback_no_bundle_returns_system_prompt():
     agent = DungeonMasterAgent(provider=_MockProvider())
     result = agent.build_prompt(context_bundle=None)
-    assert result == agent._system_prompt
+    assert result == DungeonMasterAgent.SYSTEM_PROMPT
 
 
 def test_respond_with_real_bundle_system_contains_scene_location(repo):

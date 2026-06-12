@@ -44,7 +44,7 @@ class DungeonMasterAgent:
             if fallout:
                 lines.append("Active Fallout:")
                 for f in fallout:
-                    lines.append(f"  - {f.get('description', '')} [{f.get('status', '')}]")
+                    lines.append(f"  - {f.get('title', '')} [{f.get('status', '')}]")
             if clocks:
                 lines.append("Open Clocks:")
                 for c in clocks:

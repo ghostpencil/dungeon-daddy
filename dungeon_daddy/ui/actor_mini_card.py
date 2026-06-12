@@ -10,6 +10,7 @@ class ActorMiniCardData:
     actor_name: str
     stress_summary: list[tuple[str, int, int]] = field(default_factory=list)
     has_fallout: bool = False
+    actions: dict[str, int] = field(default_factory=dict)
 
 
 def build_actor_mini_card(actor: ActorState) -> ActorMiniCardData:
@@ -22,4 +23,5 @@ def build_actor_mini_card(actor: ActorState) -> ActorMiniCardData:
         actor_name=actor.display_name,
         stress_summary=summary,
         has_fallout=has_fallout,
+        actions=dict(actor.actions),
     )

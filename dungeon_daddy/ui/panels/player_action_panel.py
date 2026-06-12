@@ -8,6 +8,7 @@ class PlayerActionPanel:
         self._actors: list[ActorState] = []
         self._last_result: dict | None = None
         self._on_resolve = None
+        self._on_action_select = None
         self._actor_idx: int = 0
         self._action_key: str = "fight"
         self._push_yourself: bool = False
@@ -52,6 +53,9 @@ class PlayerActionPanel:
 
     def set_resolve_callback(self, fn) -> None:
         self._on_resolve = fn
+
+    def set_action_select_callback(self, fn) -> None:
+        self._on_action_select = fn
 
     def setup_widget(self, manager: object | None, x: float, y: float, w: float, h: float) -> None:
         if manager is None:
@@ -175,6 +179,8 @@ class PlayerActionPanel:
                 self._action_key = k
                 for bk, b in self._action_btn_refs.items():
                     b.style = _btn_style(bk == k)  # type: ignore[union-attr]
+                if self._on_action_select:
+                    self._on_action_select(k)
 
             manager.add(btn)  # type: ignore[union-attr]
             self._all_widgets.append(btn)
