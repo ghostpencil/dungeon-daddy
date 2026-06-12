@@ -105,6 +105,7 @@ def _run_pipeline(tmp_path: Path) -> _PipelineResult:
         summary=(
             f"Sable suffered {new_fallout.title} after the forge-floor confrontation."
         ),
+        status="approved",
         importance=7,
     )
     db.add_memory_tag(new_memory_id, f"actor:{SABLE_ID}")

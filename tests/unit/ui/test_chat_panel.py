@@ -231,3 +231,281 @@ def test_draw_messages_inner_calls_label_draw(panel):
         )
     mock_label.update_position.assert_called_once()
     mock_label.draw.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# 39.S1 — set_pending_chips and set_chip_click_callback
+# ---------------------------------------------------------------------------
+
+
+def test_set_pending_chips_stores_labels(panel):
+    panel.set_pending_chips(["STUDY", "SENSE", "No Roll"])
+    assert panel._pending_chips == ["STUDY", "SENSE", "No Roll"]
+
+
+def test_set_pending_chips_none_clears(panel):
+    panel.set_pending_chips(["STUDY"])
+    panel.set_pending_chips(None)
+    assert panel._pending_chips is None
+
+
+def test_pending_chips_none_by_default(panel):
+    assert panel._pending_chips is None
+
+
+def test_set_chip_click_callback_stores_fn(panel):
+    cb = MagicMock()
+    panel.set_chip_click_callback(cb)
+    assert panel._on_chip_click is cb
+
+
+def test_chip_click_callback_none_by_default(panel):
+    assert panel._on_chip_click is None
+
+
+def test_pending_chip_click_calls_callback_not_send(panel):
+    cb = MagicMock()
+    panel.set_pending_chips(["STUDY", "SENSE", "No Roll"])
+    panel.set_chip_click_callback(cb)
+    panel._chip_rects = [(0.0, 4.0, 80.0, 24.0, "STUDY")]
+    result = panel.on_mouse_press(40.0, 14.0)
+    assert result is True
+    cb.assert_called_once_with("STUDY")
+    panel._on_send.assert_not_called()
+
+
+def test_pending_chip_click_no_callback_consumes_click(panel):
+    """Click on pending chip with no callback set: consumed but nothing called."""
+    panel.set_pending_chips(["STUDY"])
+    panel._chip_rects = [(0.0, 4.0, 80.0, 24.0, "STUDY")]
+    result = panel.on_mouse_press(40.0, 14.0)
+    assert result is True
+    panel._on_send.assert_not_called()
+
+
+def test_static_chip_click_calls_on_send_when_no_pending(panel):
+    """Without pending chips, existing _on_send routing still works."""
+    panel._chip_rects = [(0.0, 4.0, 110.0, 24.0, "Describe room")]
+    result = panel.on_mouse_press(55.0, 14.0)
+    assert result is True
+    panel._on_send.assert_called_once_with("Describe room")
+
+
+# ---------------------------------------------------------------------------
+# 39.S4 — set_actor_mini_card
+# ---------------------------------------------------------------------------
+
+def test_actor_mini_card_initially_none(panel):
+    assert panel._actor_mini_card is None
+
+
+def test_set_actor_mini_card_stores_card(panel):
+    from dungeon_daddy.ui.actor_mini_card import ActorMiniCardData
+    card = ActorMiniCardData(actor_name="Mara")
+    panel.set_actor_mini_card(card)
+    assert panel._actor_mini_card is card
+
+
+def test_set_actor_mini_card_none_clears(panel):
+    from dungeon_daddy.ui.actor_mini_card import ActorMiniCardData
+    panel.set_actor_mini_card(ActorMiniCardData(actor_name="Mara"))
+    panel.set_actor_mini_card(None)
+    assert panel._actor_mini_card is None
+
+
+# ---------------------------------------------------------------------------
+# 39.S6.2 — Actor switcher: set_has_multiple_actors / set_actor_switch_callback
+# ---------------------------------------------------------------------------
+
+def test_has_multiple_actors_false_by_default(panel):
+    assert panel._has_multiple_actors is False
+
+
+def test_set_has_multiple_actors_true(panel):
+    panel.set_has_multiple_actors(True)
+    assert panel._has_multiple_actors is True
+
+
+def test_set_has_multiple_actors_false(panel):
+    panel.set_has_multiple_actors(True)
+    panel.set_has_multiple_actors(False)
+    assert panel._has_multiple_actors is False
+
+
+def test_actor_switch_callback_none_by_default(panel):
+    assert panel._actor_switch_callback is None
+
+
+def test_set_actor_switch_callback_stores_fn(panel):
+    cb = MagicMock()
+    panel.set_actor_switch_callback(cb)
+    assert panel._actor_switch_callback is cb
+
+
+def test_mini_card_prev_rect_none_by_default(panel):
+    assert panel._mini_card_prev_rect is None
+
+
+def test_mini_card_next_rect_none_by_default(panel):
+    assert panel._mini_card_next_rect is None
+
+
+def test_prev_arrow_click_calls_switch_callback(panel):
+    cb = MagicMock()
+    panel.set_actor_switch_callback(cb)
+    panel._mini_card_prev_rect = (0.0, 98.0, 15.0, 112.0)
+    result = panel.on_mouse_press(7.5, 105.0)
+    assert result is True
+    cb.assert_called_once_with("prev")
+
+
+def test_next_arrow_click_calls_switch_callback(panel):
+    cb = MagicMock()
+    panel.set_actor_switch_callback(cb)
+    panel._mini_card_next_rect = (200.0, 98.0, 215.0, 112.0)
+    result = panel.on_mouse_press(207.5, 105.0)
+    assert result is True
+    cb.assert_called_once_with("next")
+
+
+def test_arrow_click_no_callback_returns_true(panel):
+    panel._mini_card_prev_rect = (0.0, 98.0, 15.0, 112.0)
+    result = panel.on_mouse_press(7.5, 105.0)
+    assert result is True
+    panel._on_send.assert_not_called()
+
+
+def test_arrow_miss_returns_false(panel):
+    panel._mini_card_prev_rect = (0.0, 98.0, 15.0, 112.0)
+    panel._mini_card_next_rect = (200.0, 98.0, 215.0, 112.0)
+    result = panel.on_mouse_press(100.0, 105.0)
+    assert result is False
+
+
+# ---------------------------------------------------------------------------
+# 39.S6.3 — In-chat action card: add_action_card / resolve_active_card
+# ---------------------------------------------------------------------------
+
+def test_add_action_card_stores_card_data(panel):
+    panel.add_action_card("Talvas", "I study the runes", ["STUDY", "SENSE"])
+    assert len(panel._action_cards) == 1
+    idx = next(iter(panel._action_cards))
+    card = panel._action_cards[idx]
+    assert card.actor_name == "Talvas"
+    assert "study the runes" in card.intent_text
+    assert card.action_keys == ["STUDY", "SENSE"]
+    assert card.resolved_label is None
+
+
+def test_add_action_card_sets_active_card_index(panel):
+    panel.add_action_card("Talvas", "I study the runes", ["STUDY", "SENSE"])
+    assert panel._active_card_index is not None
+
+
+def test_add_action_card_deactivates_previous_card(panel):
+    panel.add_action_card("Talvas", "first intent", ["STUDY"])
+    first_idx = panel._active_card_index
+    panel.add_action_card("Talvas", "second intent", ["SENSE"])
+    second_idx = panel._active_card_index
+    assert second_idx != first_idx
+    # Previous card still stored but no longer active
+    assert first_idx in panel._action_cards
+    assert panel._active_card_index == second_idx
+
+
+def test_active_card_index_none_by_default(panel):
+    assert panel._active_card_index is None
+
+
+def test_action_cards_empty_by_default(panel):
+    assert panel._action_cards == {}
+
+
+def test_resolve_active_card_sets_resolved_label(panel):
+    panel.add_action_card("Talvas", "I study the runes", ["STUDY", "SENSE"])
+    panel.resolve_active_card("STUDY")
+    idx = panel._active_card_index
+    assert panel._action_cards[idx].resolved_label == "STUDY"
+
+
+def test_resolve_active_card_no_op_when_no_active_card(panel):
+    panel.resolve_active_card("STUDY")  # should not raise
+
+
+def test_action_card_button_rects_empty_by_default(panel):
+    assert panel._active_card_button_rects == []
+
+
+def test_active_card_button_click_fires_chip_click_callback(panel):
+    cb = MagicMock()
+    panel.set_chip_click_callback(cb)
+    panel.add_action_card("Talvas", "I study the runes", ["STUDY", "SENSE"])
+    # Manually set a button rect as draw() would
+    panel._active_card_button_rects = [
+        ("STUDY", (10.0, 50.0, 70.0, 70.0)),
+        ("SENSE", (80.0, 50.0, 140.0, 70.0)),
+    ]
+    result = panel.on_mouse_press(40.0, 60.0)
+    assert result is True
+    cb.assert_called_once_with("STUDY")
+
+
+def test_resolved_card_does_not_fire_callback(panel):
+    cb = MagicMock()
+    panel.set_chip_click_callback(cb)
+    panel.add_action_card("Talvas", "I study the runes", ["STUDY", "SENSE"])
+    panel.resolve_active_card("STUDY")
+    panel._active_card_button_rects = [
+        ("STUDY", (10.0, 50.0, 70.0, 70.0)),
+    ]
+    panel.on_mouse_press(40.0, 60.0)
+    cb.assert_not_called()
+
+
+def test_card_button_miss_falls_through(panel):
+    cb = MagicMock()
+    panel.set_chip_click_callback(cb)
+    panel.add_action_card("Talvas", "I study the runes", ["STUDY"])
+    panel._active_card_button_rects = [("STUDY", (10.0, 50.0, 70.0, 70.0))]
+    result = panel.on_mouse_press(200.0, 60.0)
+    assert result is False
+    cb.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# 39.S6 UI fix — hover tracking on action card buttons
+# ---------------------------------------------------------------------------
+
+def test_hovered_card_button_none_by_default(panel):
+    assert panel._hovered_card_button is None
+
+
+def test_on_mouse_motion_sets_hovered_button(panel):
+    panel.add_action_card("Talvas", "I study the runes", ["STUDY", "SENSE"])
+    panel._active_card_button_rects = [
+        ("STUDY", (10.0, 50.0, 60.0, 18.0)),
+        ("SENSE", (80.0, 50.0, 60.0, 18.0)),
+    ]
+    panel.on_mouse_motion(40.0, 59.0)
+    assert panel._hovered_card_button == "STUDY"
+
+
+def test_on_mouse_motion_clears_hovered_when_outside(panel):
+    panel.add_action_card("Talvas", "I study the runes", ["STUDY"])
+    panel._active_card_button_rects = [("STUDY", (10.0, 50.0, 60.0, 18.0))]
+    panel._hovered_card_button = "STUDY"
+    panel.on_mouse_motion(200.0, 59.0)
+    assert panel._hovered_card_button is None
+
+
+def test_on_mouse_motion_no_hover_when_card_resolved(panel):
+    panel.add_action_card("Talvas", "I study the runes", ["STUDY"])
+    panel.resolve_active_card("STUDY")
+    panel._active_card_button_rects = [("STUDY", (10.0, 50.0, 60.0, 18.0))]
+    panel.on_mouse_motion(40.0, 59.0)
+    assert panel._hovered_card_button is None
+
+
+def test_on_mouse_motion_no_hover_when_no_active_card(panel):
+    panel.on_mouse_motion(40.0, 59.0)
+    assert panel._hovered_card_button is None

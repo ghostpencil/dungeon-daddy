@@ -4,6 +4,27 @@
     "label": "The Expedition",
     "actors": [
       {
+        "slug": "protagonist",
+        "display_name": "Protagonist",
+        "actor_type": "pc",
+        "concept": "[seed] player-controlled actor",
+        "actions": {
+          "fight": 0,
+          "endure": 0,
+          "move": 0,
+          "sense": 0,
+          "sway": 0,
+          "study": 0,
+          "tinker": 0,
+          "focus": 0,
+          "channel": 0
+        },
+        "stress_tracks": ["body", "composure", "bonds", "weird"],
+        "tags": [],
+        "threat_tags": [],
+        "relationships": []
+      },
+      {
         "slug": "kira-dawnseeker",
         "display_name": "Kira Dawnseeker",
         "actor_type": "pc",

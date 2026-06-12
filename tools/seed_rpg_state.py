@@ -322,6 +322,7 @@ def _upsert_memory(
             memory_id, campaign_id, mem_spec["type"],
             mem_spec["title"], mem_spec["summary"],
             importance=mem_spec.get("importance", 5),
+            status="approved",
         )
         for tag in mem_spec.get("tags", []):
             repo.add_memory_tag(memory_id, tag)
@@ -447,6 +448,7 @@ def seed_campaign_with_pack(
             repo.save_memory_entry(
                 memory_id, campaign_id, memory.type, memory.title, memory.summary,
                 importance=memory.importance,
+                status="approved",
             )
             for tag in memory.tags:
                 repo.add_memory_tag(memory_id, tag)
@@ -455,6 +457,7 @@ def seed_campaign_with_pack(
             repo.save_memory_entry(
                 memory_id, campaign_id, memory.type, memory.title, memory.summary,
                 importance=memory.importance,
+                status="approved",
             )
             for tag in memory.tags:
                 repo.add_memory_tag(memory_id, tag)

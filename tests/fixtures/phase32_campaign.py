@@ -123,35 +123,35 @@ def seed_campaign(repo: MemoryRepository) -> Phase32IDs:
     repo.save_memory_entry(
         MEM_SABLE_PACT_ID, CAMPAIGN_ID, "event", "The Binding Pact",
         summary="Sable swore an oath to the Vault-Keeper in exchange for passage.",
-        importance=9,
+        status="approved", importance=9,
     )
     repo.add_memory_tag(MEM_SABLE_PACT_ID, f"actor:{SABLE_ID}")
 
     repo.save_memory_entry(
         MEM_GOLEM_LORE_ID, CAMPAIGN_ID, "lore", "Shard Golem Origin",
         summary="The golems were constructed during the Second Forging to guard the forge-floor.",
-        importance=7,
+        status="approved", importance=7,
     )
     repo.add_memory_tag(MEM_GOLEM_LORE_ID, "location:forge-floor")
 
     repo.save_memory_entry(
         MEM_INFORMANT_ID, CAMPAIGN_ID, "npc", "The Informant",
         summary="Nervous courier who knows the vault layout but won't say how.",
-        importance=6,
+        status="approved", importance=6,
     )
     repo.add_memory_tag(MEM_INFORMANT_ID, f"actor:{INFORMANT_ID}")
 
     repo.save_memory_entry(
         MEM_OLD_SECRET_ID, CAMPAIGN_ID, "lore", "Hidden Cache",
         summary="Rumour of valuables hidden in the library annex.",
-        importance=5,
+        status="approved", importance=5,
     )
     repo.add_memory_tag(MEM_OLD_SECRET_ID, "location:library-annex")
 
     repo.save_memory_entry(
         MEM_SIDE_NOTE_ID, CAMPAIGN_ID, "event", "Overheard Argument",
         summary="Two guards arguing near the tavern entrance.",
-        importance=3,
+        status="approved", importance=3,
     )
 
     return Phase32IDs(

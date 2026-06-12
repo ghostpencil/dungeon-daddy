@@ -49,6 +49,7 @@ def _make_play_view(repo: DungeonRepository) -> PlayView:
     view._dungeon = None
     view._state = None
     view._has_memory = False
+    view._rpg_debug = None
     view._map = MagicMock()
     view._chat = MagicMock()
     return view

@@ -42,13 +42,13 @@ def _seed(repo: MemoryRepository) -> None:
         track_key="body", severity="minor", title="Bruised", summary="Took a hit.",
     ))
     repo.save_memory_entry("mem-1", "camp-1", "event", "The Pact",
-                           summary="Party made a deal.", importance=9)
+                           summary="Party made a deal.", importance=9, status="approved")
     repo.add_memory_tag("mem-1", "actor:actor-1")
     repo.save_memory_entry("mem-2", "camp-1", "lore", "Crypt Legend",
-                           summary="Ancient tales.", importance=5)
+                           summary="Ancient tales.", importance=5, status="approved")
     repo.add_memory_tag("mem-2", "location:crypt")
     repo.save_memory_entry("mem-3", "camp-1", "event", "Side Note",
-                           summary="Unrelated.", importance=3)
+                           summary="Unrelated.", importance=3, status="approved")
     repo.save_memory_entry("mem-4", "camp-1", "event", "Old Secret",
                            summary="Archived.", importance=8, status="archived")
 

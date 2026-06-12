@@ -1,0 +1,16 @@
+{
+  "classify_study": true,
+  "classify_fight": true,
+  "classify_empty": true,
+  "pending_intent_model": true,
+  "framing_chips": true,
+  "nl_creates_pending": true,
+  "nl_framing_shown": true,
+  "chip_click_uses_raw_text": true,
+  "chip_click_state_reset": true,
+  "pending_chips_set": true,
+  "no_roll_chip_dm_thread": true,
+  "no_roll_chip_state_reset": true,
+  "text_no_roll_dm_thread": true,
+  "text_no_roll_state_reset": true
+}

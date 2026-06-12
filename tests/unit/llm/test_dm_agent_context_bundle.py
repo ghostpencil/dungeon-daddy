@@ -27,7 +27,7 @@ def _make_bundle(**kwargs):
         mode="run_scene",
         scene_brief={"scene_id": "scene-1", "location_slug": "crypt-entrance", "status": "active"},
         mechanical_state={"actor-1": {"action_ratings": {"skirmish": 2}, "stress_tracks": {"body": 3}}},
-        active_fallout=[{"actor_id": "actor-1", "description": "Broken arm", "status": "active"}],
+        active_fallout=[{"actor_id": "actor-1", "title": "Broken arm", "status": "active"}],
         open_clocks=[{"clock_id": "clk-1", "name": "Ritual Countdown", "segments": 6, "filled": 3, "status": "active"}],
         memory_cards=[
             {"memory_id": "m-1", "title": "Pact with the Shadow", "summary": "Party agreed to spare the wraith.", "importance": 8},

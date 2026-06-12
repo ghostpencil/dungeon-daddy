@@ -723,7 +723,9 @@ Phase 38 is complete when:
 
 ---
 
-# Phase 39 â€” Intent Framing and Player Confirmation
+# Phase 39 — Intent Framing and Player Confirmation
+
+**Status: Complete (2026-06-12) — 2023 unit + 149 integration = 2172 total passing.**
 
 ## Goal
 
@@ -850,16 +852,27 @@ tests/integration/test_intent_confirmation_loop.py
 
 ## Exit Criteria
 
-Phase 39 is complete when:
+- [x] Natural language chat can create a pending intent.
+- [x] System proposes action choices without resolving automatically.
+- [x] Player confirmation is required before any RPG action roll.
+- [x] Confirmed action uses the authoritative RPG/world reaction path.
+- [x] No-roll path remains available.
+- [x] LLM does not directly resolve player intent.
+- [x] Tests cover classifier, confirmation, cancellation, and no-roll paths.
+- [x] Smoke test shows a full natural-language intent → suggested action → confirmed roll → consequence → narration flow.
 
-- [ ] Natural language chat can create a pending intent.
-- [ ] System proposes action choices without resolving automatically.
-- [ ] Player confirmation is required before any RPG action roll.
-- [ ] Confirmed action uses the authoritative RPG/world reaction path.
-- [ ] No-roll path remains available.
-- [ ] LLM does not directly resolve player intent.
-- [ ] Tests cover classifier, confirmation, cancellation, and no-roll paths.
-- [ ] Smoke test shows a full natural-language intent -> suggested action -> confirmed roll -> consequence -> narration flow.
+### Post-completion UI polish (2026-06-12)
+
+- Replaced mini card + static play chips with a full **character card** in `ChatPanel`:
+  - Portrait placeholder (dark box, `◆` icon) on the left column
+  - Character name with fixed-position `<` / `>` carousel arrows (wraps last → first)
+  - 3×3 action ratings grid (teal when rating > 0, dim when 0)
+  - 4 stress tracks in 2×2 layout (body/composure, bonds/weird)
+  - Play mode `INPUT_AREA_H` expanded 122 → 176 px
+- Removed `_CHIPS_PLAY` static suggestions; play mode shows chips only when `_pending_chips` explicitly set
+- Added `actions: dict[str, int]` to `ActorMiniCardData`
+- Fixed stress label/box overlap (`_LBL_W` 22→30, `_SQ_GAP` 1→2)
+- Fixed `rpg_seed.json` (The Crucible): added `protagonist` actor so `--force` resets its stress tracks; removed stale string-ID protagonist row from DB
 
 ---
 

@@ -182,7 +182,7 @@ class Dungeon(BaseModel):
 # ---------------------------------------------------------------------------
 
 class ChatMessage(BaseModel):
-    role: Literal["gm", "dm", "system"]
+    role: Literal["gm", "dm", "system", "action_card"]
     content: str
 
 
