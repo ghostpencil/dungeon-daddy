@@ -137,11 +137,11 @@
     {
       "slug": "ossuary-cult",
       "display_name": "The Ossuary Cult",
-      "actor_type": "faction",
       "concept": "Scattered remnants of the cult. Still loyal to the Warden's rite.",
+      "goal": "Complete the Warden's rite and seal the relic before the party can retrieve it.",
       "status": "active",
-      "action_ratings": {},
-      "stress_tracks": [],
+      "reputation": "cold",
+      "tier": 1,
       "tags": [
         "antagonist"
       ]
@@ -179,7 +179,7 @@
       ],
       "visible_to_player": true,
       "stakes": "The ancient bones holding up the cathedral are failing.",
-      "completion_effect": "The cathedral collapses — all inside must escape or be buried."
+      "completion_effect": "The cathedral collapses \u2014 all inside must escape or be buried."
     },
     {
       "slug": "shade-patrol-awareness",
@@ -194,12 +194,11 @@
       "action_tags": [],
       "visible_to_player": false,
       "stakes": "Shades in the nave become aware of intruders.",
-      "completion_effect": "Ossuary shades converge — the party can no longer move freely through the nave."
+      "completion_effect": "Ossuary shades converge \u2014 the party can no longer move freely through the nave."
     }
   ],
   "memory_seeds": [
-    "The party entered the Bone Cathedral through a collapsed side chapel, avoiding the main gate.",
-    "Valeria recognizes the cult's iconography from a previous inquisition — this sect was declared extinct two decades ago.",
+    "Valeria recognizes the cult's iconography from a previous inquisition \u2014 this sect was declared extinct two decades ago.",
     "Osric spotted a fresh handprint in the bone dust near the reliquary stairs. Someone else is here."
   ],
   "room_threats": [

@@ -36,6 +36,7 @@ class ContextBundleBuilder:
             open_clocks=self._fetch_open_clocks(repo),
             memory_cards=memory_cards,
             must_remember=must_remember,
+            faction_reputations=self._fetch_faction_reputations(repo),
             provenance=provenance,
         )
 
@@ -89,6 +90,22 @@ class ContextBundleBuilder:
                 "stress_tracks": repo.get_actor_stress_tracks(actor_id),
             }
         return state
+
+    def _fetch_faction_reputations(self, repo: MemoryRepository) -> list[dict]:
+        factions = repo.get_factions(self._campaign_id)
+        return [
+            {
+                "faction_id": f["faction_id"],
+                "slug": f["slug"],
+                "display_name": f["display_name"],
+                "reputation": f["reputation"],
+                "goal": f["goal"],
+                "tier": f["tier"],
+                "status": f["status"],
+            }
+            for f in factions
+            if f["status"] == "active"
+        ]
 
     def _fetch_scene_brief(self, repo: MemoryRepository) -> dict:
         if self._scene_id is None:

@@ -1,4 +1,4 @@
-from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, ClockManifest
+from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, ClockManifest, FactionManifest
 from dungeon_daddy.campaign.validator import ManifestError, validate_manifest
 
 
@@ -33,7 +33,7 @@ def test_duplicate_actor_slugs_across_world_actors_and_factions():
             ActorManifest(slug="warden", display_name="The Warden", actor_type="dungeon"),
         ],
         factions=[
-            ActorManifest(slug="warden", display_name="Warden Faction", actor_type="faction"),
+            FactionManifest(slug="warden", display_name="Warden Faction"),
         ],
     )
     errors = validate_manifest(manifest)

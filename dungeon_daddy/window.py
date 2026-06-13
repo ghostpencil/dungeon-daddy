@@ -163,6 +163,7 @@ class DungeonDaddyWindow(arcade.Window):
         _load_fonts()
 
         # Import here to avoid circular dependency at module load
+        from dungeon_daddy.views.campaign_view import CampaignView
         from dungeon_daddy.views.design_view import DesignView
         from dungeon_daddy.views.play_view import PlayView
 
@@ -180,6 +181,7 @@ class DungeonDaddyWindow(arcade.Window):
         )
         rpg_service = RpgService()
         self._play_view = PlayView(self._repo, self._menu_bar, dm_agent=dm_agent, rpg_service=rpg_service)
+        self._campaign_view = CampaignView(self._menu_bar)
         self.show_view(self._design_view)
 
     def _build_menu(self) -> dict[str, list[MenuAction]]:
@@ -408,6 +410,11 @@ class DungeonDaddyWindow(arcade.Window):
         self.show_view(self._design_view)
         _log.info("Switched to design mode")
 
+    def switch_to_campaign(self) -> None:
+        self._mode = "campaign"
+        self.show_view(self._campaign_view)
+        _log.info("Switched to campaign mode")
+
     def switch_to_play(self) -> None:
         self._mode = "play"
         self.show_view(self._play_view)
@@ -449,6 +456,8 @@ class DungeonDaddyWindow(arcade.Window):
     def switch_mode(self, mode: str) -> None:
         if mode == "design":
             self.switch_to_design()
+        elif mode == "campaign":
+            self.switch_to_campaign()
         elif mode == "play":
             self.switch_to_play()
         else:

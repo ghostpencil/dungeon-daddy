@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 _ACTOR_NS = uuid.UUID("7a3f1c2e-4b5d-5e6f-8a9b-0c1d2e3f4a5b")
 _CLOCK_NS = uuid.UUID("1b2c3d4e-5f6a-5b7c-8d9e-0f1a2b3c4d5e")
+_FACTION_NS = uuid.UUID("9f8e7d6c-5b4a-5392-8172-06152d3c4b5a")
 
 
 def derive_actor_id(campaign_slug: str, actor_slug: str) -> str:
@@ -21,6 +22,21 @@ def derive_actor_id(campaign_slug: str, actor_slug: str) -> str:
 
 def derive_clock_id(campaign_slug: str, clock_slug: str) -> str:
     return str(uuid.uuid5(_CLOCK_NS, f"{campaign_slug}:{clock_slug}"))
+
+
+def derive_faction_id(campaign_slug: str, faction_slug: str) -> str:
+    return str(uuid.uuid5(_FACTION_NS, f"{campaign_slug}:{faction_slug}"))
+
+
+class SeedFaction(BaseModel):
+    slug: str
+    display_name: str
+    concept: str | None = None
+    goal: str | None = None
+    status: Literal["active", "inactive", "dissolved"] = "active"
+    reputation: Literal["hostile", "cold", "neutral", "warm", "allied"] = "neutral"
+    tier: int = 0
+    tags: list[str] = Field(default_factory=list)
 
 
 class SeedActor(BaseModel):
@@ -85,6 +101,7 @@ class SeedPack(BaseModel):
     clocks: list[SeedClock] = Field(default_factory=list)
     memories: list[SeedMemory] = Field(default_factory=list)
     room_threats: list[SeedRoomThreat] = Field(default_factory=list)
+    factions: list[SeedFaction] = Field(default_factory=list)
 
 
 def load_seed_pack(path: Path) -> SeedPack:
@@ -104,6 +121,7 @@ class ApplyResult:
     actors_applied: int
     clocks_applied: int
     memories_applied: int
+    factions_applied: int = 0
 
 
 def apply_seed_pack(
@@ -163,8 +181,29 @@ def apply_seed_pack(
                 action_tags=threat.trigger_tags,
             )
 
+    existing_faction_ids = {f["faction_id"] for f in repo.get_factions(campaign_id)}
+    factions_applied = 0
+    for faction in pack.factions:
+        faction_id = derive_faction_id(pack.campaign_slug, faction.slug)
+        if faction_id not in existing_faction_ids:
+            from dungeon_daddy.rpg.models import FactionState
+            repo.save_faction(FactionState(
+                faction_id=faction_id,
+                campaign_id=campaign_id,
+                slug=faction.slug,
+                display_name=faction.display_name,
+                concept=faction.concept,
+                goal=faction.goal,
+                status=faction.status,
+                reputation=faction.reputation,
+                tier=faction.tier,
+                tags=faction.tags,
+            ))
+            factions_applied += 1
+
     return ApplyResult(
         actors_applied=len(all_actors),
         clocks_applied=len(pack.clocks),
         memories_applied=len(pack.memories),
+        factions_applied=factions_applied,
     )

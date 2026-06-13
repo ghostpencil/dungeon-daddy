@@ -1096,7 +1096,7 @@ Exit criteria all met:
 
 ## Phase 42 â€” Campaign Authoring UI
 
-**Status: NOT STARTED**
+**Status: Complete (2026-06-13) â€” 2402 tests passing.**
 
 Add a Design Mode interface for:
 
@@ -1109,9 +1109,26 @@ Add a Design Mode interface for:
 - memory seeds,
 - validation report.
 
-Do not begin this before the CLI and manifest validator are reliable.
+Spec: `spec/PHASE_42_CAMPAIGN_AUTHORING_UI.md`
 
-## Phase 43 â€” Playtest Telemetry and Balance Reports
+## Phase 43 â€” Faction System
+
+**Status: Complete (2026-06-13) â€” 2402 tests passing.**
+
+Add named factions as first-class campaign entities with persistent reputation state.
+
+Spec: `spec/PHASE_42_ADDITION_FACTION_SYSTEM.md`
+
+Major work:
+
+- `FactionManifest` model (replaces `ActorManifest` for factions); named reputation tiers (hostile/cold/neutral/warm/allied).
+- `FactionState` persisted in DuckDB (`007_factions.sql`).
+- `AdjustReputationChange` in LLM proposal system.
+- Faction reputations included in `ContextBundle`.
+- Campaign UI: faction-specific edit form and list card (reputation chip, tier label, no action ratings/stress tracks).
+- 7 TDD slices.
+
+## Phase 44 â€” Playtest Telemetry and Balance Reports
 
 Generate reports from domain events:
 

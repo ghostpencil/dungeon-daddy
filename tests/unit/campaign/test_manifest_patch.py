@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, ClockManifest
+from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, ClockManifest, FactionManifest
 from dungeon_daddy.campaign.patch import ManifestPatch, apply_patch
 
 
@@ -17,7 +17,7 @@ def _base_manifest() -> CampaignManifest:
             ActorManifest(slug="bone-warden", display_name="The Bone Warden", actor_type="dungeon"),
         ],
         factions=[
-            ActorManifest(slug="ossuary-cult", display_name="The Ossuary Cult", actor_type="faction"),
+            FactionManifest(slug="ossuary-cult", display_name="The Ossuary Cult"),
         ],
         clocks=[
             ClockManifest(slug="final-rite", label="Final Rite Completion", segments=8),

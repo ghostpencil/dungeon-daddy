@@ -21,7 +21,7 @@ def validate_manifest(manifest: CampaignManifest) -> list[ManifestError]:
     errors.extend(_check_duplicate_actor_slugs(manifest))
     errors.extend(_check_duplicate_clock_slugs(manifest))
     errors.extend(_check_player_side(manifest))
-    for actor in manifest.world_actors + manifest.factions:
+    for actor in manifest.world_actors:
         errors.extend(_check_actor_action_ratings(actor))
         errors.extend(_check_actor_stress_tracks(actor))
     for clock in manifest.clocks:

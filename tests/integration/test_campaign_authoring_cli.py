@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from dungeon_daddy.campaign.creator import CreateResult, create_campaign_folder
-from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, ClockManifest
+from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, ClockManifest, FactionManifest
 from dungeon_daddy.campaign.seeder import SeedResult, seed_from_manifest
 from dungeon_daddy.memory.repository import MemoryRepository
 
@@ -51,7 +51,7 @@ def test_seed_from_manifest_creates_actors(repo: MemoryRepository) -> None:
             ActorManifest(slug="guard", display_name="Guard", actor_type="npc"),
         ],
         factions=[
-            ActorManifest(slug="cult", display_name="The Cult", actor_type="faction"),
+            FactionManifest(slug="cult", display_name="The Cult"),
         ],
     )
 
@@ -61,8 +61,7 @@ def test_seed_from_manifest_creates_actors(repo: MemoryRepository) -> None:
     slugs = {a["slug"] for a in actors}
     assert "hero" in slugs
     assert "guard" in slugs
-    assert "cult" in slugs
-    assert result.created >= 3
+    assert result.created >= 2
 
 
 # ---------------------------------------------------------------------------
@@ -366,7 +365,7 @@ def test_example_bone_cathedral_manifest_seeds_cleanly(tmp_path: Path) -> None:
     memories = repo.get_memory_entries_by_campaign(campaign_id)
     repo.close()
 
-    assert result.created >= 5  # 4 world_actors + 1 faction + 3 clocks + 3 memory_seeds
+    assert result.created >= 4  # 4 world_actors + 3 clocks + 3 memory_seeds (factions seeded separately in Slice 3)
     assert result.warnings == []
     pc_slugs = {a["slug"] for a in actors if a["actor_type"] == "pc"}
     assert pc_slugs == {"valeria", "osric"}
@@ -392,3 +391,54 @@ def test_example_bone_cathedral_manifest_seeds_idempotently(tmp_path: Path) -> N
 
     assert result2.created == 0
     assert result2.skipped > 0
+
+
+def test_seed_from_manifest_seeds_factions(tmp_path: Path) -> None:
+    """seed_from_manifest inserts factions from CampaignManifest.factions."""
+    from dungeon_daddy.campaign.manifest import FactionManifest
+
+    manifest = _minimal_manifest(
+        factions=[
+            FactionManifest(slug="ossuary-cult", display_name="The Ossuary Cult", reputation="cold", tier=1),
+        ],
+    )
+
+    db = tmp_path / "test.duckdb"
+    repo = MemoryRepository(db)
+    repo.initialize_schema(_MIGRATIONS)
+    campaign_id = "campaign:test"
+    repo.save_campaign(campaign_id, manifest.slug, manifest.title)
+
+    result = seed_from_manifest(manifest, repo, campaign_id)
+    factions = repo.get_factions(campaign_id)
+    repo.close()
+
+    assert result.created >= 1
+    assert len(factions) == 1
+    assert factions[0]["slug"] == "ossuary-cult"
+    assert factions[0]["reputation"] == "cold"
+
+
+def test_seed_from_manifest_factions_idempotent_no_reputation_reset(tmp_path: Path) -> None:
+    """Re-seeding factions does not overwrite reputation changed at runtime."""
+    from dungeon_daddy.campaign.manifest import FactionManifest
+    from dungeon_daddy.campaign.seeder import _faction_id as _fid
+
+    manifest = _minimal_manifest(
+        factions=[FactionManifest(slug="ossuary-cult", display_name="The Ossuary Cult", reputation="cold")],
+    )
+    db = tmp_path / "test.duckdb"
+    repo = MemoryRepository(db)
+    repo.initialize_schema(_MIGRATIONS)
+    campaign_id = "campaign:test"
+    repo.save_campaign(campaign_id, manifest.slug, manifest.title)
+
+    seed_from_manifest(manifest, repo, campaign_id)
+    faction_id = _fid(manifest.slug, "ossuary-cult")
+    repo.update_faction_reputation(faction_id, delta_steps=2)  # cold → warm
+
+    seed_from_manifest(manifest, repo, campaign_id)  # re-seed
+    factions = repo.get_factions(campaign_id)
+    repo.close()
+
+    assert factions[0]["reputation"] == "warm"  # not reset to "cold"

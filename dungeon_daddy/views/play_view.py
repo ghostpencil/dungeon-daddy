@@ -27,7 +27,7 @@ from dungeon_daddy.rpg.proposal import parse_proposal
 from dungeon_daddy.rpg.proposal_applier import ApplyResult, apply_low_risk_proposals
 from dungeon_daddy.rpg.proposal_validator import ValidationResult, validate_proposal
 from dungeon_daddy.rpg.service import RpgService
-from dungeon_daddy.ui.chrome import MenuBar, draw_title_bar
+from dungeon_daddy.ui.chrome import MenuBar, draw_title_bar, title_bar_mode_at
 from dungeon_daddy.ui.mechanical_bubble import format_mechanical_bubble
 from dungeon_daddy.ui.player_action_state import PlayerActionState
 from dungeon_daddy.ui.panels.character_sheet_panel import CharacterSheetPanel
@@ -424,6 +424,10 @@ class PlayView(arcade.View):
         if self._menu_bar.handle_click(x, y, self.window):
             return
         if button != arcade.MOUSE_BUTTON_LEFT:
+            return
+        pill = title_bar_mode_at(x, y, self.window)
+        if pill and pill != "play":
+            self.window.switch_mode(pill)
             return
         # RPG panel toggle button (title bar)
         if self._rpg_toggle_rect and self._point_in_rect(x, y, self._rpg_toggle_rect):

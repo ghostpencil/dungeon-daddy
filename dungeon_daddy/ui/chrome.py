@@ -20,8 +20,10 @@ from dungeon_daddy.ui.theme import (
     FONT_SIGIL,
     FONT_UI,
     FONT_UI_MED,
+    GOLD,
     INK_1,
     INK_2,
+    INK_3,
     INK_4,
     LINE,
     PAD_MD,
@@ -39,6 +41,56 @@ _log = logging.getLogger(__name__)
 _CHAR_W = 7
 _DROP_W = 160
 _ITEM_H = 22
+
+# ---------------------------------------------------------------------------
+# Three-pill mode switcher
+# ---------------------------------------------------------------------------
+
+_PILL_W = 90
+_PILL_H = 22
+_PILL_GAP = 8
+_PILL_MODES = ["design", "campaign", "play"]
+_PILL_FILL: dict[str, tuple[int, ...]] = {
+    "design":   VIOLET,
+    "campaign": GOLD,
+    "play":     TEAL,
+}
+
+
+def _pill_rect(mode: str, window: object) -> tuple[float, float, float, float]:
+    """Return (left, bottom, right, top) of a mode pill in window coordinates."""
+    w: int = window.width  # type: ignore[attr-defined]
+    h: int = window.height  # type: ignore[attr-defined]
+    bar_top = h - CHROME_MENUBAR_HEIGHT
+    bar_mid = bar_top - CHROME_TITLEBAR_HEIGHT / 2
+    total_w = len(_PILL_MODES) * _PILL_W + (len(_PILL_MODES) - 1) * _PILL_GAP
+    right_edge = float(w) - PAD_MD
+    idx = _PILL_MODES.index(mode)
+    cx = right_edge - total_w + idx * (_PILL_W + _PILL_GAP) + _PILL_W / 2
+    return (
+        cx - _PILL_W / 2,
+        bar_mid - _PILL_H / 2,
+        cx + _PILL_W / 2,
+        bar_mid + _PILL_H / 2,
+    )
+
+
+def title_bar_mode_at(x: float, y: float, window: object) -> str | None:
+    """Return which mode pill was clicked, or None if the click is outside all pills."""
+    try:
+        h: int = window.height  # type: ignore[attr-defined]
+        bar_top = h - CHROME_MENUBAR_HEIGHT
+        bar_bottom = bar_top - CHROME_TITLEBAR_HEIGHT
+        if not (bar_bottom <= y <= bar_top):
+            return None
+        for mode in _PILL_MODES:
+            left, bot, right, top = _pill_rect(mode, window)
+            if left <= x <= right and bot <= y <= top:
+                return mode
+    except TypeError:
+        return None
+    return None
+
 
 # ---------------------------------------------------------------------------
 # MenuAction — every menu item is wired, nothing is decorative
@@ -110,13 +162,12 @@ def draw_menu_bar(window: object) -> None:
 def draw_title_bar(
     window: object,
     mode: str,
-    on_mode: Callable[[str], None],
+    on_mode: Callable[[str], None] | None = None,
 ) -> None:
     """
-    Draw the title bar showing the app name, current mode, and mode toggle.
-    mode: "design" | "play"
-    on_mode: called with "design" or "play" when the toggle is clicked.
-    (Click handling is done by UIManager widgets — this function only draws.)
+    Draw the title bar with app name and three mode pills (DESIGN / CAMPAIGN / PLAY).
+    mode: "design" | "campaign" | "play" — active pill is filled with its accent colour.
+    on_mode: unused (click detection is handled by the views via title_bar_mode_at).
     """
     w: int = window.width  # type: ignore[attr-defined]
     h: int = window.height  # type: ignore[attr-defined]
@@ -147,22 +198,22 @@ def draw_title_bar(
         anchor_y="center",
     )
 
-    # Mode indicator badge (right side)
-    mode_label = "DESIGN MODE" if mode == "design" else "PLAY MODE"
-    mode_color = VIOLET if mode == "design" else TEAL
-    badge_w, badge_h = 100, 22
-    badge_cx = w - PAD_MD - badge_w / 2
-    arcade.draw_rect_filled(arcade.XYWH(badge_cx, bar_mid, badge_w, badge_h), BG_2)
-    arcade.draw_rect_outline(arcade.XYWH(badge_cx, bar_mid, badge_w, badge_h), mode_color, 1)
-    arcade.draw_text(
-        mode_label,
-        badge_cx, bar_mid,
-        mode_color,
-        font_size=TEXT_SM,
-        font_name=FONT_UI_MED,
-        anchor_x="center",
-        anchor_y="center",
-    )
+    # Three mode pills — active pill filled with accent colour; inactive: BG_2 + LINE border
+    for pill_mode in _PILL_MODES:
+        left, bot, right, top = _pill_rect(pill_mode, window)
+        cx = (left + right) / 2
+        cy = (bot + top) / 2
+        is_active = pill_mode == mode
+        fill = _PILL_FILL[pill_mode] if is_active else BG_2
+        label_color = BG_1 if is_active else INK_3
+        border = _PILL_FILL[pill_mode] if is_active else LINE
+        arcade.draw_rect_filled(arcade.XYWH(cx, cy, _PILL_W, _PILL_H), fill)
+        arcade.draw_rect_outline(arcade.XYWH(cx, cy, _PILL_W, _PILL_H), border, 1)
+        arcade.draw_text(
+            pill_mode.upper(), cx, cy, label_color,
+            font_size=TEXT_SM, font_name=FONT_UI_MED,
+            anchor_x="center", anchor_y="center",
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -8,10 +8,12 @@ from dungeon_daddy.rpg.seed_pack import (
     ApplyResult,
     SeedActor,
     SeedClock,
+    SeedFaction,
     SeedPack,
     apply_seed_pack,
     derive_actor_id,
     derive_clock_id,
+    derive_faction_id,
     load_seed_pack,
 )
 
@@ -430,6 +432,61 @@ _SEED_DATA_DIR = (
 )
 
 
+class TestApplySeedPackFactions:
+    @pytest.fixture
+    def repo(self, tmp_path: Path) -> MemoryRepository:
+        return MemoryRepository(tmp_path / "campaign.duckdb")
+
+    def _pack_with_factions(self) -> dict:
+        return {
+            **_MINIMAL_PACK,
+            "factions": [
+                {
+                    "slug": "ossuary-cult",
+                    "display_name": "The Ossuary Cult",
+                    "reputation": "cold",
+                    "tier": 1,
+                    "goal": "Seal the relic.",
+                }
+            ],
+        }
+
+    def test_apply_inserts_faction_row(self, repo: MemoryRepository) -> None:
+        pack = SeedPack.model_validate(self._pack_with_factions())
+        apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR)
+        factions = repo.get_factions("campaign-123")
+        assert len(factions) == 1
+        assert factions[0]["slug"] == "ossuary-cult"
+        assert factions[0]["reputation"] == "cold"
+
+    def test_apply_result_includes_factions_applied(self, repo: MemoryRepository) -> None:
+        pack = SeedPack.model_validate(self._pack_with_factions())
+        result = apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR)
+        assert result.factions_applied == 1
+
+    def test_apply_faction_id_is_stable(self, repo: MemoryRepository) -> None:
+        pack = SeedPack.model_validate(self._pack_with_factions())
+        apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR)
+        expected_id = derive_faction_id("test-campaign", "ossuary-cult")
+        factions = repo.get_factions("campaign-123")
+        assert factions[0]["faction_id"] == expected_id
+
+    def test_apply_factions_is_idempotent(self, repo: MemoryRepository) -> None:
+        pack = SeedPack.model_validate(self._pack_with_factions())
+        apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR)
+        apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR)
+        assert len(repo.get_factions("campaign-123")) == 1
+
+    def test_apply_does_not_reset_runtime_reputation(self, repo: MemoryRepository) -> None:
+        pack = SeedPack.model_validate(self._pack_with_factions())
+        apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR)
+        faction_id = derive_faction_id("test-campaign", "ossuary-cult")
+        repo.update_faction_reputation(faction_id, delta_steps=2)  # cold → warm
+        apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR)  # re-seed
+        factions = repo.get_factions("campaign-123")
+        assert factions[0]["reputation"] == "warm"  # not reset to "cold"
+
+
 class TestCampaignSeedFilesValidate:
     @pytest.mark.parametrize("campaign_dir", list(_SEED_DATA_DIR.iterdir()) if _SEED_DATA_DIR.exists() else [])
     def test_campaign_rpg_seed_parses_against_schema(self, campaign_dir: Path) -> None:
@@ -465,3 +522,61 @@ class TestCampaignSeedFilesValidate:
                 assert clock.scope_room_id is not None, (
                     f"{campaign_dir.name}: room clock {clock.slug!r} missing scope_room_id"
                 )
+
+
+class TestDeriveFactionId:
+    def test_derive_faction_id_is_deterministic(self) -> None:
+        id1 = derive_faction_id("my-campaign", "ossuary-cult")
+        id2 = derive_faction_id("my-campaign", "ossuary-cult")
+        assert id1 == id2
+
+    def test_derive_faction_id_differs_for_different_slugs(self) -> None:
+        assert derive_faction_id("camp", "cult") != derive_faction_id("camp", "guild")
+
+    def test_faction_namespace_isolated_from_actor_and_clock(self) -> None:
+        slug = "same-slug"
+        assert derive_faction_id("camp", slug) != derive_actor_id("camp", slug)
+        assert derive_faction_id("camp", slug) != derive_clock_id("camp", slug)
+
+
+class TestSeedFactionModel:
+    def test_seed_faction_parses_from_dict(self) -> None:
+        data = {
+            "slug": "ossuary-cult",
+            "display_name": "The Ossuary Cult",
+            "concept": "Scattered remnants loyal to the Warden's rite.",
+            "goal": "Seal the relic before the party can retrieve it.",
+            "reputation": "cold",
+            "tier": 1,
+            "tags": ["antagonist"],
+        }
+        faction = SeedFaction.model_validate(data)
+        assert faction.slug == "ossuary-cult"
+        assert faction.display_name == "The Ossuary Cult"
+        assert faction.reputation == "cold"
+        assert faction.tier == 1
+        assert "antagonist" in faction.tags
+
+    def test_seed_faction_defaults(self) -> None:
+        faction = SeedFaction(slug="guild", display_name="Merchants Guild")
+        assert faction.reputation == "neutral"
+        assert faction.tier == 0
+        assert faction.status == "active"
+        assert faction.tags == []
+        assert faction.concept is None
+        assert faction.goal is None
+
+    def test_seed_pack_accepts_factions_key(self) -> None:
+        data = {
+            **_MINIMAL_PACK,
+            "factions": [
+                {"slug": "ossuary-cult", "display_name": "The Ossuary Cult", "reputation": "cold", "tier": 1}
+            ],
+        }
+        pack = SeedPack.model_validate(data)
+        assert len(pack.factions) == 1
+        assert pack.factions[0].slug == "ossuary-cult"
+
+    def test_seed_pack_factions_defaults_to_empty(self) -> None:
+        pack = SeedPack.model_validate(_MINIMAL_PACK)
+        assert pack.factions == []

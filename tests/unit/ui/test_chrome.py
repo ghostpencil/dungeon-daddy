@@ -1,4 +1,4 @@
-"""Tests for MenuBar.handle_click() — hit-test, dropdown dispatch, handler invocation."""
+"""Tests for MenuBar.handle_click() and title_bar_mode_at() hit-test logic."""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from dungeon_daddy.ui.chrome import MenuAction, MenuBar
+from dungeon_daddy.ui.chrome import MenuAction, MenuBar, title_bar_mode_at
 
 # Window stub: 1280 × 800
 _WIN = SimpleNamespace(width=1280, height=800)
@@ -109,3 +109,44 @@ class TestDropdownDispatch:
         assert result is True
         assert bar._open is None
         handler1.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# title_bar_mode_at — pill hit-test
+# ---------------------------------------------------------------------------
+#
+# Window 1000 × 800:
+#   CHROME_MENUBAR_HEIGHT=26 → bar_top=774, bar_bottom=730, bar_mid=752
+#   _PILL_W=90, _PILL_H=22, _PILL_GAP=8, PAD_MD=12
+#   total_w = 3*90 + 2*8 = 286; right_edge = 1000-12 = 988
+#   design  (idx=0): cx = 988-286 + 0*98 + 45 = 747  → left=702, right=792
+#   campaign(idx=1): cx = 988-286 + 1*98 + 45 = 845  → left=800, right=890
+#   play    (idx=2): cx = 988-286 + 2*98 + 45 = 943  → left=898, right=988
+
+_W1000 = SimpleNamespace(width=1000, height=800)
+
+
+class TestTitleBarModeAt:
+    def test_click_design_pill_returns_design(self):
+        assert title_bar_mode_at(747, 752, _W1000) == "design"
+
+    def test_click_campaign_pill_returns_campaign(self):
+        assert title_bar_mode_at(845, 752, _W1000) == "campaign"
+
+    def test_click_play_pill_returns_play(self):
+        assert title_bar_mode_at(943, 752, _W1000) == "play"
+
+    def test_click_between_pills_returns_none(self):
+        # x=796 is between design (right=792) and campaign (left=800)
+        assert title_bar_mode_at(796, 752, _W1000) is None
+
+    def test_click_left_of_pills_returns_none(self):
+        assert title_bar_mode_at(400, 752, _W1000) is None
+
+    def test_click_in_menu_bar_returns_none(self):
+        # menu bar is y > 774; y=790 is in menu bar, not title bar
+        assert title_bar_mode_at(747, 790, _W1000) is None
+
+    def test_click_below_title_bar_returns_none(self):
+        # title bar bottom = 730; y=720 is below it
+        assert title_bar_mode_at(747, 720, _W1000) is None
