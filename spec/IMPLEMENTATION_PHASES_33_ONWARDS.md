@@ -1078,19 +1078,25 @@ These are not part of the immediate implementation request unless explicitly app
 
 ## Phase 41 â€” AI-Assisted Campaign Drafting
 
+**Status: Complete (2026-06-13) â€” 2266 tests passing. Manually verified.**
+
 Let the LLM draft campaign manifest changes, but require validation and human approval before writing.
 
-Expected flow:
+Modules: `dungeon_daddy/campaign/patch.py`, `drafter.py`, `patch_validator.py`, `approval.py`, `draft_flow.py`
+CLI: `tools/draft_campaign_patch.py`
+Tests: `tests/unit/campaign/test_manifest_patch.py`, `test_campaign_drafter.py`, `test_patch_validator.py`, `test_approval_flow.py`, `tests/integration/test_ai_campaign_drafting.py`
 
-```text
-User: Add an undead jailer to the ossuary.
-LLM drafts manifest patch.
-Validator checks it.
-User approves.
-Authoring service applies it.
-```
+Exit criteria all met:
+- LLM proposes manifest additions/removals in structured form
+- Validator always runs before any patch is applied
+- Human must explicitly approve before the manifest is mutated
+- Patch application is idempotent
+- LLM provider is injected â€” no live API calls in unit tests
+- Integration test: end-to-end natural-language â†' patch â†' validate â†' apply â†' re-validate
 
 ## Phase 42 â€” Campaign Authoring UI
+
+**Status: NOT STARTED**
 
 Add a Design Mode interface for:
 
