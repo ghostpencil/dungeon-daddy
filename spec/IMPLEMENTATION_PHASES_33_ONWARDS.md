@@ -876,7 +876,9 @@ tests/integration/test_intent_confirmation_loop.py
 
 ---
 
-# Phase 40 â€” Campaign Authoring Foundation
+# Phase 40 — Campaign Authoring Foundation
+
+**Status: Complete (2026-06-13) — 2216 total passing.**
 
 ## Goal
 
