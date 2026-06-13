@@ -1,4 +1,12 @@
-"""Export a campaign's full state to a JSON-serializable dict."""
+"""Export a campaign's full state to a JSON-serializable dict.
+
+Raw state export (default):
+    python tools/export_campaign.py campaigns/the-crucible/campaign.duckdb campaign:the-crucible
+
+Manifest export (CampaignManifest schema):
+    python tools/export_campaign.py campaigns/the-crucible/campaign.duckdb campaign:the-crucible --manifest
+    python tools/export_campaign.py campaigns/the-crucible/campaign.duckdb campaign:the-crucible --manifest --out manifest.json
+"""
 from __future__ import annotations
 
 import json
@@ -100,6 +108,11 @@ if __name__ == "__main__":
     parser.add_argument("db_path", help="Path to campaign.duckdb")
     parser.add_argument("campaign_id", help="Campaign ID to export")
     parser.add_argument("--out", help="Output file (default: stdout)")
+    parser.add_argument(
+        "--manifest",
+        action="store_true",
+        help="Export as CampaignManifest JSON (Phase 40 schema) instead of raw state bundle",
+    )
     args = parser.parse_args()
 
     _MIGRATIONS = (
@@ -107,10 +120,17 @@ if __name__ == "__main__":
     )
     r = MemoryRepository(Path(args.db_path))
     r.initialize_schema(_MIGRATIONS)
-    bundle = export_campaign(r, args.campaign_id)
-    r.close()
 
-    output = json.dumps(bundle, indent=2, default=str)
+    if args.manifest:
+        from dungeon_daddy.campaign.exporter import export_campaign_manifest
+        manifest = export_campaign_manifest(args.campaign_id, r)
+        r.close()
+        output = json.dumps(manifest.model_dump(mode="json"), indent=2, ensure_ascii=False)
+    else:
+        bundle = export_campaign(r, args.campaign_id)
+        r.close()
+        output = json.dumps(bundle, indent=2, default=str)
+
     if args.out:
         Path(args.out).write_text(output, encoding="utf-8")
         print(f"Exported to {args.out}")
