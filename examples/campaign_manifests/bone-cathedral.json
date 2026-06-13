@@ -21,10 +21,21 @@
         "study": 1
       },
       "stress_tracks": [
-        {"track_key": "body", "capacity": 6, "filled": 0},
-        {"track_key": "composure", "capacity": 6, "filled": 0}
+        {
+          "track_key": "body",
+          "capacity": 6,
+          "filled": 0
+        },
+        {
+          "track_key": "composure",
+          "capacity": 6,
+          "filled": 0
+        }
       ],
-      "tags": ["player", "inquisitor"]
+      "tags": [
+        "player",
+        "inquisitor"
+      ]
     },
     {
       "slug": "osric",
@@ -38,10 +49,21 @@
         "sense": 1
       },
       "stress_tracks": [
-        {"track_key": "body", "capacity": 6, "filled": 0},
-        {"track_key": "bonds", "capacity": 4, "filled": 0}
+        {
+          "track_key": "body",
+          "capacity": 6,
+          "filled": 0
+        },
+        {
+          "track_key": "bonds",
+          "capacity": 4,
+          "filled": 0
+        }
       ],
-      "tags": ["player", "rogue"]
+      "tags": [
+        "player",
+        "rogue"
+      ]
     },
     {
       "slug": "bone-warden",
@@ -55,9 +77,16 @@
         "channel": 2
       },
       "stress_tracks": [
-        {"track_key": "body", "capacity": 12, "filled": 0}
+        {
+          "track_key": "body",
+          "capacity": 12,
+          "filled": 0
+        }
       ],
-      "tags": ["boss", "undead"]
+      "tags": [
+        "boss",
+        "undead"
+      ]
     },
     {
       "slug": "ossuary-shade",
@@ -70,9 +99,38 @@
         "channel": 1
       },
       "stress_tracks": [
-        {"track_key": "body", "capacity": 4, "filled": 0}
+        {
+          "track_key": "body",
+          "capacity": 4,
+          "filled": 0
+        }
       ],
-      "tags": ["patrol", "undead"]
+      "tags": [
+        "patrol",
+        "undead"
+      ]
+    },
+    {
+      "slug": "undead-jailer",
+      "display_name": "Undead Jailer",
+      "actor_type": "monster",
+      "concept": "A skeletal figure tasked with confining the souls and intruders within the ossuary.",
+      "status": "active",
+      "action_ratings": {
+        "fight": 2,
+        "endure": 1
+      },
+      "stress_tracks": [
+        {
+          "track_key": "body",
+          "capacity": 6,
+          "filled": 0
+        }
+      ],
+      "tags": [
+        "undead",
+        "guardian"
+      ]
     }
   ],
   "factions": [
@@ -84,7 +142,9 @@
       "status": "active",
       "action_ratings": {},
       "stress_tracks": [],
-      "tags": ["antagonist"]
+      "tags": [
+        "antagonist"
+      ]
     }
   ],
   "clocks": [
@@ -96,6 +156,9 @@
       "status": "active",
       "clock_level": "dungeon",
       "category": "threat",
+      "scope_room_id": null,
+      "level_id": null,
+      "action_tags": [],
       "visible_to_player": true,
       "stakes": "If completed, the relic is sealed inside the Warden forever.",
       "completion_effect": "The Bone Warden absorbs the relic and becomes permanently bound to the cathedral."
@@ -108,7 +171,12 @@
       "status": "active",
       "clock_level": "dungeon",
       "category": "environment",
-      "action_tags": ["fight", "move"],
+      "scope_room_id": null,
+      "level_id": null,
+      "action_tags": [
+        "fight",
+        "move"
+      ],
       "visible_to_player": true,
       "stakes": "The ancient bones holding up the cathedral are failing.",
       "completion_effect": "The cathedral collapses — all inside must escape or be buried."
@@ -120,8 +188,10 @@
       "filled": 0,
       "status": "active",
       "clock_level": "level",
-      "level_id": "nave",
       "category": "escalation",
+      "scope_room_id": null,
+      "level_id": "nave",
+      "action_tags": [],
       "visible_to_player": false,
       "stakes": "Shades in the nave become aware of intruders.",
       "completion_effect": "Ossuary shades converge — the party can no longer move freely through the nave."
@@ -136,14 +206,30 @@
     {
       "location_slug": "nave",
       "description": "Ossuary shades drift between the pews. They respond to sound and light.",
-      "related_actor_slugs": ["ossuary-shade"],
-      "related_clock_slugs": ["shade-patrol-awareness"]
+      "related_actor_slugs": [
+        "ossuary-shade"
+      ],
+      "related_clock_slugs": [
+        "shade-patrol-awareness"
+      ]
     },
     {
       "location_slug": "reliquary",
       "description": "The Bone Warden performs the rite. Interrupting it advances cathedral collapse.",
-      "related_actor_slugs": ["bone-warden"],
-      "related_clock_slugs": ["final-rite", "cathedral-collapse"]
+      "related_actor_slugs": [
+        "bone-warden"
+      ],
+      "related_clock_slugs": [
+        "final-rite",
+        "cathedral-collapse"
+      ]
+    },
+    {
+      "location_slug": "ossuary",
+      "description": "An Undead Jailer wanders the halls, seeking to capture any intruders.",
+      "related_actor_slugs": [
+        "undead-jailer"
+      ]
     }
   ]
 }

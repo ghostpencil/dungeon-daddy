@@ -13,6 +13,6 @@ Load only the file that covers the phase you are working on.
 
 ## Current phase
 
-Phase 40 is complete. Next phase is **41 — AI-Assisted Campaign Drafting**.
+Phase 41 is complete. Next phase is **42 — Campaign Authoring UI**.
 
 See `IMPLEMENTATION_PHASES_33_ONWARDS.md` for the full spec.
