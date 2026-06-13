@@ -6,7 +6,7 @@ from pathlib import Path
 import duckdb
 
 from dungeon_daddy.memory.models import DomainEvent
-from dungeon_daddy.rpg.models import FalloutRecord
+from dungeon_daddy.rpg.models import FactionState, FalloutRecord
 
 
 def _ensure_migration_table(conn: duckdb.DuckDBPyConnection) -> None:
@@ -764,6 +764,91 @@ class MemoryRepository:
             }
             for r in rows
         ]
+
+    # ------------------------------------------------------------------
+    # Factions
+    # ------------------------------------------------------------------
+
+    _REPUTATION_TIERS: list[str] = ["hostile", "cold", "neutral", "warm", "allied"]
+
+    def save_faction(self, faction: FactionState) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO factions (
+                faction_id, campaign_id, slug, display_name,
+                concept, goal, status, reputation, tier, tags
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (faction_id) DO UPDATE SET
+                slug         = excluded.slug,
+                display_name = excluded.display_name,
+                concept      = excluded.concept,
+                goal         = excluded.goal,
+                status       = excluded.status,
+                reputation   = excluded.reputation,
+                tier         = excluded.tier,
+                tags         = excluded.tags
+            """,
+            [
+                faction.faction_id,
+                faction.campaign_id,
+                faction.slug,
+                faction.display_name,
+                faction.concept,
+                faction.goal,
+                faction.status,
+                faction.reputation,
+                faction.tier,
+                json.dumps(faction.tags),
+            ],
+        )
+
+    def get_factions(self, campaign_id: str) -> list[dict]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT faction_id, campaign_id, slug, display_name,
+                   concept, goal, status, reputation, tier, tags
+            FROM factions WHERE campaign_id = ?
+            ORDER BY display_name
+            """,
+            [campaign_id],
+        ).fetchall()
+        return [
+            {
+                "faction_id": r[0],
+                "campaign_id": r[1],
+                "slug": r[2],
+                "display_name": r[3],
+                "concept": r[4],
+                "goal": r[5],
+                "status": r[6],
+                "reputation": r[7],
+                "tier": r[8],
+                "tags": json.loads(r[9]) if r[9] else [],
+            }
+            for r in rows
+        ]
+
+    def update_faction_reputation(self, faction_id: str, delta_steps: int) -> str:
+        assert self._conn is not None
+        row = self._conn.execute(
+            "SELECT reputation FROM factions WHERE faction_id = ?",
+            [faction_id],
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"Faction {faction_id!r} not found")
+        current = row[0]
+        tiers = self._REPUTATION_TIERS
+        idx = tiers.index(current)
+        new_idx = max(0, min(len(tiers) - 1, idx + delta_steps))
+        new_rep = tiers[new_idx]
+        self._conn.execute(
+            "UPDATE factions SET reputation = ? WHERE faction_id = ?",
+            [new_rep, faction_id],
+        )
+        return new_rep
 
     def close(self) -> None:
         if self._conn is not None:

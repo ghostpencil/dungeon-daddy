@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest
+from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, FactionManifest
 from dungeon_daddy.memory.repository import MemoryRepository
 
 
@@ -37,8 +37,7 @@ def seed_from_manifest(
     result = SeedResult()
     slug = manifest.slug
 
-    all_actors = manifest.world_actors + manifest.factions
-    for actor in all_actors:
+    for actor in manifest.world_actors:
         _seed_actor(actor, repo, campaign_id, slug, result, dry_run=dry_run, force=force)
 
     for clock in manifest.clocks:
@@ -46,6 +45,9 @@ def seed_from_manifest(
 
     for i, memory_text in enumerate(manifest.memory_seeds):
         _seed_memory(memory_text, i, repo, campaign_id, slug, result, dry_run=dry_run, force=force)
+
+    for faction in manifest.factions:
+        _seed_faction(faction, repo, campaign_id, slug, result, dry_run=dry_run)
 
     return result
 
@@ -60,6 +62,10 @@ def _clock_id(campaign_slug: str, clock_slug: str) -> str:
 
 def _memory_id(campaign_slug: str, index: int) -> str:
     return f"memory:{campaign_slug}:seed-{index}"
+
+
+def _faction_id(campaign_slug: str, faction_slug: str) -> str:
+    return f"faction:{campaign_slug}:{faction_slug}"
 
 
 def _seed_actor(
@@ -138,6 +144,41 @@ def _seed_clock(
         )
         result.created += 1 if is_new else 0
         result.updated += 0 if is_new else 1
+    else:
+        result.skipped += 1
+
+
+def _seed_faction(
+    faction: FactionManifest,
+    repo: MemoryRepository,
+    campaign_id: str,
+    campaign_slug: str,
+    result: SeedResult,
+    dry_run: bool,
+) -> None:
+    from dungeon_daddy.rpg.models import FactionState
+    fac_id = _faction_id(campaign_slug, faction.slug)
+    existing_ids = {f["faction_id"] for f in repo.get_factions(campaign_id)}
+
+    if dry_run:
+        result.created += 1 if fac_id not in existing_ids else 0
+        result.skipped += 0 if fac_id not in existing_ids else 1
+        return
+
+    if fac_id not in existing_ids:
+        repo.save_faction(FactionState(
+            faction_id=fac_id,
+            campaign_id=campaign_id,
+            slug=faction.slug,
+            display_name=faction.display_name,
+            concept=faction.concept,
+            goal=faction.goal,
+            status=faction.status,
+            reputation=faction.reputation,
+            tier=faction.tier,
+            tags=faction.tags,
+        ))
+        result.created += 1
     else:
         result.skipped += 1
 

@@ -28,7 +28,7 @@ from dungeon_daddy.llm.agents.design_agent import DesignAgent
 from dungeon_daddy.llm.agents.generator_agent import DungeonGeneratorAgent
 from dungeon_daddy.llm.agents.wizard_agent import DungeonBrief, DungeonWizardAgent, LevelBrief
 from dungeon_daddy.llm.provider import LLMMessage
-from dungeon_daddy.ui.chrome import MenuBar, draw_title_bar
+from dungeon_daddy.ui.chrome import MenuBar, draw_title_bar, title_bar_mode_at
 from dungeon_daddy.ui.panels.chat_panel import ChatPanel
 from dungeon_daddy.ui.panels.dungeon_tree_panel import DungeonTreePanel
 from dungeon_daddy.ui.panels.inspector_panel import InspectorPanel
@@ -208,6 +208,10 @@ class DesignView(arcade.View):
         if self._overlay_open:
             return  # overlay is modal — UIManager handles save/cancel clicks
         if self._menu_bar.handle_click(x, y, self.window):
+            return
+        pill = title_bar_mode_at(x, y, self.window)
+        if pill and pill != "design":
+            self.window.switch_mode(pill)
             return
         if self._tree.handle_click(x, y):
             return

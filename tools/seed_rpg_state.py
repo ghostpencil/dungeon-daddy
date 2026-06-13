@@ -379,9 +379,35 @@ def seed_campaign_with_pack(
     _upsert_session(repo, campaign_id, campaign_slug, result)
     _upsert_scene(repo, campaign_id, campaign_slug, result)
 
+    from dungeon_daddy.rpg.seed_pack import derive_actor_id, derive_faction_id
+    from dungeon_daddy.rpg.models import FactionState
+
     all_actors = pack.player_side.actors + pack.dungeon_side.actors
+    faction_slugs = {a.slug for a in all_actors if a.actor_type == "faction"}
+
     for actor in all_actors:
-        from dungeon_daddy.rpg.seed_pack import derive_actor_id
+        if actor.actor_type == "faction":
+            faction_id = derive_faction_id(pack.campaign_slug, actor.slug)
+            existing_factions = {f["faction_id"] for f in repo.get_factions(campaign_id)}
+            is_new = faction_id not in existing_factions
+            if is_new or force:
+                repo.save_faction(FactionState(
+                    faction_id=faction_id,
+                    campaign_id=campaign_id,
+                    slug=actor.slug,
+                    display_name=actor.display_name,
+                    concept=actor.concept,
+                    goal=actor.instinct,
+                    status="active",
+                    reputation="neutral",
+                    tier=0,
+                    tags=actor.tags,
+                ))
+                result.created += 1 if is_new else 0
+                result.updated += 1 if not is_new else 0
+            else:
+                result.skipped += 1
+            continue
 
         actor_id = derive_actor_id(pack.campaign_slug, actor.slug)
         existing = repo.get_actor(actor_id)
@@ -412,7 +438,8 @@ def seed_campaign_with_pack(
         seed_clock_ids.add(clock_id)
         owner_actor_id = (
             _derive_actor_id(pack.campaign_slug, clock.owner_actor_slug)
-            if clock.owner_actor_slug else None
+            if clock.owner_actor_slug and clock.owner_actor_slug not in faction_slugs
+            else None
         )
         is_new = clock_id not in existing_clock_ids
         if is_new or force:

@@ -40,8 +40,21 @@ class NpcReactionChange(BaseModel):
     reason: str
 
 
+class AdjustReputationChange(BaseModel):
+    kind: Literal["adjust_reputation"] = "adjust_reputation"
+    faction_slug: str
+    delta_steps: int
+    reason: str
+
+
 ProposedChange = Annotated[
-    Union[AdvanceClockChange, ApplyConsequenceChange, CreateMemoryChange, NpcReactionChange],
+    Union[
+        AdvanceClockChange,
+        ApplyConsequenceChange,
+        CreateMemoryChange,
+        NpcReactionChange,
+        AdjustReputationChange,
+    ],
     Field(discriminator="kind"),
 ]
 

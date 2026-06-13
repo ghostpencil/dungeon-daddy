@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.rpg.proposal import ApplyConsequenceChange, CreateMemoryChange, ProposedChange
+from dungeon_daddy.rpg.proposal import AdjustReputationChange, ApplyConsequenceChange, CreateMemoryChange, ProposedChange
 from dungeon_daddy.rpg.proposal_validator import ValidationResult
 
 
@@ -53,6 +53,26 @@ def apply_low_risk_proposals(
             repo.insert_domain_event(event)
             result.applied.append(change)
             result.events.append(event)
+        elif isinstance(change, AdjustReputationChange):
+            factions = repo.get_factions(campaign_id)
+            match = next((f for f in factions if f["slug"] == change.faction_slug), None)
+            if match is None:
+                result.skipped.append(change)
+            else:
+                repo.update_faction_reputation(match["faction_id"], change.delta_steps)
+                event = DomainEvent(
+                    event_id=str(uuid.uuid4()),
+                    campaign_id=campaign_id,
+                    event_type="reputation_changed",
+                    payload={
+                        "faction_slug": change.faction_slug,
+                        "delta_steps": change.delta_steps,
+                        "reason": change.reason,
+                    },
+                )
+                repo.insert_domain_event(event)
+                result.applied.append(change)
+                result.events.append(event)
         elif isinstance(change, ApplyConsequenceChange):
             # Deterministic reaction is authoritative for stress; skip to prevent duplication.
             result.skipped.append(change)

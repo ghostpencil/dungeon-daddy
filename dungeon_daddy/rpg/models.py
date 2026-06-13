@@ -134,6 +134,19 @@ class WorldReaction(BaseModel):
     summary_lines: list[str] = Field(default_factory=list)
 
 
+class FactionState(BaseModel):
+    faction_id: str
+    campaign_id: str
+    slug: str
+    display_name: str
+    concept: str | None = None
+    goal: str | None = None
+    status: Literal["active", "inactive", "dissolved"] = "active"
+    reputation: Literal["hostile", "cold", "neutral", "warm", "allied"] = "neutral"
+    tier: int = 0
+    tags: list[str] = Field(default_factory=list)
+
+
 class FalloutRecord(BaseModel):
     fallout_id: str
     campaign_id: str

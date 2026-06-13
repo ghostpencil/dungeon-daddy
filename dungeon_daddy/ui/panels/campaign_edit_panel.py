@@ -1,0 +1,561 @@
+"""Campaign Edit Panel — right-side form panel for Campaign Mode."""
+from __future__ import annotations
+
+import logging
+from collections.abc import Callable
+from typing import Any
+
+import arcade
+import arcade.gui
+
+from dungeon_daddy.ui.theme import (
+    BG_1,
+    BG_2,
+    BG_3,
+    BG_HI,
+    FONT_MONO,
+    FONT_SERIF,
+    FONT_UI,
+    FONT_UI_MED,
+    INK_1,
+    INK_2,
+    INK_3,
+    INK_4,
+    LINE,
+    LINE_HI,
+    PAD_MD,
+    PAD_SM,
+    TEAL,
+    TEXT_BASE,
+    TEXT_SM,
+    draw_kicker,
+)
+
+_log = logging.getLogger(__name__)
+
+_FIELD_H = 26
+_FIELD_GAP = 8
+_LABEL_H = 12
+_LABEL_GAP = 3
+_ROW_H = 22       # compact input height for action/stress rows
+_ROW_GAP = 4
+_ROW_LABEL_W = 80  # px width of inline label column for action/stress rows
+_BTN_H = 26
+_BTN_W = 80
+
+_ACTION_KEYS = ["fight", "move", "tinker", "study", "focus", "sway", "sense", "channel", "endure"]
+_STRESS_KEYS = ["body", "composure", "bonds", "weird"]
+_REPUTATION_TIERS = ["hostile", "cold", "neutral", "warm", "allied"]
+
+
+def _btn_style(variant: str) -> dict[str, Any]:
+    if variant == "teal":
+        fg = (*TEAL, 255)
+        border = (*TEAL, 255)
+    else:
+        fg = (*INK_2, 255)
+        border = (*LINE, 255)
+    return {
+        "normal": arcade.gui.UIFlatButton.UIStyle(
+            font_size=TEXT_SM, font_name=FONT_UI_MED,
+            font_color=fg, bg=(*BG_2, 255),
+            border=border, border_width=1,
+        ),
+        "hover": arcade.gui.UIFlatButton.UIStyle(
+            font_size=TEXT_SM, font_name=FONT_UI_MED,
+            font_color=(*INK_1, 255), bg=(*BG_3, 255),
+            border=(*LINE_HI, 255), border_width=1,
+        ),
+        "press": arcade.gui.UIFlatButton.UIStyle(
+            font_size=TEXT_SM, font_name=FONT_UI_MED,
+            font_color=fg, bg=(*BG_HI, 255),
+            border=border, border_width=1,
+        ),
+        "disabled": arcade.gui.UIFlatButton.UIStyle(
+            font_size=TEXT_SM, font_name=FONT_UI_MED,
+            font_color=(*INK_4, 255), bg=(*BG_2, 255),
+            border=(*LINE, 255), border_width=1,
+        ),
+    }
+
+
+class CampaignEditPanel:
+    """Right-side form panel.  Owns UIManager widgets for the active form."""
+
+    def __init__(self) -> None:
+        self._x = self._y = self._w = self._h = 0.0
+        self._manager: arcade.gui.UIManager | None = None
+        self._widgets: list[arcade.gui.UIWidget] = []
+        self.mode: str = "none"
+        self._on_save: Callable[[dict], None] | None = None
+        self._on_cancel: Callable[[], None] | None = None
+        self._inputs: dict[str, arcade.gui.UIInputText] = {}
+        # (text, center_y, color) tuples drawn each frame by draw()
+        self._labels: list[tuple[str, float, tuple]] = []
+        # Extra data merged into _collect_inputs() (e.g. actor_type)
+        self._extra_data: dict = {}
+        # Number-picker state: value and draw position for each numeric field
+        self._number_values: dict[str, int] = {}
+        self._number_label_centers: dict[str, tuple[float, float]] = {}
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
+    def setup(
+        self,
+        manager: arcade.gui.UIManager,
+        x: float,
+        y: float,
+        w: float,
+        h: float,
+    ) -> None:
+        self._manager = manager
+        self._x, self._y, self._w, self._h = x, y, w, h
+
+    def resize(self, x: float, y: float, w: float, h: float) -> None:
+        self._x, self._y, self._w, self._h = x, y, w, h
+        # Widgets are fixed-position; rebuild on next show_* call.
+        self.clear()
+
+    # ------------------------------------------------------------------
+    # Public show-form entry points
+    # ------------------------------------------------------------------
+
+    def show_actor(
+        self,
+        actor: object,
+        on_save: Callable[[dict], None],
+        on_cancel: Callable[[], None],
+        *,
+        is_new: bool = False,
+    ) -> None:
+        self.clear()
+        self.mode = "new_actor" if is_new else "actor"
+        self._on_save = on_save
+        self._on_cancel = on_cancel
+        self._build_actor_form(actor)
+
+    def show_clock(
+        self,
+        clock: object,
+        on_save: Callable[[dict], None],
+        on_cancel: Callable[[], None],
+        *,
+        is_new: bool = False,
+    ) -> None:
+        self.clear()
+        self.mode = "new_clock" if is_new else "clock"
+        self._on_save = on_save
+        self._on_cancel = on_cancel
+        self._build_clock_form(clock)
+
+    def show_lore(
+        self,
+        text: str,
+        on_save: Callable[[dict], None],
+        on_cancel: Callable[[], None],
+        *,
+        is_new: bool = False,
+    ) -> None:
+        self.clear()
+        self.mode = "new_lore" if is_new else "lore"
+        self._on_save = on_save
+        self._on_cancel = on_cancel
+        self._build_lore_form(text)
+
+    def show_faction(
+        self,
+        faction: object,
+        on_save: Callable[[dict], None],
+        on_cancel: Callable[[], None],
+        *,
+        is_new: bool = False,
+    ) -> None:
+        self.clear()
+        self.mode = "new_faction" if is_new else "faction"
+        self._on_save = on_save
+        self._on_cancel = on_cancel
+        self._build_faction_form(faction)
+
+    def show_threat(
+        self,
+        threat: dict,
+        on_save: Callable[[dict], None],
+        on_cancel: Callable[[], None],
+        *,
+        is_new: bool = False,
+    ) -> None:
+        self.clear()
+        self.mode = "new_threat" if is_new else "threat"
+        self._on_save = on_save
+        self._on_cancel = on_cancel
+        self._build_threat_form(threat)
+
+    def clear(self) -> None:
+        for widget in self._widgets:
+            try:
+                assert self._manager is not None
+                self._manager.remove(widget)
+            except Exception:
+                pass
+        self._widgets.clear()
+        self._inputs.clear()
+        self._labels.clear()
+        self._extra_data.clear()
+        self._number_values.clear()
+        self._number_label_centers.clear()
+        self.mode = "none"
+
+    # ------------------------------------------------------------------
+    # Drawing
+    # ------------------------------------------------------------------
+
+    def draw(self) -> None:
+        """Draw the panel background, labels, and placeholder when no form is open."""
+        px, py, pw, ph = self._x, self._y, self._w, self._h
+        arcade.draw_rect_filled(arcade.XYWH(px + pw / 2, py + ph / 2, pw, ph), BG_1)
+
+        if self.mode == "none":
+            arcade.draw_text(
+                "Select an item to edit",
+                px + pw / 2,
+                py + ph / 2,
+                INK_4,
+                font_size=TEXT_SM,
+                font_name=FONT_MONO,
+                anchor_x="center",
+                anchor_y="center",
+                italic=True,
+            )
+
+        for text, cy, color in self._labels:
+            arcade.draw_text(
+                text, px + PAD_SM, cy, color,
+                font_size=TEXT_SM, font_name=FONT_MONO,
+                anchor_x="left", anchor_y="center",
+            )
+
+        for key, (vx, vy) in self._number_label_centers.items():
+            arcade.draw_text(
+                str(self._number_values.get(key, 0)),
+                vx, vy,
+                (*INK_1, 255),
+                font_size=TEXT_BASE, font_name=FONT_MONO,
+                anchor_x="center", anchor_y="center",
+            )
+
+    # ------------------------------------------------------------------
+    # Widget y-position helper
+    # ------------------------------------------------------------------
+
+    def _widget_y(self, offset_from_top: float, height: float) -> int:
+        """Arcade y (bottom-left) for a widget placed offset_from_top px below the panel top."""
+        return int(self._y + self._h - offset_from_top - height)
+
+    def _add(self, widget: arcade.gui.UIWidget) -> None:
+        assert self._manager is not None
+        self._manager.add(widget)
+        self._widgets.append(widget)
+
+    def _add_input(
+        self,
+        key: str,
+        value: str,
+        x: float,
+        y_bottom: float,
+        w: float,
+        h: float,
+        multiline: bool = False,
+    ) -> arcade.gui.UIInputText:
+        widget = arcade.gui.UIInputText(
+            x=int(x),
+            y=int(y_bottom),
+            width=int(w),
+            height=int(h),
+            text=value,
+            font_name=(FONT_MONO,),
+            font_size=TEXT_BASE,
+            text_color=(*INK_1, 255),
+            multiline=multiline,
+        )
+        self._add(widget)
+        self._inputs[key] = widget
+        return widget
+
+    def _add_save_cancel(self, offset_from_top: float) -> None:
+        pad = PAD_SM
+        fx = self._x + pad
+        fw = self._w - 2 * pad
+        y = self._widget_y(offset_from_top, _BTN_H)
+
+        save_btn = arcade.gui.UIFlatButton(
+            x=int(fx), y=int(y),
+            width=int(fw / 2 - pad / 2), height=_BTN_H,
+            text="SAVE", style=_btn_style("teal"),
+        )
+        cancel_btn = arcade.gui.UIFlatButton(
+            x=int(fx + fw / 2 + pad / 2), y=int(y),
+            width=int(fw / 2 - pad / 2), height=_BTN_H,
+            text="CANCEL", style=_btn_style("default"),
+        )
+
+        @save_btn.event
+        def on_click(event: arcade.gui.UIOnClickEvent) -> None:
+            if self._on_save:
+                self._on_save(self._collect_inputs())
+
+        @cancel_btn.event  # type: ignore[no-redef]
+        def on_click(event: arcade.gui.UIOnClickEvent) -> None:  # noqa: F811
+            if self._on_cancel:
+                self._on_cancel()
+
+        self._add(save_btn)
+        self._add(cancel_btn)
+
+    def _collect_inputs(self) -> dict:
+        if self.mode in ("faction", "new_faction"):
+            return self._collect_faction_inputs()
+        result = {k: v.text for k, v in self._inputs.items()}
+        result.update(self._extra_data)
+        result.update({k: str(v) for k, v in self._number_values.items()})
+        return result
+
+    def _collect_faction_inputs(self) -> dict:
+        result = {k: v.text for k, v in self._inputs.items()}
+        result.update(self._extra_data)
+        rep_idx = self._number_values.get("reputation_idx", 2)
+        result["reputation"] = _REPUTATION_TIERS[max(0, min(4, rep_idx))]
+        result["tier"] = str(self._number_values.get("tier", 0))
+        return result
+
+    # ------------------------------------------------------------------
+    # Form builders
+    # ------------------------------------------------------------------
+
+    def _build_actor_form(self, actor: object) -> None:
+        pad = PAD_SM
+        fw = self._w - 2 * pad
+        fx = self._x + pad
+        cursor = 48.0
+
+        # Preserve actor_type (no UI selector yet — roundtrip via _extra_data)
+        self._extra_data["actor_type"] = getattr(actor, "actor_type", "pc")
+
+        action_ratings: dict = getattr(actor, "action_ratings", {}) or {}
+        stress_caps: dict[str, int] = {}
+        for track in getattr(actor, "stress_tracks", []):
+            if isinstance(track, dict):
+                k, v = track.get("track_key", ""), track.get("capacity", 6)
+            else:
+                k, v = getattr(track, "track_key", ""), getattr(track, "capacity", 6)
+            if k:
+                stress_caps[k] = v
+
+        def _lbl(text: str, color: tuple = INK_3) -> None:
+            nonlocal cursor
+            cy = self._widget_y(cursor, _LABEL_H) + _LABEL_H / 2
+            self._labels.append((text, cy, color))
+            cursor += _LABEL_H + _LABEL_GAP
+
+        def _inp(key: str, value: str, h: float = _FIELD_H, multiline: bool = False) -> None:
+            nonlocal cursor
+            self._add_input(key, value, fx, self._widget_y(cursor, h), fw, h, multiline)
+            cursor += h + _FIELD_GAP
+
+        _BTN_W_PICKER = 22  # width of [-] and [+] buttons
+
+        def _number_row(label: str, field_key: str, value: int, max_val: int = 9) -> None:
+            """Row label + [-] value [+] number picker (no UIInputText — no hover jitter)."""
+            nonlocal cursor
+            h = _ROW_H
+            input_x = fx + _ROW_LABEL_W
+            input_w = fw - _ROW_LABEL_W
+            wy = self._widget_y(cursor, h)
+            cy = wy + h // 2
+
+            self._labels.append((label, cy, INK_3))
+            self._number_values[field_key] = value
+
+            # Value center between the two buttons
+            vx = input_x + _BTN_W_PICKER + (input_w - 2 * _BTN_W_PICKER) / 2
+            self._number_label_centers[field_key] = (vx, cy)
+
+            minus_btn = arcade.gui.UIFlatButton(
+                x=int(input_x), y=wy,
+                width=_BTN_W_PICKER, height=h,
+                text="-", style=_btn_style("default"),
+            )
+            plus_btn = arcade.gui.UIFlatButton(
+                x=int(input_x + input_w - _BTN_W_PICKER), y=wy,
+                width=_BTN_W_PICKER, height=h,
+                text="+", style=_btn_style("default"),
+            )
+
+            @minus_btn.event
+            def on_click(event: arcade.gui.UIOnClickEvent, _k: str = field_key, _min: int = 0) -> None:
+                self._number_values[_k] = max(_min, self._number_values[_k] - 1)
+
+            @plus_btn.event  # type: ignore[no-redef]
+            def on_click(event: arcade.gui.UIOnClickEvent, _k: str = field_key, _max: int = max_val) -> None:  # noqa: F811
+                self._number_values[_k] = min(_max, self._number_values[_k] + 1)
+
+            self._add(minus_btn)
+            self._add(plus_btn)
+            cursor += h + _ROW_GAP
+
+        # Basic fields
+        _lbl("NAME")
+        _inp("display_name", getattr(actor, "display_name", ""))
+        _lbl("SLUG")
+        _inp("slug", getattr(actor, "slug", ""))
+        _lbl("CONCEPT")
+        _inp("concept", getattr(actor, "concept", "") or "", h=80, multiline=True)
+
+        # Action ratings
+        _lbl("── ACTION RATINGS ──", INK_2)
+        for key in _ACTION_KEYS:
+            _number_row(key, f"rating_{key}", action_ratings.get(key, 0))
+
+        # Stress tracks (max capacity)
+        _lbl("── STRESS TRACKS ──", INK_2)
+        for key in _STRESS_KEYS:
+            _number_row(key, f"stress_{key}", stress_caps.get(key, 0))
+
+        self._add_save_cancel(cursor + 8)
+
+    def _build_clock_form(self, clock: object) -> None:
+        pad = PAD_SM
+        fw = self._w - 2 * pad
+        fx = self._x + pad
+        cursor = 48.0
+
+        def _lbl(text: str) -> None:
+            nonlocal cursor
+            cy = self._widget_y(cursor, _LABEL_H) + _LABEL_H / 2
+            self._labels.append((text, cy, INK_3))
+            cursor += _LABEL_H + _LABEL_GAP
+
+        def _input(key: str, value: str, h: float = _FIELD_H, multiline: bool = False) -> None:
+            nonlocal cursor
+            self._add_input(key, value, fx, self._widget_y(cursor, h), fw, h, multiline)
+            cursor += h + _FIELD_GAP
+
+        _lbl("NAME")
+        _input("label", getattr(clock, "label", ""))
+        _lbl("SLUG")
+        _input("slug", getattr(clock, "slug", ""))
+        _lbl("SEGMENTS")
+        _input("segments", str(getattr(clock, "segments", 6)))
+        _lbl("FILLED")
+        _input("filled", str(getattr(clock, "filled", 0)))
+        _lbl("STAKES")
+        _input("stakes", getattr(clock, "stakes", "") or "", h=64, multiline=True)
+
+        self._add_save_cancel(cursor + 8)
+
+    def _build_lore_form(self, text: str) -> None:
+        pad = PAD_SM
+        fw = self._w - 2 * pad
+        fx = self._x + pad
+        cursor = 48.0
+
+        cy = self._widget_y(cursor, _LABEL_H) + _LABEL_H / 2
+        self._labels.append(("TEXT", cy, INK_3))
+        cursor += _LABEL_H + _LABEL_GAP
+
+        self._add_input("text", text, fx, self._widget_y(cursor, 160), fw, 160, multiline=True)
+        self._add_save_cancel(cursor + 160 + _FIELD_GAP + 8)
+
+    def _build_threat_form(self, threat: dict) -> None:
+        pad = PAD_SM
+        fw = self._w - 2 * pad
+        fx = self._x + pad
+        cursor = 48.0
+
+        def _lbl(text: str) -> None:
+            nonlocal cursor
+            cy = self._widget_y(cursor, _LABEL_H) + _LABEL_H / 2
+            self._labels.append((text, cy, INK_3))
+            cursor += _LABEL_H + _LABEL_GAP
+
+        def _input(key: str, value: str, h: float = _FIELD_H, multiline: bool = False) -> None:
+            nonlocal cursor
+            self._add_input(key, value, fx, self._widget_y(cursor, h), fw, h, multiline)
+            cursor += h + _FIELD_GAP
+
+        _lbl("LOCATION")
+        _input("location_slug", threat.get("location_slug", ""))
+        _lbl("DESCRIPTION")
+        _input("description", threat.get("description", ""), h=80, multiline=True)
+
+        self._add_save_cancel(cursor + 8)
+
+    def _build_faction_form(self, faction: object) -> None:
+        pad = PAD_SM
+        fw = self._w - 2 * pad
+        fx = self._x + pad
+        cursor = 48.0
+
+        def _lbl(text: str, color: tuple = INK_3) -> None:
+            nonlocal cursor
+            cy = self._widget_y(cursor, _LABEL_H) + _LABEL_H / 2
+            self._labels.append((text, cy, color))
+            cursor += _LABEL_H + _LABEL_GAP
+
+        def _inp(key: str, value: str, h: float = _FIELD_H, multiline: bool = False) -> None:
+            nonlocal cursor
+            self._add_input(key, value, fx, self._widget_y(cursor, h), fw, h, multiline)
+            cursor += h + _FIELD_GAP
+
+        _BTN_W_PICKER = 22
+
+        def _rep_row(label: str, field_key: str, value: int) -> None:
+            nonlocal cursor
+            h = _ROW_H
+            input_x = fx + _ROW_LABEL_W
+            input_w = fw - _ROW_LABEL_W
+            wy = self._widget_y(cursor, h)
+            cy = wy + h // 2
+
+            self._labels.append((label, cy, INK_3))
+            self._number_values[field_key] = value
+            vx = input_x + _BTN_W_PICKER + (input_w - 2 * _BTN_W_PICKER) / 2
+            self._number_label_centers[field_key] = (vx, cy)
+
+            minus_btn = arcade.gui.UIFlatButton(
+                x=int(input_x), y=wy, width=_BTN_W_PICKER, height=h,
+                text="-", style=_btn_style("default"),
+            )
+            plus_btn = arcade.gui.UIFlatButton(
+                x=int(input_x + input_w - _BTN_W_PICKER), y=wy, width=_BTN_W_PICKER, height=h,
+                text="+", style=_btn_style("default"),
+            )
+
+            @minus_btn.event
+            def on_click(event: arcade.gui.UIOnClickEvent, _k: str = field_key) -> None:
+                self._number_values[_k] = max(0, self._number_values[_k] - 1)
+
+            @plus_btn.event  # type: ignore[no-redef]
+            def on_click(event: arcade.gui.UIOnClickEvent, _k: str = field_key, _max: int = 4) -> None:  # noqa: F811
+                self._number_values[_k] = min(_max, self._number_values[_k] + 1)
+
+            self._add(minus_btn)
+            self._add(plus_btn)
+            cursor += h + _ROW_GAP
+
+        rep_idx = _REPUTATION_TIERS.index(getattr(faction, "reputation", "neutral"))
+        tier_val = int(getattr(faction, "tier", 0))
+
+        _lbl("NAME")
+        _inp("display_name", getattr(faction, "display_name", ""))
+        _lbl("SLUG")
+        _inp("slug", getattr(faction, "slug", ""))
+        _lbl("CONCEPT")
+        _inp("concept", getattr(faction, "concept", "") or "", h=80, multiline=True)
+        _lbl("GOAL")
+        _inp("goal", getattr(faction, "goal", "") or "", h=60, multiline=True)
+        _rep_row("REPUTATION", "reputation_idx", rep_idx)
+        _rep_row("TIER", "tier", tier_val)
+
+        self._add_save_cancel(cursor + 8)
