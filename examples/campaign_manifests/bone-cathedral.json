@@ -1,0 +1,149 @@
+{
+  "slug": "bone-cathedral",
+  "title": "The Bone Cathedral",
+  "premise": "A crumbling ossuary haunted by the remnants of a forgotten death-cult. The party seeks a stolen relic before the cathedral's guardian completes its final rite.",
+  "dungeon_slug": "bone-cathedral",
+  "starting_level": "nave",
+  "player_side": [
+    "valeria",
+    "osric"
+  ],
+  "world_actors": [
+    {
+      "slug": "valeria",
+      "display_name": "Valeria Crane",
+      "actor_type": "pc",
+      "concept": "A disgraced inquisitor hunting blasphemous relics.",
+      "status": "active",
+      "action_ratings": {
+        "fight": 2,
+        "sway": 1,
+        "study": 1
+      },
+      "stress_tracks": [
+        {"track_key": "body", "capacity": 6, "filled": 0},
+        {"track_key": "composure", "capacity": 6, "filled": 0}
+      ],
+      "tags": ["player", "inquisitor"]
+    },
+    {
+      "slug": "osric",
+      "display_name": "Osric Vane",
+      "actor_type": "pc",
+      "concept": "A grave-robber who knows too many secrets.",
+      "status": "active",
+      "action_ratings": {
+        "move": 2,
+        "tinker": 2,
+        "sense": 1
+      },
+      "stress_tracks": [
+        {"track_key": "body", "capacity": 6, "filled": 0},
+        {"track_key": "bonds", "capacity": 4, "filled": 0}
+      ],
+      "tags": ["player", "rogue"]
+    },
+    {
+      "slug": "bone-warden",
+      "display_name": "The Bone Warden",
+      "actor_type": "dungeon",
+      "concept": "The cathedral's undying custodian, completing a rite that will seal the relic forever.",
+      "status": "active",
+      "action_ratings": {
+        "fight": 3,
+        "endure": 2,
+        "channel": 2
+      },
+      "stress_tracks": [
+        {"track_key": "body", "capacity": 12, "filled": 0}
+      ],
+      "tags": ["boss", "undead"]
+    },
+    {
+      "slug": "ossuary-shade",
+      "display_name": "Ossuary Shade",
+      "actor_type": "monster",
+      "concept": "A fragment of the death-cult, bound to patrol the reliquary.",
+      "status": "active",
+      "action_ratings": {
+        "fight": 1,
+        "channel": 1
+      },
+      "stress_tracks": [
+        {"track_key": "body", "capacity": 4, "filled": 0}
+      ],
+      "tags": ["patrol", "undead"]
+    }
+  ],
+  "factions": [
+    {
+      "slug": "ossuary-cult",
+      "display_name": "The Ossuary Cult",
+      "actor_type": "faction",
+      "concept": "Scattered remnants of the cult. Still loyal to the Warden's rite.",
+      "status": "active",
+      "action_ratings": {},
+      "stress_tracks": [],
+      "tags": ["antagonist"]
+    }
+  ],
+  "clocks": [
+    {
+      "slug": "final-rite",
+      "label": "Final Rite Completion",
+      "segments": 8,
+      "filled": 0,
+      "status": "active",
+      "clock_level": "dungeon",
+      "category": "threat",
+      "visible_to_player": true,
+      "stakes": "If completed, the relic is sealed inside the Warden forever.",
+      "completion_effect": "The Bone Warden absorbs the relic and becomes permanently bound to the cathedral."
+    },
+    {
+      "slug": "cathedral-collapse",
+      "label": "Cathedral Structural Collapse",
+      "segments": 6,
+      "filled": 1,
+      "status": "active",
+      "clock_level": "dungeon",
+      "category": "environment",
+      "action_tags": ["fight", "move"],
+      "visible_to_player": true,
+      "stakes": "The ancient bones holding up the cathedral are failing.",
+      "completion_effect": "The cathedral collapses — all inside must escape or be buried."
+    },
+    {
+      "slug": "shade-patrol-awareness",
+      "label": "Shade Patrol Alert",
+      "segments": 4,
+      "filled": 0,
+      "status": "active",
+      "clock_level": "level",
+      "level_id": "nave",
+      "category": "escalation",
+      "visible_to_player": false,
+      "stakes": "Shades in the nave become aware of intruders.",
+      "completion_effect": "Ossuary shades converge — the party can no longer move freely through the nave."
+    }
+  ],
+  "memory_seeds": [
+    "The party entered the Bone Cathedral through a collapsed side chapel, avoiding the main gate.",
+    "Valeria recognizes the cult's iconography from a previous inquisition — this sect was declared extinct two decades ago.",
+    "Osric spotted a fresh handprint in the bone dust near the reliquary stairs. Someone else is here."
+  ],
+  "room_threats": [
+    {
+      "location_slug": "nave",
+      "description": "Ossuary shades drift between the pews. They respond to sound and light.",
+      "related_actor_slugs": ["ossuary-shade"],
+      "related_clock_slugs": ["shade-patrol-awareness"]
+    },
+    {
+      "location_slug": "reliquary",
+      "description": "The Bone Warden performs the rite. Interrupting it advances cathedral collapse.",
+      "related_actor_slugs": ["bone-warden"],
+      "related_clock_slugs": ["final-rite", "cathedral-collapse"]
+    }
+  ]
+}
