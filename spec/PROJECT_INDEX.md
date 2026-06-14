@@ -2,7 +2,44 @@
 
 ## Phase
 
-Phase: 43 — Faction System
+Phase: 44 — Playtest Telemetry and Balance Reports
+Spec: `spec/PHASE_44_PLAYTEST_TELEMETRY.md`
+Status: **COMPLETE** — All 6 slices done (2026-06-13). 2435 tests passing.
+Branch: `phase-44-playtest-telemetry`
+
+Summary: New `dungeon_daddy/reporting/` module with Pydantic models, aggregation queries, and `build_report()`. Two new domain events: `proposal.applied` (emitted per applied change in `proposal_applier.py`) and `proposal.rejected` (via `ValidationResult.rejection_events` on the pure validator). CLI tool `tools/playtest_report.py` prints formatted balance reports. 6 TDD slices, 33 new tests.
+
+Slice 1 complete (2026-06-13):
+- `dungeon_daddy/reporting/__init__.py`, `models.py` — all 8 Pydantic model classes
+- 4 tests in `tests/unit/reporting/test_models.py`
+
+Slice 2 complete (2026-06-13):
+- `dungeon_daddy/reporting/queries.py` — `action_usage`, `outcome_breakdown`, `stress_distribution`
+- `tests/unit/reporting/conftest.py` — repo fixture (mirrors `tests/unit/memory/conftest.py`)
+- 7 tests in `tests/unit/reporting/test_queries.py`
+
+Slice 3 complete (2026-06-13):
+- `dungeon_daddy/reporting/queries.py` — `clock_activity`, `fallout_frequency`
+- 6 new tests in `tests/unit/reporting/test_queries.py`
+
+Slice 4 complete (2026-06-13):
+- `dungeon_daddy/rpg/proposal_validator.py` — `ValidationResult.rejection_events: list[DomainEvent]`; emits `proposal.rejected` per rejected change (campaign_id="" — call site fills in before inserting)
+- `dungeon_daddy/rpg/proposal_applier.py` — emits `proposal.applied` per applied `CreateMemoryChange` and `AdjustReputationChange`
+- `dungeon_daddy/reporting/queries.py` — `proposal_stats`, `memory_stats`
+- 3 new tests in `tests/unit/rpg/test_proposal_validator.py`; 2 new tests in `tests/unit/rpg/test_proposal_applier.py`; 3 new tests in `tests/unit/reporting/test_queries.py`
+- Fixed pre-existing failure: `test_example_bone_cathedral_manifest_seeds_cleanly` expected 3 memory seeds but manifest has 2
+
+Slice 5 complete (2026-06-13):
+- `dungeon_daddy/reporting/reporter.py` — `build_report(repo, campaign_id) -> PlaytestReport`
+- 4 tests in `tests/unit/reporting/test_reporter.py`
+
+Slice 6 complete (2026-06-13):
+- `tools/playtest_report.py` — `format_report()` + `main()` CLI
+- 4 tests in `tests/unit/tools/test_playtest_report.py`
+
+---
+
+### Phase 43 — Faction System (COMPLETE)
 Spec: `spec/PHASE_42_ADDITION_FACTION_SYSTEM.md`
 Status: **COMPLETE** — All 7 slices done (2026-06-13). 2402 tests passing.
 Summary: New `FactionManifest` model (replaces `ActorManifest` for factions); named reputation tiers (hostile/cold/neutral/warm/allied); `FactionState` persisted in DuckDB; `AdjustReputationChange` in LLM proposal system; faction reputations included in `ContextBundle`; faction-specific Campaign UI edit form (no action ratings/stress tracks); 7 TDD slices.
@@ -94,7 +131,7 @@ Edit panel bug fixes (2026-06-13, found during manual QA):
 - Action ratings and stress track rows replaced with `[-] value [+]` number pickers (`_number_row` closure in `_build_actor_form`); eliminates `UIInputText` hover-redraw jitter entirely; values stored in `_number_values`, drawn via `_number_label_centers` in `draw()`, merged in `_collect_inputs()`
 - Concept textarea enlarged from h=36 to h=80; arcade multiline `UIInputText` handles scroll natively
 
-Branch: `phase-42-campaign-authoring-ui`
+Branch: `phase-43-faction-system` (merged into main 2026-06-13)
 
 ---
 
@@ -109,7 +146,7 @@ Branch: `phase-42-campaign-authoring-ui`
 
 ## Known Failures
 
-None (test suite passes — 2402 tests as of 2026-06-13).
+None (test suite passes — 2435 tests as of 2026-06-13).
 
 ---
 
@@ -123,9 +160,10 @@ Phase 41 and earlier are complete. Full history in `spec/HISTORY.md`.
 
 - Provider: OpenAI (`gpt-4o`); `OPENAI_API_KEY` must be set.
 - Phase specs: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (current); index at `spec/IMPLEMENTATION_PHASES.md`.
-- **Phase 42 detailed UI plan:** `spec/PHASE_42_CAMPAIGN_AUTHORING_UI.md` — layout, visual design, file plan, TDD slices, verification checklist.
 - Spec loading rules and skills: `CLAUDE.md` (canonical source).
 - `protagonist` actor is in `seed_data/campaigns/the-crucible/rpg_seed.json`; `--force` resets its stress tracks.
-- Example campaign manifest: `examples/campaign_manifests/bone-cathedral.json` (validates and seeds cleanly).
-- `tools/seed_rpg_state.py` updated (2026-06-13): `actor_type="faction"` entries in seed packs are now routed to `repo.save_faction()` instead of `repo.save_actor()`; faction clock `owner_actor_id` set to `None` for faction-typed owner slugs. Safe with `--force`.
-- Live campaigns migrated (2026-06-13): `The Crucible` — `desert-djinn-fragment` moved from `actors` table to `factions` table; djinn clock `owner_actor_id` cleared. `Tomb of the Forgotten King` — no migration needed.
+- Example campaign manifest: `examples/campaign_manifests/bone-cathedral.json` (validates and seeds cleanly; 2 memory seeds).
+- `tools/seed_rpg_state.py`: `actor_type="faction"` entries routed to `repo.save_faction()`; faction clock `owner_actor_id` cleared.
+- Live campaigns migrated (2026-06-13): `The Crucible` — `desert-djinn-fragment` moved from `actors` to `factions` table.
+- Playtest reports: `python -m tools.playtest_report <db_path> <campaign_id>` (requires `PYTHONPATH=.`).
+- `proposal.applied` / `proposal.rejected` events now emitted; call sites must insert `result.rejection_events` into repo with correct `campaign_id` after `validate_proposal()`.

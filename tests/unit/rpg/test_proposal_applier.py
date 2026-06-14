@@ -90,11 +90,11 @@ class TestCreateMemoryAutoApplied:
         apply_result = apply_low_risk_proposals(result, repo=repo, campaign_id="camp_x")
 
         events = repo.get_domain_events("camp_x")
-        assert len(events) == 1
-        assert events[0].event_type == "memory_created"
-        assert events[0].payload["title"] == "Mara woke the ossuary hinges"
-        assert events[0].payload["source"] == "llm_draft"
-        assert len(apply_result.events) == 1  # memory_created
+        memory_events = [e for e in events if e.event_type == "memory_created"]
+        assert len(memory_events) == 1
+        assert memory_events[0].payload["title"] == "Mara woke the ossuary hinges"
+        assert memory_events[0].payload["source"] == "llm_draft"
+        assert len(apply_result.events) == 1  # memory_created (proposal.applied not in apply_result.events)
 
 
 class TestNonCreateMemorySkipped:
@@ -164,6 +164,47 @@ class TestApplyConsequenceNoDuplication:
 
         assert apply_result.events == []
         assert repo.get_domain_events("campaign_1") == []
+
+
+class TestProposalAppliedEvent:
+    def test_create_memory_emits_proposal_applied_event(self, tmp_path):
+        repo = _repo(tmp_path)
+        change = CreateMemoryChange(
+            title="Test memory",
+            summary="Something happened.",
+            importance=3,
+            tags=[],
+        )
+        result = ValidationResult(accepted=[change], rejected=[])
+
+        apply_low_risk_proposals(result, repo=repo, campaign_id="camp_x")
+
+        events = repo.get_domain_events("camp_x")
+        applied_events = [e for e in events if e.event_type == "proposal.applied"]
+        assert len(applied_events) == 1
+        assert applied_events[0].payload["kind"] == "create_memory"
+
+    def test_adjust_reputation_emits_proposal_applied_event(self, tmp_path):
+        from dungeon_daddy.rpg.proposal import AdjustReputationChange
+        from dungeon_daddy.rpg.models import FactionState
+        import uuid as _uuid
+        repo = _repo(tmp_path)
+        faction = FactionState(
+            faction_id=str(_uuid.uuid4()),
+            campaign_id="camp_x",
+            slug="bone-choir",
+            display_name="Bone Choir",
+        )
+        repo.save_faction(faction)
+        change = AdjustReputationChange(faction_slug="bone-choir", delta_steps=1, reason="helped them")
+        result = ValidationResult(accepted=[change], rejected=[])
+
+        apply_low_risk_proposals(result, repo=repo, campaign_id="camp_x")
+
+        events = repo.get_domain_events("camp_x")
+        applied_events = [e for e in events if e.event_type == "proposal.applied"]
+        assert len(applied_events) == 1
+        assert applied_events[0].payload["kind"] == "adjust_reputation"
 
 
 class TestApplyConsequenceDivergingTrack:
