@@ -206,8 +206,6 @@ class DungeonDaddyWindow(arcade.Window):
                 MenuAction("Switch to Design", lambda: self.switch_mode("design")),
             ],
             "View": [
-                MenuAction("Map: Grid", lambda: self.set_map_variant("grid")),
-                MenuAction("Map: Tiles", lambda: self.set_map_variant("tiles")),
                 MenuAction("Map: Graph", lambda: self.set_map_variant("graph")),
             ],
             "Window": [
@@ -385,20 +383,12 @@ class DungeonDaddyWindow(arcade.Window):
 
     def set_map_variant(self, variant: str) -> None:
         from dungeon_daddy.map.graph_renderer import GraphRenderer
-        from dungeon_daddy.map.grid_renderer import GridRenderer
-        from dungeon_daddy.map.tiles_renderer import TilesRenderer
 
         _CELL_PX = 48
-        renderers = {
-            "grid": GridRenderer(cell_px=_CELL_PX),
-            "tiles": TilesRenderer(cell_px=_CELL_PX),
-            "graph": GraphRenderer(cell_px=_CELL_PX),
-        }
-        renderer = renderers.get(variant)
-        if renderer is None:
+        if variant != "graph":
             _log.warning("Unknown map variant: %s", variant)
             return
-        self._play_view.set_map_renderer(renderer)
+        self._play_view.set_map_renderer(GraphRenderer(cell_px=_CELL_PX))
         _log.info("Map variant: %s", variant)
 
     # ------------------------------------------------------------------

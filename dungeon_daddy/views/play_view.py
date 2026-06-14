@@ -14,7 +14,7 @@ from dungeon_daddy.data.models import Dungeon, Level, Room, SessionState
 from dungeon_daddy.data.repository import DungeonRepository
 from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
 from dungeon_daddy.llm.provider import LLMMessage
-from dungeon_daddy.map.grid_renderer import GridRenderer
+from dungeon_daddy.map.graph_renderer import GraphRenderer
 from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
 from dungeon_daddy.memory.models import MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
@@ -27,7 +27,7 @@ from dungeon_daddy.rpg.proposal import parse_proposal
 from dungeon_daddy.rpg.proposal_applier import ApplyResult, apply_low_risk_proposals
 from dungeon_daddy.rpg.proposal_validator import ValidationResult, validate_proposal
 from dungeon_daddy.rpg.service import RpgService
-from dungeon_daddy.ui.chrome import MenuBar, draw_title_bar, title_bar_mode_at
+from dungeon_daddy.ui.chrome import MenuBar, PILLS_CLUSTER_W, draw_title_bar, title_bar_mode_at
 from dungeon_daddy.ui.mechanical_bubble import format_mechanical_bubble
 from dungeon_daddy.ui.player_action_state import PlayerActionState
 from dungeon_daddy.ui.panels.character_sheet_panel import CharacterSheetPanel
@@ -314,12 +314,12 @@ class PlayView(arcade.View):
         self._dungeon: Dungeon | None = None
         self._state: SessionState | None = None
         self._manager = arcade.gui.UIManager()
-        self._renderer = GridRenderer(cell_px=_CELL_PX)
+        self._renderer = GraphRenderer(cell_px=_CELL_PX)
         self._chat = ChatPanel(self._on_chat_send, mode="play")
         self._map = MapPanel(
             self._on_level_change,
             renderer=self._renderer,
-            on_variant_change=lambda variant: self.window.set_map_variant(variant),
+            on_variant_change=None,
             on_activate_loop=self.on_activate_loop,
             on_room_select=self._on_graph_room_select,
             on_connection_select=self._on_graph_connection_select,
@@ -1028,7 +1028,7 @@ class PlayView(arcade.View):
     # Map variant switching
     # ------------------------------------------------------------------
 
-    def set_map_renderer(self, renderer: GridRenderer) -> None:
+    def set_map_renderer(self, renderer: GraphRenderer) -> None:
         self._renderer = renderer
         self._map.set_renderer(renderer)
 
@@ -1600,22 +1600,20 @@ class PlayView(arcade.View):
         self._chat.add_message("system", msg)
 
     @staticmethod
-    def _compute_edit_btn_rect(window_w: int, content_h: int) -> tuple[float, float, float, float]:
-        # Place button in the title bar, to the left of the PLAY MODE badge.
-        # PLAY MODE badge: right edge at w - PAD_MD, width 100px.
-        _PLAY_BADGE_W = 100
-        btn_right = window_w - PAD_MD - _PLAY_BADGE_W - PAD_MD * 2
-        btn_x = btn_right - _BTN_EDIT_W
-        bar_mid = content_h + CHROME_TITLEBAR_HEIGHT / 2
-        btn_y = bar_mid - _BTN_EDIT_H / 2
-        return (float(btn_x), float(btn_y), float(_BTN_EDIT_W), float(_BTN_EDIT_H))
-
-    @staticmethod
     def _compute_rpg_toggle_rect(window_w: int, content_h: int) -> tuple[float, float, float, float]:
-        _PLAY_BADGE_W = 100
-        edit_left = window_w - PAD_MD - _PLAY_BADGE_W - PAD_MD * 2 - _BTN_EDIT_W
-        btn_right = edit_left - PAD_MD
-        btn_x = btn_right - _BTN_RPG_W
+        # Sits immediately left of the pills cluster (Design/Campaign/Play).
+        pills_left = window_w - PAD_MD - PILLS_CLUSTER_W
+        btn_x = pills_left - PAD_MD - _BTN_RPG_W
         bar_mid = content_h + CHROME_TITLEBAR_HEIGHT / 2
         btn_y = bar_mid - _BTN_EDIT_H / 2
         return (float(btn_x), float(btn_y), float(_BTN_RPG_W), float(_BTN_EDIT_H))
+
+    @staticmethod
+    def _compute_edit_btn_rect(window_w: int, content_h: int) -> tuple[float, float, float, float]:
+        # Sits immediately left of the RPG button.
+        pills_left = window_w - PAD_MD - PILLS_CLUSTER_W
+        rpg_x = pills_left - PAD_MD - _BTN_RPG_W
+        btn_x = rpg_x - PAD_MD - _BTN_EDIT_W
+        bar_mid = content_h + CHROME_TITLEBAR_HEIGHT / 2
+        btn_y = bar_mid - _BTN_EDIT_H / 2
+        return (float(btn_x), float(btn_y), float(_BTN_EDIT_W), float(_BTN_EDIT_H))

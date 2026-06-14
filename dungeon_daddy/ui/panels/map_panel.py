@@ -43,7 +43,7 @@ from dungeon_daddy.ui.theme import (
 _HEADER_H = 38   # map panel header bar
 _TAB_H = 32
 _TAB_W = 64
-_VARIANT_TABS = ["Grid", "Tiles", "Graph"]
+_VARIANT_TABS = ["Map"]
 _PAN_TAB_GAP = 16  # extra left margin separating Pan from view-mode tabs
 
 _ZOOM_MIN = 0.5
@@ -132,7 +132,7 @@ class MapPanel:
         self._on_room_select = on_room_select
         self._on_connection_select = on_connection_select
         self._variant_btns: list[arcade.gui.UIFlatButton] = []
-        self._active_variant = "Grid"
+        self._active_variant = "Map"
         self._active_tool: str = "select"   # "select" | "pan"
         self._pan_offset_x: float = 0.0
         self._pan_offset_y: float = 0.0
@@ -193,10 +193,7 @@ class MapPanel:
             self._level_view_states[level_idx] = GraphViewState()
         self._view_state = self._level_view_states[level_idx]
         self._zoom_level = _ZOOM_DEFAULT
-        if self._active_variant == "Graph":
-            self._fit_layout_camera()
-        else:
-            self._center_level()
+        self._fit_layout_camera()
         self._active_loop_id = state.active_loop_id
         self._build_loop_strip_rects(level)
 
@@ -206,24 +203,6 @@ class MapPanel:
         self._stepper.set_label(f"L{idx}")
         self._stepper.set_up_enabled(idx > 1)
         self._stepper.set_down_enabled(idx < total_levels)
-
-    def _center_level(self) -> None:
-        """Set pan offset so the level's room bounding box is centred in the viewport."""
-        if not (self._level and self._level.rooms and self._w > 0 and self._h > 0):
-            self._pan_offset_x = 0.0
-            self._pan_offset_y = 0.0
-            return
-        map_w = self._w - PANEL_STEPPER_WIDTH
-        map_h = self._h - _HEADER_H
-        effective = self._renderer.cell_px * self._zoom_level
-        min_gx = min(r.x for r in self._level.rooms)
-        min_gy = min(r.y for r in self._level.rooms)
-        max_gx = max(r.x + r.w for r in self._level.rooms)
-        max_gy = max(r.y + r.h for r in self._level.rooms)
-        grid_cx = (min_gx + max_gx) / 2
-        grid_cy = (min_gy + max_gy) / 2
-        self._pan_offset_x = map_w / 2 - PAD_MD - grid_cx * effective
-        self._pan_offset_y = map_h / 2 - PAD_MD - grid_cy * effective
 
     def _fit_layout_camera(self) -> None:
         """Set zoom + pan so the layout bounds fill the Graph viewport."""
@@ -308,9 +287,9 @@ class MapPanel:
             self._apply_zoom(_ZOOM_DEFAULT, map_cx, map_cy)
         elif key == arcade.key.D and self._layout_result is not None:
             self._layout_result.debug_overlay.enabled = not self._layout_result.debug_overlay.enabled
-        elif key == arcade.key.R and self._active_variant == "Graph":
+        elif key == arcade.key.R and self._active_variant == "Map":
             self._fit_layout_camera()
-        elif key == arcade.key.ESCAPE and self._active_variant == "Graph":
+        elif key == arcade.key.ESCAPE and self._active_variant == "Map":
             self._selected_room_id = None
 
     # ------------------------------------------------------------------
@@ -329,7 +308,7 @@ class MapPanel:
                     return True
         if (
             button == arcade.MOUSE_BUTTON_LEFT
-            and self._active_variant == "Graph"
+            and self._active_variant == "Map"
             and self._active_tool == "select"
             and self._layout_result is not None
             and self._in_map_viewport(x, y)
@@ -376,7 +355,7 @@ class MapPanel:
             self._is_panning = False
 
     def handle_mouse_motion(self, x: float, y: float) -> None:
-        if self._active_variant != "Graph" or self._layout_result is None:
+        if self._active_variant != "Map" or self._layout_result is None:
             self._view_state.hover_room(None)
             self._view_state.hover_connection(None)
             return
@@ -425,7 +404,7 @@ class MapPanel:
             if self._art is None:
                 from dungeon_daddy.map.map_art_assets import MapArtAssets
                 self._art = MapArtAssets()
-            if self._active_variant == "Graph" and self._art.background is not None:
+            if self._active_variant == "Map" and self._art.background is not None:
                 arcade.draw_texture_rect(
                     self._art.background,
                     arcade.XYWH(x + map_w / 2, y + map_h / 2, map_w, map_h),
@@ -433,7 +412,7 @@ class MapPanel:
             if self._level is not None and self._state is not None:
                 origin_x = x + PAD_MD + self._pan_offset_x
                 origin_y = y + PAD_MD + self._pan_offset_y
-                if self._active_variant == "Graph" and self._layout_result is not None:
+                if self._layout_result is not None:
                     self._layout_renderer.draw(
                         self._layout_result, origin_x, origin_y, self._zoom_level,
                         view_state=self._view_state,
@@ -546,8 +525,7 @@ class MapPanel:
     def _handle_variant_click(self, label: str) -> None:
         self._active_variant = label
         self._active_tool = "select"
-        if label == "Graph":
-            self._fit_layout_camera()
+        self._fit_layout_camera()
         self._refresh_tab_styles()
         if self._on_variant_change is not None:
             self._on_variant_change(label.lower())
@@ -568,12 +546,11 @@ class MapPanel:
         _BTN_GAP = 4
         map_w = w - PANEL_STEPPER_WIDTH
 
-        # Right-align within map area; Grid/Tiles/Graph then gap then Pan
-        total_w = 3 * _BTN_W + 2 * _BTN_GAP + _PAN_TAB_GAP + _BTN_W
+        # Right-align within map area; Graph then gap then Pan
+        total_w = _BTN_W + _PAN_TAB_GAP + _BTN_W
         tab_x = x + map_w - PAD_MD - total_w
         tab_y = y + h - _HEADER_H - PAD_MD - _BTN_H   # bottom of button, inside canvas
 
-        # View-mode tabs: Grid / Tiles / Graph
         for label in _VARIANT_TABS:
             is_active = label == self._active_variant and self._active_tool == "select"
             btn = arcade.gui.UIFlatButton(

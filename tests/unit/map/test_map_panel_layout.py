@@ -139,7 +139,7 @@ def test_fit_layout_camera_zoom_within_bounds() -> None:
 
 def test_load_on_graph_tab_applies_camera_fit() -> None:
     p = _panel_sized(w=900.0, h=700.0)
-    p._active_variant = "Graph"
+    p._active_variant = "Map"
     level = _level(["a", "b", "c"], [_conn("a", "b"), _conn("b", "c")])
     p.load(level, _state())
     # Camera fit should have been applied — zoom or pan differs from defaults
@@ -153,7 +153,7 @@ def test_load_on_graph_tab_applies_camera_fit() -> None:
 def _graph_panel_with_room(room_id: str = "a") -> tuple[MapPanel, RoomRect]:
     """Panel in Graph/select mode, zoom=1, pan=0, with one room at origin."""
     p = _panel_sized(900.0, 700.0)
-    p._active_variant = "Graph"
+    p._active_variant = "Map"
     p._active_tool = "select"
     p._pan_offset_x = 0.0
     p._pan_offset_y = 0.0
@@ -234,7 +234,7 @@ def _graph_panel_with_callback(
         on_connection_select=on_connection_select,  # type: ignore[arg-type]
     )
     p._x, p._y, p._w, p._h = 0.0, 0.0, 900.0, 700.0
-    p._active_variant = "Graph"
+    p._active_variant = "Map"
     p._active_tool = "select"
     p._pan_offset_x = 0.0
     p._pan_offset_y = 0.0
@@ -309,7 +309,7 @@ def test_miss_outside_room_and_edge_does_not_fire_callbacks() -> None:
 def _graph_panel_with_layout() -> MapPanel:
     """Panel in Graph mode with a layout result and non-default pan/zoom."""
     p = _panel_sized(w=900.0, h=700.0)
-    p._active_variant = "Graph"
+    p._active_variant = "Map"
     level = _level(["a", "b", "c"], [_conn("a", "b"), _conn("b", "c")])
     p.load(level, _state())
     # Shift pan so we can observe recenter effect
@@ -327,18 +327,9 @@ def test_r_key_recenters_graph_camera() -> None:
     assert p._pan_offset_y != 9999.0
 
 
-def test_r_key_in_grid_mode_does_not_recenter() -> None:
-    p = _graph_panel_with_layout()
-    p._active_variant = "Grid"
-    p.handle_key_press(arcade.key.R)
-    # Pan should remain untouched
-    assert p._pan_offset_x == 9999.0
-    assert p._pan_offset_y == 9999.0
-
-
 def test_r_key_without_layout_does_not_raise() -> None:
     p = _panel_sized(w=900.0, h=700.0)
-    p._active_variant = "Graph"
+    p._active_variant = "Map"
     p._layout_result = None
     p.handle_key_press(arcade.key.R)  # must not raise
 
@@ -349,23 +340,15 @@ def test_r_key_without_layout_does_not_raise() -> None:
 
 def test_escape_clears_selected_room_in_graph_mode() -> None:
     p = _panel_sized(w=900.0, h=700.0)
-    p._active_variant = "Graph"
+    p._active_variant = "Map"
     p._selected_room_id = "R1"
     p.handle_key_press(arcade.key.ESCAPE)
     assert p._selected_room_id is None
 
 
-def test_escape_in_grid_mode_does_not_clear_selection() -> None:
-    p = _panel_sized(w=900.0, h=700.0)
-    p._active_variant = "Grid"
-    p._selected_room_id = "R1"
-    p.handle_key_press(arcade.key.ESCAPE)
-    assert p._selected_room_id == "R1"
-
-
 def test_escape_with_no_selection_does_not_raise() -> None:
     p = _panel_sized(w=900.0, h=700.0)
-    p._active_variant = "Graph"
+    p._active_variant = "Map"
     p._selected_room_id = None
     p.handle_key_press(arcade.key.ESCAPE)  # must not raise
     assert p._selected_room_id is None
@@ -390,18 +373,6 @@ def test_mouse_motion_off_room_clears_hover() -> None:
     p, _ = _graph_panel_with_room("a")
     p._view_state.hover_room("a")
     p.handle_mouse_motion(p._x + PAD_MD + 500.0, p._y + PAD_MD + 500.0)
-    assert p._view_state.hovered_room_id is None
-
-
-# ---------------------------------------------------------------------------
-# Cycle 15 — handle_mouse_motion in non-graph mode does not update hover
-# ---------------------------------------------------------------------------
-
-def test_mouse_motion_in_grid_mode_does_not_set_hover() -> None:
-    p, room = _graph_panel_with_room("a")
-    p._active_variant = "Grid"
-    cx, cy = _screen_center(p, room)
-    p.handle_mouse_motion(cx, cy)
     assert p._view_state.hovered_room_id is None
 
 

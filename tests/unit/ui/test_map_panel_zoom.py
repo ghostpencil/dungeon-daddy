@@ -159,59 +159,12 @@ def test_zoom_in_adjusts_pan_offset() -> None:
 # Variant tab callback
 # ---------------------------------------------------------------------------
 
-def test_variant_tab_click_fires_callback() -> None:
-    calls: list[str] = []
-    panel, _, _, _ = _make_panel(on_variant_change=calls.append)
-    panel._variant_btns = [MagicMock(), MagicMock(), MagicMock(), MagicMock()]
-    panel._handle_variant_click("Tiles")
-    assert calls == ["tiles"]
-
-
 def test_variant_tab_click_no_callback_does_not_raise() -> None:
     panel, _, _, _ = _make_panel(on_variant_change=None)
-    panel._variant_btns = [MagicMock(), MagicMock(), MagicMock(), MagicMock()]
-    panel._handle_variant_click("Graph")
-    assert panel._active_variant == "Graph"
+    panel._variant_btns = [MagicMock(), MagicMock()]  # Graph + Pan
+    panel._handle_variant_click("Map")
+    assert panel._active_variant == "Map"
     assert panel._active_tool == "select"
-
-
-# ---------------------------------------------------------------------------
-# load() centers level and resets zoom
-# ---------------------------------------------------------------------------
-
-def test_load_resets_zoom_to_default() -> None:
-    panel, _, _, default = _make_panel()
-    panel._zoom_level = 2.5
-    level = _make_level([{"x": 0, "y": 0, "w": 10, "h": 8}])
-    panel.load(level, _make_state())
-    assert panel.zoom_level == pytest.approx(default)
-
-
-def test_load_centers_level_in_viewport() -> None:
-    # Panel: w=800, h=600; PANEL_STEPPER_WIDTH=70, _HEADER_H=38, PAD_MD=12, cell_px=48
-    # Room at (x=2, y=3, w=8, h=6) → grid_cx=6, grid_cy=6
-    # map_w=730, map_h=562, effective=48
-    # pan_x = 730/2 - 12 - 6*48 = 365 - 12 - 288 = 65
-    # pan_y = 562/2 - 12 - 6*48 = 281 - 12 - 288 = -19
-    panel, _, _, _ = _make_panel()
-    level = _make_level([{"x": 2, "y": 3, "w": 8, "h": 6}])
-    panel.load(level, _make_state())
-    px, py = panel.pan_offset
-    assert px == pytest.approx(65.0)
-    assert py == pytest.approx(-19.0)
-
-
-def test_load_centers_multi_room_level() -> None:
-    # Two rooms: (0,0,4,4) and (10,8,4,4)
-    # bounding box: min=(0,0), max=(14,12) → grid_cx=7, grid_cy=6
-    # pan_x = 365 - 12 - 7*48 = 365 - 12 - 336 = 17
-    # pan_y = 281 - 12 - 6*48 = 281 - 12 - 288 = -19
-    panel, _, _, _ = _make_panel()
-    level = _make_level([{"x": 0, "y": 0, "w": 4, "h": 4}, {"x": 10, "y": 8, "w": 4, "h": 4}])
-    panel.load(level, _make_state())
-    px, py = panel.pan_offset
-    assert px == pytest.approx(17.0)
-    assert py == pytest.approx(-19.0)
 
 
 def test_load_zeroes_pan_when_panel_not_set_up() -> None:
