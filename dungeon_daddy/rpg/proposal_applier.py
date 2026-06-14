@@ -51,6 +51,13 @@ def apply_low_risk_proposals(
                 },
             )
             repo.insert_domain_event(event)
+            applied_event = DomainEvent(
+                event_id=str(uuid.uuid4()),
+                campaign_id=campaign_id,
+                event_type="proposal.applied",
+                payload={"kind": change.kind, "reason": None},
+            )
+            repo.insert_domain_event(applied_event)
             result.applied.append(change)
             result.events.append(event)
         elif isinstance(change, AdjustReputationChange):
@@ -71,6 +78,13 @@ def apply_low_risk_proposals(
                     },
                 )
                 repo.insert_domain_event(event)
+                applied_event = DomainEvent(
+                    event_id=str(uuid.uuid4()),
+                    campaign_id=campaign_id,
+                    event_type="proposal.applied",
+                    payload={"kind": change.kind, "reason": change.reason},
+                )
+                repo.insert_domain_event(applied_event)
                 result.applied.append(change)
                 result.events.append(event)
         elif isinstance(change, ApplyConsequenceChange):

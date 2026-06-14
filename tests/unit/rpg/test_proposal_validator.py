@@ -196,3 +196,27 @@ class TestPlayerActorIntentControlRejected:
 
         assert len(result.accepted) == 1
         assert len(result.rejected) == 0
+
+
+class TestRejectionEvents:
+    def test_rejected_change_emits_rejection_event(self):
+        proposal = _proposal_with_clock("clock_unknown")
+        result = validate_proposal(proposal, known_clock_ids=set())
+
+        assert len(result.rejection_events) == 1
+        evt = result.rejection_events[0]
+        assert evt.event_type == "proposal.rejected"
+        assert "kind" in evt.payload
+        assert "reason" in evt.payload
+
+    def test_all_accepted_yields_empty_rejection_events(self):
+        proposal = _proposal_with_clock("clock_real")
+        result = validate_proposal(proposal, known_clock_ids={"clock_real"})
+
+        assert result.rejection_events == []
+
+    def test_rejection_event_payload_contains_kind(self):
+        proposal = _proposal_with_clock("clock_unknown")
+        result = validate_proposal(proposal, known_clock_ids=set())
+
+        assert result.rejection_events[0].payload["kind"] == "advance_clock"

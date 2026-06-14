@@ -131,11 +131,11 @@ class TestApplyReputationChange:
         apply_result = apply_low_risk_proposals(result, repo=repo, campaign_id="campaign_1")
 
         events = repo.get_domain_events("campaign_1")
-        assert len(events) == 1
-        assert events[0].event_type == "reputation_changed"
-        assert events[0].payload["faction_slug"] == "ossuary-cult"
-        assert events[0].payload["delta_steps"] == 1
-        assert events[0].payload["reason"] == "Party helped recover stolen relics."
+        rep_events = [e for e in events if e.event_type == "reputation_changed"]
+        assert len(rep_events) == 1
+        assert rep_events[0].payload["faction_slug"] == "ossuary-cult"
+        assert rep_events[0].payload["delta_steps"] == 1
+        assert rep_events[0].payload["reason"] == "Party helped recover stolen relics."
         assert len(apply_result.events) == 1
 
     def test_apply_clamps_reputation_at_allied(self, tmp_path):

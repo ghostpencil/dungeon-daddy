@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from dataclasses import dataclass, field
 from typing import Literal
 
+from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.rpg.proposal import (
     AdvanceClockChange,
     AdjustReputationChange,
@@ -29,6 +31,7 @@ class ValidationResult:
     rejected: list[RejectedChange] = field(default_factory=list)
     source: Literal["deterministic", "llm_draft", "human_approved"] = "llm_draft"
     parse_status: str | None = None
+    rejection_events: list[DomainEvent] = field(default_factory=list)
 
 
 def validate_proposal(
@@ -64,6 +67,12 @@ def validate_proposal(
         if rejection_reason is not None:
             _log.info("Proposal rejected [%s]: %s", change.kind, rejection_reason)
             result.rejected.append(RejectedChange(change=change, reason=rejection_reason))
+            result.rejection_events.append(DomainEvent(
+                event_id=str(uuid.uuid4()),
+                campaign_id="",
+                event_type="proposal.rejected",
+                payload={"kind": change.kind, "reason": rejection_reason},
+            ))
         else:
             _log.info("Proposal accepted [%s]", change.kind)
             result.accepted.append(change)

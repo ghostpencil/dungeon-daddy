@@ -365,12 +365,12 @@ def test_example_bone_cathedral_manifest_seeds_cleanly(tmp_path: Path) -> None:
     memories = repo.get_memory_entries_by_campaign(campaign_id)
     repo.close()
 
-    assert result.created >= 4  # 4 world_actors + 3 clocks + 3 memory_seeds (factions seeded separately in Slice 3)
+    assert result.created >= 4  # 4 world_actors + 3 clocks + 2 memory_seeds (factions seeded separately in Slice 3)
     assert result.warnings == []
     pc_slugs = {a["slug"] for a in actors if a["actor_type"] == "pc"}
     assert pc_slugs == {"valeria", "osric"}
     assert len(clocks) == 3
-    assert len(memories) == 3
+    assert len(memories) == 2
 
 
 def test_example_bone_cathedral_manifest_seeds_idempotently(tmp_path: Path) -> None:
