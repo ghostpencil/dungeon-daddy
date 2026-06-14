@@ -509,3 +509,43 @@ def test_on_mouse_motion_no_hover_when_card_resolved(panel):
 def test_on_mouse_motion_no_hover_when_no_active_card(panel):
     panel.on_mouse_motion(40.0, 59.0)
     assert panel._hovered_card_button is None
+
+
+# ---------------------------------------------------------------------------
+# Portrait texture loading
+# ---------------------------------------------------------------------------
+
+def test_portrait_texture_initially_none(panel):
+    assert panel._portrait_texture is None
+
+
+def test_set_actor_mini_card_loads_texture_from_portrait_path(panel, tmp_path):
+    from pathlib import Path
+    from dungeon_daddy.ui.actor_mini_card import ActorMiniCardData
+    png = tmp_path / "mara.png"
+    png.write_bytes(b"")
+    card = ActorMiniCardData(actor_name="Mara", portrait_path=png)
+    fake_tex = object()
+    with patch("dungeon_daddy.ui.panels.chat_panel.arcade.load_texture", return_value=fake_tex) as mock_load:
+        panel.set_actor_mini_card(card)
+    mock_load.assert_called_once_with(png)
+    assert panel._portrait_texture is fake_tex
+
+
+def test_set_actor_mini_card_without_portrait_path_leaves_texture_none(panel):
+    from dungeon_daddy.ui.actor_mini_card import ActorMiniCardData
+    card = ActorMiniCardData(actor_name="Mara")
+    panel.set_actor_mini_card(card)
+    assert panel._portrait_texture is None
+
+
+def test_set_actor_mini_card_none_clears_portrait_texture(panel, tmp_path):
+    from pathlib import Path
+    from dungeon_daddy.ui.actor_mini_card import ActorMiniCardData
+    png = tmp_path / "mara.png"
+    png.write_bytes(b"")
+    card = ActorMiniCardData(actor_name="Mara", portrait_path=png)
+    with patch("dungeon_daddy.ui.panels.chat_panel.arcade.load_texture", return_value=object()):
+        panel.set_actor_mini_card(card)
+    panel.set_actor_mini_card(None)
+    assert panel._portrait_texture is None

@@ -51,7 +51,7 @@ _CHIP_CY_OFF = 86    # distance from panel bottom to chip row centre (design mod
 _PLAY_INPUT_AREA_H = 176  # play mode: char card (96) + gap (6) + input (70) + top pad (4)
 _CHAR_CARD_H = 96         # character card height
 _CHAR_CARD_Y_BOT = 76     # card bottom offset from panel bottom (_INPUT_Y_OFF + INPUT_H + 6)
-_PORTRAIT_W = 58          # width of portrait section including divider
+_PORTRAIT_W = 96          # width of portrait section including divider
 _LABEL_H = 20  # height reserved at top of each bubble for the role label
 _SCROLL_SPEED = 30  # pixels per mouse wheel click
 _CHIPS_DESIGN = [
@@ -110,6 +110,7 @@ class ChatPanel:
         self._pending_chips: list[str] | None = None
         self._on_chip_click: Callable[[str], None] | None = None
         self._actor_mini_card: ActorMiniCardData | None = None
+        self._portrait_texture: arcade.Texture | None = None
         self._has_multiple_actors: bool = False
         self._actor_switch_callback: Callable[[str], None] | None = None
         self._mini_card_prev_rect: tuple[float, float, float, float] | None = None
@@ -279,6 +280,10 @@ class ChatPanel:
 
     def set_actor_mini_card(self, card: ActorMiniCardData | None) -> None:
         self._actor_mini_card = card
+        if card is not None and card.portrait_path is not None:
+            self._portrait_texture = arcade.load_texture(card.portrait_path)
+        else:
+            self._portrait_texture = None
 
     def set_has_multiple_actors(self, flag: bool) -> None:
         self._has_multiple_actors = flag
@@ -505,7 +510,7 @@ class ChatPanel:
         arcade.draw_rect_filled(arcade.XYWH(x + w / 2, card_bot + _CHAR_CARD_H / 2, w, _CHAR_CARD_H), BG_2)
         arcade.draw_line(x, card_top, x + w, card_top, LINE, 1)
 
-        # Portrait placeholder (left column)
+        # Portrait column
         _PORT_PAD = 5
         port_inner_x = x + _PORT_PAD
         port_inner_w = _PORTRAIT_W - _PORT_PAD * 2
@@ -513,12 +518,18 @@ class ChatPanel:
         port_cx = port_inner_x + port_inner_w / 2
         port_cy = card_bot + _CHAR_CARD_H / 2
         arcade.draw_rect_filled(arcade.XYWH(port_cx, port_cy, port_inner_w, port_inner_h), BG_0)
-        arcade.draw_rect_outline(arcade.XYWH(port_cx, port_cy, port_inner_w, port_inner_h), LINE, 1)
-        arcade.draw_text(
-            "◆", port_cx, port_cy,
-            INK_4, font_size=TEXT_BASE, font_name=FONT_MONO,
-            anchor_x="center", anchor_y="center",
-        )
+        if self._portrait_texture is not None:
+            arcade.draw_texture_rect(
+                self._portrait_texture,
+                arcade.XYWH(port_cx, port_cy, port_inner_w, port_inner_h),
+            )
+        else:
+            arcade.draw_rect_outline(arcade.XYWH(port_cx, port_cy, port_inner_w, port_inner_h), LINE, 1)
+            arcade.draw_text(
+                "◆", port_cx, port_cy,
+                INK_4, font_size=TEXT_BASE, font_name=FONT_MONO,
+                anchor_x="center", anchor_y="center",
+            )
 
         # Vertical divider
         arcade.draw_line(x + _PORTRAIT_W, card_bot, x + _PORTRAIT_W, card_top, LINE, 1)

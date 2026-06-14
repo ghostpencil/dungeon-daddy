@@ -422,13 +422,16 @@ class DungeonDaddyWindow(arcade.Window):
         from dungeon_daddy.memory.repository import MemoryRepository
         mem_repo = None
         campaign_id = None
+        portraits_dir = None
         if save_name and self._repo._dir is not None:
-            db_path = self._repo._dir / save_name / "campaign.duckdb"
+            campaign_dir = self._repo._dir / save_name
+            portraits_dir = campaign_dir / "assets" / "portraits"
+            db_path = campaign_dir / "campaign.duckdb"
             if db_path.exists():
                 mem_repo = MemoryRepository(db_path)
                 mem_repo.initialize_schema(_MIGRATIONS_DIR)
                 campaign_id = f"campaign:{_slugify(save_name)}"
-        self._play_view.set_rpg_context(mem_repo, campaign_id)
+        self._play_view.set_rpg_context(mem_repo, campaign_id, portraits_dir=portraits_dir)
 
     def launch_test_drive(self, dungeon: Dungeon) -> None:
         self._play_view.load_dungeon(dungeon)

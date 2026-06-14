@@ -93,3 +93,26 @@ class TestHasFallout:
         from dungeon_daddy.ui.actor_mini_card import build_actor_mini_card
         card = build_actor_mini_card(_actor(stress={}))
         assert card.has_fallout is False
+
+
+# ---------------------------------------------------------------------------
+# Slice 4 — portrait_path
+# ---------------------------------------------------------------------------
+
+class TestPortraitPath:
+    def test_portrait_path_none_without_portraits_dir(self):
+        from dungeon_daddy.ui.actor_mini_card import build_actor_mini_card
+        card = build_actor_mini_card(_actor())
+        assert card.portrait_path is None
+
+    def test_portrait_path_none_when_file_missing(self, tmp_path):
+        from dungeon_daddy.ui.actor_mini_card import build_actor_mini_card
+        card = build_actor_mini_card(_actor(slug="mara"), portraits_dir=tmp_path)
+        assert card.portrait_path is None
+
+    def test_portrait_path_resolved_for_png(self, tmp_path):
+        from dungeon_daddy.ui.actor_mini_card import build_actor_mini_card
+        png = tmp_path / "mara.png"
+        png.write_bytes(b"")
+        card = build_actor_mini_card(_actor(slug="mara"), portraits_dir=tmp_path)
+        assert card.portrait_path == png

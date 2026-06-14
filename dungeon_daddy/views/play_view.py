@@ -6,6 +6,7 @@ import queue
 import re
 import threading
 from dataclasses import dataclass
+from pathlib import Path
 
 import arcade
 import arcade.gui
@@ -599,7 +600,12 @@ class PlayView(arcade.View):
     # Player actors
     # ------------------------------------------------------------------
 
-    def set_rpg_context(self, mem_repo: MemoryRepository | None, campaign_id: str | None) -> None:
+    def set_rpg_context(
+        self,
+        mem_repo: MemoryRepository | None,
+        campaign_id: str | None,
+        portraits_dir: Path | None = None,
+    ) -> None:
         """Update the active RPG repository and campaign id. Closes the previous repo if any."""
         old = getattr(self, "_mem_repo", None)
         if old is not None and old is not mem_repo:
@@ -609,6 +615,7 @@ class PlayView(arcade.View):
                 pass
         self._mem_repo = mem_repo
         self._rpg_campaign_id = campaign_id
+        self._portraits_dir = portraits_dir
         self._load_player_actors()
 
     def _sync_debug_level_id(self) -> None:
@@ -800,7 +807,10 @@ class PlayView(arcade.View):
         actor_id = self._action_state.actor_id
         actors = getattr(self._rpg_action, "_actors", [])
         actor = next((a for a in actors if a.actor_id == actor_id), None) if actor_id else None
-        self._chat.set_actor_mini_card(build_actor_mini_card(actor) if actor else None)
+        portraits_dir = getattr(self, "_portraits_dir", None)
+        self._chat.set_actor_mini_card(
+            build_actor_mini_card(actor, portraits_dir=portraits_dir) if actor else None
+        )
         self._chat.set_has_multiple_actors(self._action_state.has_multiple_actors)
 
     def _on_actor_switch(self, direction: str) -> None:

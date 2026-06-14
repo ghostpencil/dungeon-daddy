@@ -431,3 +431,52 @@ def test_apply_world_reaction_persists_weird_track_with_correct_capacity(tmp_pat
     assert "weird" in tracks_after, "weird track should be persisted"
     assert tracks_after["weird"]["filled"] == 3
     assert tracks_after["weird"]["capacity"] == 6, "must use weird capacity, not body capacity"
+
+
+# ---------------------------------------------------------------------------
+# Portrait — set_rpg_context stores portraits_dir; _refresh_chat_mini_card uses it
+# ---------------------------------------------------------------------------
+
+def test_set_rpg_context_stores_portraits_dir(tmp_path):
+    from dungeon_daddy.views.play_view import PlayView
+    view = PlayView.__new__(PlayView)
+    view._mem_repo = None
+    view._rpg_campaign_id = None
+    portraits = tmp_path / "portraits"
+    view.set_rpg_context(None, None, portraits_dir=portraits)
+    assert view._portraits_dir == portraits
+
+
+def test_set_rpg_context_portraits_dir_defaults_none(tmp_path):
+    from dungeon_daddy.views.play_view import PlayView
+    view = PlayView.__new__(PlayView)
+    view._mem_repo = None
+    view._rpg_campaign_id = None
+    view.set_rpg_context(None, None)
+    assert view._portraits_dir is None
+
+
+def test_refresh_chat_mini_card_passes_portraits_dir(tmp_path):
+    from unittest.mock import patch, MagicMock
+    from dungeon_daddy.views.play_view import PlayView
+    from dungeon_daddy.rpg.models import ActorState
+
+    view = PlayView.__new__(PlayView)
+    view._portraits_dir = tmp_path / "portraits"
+    view._action_state = MagicMock()
+    view._action_state.actor_id = "a1"
+
+    actor = ActorState(
+        actor_id="a1", campaign_id="c1", actor_type="pc",
+        slug="mara", display_name="Mara",
+    )
+    action_panel = MagicMock()
+    action_panel._actors = [actor]
+    view._rpg_action = action_panel
+    view._chat = MagicMock()
+
+    with patch("dungeon_daddy.views.play_view.build_actor_mini_card") as mock_build:
+        mock_build.return_value = MagicMock()
+        view._refresh_chat_mini_card()
+
+    mock_build.assert_called_once_with(actor, portraits_dir=view._portraits_dir)
