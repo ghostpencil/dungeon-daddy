@@ -3,10 +3,14 @@
 ## Phase
 
 Phase: 44 — Stabilization
-Status: **IN PROGRESS** — Cleanup round after Phase 44. 2403 tests passing.
-Branch: `stabilization-remove-grid-tiles`
+Status: **COMPLETE** — All stabilization items done (2026-06-13). 2393 tests passing.
+Branch: `main`
 
 ### Stabilization log
+
+**Item 4 complete (2026-06-13): Prune low-value tests**
+- Deleted 10 tests across 4 categories: 3 Grid-mode negative tests (removed feature), `test_map_panel_background.py` (entire file — pure mock-wiring), `test_dm_error_result_shows_error_bubble` (duplicate of canonical test), 4 call-count-only tests in `test_layout_renderer.py`
+- 2393 tests passing
 
 **Item 3 complete (2026-06-13): Reposition RPG and Edit Memory buttons to title bar**
 - `chrome.py` — exported `PILLS_CLUSTER_W = 286` (total width of the three mode pills)
