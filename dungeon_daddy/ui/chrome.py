@@ -50,6 +50,7 @@ _PILL_W = 90
 _PILL_H = 22
 _PILL_GAP = 8
 _PILL_MODES = ["design", "campaign", "play"]
+PILLS_CLUSTER_W = len(_PILL_MODES) * _PILL_W + (len(_PILL_MODES) - 1) * _PILL_GAP
 _PILL_FILL: dict[str, tuple[int, ...]] = {
     "design":   VIOLET,
     "campaign": GOLD,

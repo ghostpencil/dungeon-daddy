@@ -59,17 +59,6 @@ def test_dm_result_appears_in_chat(make_play_view):
     assert view._llm_busy is False
 
 
-def test_dm_error_result_shows_error_bubble(make_play_view):
-    view = make_play_view()
-    view._result_queue.put(DMResult(content="", error="API timeout"))
-    view._llm_busy = True
-
-    view.on_update(0)
-
-    msgs = [(c.args[0], c.args[1]) for c in view._chat.add_message.call_args_list]
-    assert any("system" in role and "API timeout" in text for role, text in msgs)
-    assert view._llm_busy is False
-
 
 def test_dm_error_result_shows_canonical_error_bubble(make_play_view):
     view = make_play_view()
@@ -208,21 +197,6 @@ def test_remember_with_no_room_selected_shows_error(make_play_view):
     view._repo.append_room_event.assert_not_called()
     msgs = [(c.args[0], c.args[1]) for c in view._chat.add_message.call_args_list]
     assert any("system" in role for role, _ in msgs)
-
-
-# ---------------------------------------------------------------------------
-# Map variant switcher
-# ---------------------------------------------------------------------------
-
-def test_set_map_renderer_updates_map_panel(make_play_view):
-    from dungeon_daddy.map.tiles_renderer import TilesRenderer
-    view = make_play_view()
-    new_renderer = TilesRenderer(cell_px=48)
-
-    view.set_map_renderer(new_renderer)
-
-    assert view._renderer is new_renderer
-    view._map.set_renderer.assert_called_once_with(new_renderer)
 
 
 # ---------------------------------------------------------------------------

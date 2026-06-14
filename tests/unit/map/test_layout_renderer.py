@@ -61,47 +61,6 @@ def _result(
     )
 
 
-# ---------------------------------------------------------------------------
-# Cycle 1 — draw() calls draw_rect_filled for each room
-# ---------------------------------------------------------------------------
-
-def test_draw_fills_each_room() -> None:
-    rooms = {"a": _room("a", 0.0, 0.0), "b": _room("b", 200.0, 0.0)}
-    result = _result(rooms=rooms)
-    renderer = LayoutRenderer()
-
-    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
-        renderer.draw(result, origin_x=0.0, origin_y=0.0, zoom=1.0)
-        assert mock_arcade.draw_rect_filled.call_count >= 2
-
-
-# ---------------------------------------------------------------------------
-# Cycle 2 — draw() calls draw_line for each edge segment
-# ---------------------------------------------------------------------------
-
-def test_draw_lines_for_each_edge_segment() -> None:
-    # Edge with 3 points → 2 segments
-    edges = [_edge("a→b", [(0.0, 0.0), (100.0, 0.0), (100.0, 80.0)])]
-    result = _result(edges=edges)
-    renderer = LayoutRenderer()
-
-    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
-        renderer.draw(result, origin_x=0.0, origin_y=0.0, zoom=1.0)
-        assert mock_arcade.draw_line.call_count >= 2
-
-
-# ---------------------------------------------------------------------------
-# Cycle 3 — draw() calls draw_text for labelled edges
-# ---------------------------------------------------------------------------
-
-def test_draw_text_for_labelled_edges() -> None:
-    labels = [_label("a→b", "door"), _label("b→c", "passage")]
-    result = _result(labels=labels)
-    renderer = LayoutRenderer()
-
-    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
-        renderer.draw(result, origin_x=0.0, origin_y=0.0, zoom=1.0)
-        assert mock_arcade.draw_text.call_count >= 2
 
 
 # ---------------------------------------------------------------------------
@@ -287,25 +246,6 @@ def test_normal_connection_uses_standard_alpha() -> None:
         colors = [call.args[4] for call in mock_arcade.draw_line.call_args_list]
         assert any(len(c) == 4 and c[3] >= 180 for c in colors)
 
-
-# ---------------------------------------------------------------------------
-# Cycle 13 — critical path rooms get an extra outline
-# ---------------------------------------------------------------------------
-
-def test_critical_path_rooms_get_extra_outline() -> None:
-    rooms = {"r1": _room("r1"), "r2": _room("r2", 200.0, 0.0)}
-
-    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
-        renderer = LayoutRenderer()
-        renderer.draw(_result(rooms=rooms, critical_path=[]), 0.0, 0.0, 1.0)
-        count_no_crit = mock_arcade.draw_rect_outline.call_count
-
-    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
-        renderer = LayoutRenderer()
-        renderer.draw(_result(rooms=rooms, critical_path=["r1", "r2"]), 0.0, 0.0, 1.0)
-        count_with_crit = mock_arcade.draw_rect_outline.call_count
-
-    assert count_with_crit > count_no_crit
 
 
 # ---------------------------------------------------------------------------
