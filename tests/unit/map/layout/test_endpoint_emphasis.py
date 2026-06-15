@@ -20,47 +20,18 @@ def test_empty_input_gives_no_endpoint_and_ambiguous_warning():
 
 
 # ---------------------------------------------------------------------------
-# Cycle 2 — boss room is detected as endpoint, is_emphasized=True
-# ---------------------------------------------------------------------------
-
-def test_boss_room_detected_as_endpoint():
-    rooms = {"R1": RoomRect(room_id="R1", x=0, y=0, w=120, h=80)}
-    result = EndpointEmphasisDetector().detect(
-        roles={"R1": "boss"},
-        rooms=rooms,
-        connections=[],
-    )
-    assert result.endpoint_room_id == "R1"
-    assert result.endpoint_role == "boss"
-    assert result.is_emphasized is True
-    assert "AMBIGUOUS_ENDPOINT_ROLE" not in result.warnings
-
-
-# ---------------------------------------------------------------------------
-# Cycle 3 — objective room is detected as endpoint, is_emphasized=True
-# ---------------------------------------------------------------------------
-
-def test_objective_room_detected_as_endpoint():
-    rooms = {"R1": RoomRect(room_id="R1", x=0, y=0, w=120, h=80)}
-    result = EndpointEmphasisDetector().detect(
-        roles={"R1": "objective"},
-        rooms=rooms,
-        connections=[],
-    )
-    assert result.endpoint_room_id == "R1"
-    assert result.endpoint_role == "objective"
-    assert result.is_emphasized is True
-
-
-# ---------------------------------------------------------------------------
-# Cycle 4 — exit-family rooms are detected as endpoints, is_emphasized=True
+# Cycles 2-4 — a room with an endpoint role (boss, objective, or exit-family)
+# is detected as the emphasized endpoint
 # ---------------------------------------------------------------------------
 
 import pytest
 
 
-@pytest.mark.parametrize("role", ["exit", "descent", "elevator", "stairs"])
-def test_exit_family_detected_as_endpoint(role: str):
+@pytest.mark.parametrize(
+    "role",
+    ["boss", "objective", "exit", "descent", "elevator", "stairs"],
+)
+def test_role_room_detected_as_endpoint(role: str):
     rooms = {"R1": RoomRect(room_id="R1", x=0, y=0, w=120, h=80)}
     result = EndpointEmphasisDetector().detect(
         roles={"R1": role},  # type: ignore[dict-item]
@@ -70,6 +41,7 @@ def test_exit_family_detected_as_endpoint(role: str):
     assert result.endpoint_room_id == "R1"
     assert result.endpoint_role == role
     assert result.is_emphasized is True
+    assert "AMBIGUOUS_ENDPOINT_ROLE" not in result.warnings
 
 
 # ---------------------------------------------------------------------------

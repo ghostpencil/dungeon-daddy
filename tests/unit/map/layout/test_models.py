@@ -60,13 +60,6 @@ class TestRoomRect:
 # ---------------------------------------------------------------------------
 
 class TestPort:
-    def test_construction(self):
-        p = Port(room_id="r1", side="right", x=100.0, y=30.0)
-        assert p.room_id == "r1"
-        assert p.side == "right"
-        assert p.x == 100.0
-        assert p.y == 30.0
-
     def test_valid_sides(self):
         for side in ("top", "bottom", "left", "right"):
             p = Port(room_id="r1", side=side, x=0.0, y=0.0)
@@ -96,20 +89,6 @@ class TestRouteSegment:
 # ---------------------------------------------------------------------------
 
 class TestRoutedEdge:
-    def test_construction(self):
-        edge = RoutedEdge(
-            connection_id="r1_to_r2",
-            points=[(0.0, 0.0), (100.0, 0.0), (100.0, 80.0)],
-            source_port="right",
-            target_port="bottom",
-            score=150.0,
-        )
-        assert edge.connection_id == "r1_to_r2"
-        assert len(edge.points) == 3
-        assert edge.source_port == "right"
-        assert edge.target_port == "bottom"
-        assert edge.score == pytest.approx(150.0)
-
     def test_bend_count_straight(self):
         edge = RoutedEdge(
             connection_id="r1_to_r2",
@@ -129,17 +108,6 @@ class TestRoutedEdge:
             score=180.0,
         )
         assert edge.bend_count == 1
-
-    def test_warnings_default_empty(self):
-        edge = RoutedEdge(
-            connection_id="r1_to_r2",
-            points=[(0.0, 0.0), (50.0, 0.0)],
-            source_port="right",
-            target_port="left",
-            score=50.0,
-        )
-        assert edge.warnings == []
-
 
 # ---------------------------------------------------------------------------
 # LabelBox

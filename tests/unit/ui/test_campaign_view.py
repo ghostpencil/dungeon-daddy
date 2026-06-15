@@ -109,65 +109,94 @@ def test_add_faction_actor_appends_to_factions():
     assert faction not in view.manifest.world_actors
 
 
-def test_add_actor_sets_dirty():
+# Mutators that should flip the dirty flag — merged from the individual
+# *_sets_dirty tests. Each case: (populate manifest, mutate view). Helpers
+# referenced inside the lambdas (_make_clock) are resolved at call time.
+_DIRTY_MUTATIONS = [
+    (lambda m: None, lambda v: v.add_actor(_make_actor())),
+    (
+        lambda m: m.world_actors.append(_make_actor("valeria", "pc")),
+        lambda v: v.update_actor("valeria", display_name="X"),
+    ),
+    (
+        lambda m: m.world_actors.append(_make_actor("valeria", "pc")),
+        lambda v: v.remove_actor("valeria"),
+    ),
+    (lambda m: None, lambda v: v.set_player_side(["slug-a"])),
+    (lambda m: None, lambda v: v.add_clock(_make_clock())),
+    (
+        lambda m: m.clocks.append(_make_clock("doom-clock")),
+        lambda v: v.update_clock("doom-clock", filled=1),
+    ),
+    (
+        lambda m: m.clocks.append(_make_clock("doom-clock")),
+        lambda v: v.remove_clock("doom-clock"),
+    ),
+    (lambda m: None, lambda v: v.add_memory_seed("A dark secret.")),
+    (
+        lambda m: setattr(m, "memory_seeds", ["seed-one"]),
+        lambda v: v.remove_memory_seed(0),
+    ),
+    (
+        lambda m: None,
+        lambda v: v.add_room_threat(
+            {"location_slug": "vault-b", "description": "Trap."}
+        ),
+    ),
+    (
+        lambda m: setattr(
+            m, "room_threats", [{"location_slug": "hall-a", "description": "Spikes."}]
+        ),
+        lambda v: v.remove_room_threat(0),
+    ),
+    (lambda m: None, lambda v: v.attach_dungeon("bone-cathedral")),
+]
+
+
+@pytest.mark.parametrize("populate,mutate", _DIRTY_MUTATIONS)
+def test_mutation_sets_dirty(populate, mutate):
     view = _make_view()
-    view.load_manifest(_minimal_manifest())
-    view.add_actor(_make_actor())
+    m = _minimal_manifest()
+    populate(m)
+    view.load_manifest(m)
+    mutate(view)
     assert view.is_dirty is True
 
 
-def test_update_actor_patches_field_in_world_actors():
+_ACTOR_COLLECTION_CASES = [
+    (
+        lambda m: m.world_actors.append(_make_actor("valeria", "pc")),
+        "valeria",
+        "world_actors",
+    ),
+    (
+        lambda m: m.factions.append(
+            FactionManifest(slug="iron-guild", display_name="Iron Guild")
+        ),
+        "iron-guild",
+        "factions",
+    ),
+]
+
+
+@pytest.mark.parametrize("populate,slug,collection", _ACTOR_COLLECTION_CASES)
+def test_update_actor_patches_field(populate, slug, collection):
     view = _make_view()
     m = _minimal_manifest()
-    m.world_actors.append(_make_actor("valeria", "pc"))
+    populate(m)
     view.load_manifest(m)
-    view.update_actor("valeria", display_name="Lady Valeria")
-    assert view.manifest.world_actors[0].display_name == "Lady Valeria"
+    view.update_actor(slug, display_name="Renamed")
+    assert getattr(view.manifest, collection)[0].display_name == "Renamed"
 
 
-def test_update_actor_patches_field_in_factions():
+@pytest.mark.parametrize("populate,slug,collection", _ACTOR_COLLECTION_CASES)
+def test_remove_actor_removes_from_collection(populate, slug, collection):
     view = _make_view()
     m = _minimal_manifest()
-    m.factions.append(FactionManifest(slug="iron-guild", display_name="Iron Guild"))
+    populate(m)
     view.load_manifest(m)
-    view.update_actor("iron-guild", display_name="The Iron Guild")
-    assert view.manifest.factions[0].display_name == "The Iron Guild"
-
-
-def test_update_actor_sets_dirty():
-    view = _make_view()
-    m = _minimal_manifest()
-    m.world_actors.append(_make_actor("valeria", "pc"))
-    view.load_manifest(m)
-    view.update_actor("valeria", display_name="X")
-    assert view.is_dirty is True
-
-
-def test_remove_actor_removes_from_world_actors():
-    view = _make_view()
-    m = _minimal_manifest()
-    m.world_actors.append(_make_actor("valeria", "pc"))
-    view.load_manifest(m)
-    view.remove_actor("valeria")
-    assert all(a.slug != "valeria" for a in view.manifest.world_actors)
-
-
-def test_remove_actor_removes_from_factions():
-    view = _make_view()
-    m = _minimal_manifest()
-    m.factions.append(FactionManifest(slug="iron-guild", display_name="Iron Guild"))
-    view.load_manifest(m)
-    view.remove_actor("iron-guild")
-    assert all(a.slug != "iron-guild" for a in view.manifest.factions)
-
-
-def test_remove_actor_sets_dirty():
-    view = _make_view()
-    m = _minimal_manifest()
-    m.world_actors.append(_make_actor("valeria", "pc"))
-    view.load_manifest(m)
-    view.remove_actor("valeria")
-    assert view.is_dirty is True
+    view.remove_actor(slug)
+    assert all(a.slug != slug for a in getattr(view.manifest, collection))
 
 
 def test_set_player_side_updates_manifest():
@@ -175,13 +204,6 @@ def test_set_player_side_updates_manifest():
     view.load_manifest(_minimal_manifest())
     view.set_player_side(["slug-a", "slug-b"])
     assert view.manifest.player_side == ["slug-a", "slug-b"]
-
-
-def test_set_player_side_sets_dirty():
-    view = _make_view()
-    view.load_manifest(_minimal_manifest())
-    view.set_player_side(["slug-a"])
-    assert view.is_dirty is True
 
 
 # ---------------------------------------------------------------------------
@@ -201,13 +223,6 @@ def test_add_clock_appends_to_clocks():
     assert clock in view.manifest.clocks
 
 
-def test_add_clock_sets_dirty():
-    view = _make_view()
-    view.load_manifest(_minimal_manifest())
-    view.add_clock(_make_clock())
-    assert view.is_dirty is True
-
-
 def test_update_clock_patches_field():
     view = _make_view()
     m = _minimal_manifest()
@@ -217,15 +232,6 @@ def test_update_clock_patches_field():
     assert view.manifest.clocks[0].filled == 3
 
 
-def test_update_clock_sets_dirty():
-    view = _make_view()
-    m = _minimal_manifest()
-    m.clocks.append(_make_clock("doom-clock"))
-    view.load_manifest(m)
-    view.update_clock("doom-clock", filled=1)
-    assert view.is_dirty is True
-
-
 def test_remove_clock_removes_from_clocks():
     view = _make_view()
     m = _minimal_manifest()
@@ -233,15 +239,6 @@ def test_remove_clock_removes_from_clocks():
     view.load_manifest(m)
     view.remove_clock("doom-clock")
     assert all(c.slug != "doom-clock" for c in view.manifest.clocks)
-
-
-def test_remove_clock_sets_dirty():
-    view = _make_view()
-    m = _minimal_manifest()
-    m.clocks.append(_make_clock("doom-clock"))
-    view.load_manifest(m)
-    view.remove_clock("doom-clock")
-    assert view.is_dirty is True
 
 
 # ---------------------------------------------------------------------------
@@ -256,13 +253,6 @@ def test_add_memory_seed_appends_text():
     assert "The cathedral was built on cursed ground." in view.manifest.memory_seeds
 
 
-def test_add_memory_seed_sets_dirty():
-    view = _make_view()
-    view.load_manifest(_minimal_manifest())
-    view.add_memory_seed("A dark secret.")
-    assert view.is_dirty is True
-
-
 def test_remove_memory_seed_removes_by_index():
     view = _make_view()
     m = _minimal_manifest()
@@ -272,28 +262,12 @@ def test_remove_memory_seed_removes_by_index():
     assert view.manifest.memory_seeds == ["seed-one", "seed-three"]
 
 
-def test_remove_memory_seed_sets_dirty():
-    view = _make_view()
-    m = _minimal_manifest()
-    m.memory_seeds = ["seed-one"]
-    view.load_manifest(m)
-    view.remove_memory_seed(0)
-    assert view.is_dirty is True
-
-
 def test_add_room_threat_appends_threat():
     view = _make_view()
     view.load_manifest(_minimal_manifest())
     threat = {"location_slug": "vault-b", "description": "Crumbling floor."}
     view.add_room_threat(threat)
     assert threat in view.manifest.room_threats
-
-
-def test_add_room_threat_sets_dirty():
-    view = _make_view()
-    view.load_manifest(_minimal_manifest())
-    view.add_room_threat({"location_slug": "vault-b", "description": "Trap."})
-    assert view.is_dirty is True
 
 
 def test_remove_room_threat_removes_by_index():
@@ -308,15 +282,6 @@ def test_remove_room_threat_removes_by_index():
     view.remove_room_threat(1)
     assert len(view.manifest.room_threats) == 2
     assert all(t["location_slug"] != "vault-b" for t in view.manifest.room_threats)
-
-
-def test_remove_room_threat_sets_dirty():
-    view = _make_view()
-    m = _minimal_manifest()
-    m.room_threats = [{"location_slug": "hall-a", "description": "Spikes."}]
-    view.load_manifest(m)
-    view.remove_room_threat(0)
-    assert view.is_dirty is True
 
 
 # ---------------------------------------------------------------------------
@@ -602,13 +567,6 @@ def test_attach_dungeon_sets_dungeon_slug():
     view.load_manifest(_minimal_manifest())
     view.attach_dungeon("bone-cathedral")
     assert view.manifest.dungeon_slug == "bone-cathedral"
-
-
-def test_attach_dungeon_sets_dirty():
-    view = _make_view()
-    view.load_manifest(_minimal_manifest())
-    view.attach_dungeon("bone-cathedral")
-    assert view.is_dirty is True
 
 
 def test_attached_dungeon_slug_returns_slug_after_attach():

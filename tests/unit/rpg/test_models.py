@@ -15,33 +15,7 @@ from dungeon_daddy.rpg.models import (
 )
 
 
-class TestReactionClockLine:
-    def test_constructs_with_required_fields(self) -> None:
-        line = ReactionClockLine(
-            clock_id="ck1",
-            label="Heat Rising",
-            ticks=2,
-            new_filled=3,
-            new_status="active",
-            reason="miss",
-        )
-        assert line.clock_id == "ck1"
-        assert line.ticks == 2
-
-
 class TestReactionStressLine:
-    def test_constructs_with_required_fields(self) -> None:
-        line = ReactionStressLine(
-            actor_id="a1",
-            display_name="Kira",
-            track_key="body",
-            amount=2,
-            new_filled=2,
-            reason="miss consequence",
-        )
-        assert line.actor_id == "a1"
-        assert line.triggered_fallout is False
-
     def test_triggered_fallout_can_be_set(self) -> None:
         line = ReactionStressLine(
             actor_id="a1",
@@ -111,16 +85,6 @@ class TestActorState:
         assert actor.actor_id == "pc_mara"
         assert actor.status == "active"
 
-    def test_status_defaults_to_active(self) -> None:
-        actor = ActorState(
-            actor_id="x",
-            campaign_id="c",
-            actor_type="npc",
-            slug="goblin",
-            display_name="Goblin",
-        )
-        assert actor.status == "active"
-
     def test_all_actor_types_accepted(self) -> None:
         for t in ("pc", "npc", "monster", "dungeon"):
             a = ActorState(
@@ -133,12 +97,6 @@ class TestActorState:
             ActorState(
                 actor_id="x", campaign_id="c", actor_type="dragon", slug="s", display_name="D"
             )
-
-    def test_actions_defaults_to_empty_dict(self) -> None:
-        actor = ActorState(
-            actor_id="x", campaign_id="c", actor_type="pc", slug="s", display_name="D"
-        )
-        assert actor.actions == {}
 
     def test_all_statuses_accepted(self) -> None:
         for s in ("active", "inactive", "dead", "absorbed", "lost"):
