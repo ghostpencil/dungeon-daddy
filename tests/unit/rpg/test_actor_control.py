@@ -1,3 +1,5 @@
+import pytest
+
 from dungeon_daddy.rpg.actor_control import filter_player_actors, is_player_controlled
 from dungeon_daddy.rpg.models import ActorState
 
@@ -14,23 +16,19 @@ def _actor(actor_type: str, status: str = "active") -> ActorState:
 
 
 class TestIsPlayerControlled:
-    def test_pc_is_player_controlled(self):
-        assert is_player_controlled("pc") is True
-
-    def test_npc_is_not_player_controlled(self):
-        assert is_player_controlled("npc") is False
-
-    def test_monster_is_not_player_controlled(self):
-        assert is_player_controlled("monster") is False
-
-    def test_dungeon_is_not_player_controlled(self):
-        assert is_player_controlled("dungeon") is False
-
-    def test_faction_is_not_player_controlled(self):
-        assert is_player_controlled("faction") is False
-
-    def test_dungeon_presence_is_not_player_controlled(self):
-        assert is_player_controlled("dungeon_presence") is False
+    @pytest.mark.parametrize(
+        "actor_type,expected",
+        [
+            ("pc", True),
+            ("npc", False),
+            ("monster", False),
+            ("dungeon", False),
+            ("faction", False),
+            ("dungeon_presence", False),
+        ],
+    )
+    def test_is_player_controlled(self, actor_type, expected):
+        assert is_player_controlled(actor_type) is expected
 
 
 class TestFilterPlayerActors:

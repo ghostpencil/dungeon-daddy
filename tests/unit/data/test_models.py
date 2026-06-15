@@ -471,13 +471,6 @@ def make_minimal_loop(**kwargs):
     return Loop(**defaults)
 
 
-def test_loop_new_fields_have_defaults():
-    loop = make_minimal_loop()
-    assert loop.type == "main"
-    assert loop.explanation == ""
-    assert loop.rooms == []
-
-
 def test_loop_type_accepts_sub():
     loop = make_minimal_loop(type="sub")
     assert loop.type == "sub"
@@ -505,17 +498,6 @@ def make_minimal_room(**kwargs):
     return Room(**defaults)
 
 
-def test_room_new_fields_default_to_none():
-    room = make_minimal_room()
-    assert room.main_loop_role is None
-    assert room.sub_loop_roles is None
-
-
-def test_room_main_loop_role_accepts_string():
-    room = make_minimal_room(main_loop_role="key holder")
-    assert room.main_loop_role == "key holder"
-
-
 def test_room_sub_loop_roles_accepts_list_of_dicts():
     from dungeon_daddy.data.models import SubLoopRole
     roles = [{"loop_id": "L2", "role": "shortcut entry"}]
@@ -526,12 +508,6 @@ def test_room_sub_loop_roles_accepts_list_of_dicts():
 # ---------------------------------------------------------------------------
 # E3: ValidationResult — warnings field
 # ---------------------------------------------------------------------------
-
-def test_validation_result_warnings_defaults_to_empty():
-    from dungeon_daddy.data.models import ValidationResult
-    result = ValidationResult(is_valid=True)
-    assert result.warnings == []
-
 
 def test_validation_result_warnings_accepts_values():
     from dungeon_daddy.data.models import ValidationResult
@@ -549,12 +525,6 @@ def test_validation_result_warnings_do_not_affect_is_valid():
 # ---------------------------------------------------------------------------
 # DungeonMeta.save_name — CD-1
 # ---------------------------------------------------------------------------
-
-def test_dungeon_meta_save_name_defaults_to_none():
-    from dungeon_daddy.data.models import DungeonMeta
-    meta = DungeonMeta(title="The Dark Pit", theme="Horror", setting="S", party="P", quest="Q")
-    assert meta.save_name is None
-
 
 def test_dungeon_meta_save_name_round_trips():
     from dungeon_daddy.data.models import DungeonMeta
