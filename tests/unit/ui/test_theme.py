@@ -55,34 +55,8 @@ def test_room_colors_each_has_fill_and_stroke():
 
 
 # ---------------------------------------------------------------------------
-# Behavior 3: MenuAction with implemented=False still has a callable handler
+# Behavior 3: draw_title_bar calls arcade.draw_rect_filled
 # ---------------------------------------------------------------------------
-
-def test_nyi_handler_is_callable():
-    from dungeon_daddy.ui.chrome import MenuAction
-    nyi_calls = []
-    def nyi(): nyi_calls.append(1)
-    action = MenuAction(label="Undo", handler=nyi, implemented=False)
-    action.handler()
-    assert nyi_calls == [1]
-
-
-# ---------------------------------------------------------------------------
-# Behavior 4: draw_menu_bar and draw_title_bar call arcade.draw_rect_filled
-# ---------------------------------------------------------------------------
-
-def test_draw_menu_bar_calls_rect_filled(mocker):
-    mocker.patch("arcade.draw_rect_filled")
-    mocker.patch("arcade.draw_text")
-    mocker.patch("arcade.draw_line")
-    import dungeon_daddy.ui.chrome as chrome
-    class FakeWindow:
-        width = 1400
-        height = 900
-    chrome.draw_menu_bar(FakeWindow())
-    import arcade
-    assert arcade.draw_rect_filled.call_count >= 1
-
 
 def test_draw_title_bar_calls_rect_filled(mocker):
     mocker.patch("arcade.draw_rect_filled")

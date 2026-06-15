@@ -9,8 +9,9 @@ import arcade
 import arcade.gui
 
 from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, ClockManifest, FactionManifest
+from dungeon_daddy.campaign.seed_library import CampaignSeedLibrary
 from dungeon_daddy.campaign.validator import ManifestError, validate_manifest
-from dungeon_daddy.ui.chrome import MenuBar, draw_title_bar, title_bar_mode_at
+from dungeon_daddy.ui.chrome import draw_title_bar, title_bar_mode_at
 from dungeon_daddy.ui.panels.campaign_edit_panel import CampaignEditPanel
 from dungeon_daddy.ui.panels.campaign_list_panel import CampaignListPanel
 from dungeon_daddy.ui.panels.campaign_nav_panel import CampaignNavPanel
@@ -75,16 +76,14 @@ class CampaignView(arcade.View):
         "validation",
     ]
 
-    def __init__(self, menu_bar: MenuBar) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self._menu_bar = menu_bar
         self._manager = arcade.gui.UIManager()
         self._nav_panel = CampaignNavPanel()
         self._list_panel = CampaignListPanel()
         self._edit_panel = CampaignEditPanel()
         self._selected_item_index: int | None = None
         self._hovered_card_index: int | None = None
-        self._manifest_path: Path | None = None
         self._ui_built = False
         self._init_state()
 
@@ -93,6 +92,7 @@ class CampaignView(arcade.View):
         self.active_section: str | None = None
         self.is_dirty: bool = False
         self._validation_result: list[ManifestError] | None = None
+        self._seed_library: CampaignSeedLibrary | None = None
 
     # ------------------------------------------------------------------
     # View lifecycle
@@ -146,7 +146,6 @@ class CampaignView(arcade.View):
         self._list_panel.draw(self.active_section, items, self._hovered_card_index)
         self._edit_panel.draw()
         self._manager.draw()
-        self._menu_bar.draw(self.window)
 
     def on_update(self, delta_time: float) -> None:
         pass
@@ -155,8 +154,6 @@ class CampaignView(arcade.View):
         self._reposition_panels(width, height)
 
     def on_mouse_press(self, x: float, y: float, button: int, modifiers: int) -> None:
-        if self._menu_bar.handle_click(x, y, self.window):
-            return
         pill = title_bar_mode_at(x, y, self.window)
         if pill and pill != "campaign":
             self.window.switch_mode(pill)
@@ -169,14 +166,8 @@ class CampaignView(arcade.View):
             if section == "validation":
                 self.run_validation()
             return
-        if self._nav_panel.load_btn_at(x, y):
-            self._load_campaign()
-            return
-        if self._nav_panel.new_btn_at(x, y):
-            self._new_campaign()
-            return
         if self._nav_panel.save_btn_at(x, y) and self.is_dirty:
-            self._save_campaign()
+            self.save_seed()
             return
 
         if self._list_panel.add_btn_at(x, y):
@@ -402,51 +393,6 @@ class CampaignView(arcade.View):
         self._edit_panel.clear()
 
     # ------------------------------------------------------------------
-    # File operations
-    # ------------------------------------------------------------------
-
-    def _load_campaign(self) -> None:
-        from tkinter import filedialog
-        root = self.window._make_tk_root()
-        path = filedialog.askopenfilename(
-            title="Load Campaign",
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
-        )
-        root.destroy()
-        if path:
-            try:
-                self._manifest_path = Path(path)
-                self.load_from_path(self._manifest_path)
-            except Exception as exc:
-                _log.error("Failed to load campaign: %s", exc)
-
-    def _new_campaign(self) -> None:
-        blank = CampaignManifest(
-            slug="new-campaign",
-            title="New Campaign",
-            dungeon_slug="",
-        )
-        self.load_manifest(blank)
-        self._manifest_path = None
-        self.is_dirty = True
-
-    def _save_campaign(self) -> None:
-        if self._manifest_path:
-            self.save_to_path(self._manifest_path)
-        else:
-            from tkinter import filedialog
-            root = self.window._make_tk_root()
-            path = filedialog.asksaveasfilename(
-                title="Save Campaign",
-                defaultextension=".json",
-                filetypes=[("JSON files", "*.json")],
-            )
-            root.destroy()
-            if path:
-                self._manifest_path = Path(path)
-                self.save_to_path(self._manifest_path)
-
-    # ------------------------------------------------------------------
     # CRUD — these methods are tested by test_campaign_view.py
     # ------------------------------------------------------------------
 
@@ -520,6 +466,28 @@ class CampaignView(arcade.View):
     def remove_room_threat(self, index: int) -> None:
         del self.manifest.room_threats[index]
         self.is_dirty = True
+
+    def set_seed_library(self, library: CampaignSeedLibrary) -> None:
+        self._seed_library = library
+
+    def save_seed(self) -> None:
+        if self._seed_library is not None:
+            self._seed_library.save(self.manifest)
+            self.is_dirty = False
+
+    def load_seed(self, slug: str) -> None:
+        if self._seed_library is not None:
+            self.load_manifest(self._seed_library.load(slug))
+
+    def attach_dungeon(self, slug: str) -> None:
+        self.manifest.dungeon_slug = slug
+        self.is_dirty = True
+
+    @property
+    def attached_dungeon_slug(self) -> str | None:
+        if self.manifest is None:
+            return None
+        return self.manifest.dungeon_slug
 
     def run_validation(self) -> list[ManifestError]:
         self._validation_result = validate_manifest(self.manifest)

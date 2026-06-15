@@ -1141,6 +1141,23 @@ Generate reports from domain events:
 - proposal acceptance/rejection rates,
 - memories created/approved/rejected.
 
+## Phase 45 â€” Campaign Pipeline: Dungeon Library â†' Campaign Seeds â†' Save Games
+
+**Status: Complete (2026-06-14) â€” 2436 tests passing**
+Spec: `spec/PHASE_45_CAMPAIGN_PIPELINE.md`
+Branch: `phase-45-campaign-pipeline`
+
+Wire Design â†' Campaign â†' Play into a real authoring â†' publishing â†' playing pipeline
+backed by three on-disk libraries: `dungeons/` (reusable templates), `campaign_seeds/`
+(manifests attached to a dungeon), and `saves/` (self-contained `dungeon + seed + live
+state`). Publishing a seed snapshots its dungeon + manifest into a new save and seeds its
+DuckDB. Existing `campaigns/*` auto-migrate once. A new Library home screen is the
+landing/hub view. Post-phase: entire top-level menu bar removed; 4-pill navigation
+(Library / Design / Campaign / Play).
+
+9 TDD slices (0â€”8): config dirs, dungeon library wiring, seed library, seed persistence,
+publish service, play loads saves, Library view, one-time migration, startup integration.
+
 
 # Development Sequence Recommendation
 

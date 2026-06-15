@@ -28,7 +28,7 @@ from dungeon_daddy.rpg.proposal import parse_proposal
 from dungeon_daddy.rpg.proposal_applier import ApplyResult, apply_low_risk_proposals
 from dungeon_daddy.rpg.proposal_validator import ValidationResult, validate_proposal
 from dungeon_daddy.rpg.service import RpgService
-from dungeon_daddy.ui.chrome import MenuBar, PILLS_CLUSTER_W, draw_title_bar, title_bar_mode_at
+from dungeon_daddy.ui.chrome import PILLS_CLUSTER_W, draw_title_bar, title_bar_mode_at
 from dungeon_daddy.ui.mechanical_bubble import format_mechanical_bubble
 from dungeon_daddy.ui.player_action_state import PlayerActionState
 from dungeon_daddy.ui.panels.character_sheet_panel import CharacterSheetPanel
@@ -301,14 +301,12 @@ class PlayView(arcade.View):
     def __init__(
         self,
         repo: DungeonRepository,
-        menu_bar: MenuBar,
         dm_agent: DungeonMasterAgent | None = None,
         rpg_service: RpgService | None = None,
         mem_repo: MemoryRepository | None = None,
     ) -> None:
         super().__init__()
         self._repo = repo
-        self._menu_bar = menu_bar
         self._dm_agent = dm_agent
         self._rpg_service = rpg_service
         self._mem_repo = mem_repo
@@ -396,7 +394,6 @@ class PlayView(arcade.View):
         if getattr(self, "_overlay_open", False):
             self._draw_overlay_backdrop()
         self._manager.draw()
-        self._menu_bar.draw(self.window)  # last — dropdown renders above all chrome
 
     def on_update(self, delta_time: float) -> None:
         self._chat.update(delta_time)
@@ -421,8 +418,6 @@ class PlayView(arcade.View):
     def on_mouse_press(self, x: float, y: float, button: int, modifiers: int) -> None:
         # Overlay is modal — absorb all clicks (save/cancel handled by UIManager)
         if getattr(self, "_overlay_open", False):
-            return
-        if self._menu_bar.handle_click(x, y, self.window):
             return
         if button != arcade.MOUSE_BUTTON_LEFT:
             return
@@ -599,6 +594,10 @@ class PlayView(arcade.View):
     # ------------------------------------------------------------------
     # Player actors
     # ------------------------------------------------------------------
+
+    def set_session_repo(self, repo: DungeonRepository) -> None:
+        """Switch the repository used for session and room-memory persistence."""
+        self._repo = repo
 
     def set_rpg_context(
         self,

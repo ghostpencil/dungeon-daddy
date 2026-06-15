@@ -128,27 +128,6 @@ def test_save_btn_at_outside_returns_false():
     assert p.save_btn_at(110, 50) is False
 
 
-def test_load_btn_at_centre_returns_true():
-    p = _nav_panel()
-    assert p.load_btn_at(57, 55) is True
-
-
-def test_load_btn_at_outside_returns_false():
-    p = _nav_panel()
-    # x=163 is in the new button zone, not load
-    assert p.load_btn_at(163, 55) is False
-
-
-def test_new_btn_at_centre_returns_true():
-    p = _nav_panel()
-    assert p.new_btn_at(163, 55) is True
-
-
-def test_new_btn_at_outside_returns_false():
-    p = _nav_panel()
-    assert p.new_btn_at(57, 55) is False
-
-
 # ---------------------------------------------------------------------------
 # CampaignListPanel.item_at
 # ---------------------------------------------------------------------------
