@@ -33,7 +33,7 @@ from dungeon_daddy.ui.theme import (
 _PILL_W = 90
 _PILL_H = 22
 _PILL_GAP = 8
-_PILL_MODES = ["library", "design", "campaign", "play"]
+_PILL_MODES = ["library"]
 PILLS_CLUSTER_W = len(_PILL_MODES) * _PILL_W + (len(_PILL_MODES) - 1) * _PILL_GAP
 _PILL_FILL: dict[str, tuple[int, ...]] = {
     "library":  EMBER,
@@ -88,8 +88,8 @@ def draw_title_bar(
     on_mode: Callable[[str], None] | None = None,
 ) -> None:
     """
-    Draw the title bar with app name and four mode pills.
-    mode: "library" | "design" | "campaign" | "play" — active pill is filled with its accent colour.
+    Draw the title bar with app name and Library home pill.
+    mode: active view name — "library" pill is filled when library is active.
     on_mode: unused (click detection is handled by the views via title_bar_mode_at).
     """
     w: int = window.width  # type: ignore[attr-defined]
