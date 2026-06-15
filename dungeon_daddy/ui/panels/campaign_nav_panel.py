@@ -79,27 +79,9 @@ class CampaignNavPanel:
         w = self._w - 2 * _BTN_PAD
         return cx, cy, w
 
-    def _load_new_btn_info(self) -> tuple[float, float, float, float]:
-        """Returns (load_cx, new_cx, cy, btn_w)."""
-        btn_w = (self._w - 3 * _BTN_PAD) / 2
-        cy = self._y + _BTN_PAD + _BTN_H + _BTN_PAD + _BTN_H / 2
-        load_cx = self._x + _BTN_PAD + btn_w / 2
-        new_cx = self._x + _BTN_PAD + btn_w + _BTN_PAD + btn_w / 2
-        return load_cx, new_cx, cy, btn_w
-
     def save_btn_at(self, x: float, y: float) -> bool:
         cx, cy, bw = self._save_btn_cx_cy_w()
         return (cx - bw / 2 <= x <= cx + bw / 2 and
-                cy - _BTN_H / 2 <= y <= cy + _BTN_H / 2)
-
-    def load_btn_at(self, x: float, y: float) -> bool:
-        load_cx, _, cy, bw = self._load_new_btn_info()
-        return (load_cx - bw / 2 <= x <= load_cx + bw / 2 and
-                cy - _BTN_H / 2 <= y <= cy + _BTN_H / 2)
-
-    def new_btn_at(self, x: float, y: float) -> bool:
-        _, new_cx, cy, bw = self._load_new_btn_info()
-        return (new_cx - bw / 2 <= x <= new_cx + bw / 2 and
                 cy - _BTN_H / 2 <= y <= cy + _BTN_H / 2)
 
     # ------------------------------------------------------------------
@@ -176,17 +158,6 @@ class CampaignNavPanel:
 
             # Row divider
             arcade.draw_line(px, row_bot, px + pw, row_bot, LINE, 1)
-
-        # Load / New buttons
-        load_cx, new_cx, btn_cy, btn_w = self._load_new_btn_info()
-        for cx, label in [(load_cx, "LOAD"), (new_cx, "NEW")]:
-            arcade.draw_rect_filled(arcade.XYWH(cx, btn_cy, btn_w, _BTN_H), BG_2)
-            arcade.draw_rect_outline(arcade.XYWH(cx, btn_cy, btn_w, _BTN_H), TEAL, 1)
-            arcade.draw_text(
-                label, cx, btn_cy, TEAL,
-                font_size=TEXT_SM, font_name=FONT_MONO,
-                anchor_x="center", anchor_y="center",
-            )
 
         # Save button
         save_cx, save_cy, save_w = self._save_btn_cx_cy_w()

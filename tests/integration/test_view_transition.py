@@ -1,4 +1,4 @@
-"""Integration tests — window open-dungeon and view-transition seams."""
+"""Integration tests — window open-in-designer and view-transition seams."""
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -36,6 +36,8 @@ def _make_dungeon(save_name: str = "test_dungeon") -> Dungeon:
 def _make_window(repo: DungeonRepository) -> DungeonDaddyWindow:
     win = DungeonDaddyWindow.__new__(DungeonDaddyWindow)
     win._repo = repo
+    win._dungeon_repo = repo
+    win._save_repo = repo
     win._design_view = MagicMock()
     win._play_view = MagicMock()
     win.switch_mode = MagicMock()
@@ -65,7 +67,7 @@ def test_both_views_share_same_dungeon_reference_after_open(tmp_path):
     repo.save(dungeon, "test_dungeon")
 
     win = _make_window(repo)
-    win.open_dungeon(_pick_fn=lambda: "test_dungeon")
+    win.open_in_designer("test_dungeon")
 
     design_arg = win._design_view.load_dungeon.call_args[0][0]
     play_arg = win._play_view.load_dungeon.call_args[0][0]
@@ -107,3 +109,41 @@ def test_corrupt_session_does_not_crash(tmp_path):
 
     assert view._dungeon is dungeon
     assert view._state is not None
+
+
+# ---------------------------------------------------------------------------
+# Slice 5: session and memory round-trip in saves dir
+# ---------------------------------------------------------------------------
+
+def test_session_round_trips_to_saves_dir(tmp_path):
+    saves_dir = tmp_path / "saves"
+    saves_dir.mkdir()
+    save_repo = DungeonRepository(saves_dir)
+    dungeon = _make_dungeon(save_name="my-save")
+    save_repo.save(dungeon, "my-save")
+
+    view = _make_play_view(DungeonRepository(tmp_path))
+    view.set_session_repo(save_repo)
+    view.load_dungeon_session(dungeon)
+    view._save_session()
+
+    assert (saves_dir / "my-save" / "session.json").exists()
+
+
+def test_room_memory_writes_to_saves_dir(tmp_path):
+    saves_dir = tmp_path / "saves"
+    saves_dir.mkdir()
+    save_repo = DungeonRepository(saves_dir)
+    dungeon = _make_dungeon(save_name="my-save")
+
+    view = _make_play_view(DungeonRepository(tmp_path))
+    view.set_session_repo(save_repo)
+    view._state = __import__("dungeon_daddy.data.models", fromlist=["SessionState"]).SessionState(
+        dungeon_id="my-save"
+    )
+
+    save_repo.save_room_memory("my-save", 1, "Some notes")
+    content = view._repo.load_room_memory("my-save", 1)
+
+    assert content == "Some notes"
+    assert any((saves_dir / "my-save").rglob("*.md"))

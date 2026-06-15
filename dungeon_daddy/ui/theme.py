@@ -119,10 +119,9 @@ PANEL_INSPECTOR_WIDTH  = 320   # Design Mode right panel
 PANEL_CHAT_WIDTH       = 440   # Play Mode left panel
 PANEL_STEPPER_WIDTH    = 70    # Play Mode right rail
 
-CHROME_MENUBAR_HEIGHT  = 26    # top of window
-CHROME_TITLEBAR_HEIGHT = 44    # below menu bar
-# Combined offset views must apply from the top of the window:
-CHROME_TOTAL_HEIGHT    = CHROME_MENUBAR_HEIGHT + CHROME_TITLEBAR_HEIGHT  # 70
+CHROME_MENUBAR_HEIGHT  = 0
+CHROME_TITLEBAR_HEIGHT = 44
+CHROME_TOTAL_HEIGHT    = CHROME_MENUBAR_HEIGHT + CHROME_TITLEBAR_HEIGHT  # 44
 
 # ---------------------------------------------------------------------------
 # Drawing utility helpers

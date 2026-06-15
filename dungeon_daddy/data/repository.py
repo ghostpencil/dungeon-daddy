@@ -232,6 +232,60 @@ class DungeonRepository:
 
 
 # ------------------------------------------------------------------
+# Campaign migration
+# ------------------------------------------------------------------
+
+def migrate_campaigns_to_libraries(
+    campaigns_dir: Path,
+    dungeons_dir: Path,
+    seeds_dir: Path,
+    saves_dir: Path,
+) -> None:
+    """One-time migration: copy each campaigns/<name>/ into the three libraries.
+
+    Idempotent — already-migrated entries are skipped.
+    Completion is marked by renaming campaigns/<name>/ → campaigns.migrated/<name>/.
+    """
+    import shutil
+
+    migrated_dir = campaigns_dir.parent / "campaigns.migrated"
+
+    for src in sorted(campaigns_dir.iterdir()):
+        if not src.is_dir():
+            continue
+
+        name = src.name
+
+        # --- copy dungeon design files to dungeons/<name>/ ---
+        dst_dungeon = dungeons_dir / name
+        dst_dungeon.mkdir(parents=True, exist_ok=True)
+        dungeon_json = src / "dungeon.json"
+        if dungeon_json.exists():
+            shutil.copy2(dungeon_json, dst_dungeon / "dungeon.json")
+        for ctx in ["setting.md", "party.md"]:
+            f = src / ctx
+            if f.exists():
+                shutil.copy2(f, dst_dungeon / ctx)
+        for f in src.glob("level_*_design.md"):
+            shutil.copy2(f, dst_dungeon / f.name)
+
+        # --- copy entire folder to saves/<name>/ ---
+        dst_save = saves_dir / name
+        shutil.copytree(str(src), str(dst_save), dirs_exist_ok=True)
+
+        # --- copy manifest to campaign_seeds/<name>/ if present ---
+        manifest = src / "campaign.json"
+        if manifest.exists():
+            dst_seed = seeds_dir / name
+            dst_seed.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(manifest, dst_seed / "campaign.json")
+
+        # --- mark as done ---
+        migrated_dir.mkdir(parents=True, exist_ok=True)
+        src.rename(migrated_dir / name)
+
+
+# ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
 

@@ -28,7 +28,7 @@ from dungeon_daddy.llm.agents.design_agent import DesignAgent
 from dungeon_daddy.llm.agents.generator_agent import DungeonGeneratorAgent
 from dungeon_daddy.llm.agents.wizard_agent import DungeonBrief, DungeonWizardAgent, LevelBrief
 from dungeon_daddy.llm.provider import LLMMessage
-from dungeon_daddy.ui.chrome import MenuBar, draw_title_bar, title_bar_mode_at
+from dungeon_daddy.ui.chrome import draw_title_bar, title_bar_mode_at
 from dungeon_daddy.ui.panels.chat_panel import ChatPanel
 from dungeon_daddy.ui.panels.dungeon_tree_panel import DungeonTreePanel
 from dungeon_daddy.ui.panels.inspector_panel import InspectorPanel
@@ -115,14 +115,12 @@ class DesignView(arcade.View):
     def __init__(
         self,
         repo: DungeonRepository,
-        menu_bar: MenuBar,
         wizard_agent: DungeonWizardAgent | None = None,
         generator_agent: DungeonGeneratorAgent | None = None,
         design_agent: DesignAgent | None = None,
     ) -> None:
         super().__init__()
         self._repo = repo
-        self._menu_bar = menu_bar
         self._dungeon: Dungeon | None = None
         self._design_mode = DesignMode.WIZARD
         self._manager = arcade.gui.UIManager()
@@ -190,7 +188,6 @@ class DesignView(arcade.View):
         if self._overlay_open:
             self._draw_overlay_backdrop()
         self._manager.draw()
-        self._menu_bar.draw(self.window)  # last — dropdown renders above all chrome
 
     def on_update(self, delta_time: float) -> None:
         self._chat.update(delta_time)
@@ -207,8 +204,6 @@ class DesignView(arcade.View):
     def on_mouse_press(self, x: float, y: float, button: int, modifiers: int) -> None:
         if self._overlay_open:
             return  # overlay is modal — UIManager handles save/cancel clicks
-        if self._menu_bar.handle_click(x, y, self.window):
-            return
         pill = title_bar_mode_at(x, y, self.window)
         if pill and pill != "design":
             self.window.switch_mode(pill)
@@ -221,8 +216,6 @@ class DesignView(arcade.View):
             return
         if self._inspector.hit_test_drive(x, y):
             self._launch_test_drive()
-        elif self._inspector.hit_start_play(x, y):
-            self._launch_start_play()
 
     def on_key_press(self, key: int, modifiers: int) -> None:
         if self._overlay_open and key == arcade.key.ESCAPE:
@@ -233,28 +226,6 @@ class DesignView(arcade.View):
     def _launch_test_drive(self) -> None:
         if self._dungeon and self._dungeon.levels:
             self.window.launch_test_drive(self._dungeon)
-
-    def _launch_start_play(self) -> None:
-        if self._dungeon and self._dungeon.levels and self._dungeon.meta.save_name:
-            self.window.launch_play_session(self._dungeon)
-
-    def _refresh_play_button_state(self) -> None:
-        is_saved = bool(self._dungeon and self._dungeon.meta.save_name)
-        has_session = False
-        if is_saved:
-            assert self._dungeon is not None
-            save_name = self._dungeon.meta.save_name
-            assert save_name is not None
-            if self._repo.load_session(save_name) is not None:
-                has_session = True
-            elif self._dungeon.levels:
-                has_session = any(
-                    bool(self._repo.load_room_memory(save_name, level.id))
-                    for level in self._dungeon.levels
-                )
-        self._inspector.set_saved_state(is_saved, has_session)
-        self.window.set_switch_to_play_enabled(is_saved)
-
 
     # ------------------------------------------------------------------
     # Dungeon loading (called by DungeonDaddyWindow)
@@ -267,7 +238,6 @@ class DesignView(arcade.View):
         self._tree.set_dungeon(dungeon, expand_all=True)
         self._inspector.set_dungeon(dungeon)
         self._refresh_context_doc_statuses()
-        self._refresh_play_button_state()
         self._chat.set_mode_label("Edit Mode")
         self._chat.add_message(
             "dm",

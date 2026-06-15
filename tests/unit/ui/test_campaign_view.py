@@ -590,3 +590,93 @@ def test_parse_rating_keys_ignores_non_rating_keys():
     result = _parse_rating_keys(data)
     assert "display_name" not in result
     assert result == {"fight": 2}
+
+
+# ---------------------------------------------------------------------------
+# Slice 3 (Phase 45) — Attach dungeon + seed persistence
+# ---------------------------------------------------------------------------
+
+
+def test_attach_dungeon_sets_dungeon_slug():
+    view = _make_view()
+    view.load_manifest(_minimal_manifest())
+    view.attach_dungeon("bone-cathedral")
+    assert view.manifest.dungeon_slug == "bone-cathedral"
+
+
+def test_attach_dungeon_sets_dirty():
+    view = _make_view()
+    view.load_manifest(_minimal_manifest())
+    view.attach_dungeon("bone-cathedral")
+    assert view.is_dirty is True
+
+
+def test_attached_dungeon_slug_returns_slug_after_attach():
+    view = _make_view()
+    view.load_manifest(_minimal_manifest())
+    view.attach_dungeon("bone-cathedral")
+    assert view.attached_dungeon_slug == "bone-cathedral"
+
+
+def test_attached_dungeon_slug_is_none_when_no_manifest():
+    view = _make_view()
+    assert view.attached_dungeon_slug is None
+
+
+def test_attached_dungeon_slug_reflects_manifest_field():
+    view = _make_view()
+    view.load_manifest(_minimal_manifest())
+    # _minimal_manifest() sets dungeon_slug="test-dungeon"
+    assert view.attached_dungeon_slug == "test-dungeon"
+
+
+def test_save_seed_writes_to_seed_library(tmp_path):
+    from dungeon_daddy.campaign.seed_library import CampaignSeedLibrary
+    lib = CampaignSeedLibrary(tmp_path)
+    view = _make_view()
+    view.load_manifest(_minimal_manifest())
+    view.set_seed_library(lib)
+    view.save_seed()
+    assert lib.exists("test-campaign")
+
+
+def test_save_seed_clears_dirty(tmp_path):
+    from dungeon_daddy.campaign.seed_library import CampaignSeedLibrary
+    lib = CampaignSeedLibrary(tmp_path)
+    view = _make_view()
+    view.load_manifest(_minimal_manifest())
+    view.set_seed_library(lib)
+    view.is_dirty = True
+    view.save_seed()
+    assert view.is_dirty is False
+
+
+def test_load_seed_restores_manifest_fields(tmp_path):
+    from dungeon_daddy.campaign.seed_library import CampaignSeedLibrary
+    lib = CampaignSeedLibrary(tmp_path)
+    m = _minimal_manifest()
+    m.dungeon_slug = "bone-cathedral"
+    lib.save(m)
+
+    view = _make_view()
+    view.set_seed_library(lib)
+    view.load_seed("test-campaign")
+    assert view.manifest.slug == "test-campaign"
+    assert view.manifest.dungeon_slug == "bone-cathedral"
+
+
+def test_save_and_load_seed_round_trip(tmp_path):
+    from dungeon_daddy.campaign.seed_library import CampaignSeedLibrary
+    lib = CampaignSeedLibrary(tmp_path)
+    view = _make_view()
+    view.set_seed_library(lib)
+    view.load_manifest(_minimal_manifest())
+    view.attach_dungeon("bone-cathedral")
+    view.save_seed()
+
+    view2 = _make_view()
+    view2.set_seed_library(lib)
+    view2.load_seed("test-campaign")
+    assert view2.manifest.dungeon_slug == "bone-cathedral"
+    assert view2.manifest.title == "Test Campaign"
+    assert view2.is_dirty is False

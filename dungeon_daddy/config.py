@@ -21,6 +21,19 @@ class AppConfig:
     def campaigns_dir(self) -> Path:
         return self.user_data_dir / "campaigns"
 
+    @property
+    def dungeons_dir(self) -> Path:
+        return self.user_data_dir / "dungeons"
+
+    @property
+    def campaign_seeds_dir(self) -> Path:
+        return self.user_data_dir / "campaign_seeds"
+
+    @property
+    def saves_dir(self) -> Path:
+        return self.user_data_dir / "saves"
+
     def ensure_dirs(self) -> None:
         """Create user data directories if they do not exist."""
-        self.campaigns_dir.mkdir(parents=True, exist_ok=True)
+        for d in (self.campaigns_dir, self.dungeons_dir, self.campaign_seeds_dir, self.saves_dir):
+            d.mkdir(parents=True, exist_ok=True)

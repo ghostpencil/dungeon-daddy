@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -26,9 +25,21 @@ import arcade
 from dungeon_daddy.config import AppConfig
 from dungeon_daddy.data.repository import DungeonRepository
 from dungeon_daddy.rpg.service import RpgService
-from dungeon_daddy.ui.chrome import MenuAction, MenuBar
 
 _MIGRATIONS_DIR = Path(__file__).parent / "data" / "migrations"
+
+
+def _run_startup_migration(config: AppConfig) -> None:
+    """Migrate legacy campaigns/ into the three new libraries (idempotent)."""
+    if not config.campaigns_dir.exists():
+        return
+    from dungeon_daddy.data.repository import migrate_campaigns_to_libraries
+    migrate_campaigns_to_libraries(
+        campaigns_dir=config.campaigns_dir,
+        dungeons_dir=config.dungeons_dir,
+        seeds_dir=config.campaign_seeds_dir,
+        saves_dir=config.saves_dir,
+    )
 
 
 def _slugify(name: str) -> str:
@@ -159,108 +170,49 @@ class DungeonDaddyWindow(arcade.Window):
         # Repository — None-dir is fine for load_sample()
         self._repo = DungeonRepository(config.campaigns_dir)
         self._repo.migrate_legacy_layout()
+        self._dungeon_repo = DungeonRepository(config.dungeons_dir)
+        self._save_repo = DungeonRepository(config.saves_dir)
+        _run_startup_migration(config)
 
         _load_fonts()
 
         # Import here to avoid circular dependency at module load
+        from dungeon_daddy.campaign.seed_library import CampaignSeedLibrary
         from dungeon_daddy.views.campaign_view import CampaignView
         from dungeon_daddy.views.design_view import DesignView
+        from dungeon_daddy.views.library_view import LibraryView
         from dungeon_daddy.views.play_view import PlayView
 
-        self._menu: dict[str, list[MenuAction]] = self._build_menu()
-        self._menu_bar = MenuBar(self._menu)
+        self._seed_library = CampaignSeedLibrary(config.campaign_seeds_dir)
 
         _llm_log = config.user_data_dir / "llm_calls.jsonl"
         wizard_agent, generator_agent, design_agent = _build_agents(_llm_log)
         dm_agent = _build_dm_agent(_llm_log)
         self._design_view = DesignView(
-            self._repo, self._menu_bar,
+            self._repo,
             wizard_agent=wizard_agent,
             generator_agent=generator_agent,
             design_agent=design_agent,
         )
         rpg_service = RpgService()
-        self._play_view = PlayView(self._repo, self._menu_bar, dm_agent=dm_agent, rpg_service=rpg_service)
-        self._campaign_view = CampaignView(self._menu_bar)
-        self.show_view(self._design_view)
-
-    def _build_menu(self) -> dict[str, list[MenuAction]]:
-        self._switch_to_play_action = MenuAction("Switch to Play", self._menu_launch_play)
-        return {
-            "File": [
-                MenuAction("New", self.new_dungeon),
-                MenuAction("Open...", self.open_dungeon),
-                MenuAction("Demo Dungeon", self.open_sample_dungeon),
-                MenuAction("Save", self.save_dungeon),
-            ],
-            "Edit": [
-                MenuAction("Undo", self._nyi, implemented=False),
-                MenuAction("Redo", self._nyi, implemented=False),
-            ],
-            "Dungeon": [
-                MenuAction("Validate", self.validate),
-                MenuAction("Generate Level", self._nyi, implemented=False),
-            ],
-            "Play": [
-                self._switch_to_play_action,
-                MenuAction("Switch to Design", lambda: self.switch_mode("design")),
-            ],
-            "View": [
-                MenuAction("Map: Graph", lambda: self.set_map_variant("graph")),
-            ],
-            "Window": [
-                MenuAction("Minimise", self.minimise),
-            ],
-            "Help": [
-                MenuAction("About", self.about),
-            ],
-        }
-
-    def _menu_launch_play(self) -> None:
-        dungeon = self._design_view._dungeon
-        if dungeon and dungeon.levels and dungeon.meta.save_name:
-            self.launch_play_session(dungeon)
+        self._play_view = PlayView(self._repo, dm_agent=dm_agent, rpg_service=rpg_service)
+        self._campaign_view = CampaignView()
+        self._library_view = LibraryView()
+        self._library_view.set_sources(
+            dungeon_repo=self._dungeon_repo,
+            seed_library=self._seed_library,
+            save_repo=self._save_repo,
+        )
+        self._mode = "library"
+        self.show_view(self._library_view)
 
     # ------------------------------------------------------------------
-    # Menu actions
+    # Actions
     # ------------------------------------------------------------------
-
-    def _nyi(self) -> None:
-        _log.info("Menu action not yet implemented")
 
     def new_dungeon(self) -> None:
         self._design_view.reset_to_wizard()
         self.switch_mode("design")
-
-    def open_dungeon(
-        self,
-        _pick_fn: Callable[[], str | None] | None = None,
-        _error_fn: Callable[[str], None] | None = None,
-    ) -> None:
-        """Open a saved dungeon chosen via file dialog (or injectable picker for tests)."""
-        if _pick_fn is None:
-            _pick_fn = self._pick_dungeon_via_dialog
-        if _error_fn is None:
-            _error_fn = self._show_error
-        name = _pick_fn()
-        if not name:
-            return
-        try:
-            dungeon = self._repo.load(name)
-            if dungeon.meta.save_name is None:
-                dungeon.meta.save_name = name
-            self._design_view.load_dungeon(dungeon)
-            self._play_view.load_dungeon(dungeon)
-            self._attach_rpg_context(name)
-            self.switch_mode("design")
-        except FileNotFoundError:
-            msg = f"No dungeon file found in '{name}'.\nThe folder exists but contains no dungeon data."
-            _log.error("Failed to open dungeon '%s': dungeon.json missing", name)
-            _error_fn(msg)
-        except Exception as exc:
-            msg = f"Could not open '{name}':\n{exc}"
-            _log.error("Failed to open dungeon '%s': %s", name, exc)
-            _error_fn(msg)
 
     def _make_tk_root(self) -> tk.Tk:
         """Create a hidden Tk root owned by the Arcade window so dialogs stay in front of it."""
@@ -295,29 +247,6 @@ class DungeonDaddyWindow(arcade.Window):
         root.destroy()
         return answer
 
-    def _pick_dungeon_via_dialog(self) -> str | None:
-        from tkinter import filedialog
-        root = self._make_tk_root()
-        path = filedialog.askdirectory(
-            title="Open Dungeon",
-            initialdir=str(self._repo._dir or Path.home()),
-        )
-        root.destroy()
-        if not path:
-            return None
-        return Path(path).name
-
-    def open_sample_dungeon(self) -> None:
-        try:
-            sample_repo = DungeonRepository(None)
-            dungeon = sample_repo.load_sample()
-            self._design_view.load_dungeon(dungeon)
-            self._play_view.load_dungeon(dungeon)
-            self._attach_rpg_context(None)  # sample dungeon has no campaign folder
-            self.switch_mode("design")
-        except Exception as exc:
-            _log.error("Failed to load sample dungeon: %s", exc)
-
     def save_dungeon(self) -> None:
         dungeon = self._play_view._dungeon or self._design_view._dungeon
         state = self._play_view._state
@@ -327,11 +256,11 @@ class DungeonDaddyWindow(arcade.Window):
         name = dungeon.meta.effective_name
         dungeon.meta.save_name = name
         try:
-            self._repo.save(dungeon, name)
+            self._dungeon_repo.save(dungeon, name)
             if state is not None:
                 self._repo.save_session(state)
             from dungeon_daddy.llm.context_docs import generate_all_context_docs
-            generate_all_context_docs(dungeon, name, self._repo)
+            generate_all_context_docs(dungeon, name, self._dungeon_repo)
             _log.info("Saved dungeon: %s", name)
         except Exception as exc:
             _log.error("Save failed: %s", exc)
@@ -372,15 +301,6 @@ class DungeonDaddyWindow(arcade.Window):
         msg = "\n".join(result.errors)
         self._show_info("Validate Dungeon", f"{len(result.errors)} error(s) found:\n\n{msg}")
 
-    def minimise(self) -> None:
-        self.minimize()
-
-    def about(self) -> None:
-        self._show_info(
-            "About Dungeon Daddy",
-            "Dungeon Daddy\n\nAI-powered tabletop dungeon crawl manager.\nBuilt with Arcade 2D.",
-        )
-
     def set_map_variant(self, variant: str) -> None:
         from dungeon_daddy.map.graph_renderer import GraphRenderer
 
@@ -394,6 +314,11 @@ class DungeonDaddyWindow(arcade.Window):
     # ------------------------------------------------------------------
     # Mode switching
     # ------------------------------------------------------------------
+
+    def switch_to_library(self) -> None:
+        self._mode = "library"
+        self.show_view(self._library_view)
+        _log.info("Switched to library mode")
 
     def switch_to_design(self) -> None:
         self._mode = "design"
@@ -410,21 +335,19 @@ class DungeonDaddyWindow(arcade.Window):
         self.show_view(self._play_view)
         _log.info("Switched to play mode")
 
-    def on_key_press(self, key: int, modifiers: int) -> None:
-        import arcade
-        if key == arcade.key.O and modifiers & arcade.key.MOD_CTRL:
-            self.open_dungeon()
-        elif key == arcade.key.N and modifiers & arcade.key.MOD_CTRL:
-            self.new_dungeon()
-
-    def _attach_rpg_context(self, save_name: str | None) -> None:
+    def _attach_rpg_context(
+        self,
+        save_name: str | None,
+        repo_dir: Path | None = None,
+    ) -> None:
         """Open campaign.duckdb for save_name (if it exists) and wire it into PlayView."""
         from dungeon_daddy.memory.repository import MemoryRepository
+        base_dir = repo_dir if repo_dir is not None else self._repo._dir
         mem_repo = None
         campaign_id = None
         portraits_dir = None
-        if save_name and self._repo._dir is not None:
-            campaign_dir = self._repo._dir / save_name
+        if save_name and base_dir is not None:
+            campaign_dir = base_dir / save_name
             portraits_dir = campaign_dir / "assets" / "portraits"
             db_path = campaign_dir / "campaign.duckdb"
             if db_path.exists():
@@ -443,11 +366,17 @@ class DungeonDaddyWindow(arcade.Window):
         self._attach_rpg_context(dungeon.meta.save_name)
         self.switch_to_play()
 
-    def set_switch_to_play_enabled(self, enabled: bool) -> None:
-        self._switch_to_play_action.enabled = enabled
+    def launch_save_game(self, save_slug: str) -> None:
+        dungeon = self._save_repo.load(save_slug)
+        self._play_view.set_session_repo(self._save_repo)
+        self._play_view.load_dungeon_session(dungeon)
+        self._attach_rpg_context(save_slug, repo_dir=self._save_repo._dir)
+        self.switch_mode("play")
 
     def switch_mode(self, mode: str) -> None:
-        if mode == "design":
+        if mode == "library":
+            self.switch_to_library()
+        elif mode == "design":
             self.switch_to_design()
         elif mode == "campaign":
             self.switch_to_campaign()
@@ -455,3 +384,62 @@ class DungeonDaddyWindow(arcade.Window):
             self.switch_to_play()
         else:
             _log.warning("Unknown mode: %s", mode)
+
+    # ------------------------------------------------------------------
+    # Library action methods
+    # ------------------------------------------------------------------
+
+    def open_in_designer(self, slug: str) -> None:
+        """Load a dungeon from the library into Design mode."""
+        try:
+            dungeon = self._dungeon_repo.load(slug)
+            if dungeon.meta.save_name is None:
+                dungeon.meta.save_name = slug
+            self._design_view.load_dungeon(dungeon)
+            self._play_view.load_dungeon(dungeon)
+            self._attach_rpg_context(slug)
+            self.switch_mode("design")
+        except Exception as exc:
+            _log.error("open_in_designer failed for '%s': %s", slug, exc)
+
+    def new_seed_from_dungeon(self, dungeon_slug: str) -> None:
+        """Create a blank campaign seed attached to dungeon_slug and open in Campaign mode."""
+        from dungeon_daddy.campaign.manifest import CampaignManifest
+        manifest = CampaignManifest(
+            slug="new-campaign",
+            title="New Campaign",
+            dungeon_slug=dungeon_slug,
+        )
+        self._campaign_view.set_seed_library(self._seed_library)
+        self._campaign_view.load_manifest(manifest)
+        self._campaign_view.is_dirty = True
+        self.switch_mode("campaign")
+
+    def edit_seed(self, seed_slug: str) -> None:
+        """Load an existing campaign seed into Campaign mode for editing."""
+        self._campaign_view.set_seed_library(self._seed_library)
+        self._campaign_view.load_seed(seed_slug)
+        self.switch_mode("campaign")
+
+    def publish_and_play(self, seed_slug: str) -> None:
+        """Publish a campaign seed as a save game, then launch it in Play mode."""
+        from dungeon_daddy.campaign.publish import publish_save
+        manifest = self._seed_library.load(seed_slug)
+        publish_save(
+            manifest=manifest,
+            dungeons_dir=self._dungeon_repo._dir,
+            saves_dir=self._save_repo._dir,
+            save_slug=seed_slug,
+            migrations_dir=_MIGRATIONS_DIR,
+        )
+        self.launch_save_game(seed_slug)
+
+    def delete_save(self, save_slug: str) -> None:
+        """Delete a save game directory from the saves library."""
+        import shutil
+        if self._save_repo._dir is None:
+            return
+        save_dir = self._save_repo._dir / save_slug
+        if save_dir.exists():
+            shutil.rmtree(save_dir)
+            _log.info("Deleted save: %s", save_slug)

@@ -786,8 +786,6 @@ def test_handle_wizard_result_error_calls_set_busy_false():
 def test_on_mouse_press_routes_tree_click():
     view = _make_view()
     view._overlay_open = False
-    view._menu_bar = MagicMock()
-    view._menu_bar.handle_click.return_value = False
     view._chat.on_mouse_press.return_value = False
     view._inspector.on_mouse_press.return_value = False
     view._inspector.hit_test_drive.return_value = False
@@ -929,8 +927,6 @@ def test_start_generation_skips_prompt_when_overwrite_confirmed():
 def _make_routable_view() -> DesignView:
     view = _make_view()
     view._overlay_open = False
-    view._menu_bar = MagicMock()
-    view._menu_bar.handle_click.return_value = False
     view._tree.handle_click.return_value = False
     view._chat.on_mouse_press.return_value = False
     view._inspector.on_mouse_press.return_value = False
@@ -950,55 +946,6 @@ def test_test_drive_click_calls_launch_test_drive():
 
     view.window.launch_test_drive.assert_called_once_with(dungeon)
     view.window.launch_play_session.assert_not_called()
-
-
-def test_start_play_click_calls_launch_play_session():
-    view = _make_routable_view()
-    dungeon = _make_dungeon()
-    dungeon.meta.save_name = "crypt"
-    dungeon.levels = [_make_level()]
-    view._dungeon = dungeon
-    view._inspector.hit_test_drive.return_value = False
-    view._inspector.hit_start_play.return_value = True
-
-    view.on_mouse_press(10, 100, 1, 0)
-
-    view.window.launch_play_session.assert_called_once_with(dungeon)
-
-
-
-def test_refresh_play_button_state_on_load():
-    view = _make_overlay_view()
-    dungeon = _make_dungeon()
-    dungeon.levels = [_make_level(level_id=1)]
-    view._repo.load_context_doc.return_value = ""
-    view._repo.load_session.return_value = None
-
-    view.load_dungeon(dungeon)
-
-    view._inspector.set_saved_state.assert_called()
-
-
-def test_refresh_play_button_state_syncs_menu_when_unsaved():
-    view = _make_overlay_view()
-    view._dungeon = _make_dungeon()  # save_name is None
-    view._repo.load_session.return_value = None
-
-    view._refresh_play_button_state()
-
-    view.window.set_switch_to_play_enabled.assert_called_once_with(False)
-
-
-def test_refresh_play_button_state_syncs_menu_when_saved():
-    view = _make_overlay_view()
-    dungeon = _make_dungeon()
-    dungeon.meta.save_name = "crypt"
-    view._dungeon = dungeon
-    view._repo.load_session.return_value = None
-
-    view._refresh_play_button_state()
-
-    view.window.set_switch_to_play_enabled.assert_called_once_with(True)
 
 
 # ---------------------------------------------------------------------------

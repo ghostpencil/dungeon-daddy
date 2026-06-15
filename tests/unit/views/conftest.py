@@ -17,8 +17,6 @@ def make_play_view():
         view._dungeon = dungeon
         view._state = state
         view.window = MagicMock()
-        view._menu_bar = MagicMock()
-        view._menu_bar.handle_click.return_value = False
         view._map = MagicMock()
         view._map.pan_offset = (0, 0)
         view._map.zoom_level = 1.0

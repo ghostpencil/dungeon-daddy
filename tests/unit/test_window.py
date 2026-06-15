@@ -20,6 +20,9 @@ def _make_window(dungeon: Dungeon):
     win = DungeonDaddyWindow.__new__(DungeonDaddyWindow)
     win._repo = MagicMock()
     win._repo._dir = None
+    win._dungeon_repo = MagicMock()
+    win._save_repo = MagicMock()
+    win._save_repo._dir = None
     win._play_view = MagicMock()
     win._play_view._dungeon = None
     win._play_view._state = None
@@ -36,63 +39,27 @@ def test_save_dungeon_uses_title_when_no_save_name():
     win = _make_window(_make_dungeon())
     with patch("dungeon_daddy.llm.context_docs.generate_all_context_docs"):
         win.save_dungeon()
-    win._repo.save.assert_called_once_with(win._design_view._dungeon, "Iron Crypts")
+    win._dungeon_repo.save.assert_called_once_with(win._design_view._dungeon, "Iron Crypts")
 
 
 def test_save_dungeon_uses_save_name_when_set():
     win = _make_window(_make_dungeon(save_name="iron-crypts"))
     with patch("dungeon_daddy.llm.context_docs.generate_all_context_docs"):
         win.save_dungeon()
-    win._repo.save.assert_called_once_with(win._design_view._dungeon, "iron-crypts")
+    win._dungeon_repo.save.assert_called_once_with(win._design_view._dungeon, "iron-crypts")
 
 
-# ---------------------------------------------------------------------------
-# open_dungeon
-# ---------------------------------------------------------------------------
-
-def test_open_dungeon_loads_dungeon_when_name_returned():
-    dungeon = _make_dungeon()
-    win = _make_window(dungeon)
-    win._repo.load.return_value = dungeon
-    win.switch_mode = MagicMock()
-
-    win.open_dungeon(_pick_fn=lambda: "iron-crypts")
-
-    win._repo.load.assert_called_once_with("iron-crypts")
-    win._design_view.load_dungeon.assert_called_once_with(dungeon)
-    win._play_view.load_dungeon.assert_called_once_with(dungeon)
-    win.switch_mode.assert_called_once_with("design")
-
-
-def test_open_dungeon_does_nothing_when_cancelled():
+def test_save_dungeon_context_docs_use_dungeon_repo():
     win = _make_window(_make_dungeon())
-    win.switch_mode = MagicMock()
+    captured: dict = {}
 
-    win.open_dungeon(_pick_fn=lambda: None)
+    def capture(dungeon, name, repo):
+        captured["repo"] = repo
 
-    win._repo.load.assert_not_called()
-    win.switch_mode.assert_not_called()
+    with patch("dungeon_daddy.llm.context_docs.generate_all_context_docs", side_effect=capture):
+        win.save_dungeon()
 
-
-def test_open_dungeon_shows_error_on_file_not_found():
-    win = _make_window(_make_dungeon())
-    win._repo.load.side_effect = FileNotFoundError("dungeon.json missing")
-    errors = []
-
-    win.open_dungeon(_pick_fn=lambda: "bad-name", _error_fn=errors.append)
-
-    assert len(errors) == 1
-    assert "bad-name" in errors[0]
-
-
-def test_open_dungeon_shows_error_on_unexpected_exception():
-    win = _make_window(_make_dungeon())
-    win._repo.load.side_effect = ValueError("corrupt json")
-    errors = []
-
-    win.open_dungeon(_pick_fn=lambda: "bad-name", _error_fn=errors.append)
-
-    assert len(errors) == 1
+    assert captured["repo"] is win._dungeon_repo
 
 
 def test_save_dungeon_stamps_save_name_on_dungeon():
@@ -101,17 +68,6 @@ def test_save_dungeon_stamps_save_name_on_dungeon():
     with patch("dungeon_daddy.llm.context_docs.generate_all_context_docs"):
         win.save_dungeon()
     assert dungeon.meta.save_name == "Iron Crypts"
-
-
-def test_open_dungeon_backfills_save_name():
-    loaded = _make_dungeon()  # save_name is None in the loaded JSON
-    win = _make_window(_make_dungeon())
-    win._repo.load.return_value = loaded
-    win.switch_mode = MagicMock()
-
-    win.open_dungeon(_pick_fn=lambda: "iron-crypts")
-
-    assert loaded.meta.save_name == "iron-crypts"
 
 
 # ---------------------------------------------------------------------------
@@ -252,3 +208,163 @@ def test_build_dm_agent_passes_model_id_to_provider(monkeypatch, tmp_path):
         from dungeon_daddy.window import _build_dm_agent
         _build_dm_agent(tmp_path / "llm_calls.jsonl")
     MockProvider.assert_called_once_with(model="gpt-4o-mini")
+
+
+# ---------------------------------------------------------------------------
+# launch_save_game — Slice 5
+# ---------------------------------------------------------------------------
+
+def test_launch_save_game_loads_dungeon_from_save_repo():
+    dungeon = _make_dungeon(save_name="my-save")
+    win = _make_window(dungeon)
+    win._save_repo.load.return_value = dungeon
+    win.switch_mode = MagicMock()
+
+    win.launch_save_game("my-save")
+
+    win._save_repo.load.assert_called_once_with("my-save")
+
+
+def test_launch_save_game_sets_play_view_session_repo():
+    dungeon = _make_dungeon(save_name="my-save")
+    win = _make_window(dungeon)
+    win._save_repo.load.return_value = dungeon
+    win.switch_mode = MagicMock()
+
+    win.launch_save_game("my-save")
+
+    win._play_view.set_session_repo.assert_called_once_with(win._save_repo)
+
+
+def test_launch_save_game_calls_load_dungeon_session():
+    dungeon = _make_dungeon(save_name="my-save")
+    win = _make_window(dungeon)
+    win._save_repo.load.return_value = dungeon
+    win.switch_mode = MagicMock()
+
+    win.launch_save_game("my-save")
+
+    win._play_view.load_dungeon_session.assert_called_once_with(dungeon)
+
+
+def test_launch_save_game_switches_to_play():
+    dungeon = _make_dungeon(save_name="my-save")
+    win = _make_window(dungeon)
+    win._save_repo.load.return_value = dungeon
+    win.switch_mode = MagicMock()
+
+    win.launch_save_game("my-save")
+
+    win.switch_mode.assert_called_once_with("play")
+
+
+def test_launch_save_game_attaches_rpg_context_from_saves_dir(tmp_path):
+    saves_dir = tmp_path / "saves"
+    saves_dir.mkdir()
+    dungeon = _make_dungeon(save_name="my-save")
+    win = _make_window(dungeon)
+    win._save_repo.load.return_value = dungeon
+    win._save_repo._dir = saves_dir
+    win.switch_mode = MagicMock()
+
+    win.launch_save_game("my-save")
+
+    call_kwargs = win._play_view.set_rpg_context.call_args.kwargs
+    assert call_kwargs.get("portraits_dir") == saves_dir / "my-save" / "assets" / "portraits"
+
+
+# ---------------------------------------------------------------------------
+# Library actions — Slice 6
+# ---------------------------------------------------------------------------
+
+def _make_window_for_library(dungeon=None):
+    """Extend _make_window with library-related attributes."""
+    win = _make_window(dungeon)
+    win._campaign_view = MagicMock()
+    win._seed_library = MagicMock()
+    win._library_view = MagicMock()
+    win.switch_mode = MagicMock()
+    return win
+
+
+def test_switch_mode_library_calls_switch_to_library():
+    win = _make_window(_make_dungeon())
+    win._library_view = MagicMock()
+    win.show_view = MagicMock()
+
+    win.switch_mode("library")
+
+    assert win._mode == "library"
+    win.show_view.assert_called_once_with(win._library_view)
+
+
+def test_open_in_designer_loads_and_switches_to_design():
+    dungeon = _make_dungeon(save_name="keep-of-ruin")
+    win = _make_window_for_library(dungeon)
+    win._dungeon_repo.load.return_value = dungeon
+
+    win.open_in_designer("keep-of-ruin")
+
+    win._dungeon_repo.load.assert_called_once_with("keep-of-ruin")
+    win._design_view.load_dungeon.assert_called_once_with(dungeon)
+    win.switch_mode.assert_called_once_with("design")
+
+
+def test_new_seed_from_dungeon_loads_manifest_into_campaign_view():
+    win = _make_window_for_library()
+    from dungeon_daddy.campaign.manifest import CampaignManifest
+
+    win.new_seed_from_dungeon("haunted-fort")
+
+    win._campaign_view.set_seed_library.assert_called_once_with(win._seed_library)
+    win._campaign_view.load_manifest.assert_called_once()
+    loaded: CampaignManifest = win._campaign_view.load_manifest.call_args[0][0]
+    assert loaded.dungeon_slug == "haunted-fort"
+    win.switch_mode.assert_called_once_with("campaign")
+
+
+def test_edit_seed_loads_seed_and_switches_to_campaign():
+    win = _make_window_for_library()
+
+    win.edit_seed("undead-lords")
+
+    win._campaign_view.set_seed_library.assert_called_once_with(win._seed_library)
+    win._campaign_view.load_seed.assert_called_once_with("undead-lords")
+    win.switch_mode.assert_called_once_with("campaign")
+
+
+def test_publish_and_play_calls_publish_then_launch(tmp_path):
+    win = _make_window_for_library()
+    win.launch_save_game = MagicMock()
+    win._dungeon_repo._dir = tmp_path / "dungeons"
+    win._save_repo._dir = tmp_path / "saves"
+    win.switch_mode = MagicMock()
+
+    with patch("dungeon_daddy.campaign.publish.publish_save") as mock_pub:
+        win.publish_and_play("bone-cathedral")
+
+    mock_pub.assert_called_once()
+    call_kwargs = mock_pub.call_args.kwargs
+    assert call_kwargs["save_slug"] == "bone-cathedral"
+    win.launch_save_game.assert_called_once_with("bone-cathedral")
+
+
+def test_delete_save_removes_directory(tmp_path):
+    saves_dir = tmp_path / "saves"
+    saves_dir.mkdir()
+    (saves_dir / "old-run").mkdir()
+    win = _make_window_for_library()
+    win._save_repo._dir = saves_dir
+
+    win.delete_save("old-run")
+
+    assert not (saves_dir / "old-run").exists()
+
+
+def test_delete_save_does_nothing_when_slug_missing(tmp_path):
+    saves_dir = tmp_path / "saves"
+    saves_dir.mkdir()
+    win = _make_window_for_library()
+    win._save_repo._dir = saves_dir
+
+    win.delete_save("nonexistent")  # should not raise
