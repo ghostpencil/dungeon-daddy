@@ -1159,6 +1159,42 @@ landing/hub view. Post-phase: entire top-level menu bar removed; 4-pill navigati
 publish service, play loads saves, Library view, one-time migration, startup integration.
 
 
+# Planned Roadmap — Phases 46–52
+
+These phases are **defined on the GitHub Projects roadmap** (`ghostpencil/dungeon-daddy`,
+project #1) and are **not yet implemented**. Numbering and scope below mirror that board.
+A detailed `spec/PHASE_NN_*.md` is written when each phase actually starts.
+
+| Phase | Title | One-line scope |
+|---|---|---|
+| 46 | Inventory System | Class Kits, Dungeon Items, Equipped Gear — narrative-first, no junk items |
+| 47 | Room Contents | Items in rooms + interactive objects with a state machine |
+| 48 | Dungeon Navigation | Room exits, party location, level connectors |
+| 49 | Starting Playbooks | Class foundations: ratings, tracks, kit, **tags**, **signature adverbs**, starting abilities |
+| 50 | Hybrid Action Model | Structured **Verb · Noun · Adverb** action input; LLM narrates only |
+| 51 | Talk to the Dungeon | Intimacy-gated freeform channel at resonance points |
+| 52 | Milestone Advancement | Playbook beats, ranks to 5, ability unlocks |
+
+## Key sequencing decisions (2026-06-17)
+
+- **The former single "Playbooks" phase was split** into:
+  - **Phase 49 — Starting Playbooks** (character creation: ratings, tracks, kit, tags,
+    signature adverbs, starting abilities, `PlaybookLibrary`, `actor_abilities` live set), and
+  - **Phase 52 — Milestone Advancement** (beats, ranks-to-5, `FulfillMilestone`, LLM
+    milestone detection, `actor_beats`, campaign-specific beats).
+- **Starting Playbooks (49) was moved ahead of the Action Model (50)** because the action
+  model's **Verb** and **Adverb** slots read directly from playbook data:
+  - **Verbs** = universal verbs (filtered by room + playbook gates) ∪ class verbs (actor abilities).
+  - **Adverbs** = universal adverb pool (filtered by target + world state) ∪ playbook signature adverbs.
+
+  The action picker reads the actor's **live** `actor_abilities` set, so Phase 52
+  advancement grows the verb/adverb lists with no rewiring.
+- **"How" → "Adverb".** The Phase 50 modifier slot is formalized as an **adverb** (it
+  modifies the verb — "pick the lock *carefully*"), giving the grammar **Verb · Noun · Adverb**.
+- Previous numbering: old 49 Hybrid Action Model → 50; old 50 Talk to the Dungeon → 51.
+
+---
+
 # Development Sequence Recommendation
 
 Use this order:
