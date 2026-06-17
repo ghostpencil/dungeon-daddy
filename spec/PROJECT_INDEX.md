@@ -2,8 +2,8 @@
 
 ## Phase
 
-Phase: Stabilization — Post-Phase 45 polish (in progress)
-Status: **STABILIZATION** — branch `stabilization-post-45`; 6 cleanup items; Phase 46 starts after merge.
+Phase: Stabilization — Post-Phase 45 polish (COMPLETE)
+Status: **STABILIZATION DONE** — branch `stabilization-post-45`; all 6 items complete; merge to main and start Phase 46.
 
 Previous: Phase 45 complete (2026-06-14). 2436 tests passing.
 Next: Phase 46 — Inventory System (PENDING, `spec/PHASE_46_*.md` to be written when stabilization merges)
