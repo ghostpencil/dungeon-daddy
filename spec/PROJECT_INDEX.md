@@ -8,15 +8,17 @@ Status: **STABILIZATION** — branch `stabilization-post-45`; 6 cleanup items; P
 Previous: Phase 45 complete (2026-06-14). 2436 tests passing.
 Next: Phase 46 — Inventory System (PENDING, `spec/PHASE_46_*.md` to be written when stabilization merges)
 
-**Last session (2026-06-17) — #64 complete; 4 stabilization items remain.**
-- **#64 DONE** — Design mode: handle no-dungeon-loaded state gracefully. Fixed two bugs: (1) `on_show_view` was adding wizard greeting even on first-visit in edit mode; (2) `reset_to_wizard()` left stale chat messages, LLM histories, and generation state across sessions. Added `ChatPanel.clear_messages()` and updated `reset_to_wizard()` to clear all session state before re-greeting. 9 new tests; 2433 passing.
-- **#63 DONE** — Removed hardcoded `Protagonist` PC actor from `_CampaignSeedSpec` in `tools/seed_rpg_state.py`. Generic `seed_campaign()` path now emits a warning directing users to `--seed-pack`. Tests updated (25 passing). Committed on `stabilization-post-45`.
-- 4 open items remaining (all `Todo` on project board):
-  - #65 Add confirmation dialog before deleting a save game
-  - #66 Play mode: prompt to save session on navigate away to Library
+**Last session (2026-06-17) — #65 and #66 complete; 2 stabilization items remain.**
+- **#66 DONE** — Play mode: prompt to save session on navigate away to Library. `on_mouse_press` in `PlayView` now calls `_ask_yes_no` when the Library pill is clicked with an active session; cancelling keeps the user in Play. No-session and non-Library pill clicks are unchanged. 5 new tests; 2440 passing.
+- **#65 DONE** — Confirmation dialog before deleting a save game. `on_delete_save` in `LibraryView` now calls `window._ask_yes_no` before delegating to `window.delete_save`; cancelled confirmation leaves the save intact. 3 new tests (replace old single test); 2435 passing.
+- 2 open items remaining (all `Todo` on project board):
   - #67 Library: show last-played date on Save cards
   - #68 Add 'Extract as Seed' action to Saves in Library
-- Next: #65 (delete save confirmation dialog).
+- Next: #67 (last-played date on Save cards).
+
+**Prior session (2026-06-17) — #64 complete; 4 stabilization items remain.**
+- **#64 DONE** — Design mode: handle no-dungeon-loaded state gracefully. Fixed two bugs: (1) `on_show_view` was adding wizard greeting even on first-visit in edit mode; (2) `reset_to_wizard()` left stale chat messages, LLM histories, and generation state across sessions. Added `ChatPanel.clear_messages()` and updated `reset_to_wizard()` to clear all session state before re-greeting. 9 new tests; 2433 passing.
+- **#63 DONE** — Removed hardcoded `Protagonist` PC actor from `_CampaignSeedSpec` in `tools/seed_rpg_state.py`. Generic `seed_campaign()` path now emits a warning directing users to `--seed-pack`. Tests updated (25 passing). Committed on `stabilization-post-45`.
 
 **Prior session (2026-06-17) — stabilization branch + GitHub issue promotion.**
 - Created branch `stabilization-post-45`.
@@ -98,7 +100,7 @@ reactions. It must not directly mutate authoritative state.
 
 ## Known Failures
 
-None (test suite passes — 2433 tests as of 2026-06-17).
+None (test suite passes — 2440 tests as of 2026-06-17).
 
 ---
 
