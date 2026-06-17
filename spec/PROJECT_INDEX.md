@@ -72,6 +72,7 @@ Phase 42 and earlier are complete. Full history in `spec/HISTORY.md`.
 
 - Provider: OpenAI (`gpt-4o`); `OPENAI_API_KEY` must be set.
 - Phase specs: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (current); index at `spec/IMPLEMENTATION_PHASES.md`.
+- Roadmap for Phases 46–52 (planned): GitHub Projects `ghostpencil/dungeon-daddy` #1, mirrored in the "Planned Roadmap — Phases 46–52" section of `IMPLEMENTATION_PHASES_33_ONWARDS.md`. Next: Phase 46 (Inventory).
 - Spec loading rules and skills: `CLAUDE.md` (canonical source).
 - `protagonist` actor is in `seed_data/campaigns/the-crucible/rpg_seed.json`; `--force` resets its stress tracks.
 - Example campaign manifest: `examples/campaign_manifests/bone-cathedral.json` (validates and seeds cleanly; 2 memory seeds).
