@@ -166,7 +166,6 @@ class DesignView(arcade.View):
         if not self._ui_built:
             self._build_ui()
             self._ui_built = True
-            self._chat.add_message("dm", _WIZARD_GREETING)
         else:
             self._reposition_panels(self.window.width, self.window.height)
 
@@ -247,11 +246,20 @@ class DesignView(arcade.View):
         _log.info("DesignView: switched to edit mode, dungeon=%s", dungeon.meta.title)
 
     def reset_to_wizard(self) -> None:
-        """Clear dungeon and return to wizard mode."""
+        """Clear all session state and return to wizard mode."""
         self._dungeon = None
         self._design_mode = DesignMode.WIZARD
+        self._brief = None
+        self._current_level_brief = None
+        self._current_level = 1
+        self._generation_retries = 0
+        self._awaiting_name_choice = False
+        self._context_overwrite_confirmed = False
+        self._wizard_history = []
+        self._design_history = []
         self._tree.set_dungeon(None)
         self._inspector.set_dungeon(None)
+        self._chat.clear_messages()
         self._chat.set_mode_label("Wizard Mode")
         self._chat.add_message("dm", _WIZARD_GREETING)
 

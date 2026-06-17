@@ -8,15 +8,15 @@ Status: **STABILIZATION** — branch `stabilization-post-45`; 6 cleanup items; P
 Previous: Phase 45 complete (2026-06-14). 2436 tests passing.
 Next: Phase 46 — Inventory System (PENDING, `spec/PHASE_46_*.md` to be written when stabilization merges)
 
-**Last session (2026-06-17) — #63 complete; 5 stabilization items remain.**
+**Last session (2026-06-17) — #64 complete; 4 stabilization items remain.**
+- **#64 DONE** — Design mode: handle no-dungeon-loaded state gracefully. Fixed two bugs: (1) `on_show_view` was adding wizard greeting even on first-visit in edit mode; (2) `reset_to_wizard()` left stale chat messages, LLM histories, and generation state across sessions. Added `ChatPanel.clear_messages()` and updated `reset_to_wizard()` to clear all session state before re-greeting. 9 new tests; 2433 passing.
 - **#63 DONE** — Removed hardcoded `Protagonist` PC actor from `_CampaignSeedSpec` in `tools/seed_rpg_state.py`. Generic `seed_campaign()` path now emits a warning directing users to `--seed-pack`. Tests updated (25 passing). Committed on `stabilization-post-45`.
-- 5 open items remaining (all `Todo` on project board):
-  - #64 Design mode: handle no-dungeon-loaded state gracefully
+- 4 open items remaining (all `Todo` on project board):
   - #65 Add confirmation dialog before deleting a save game
   - #66 Play mode: prompt to save session on navigate away to Library
   - #67 Library: show last-played date on Save cards
   - #68 Add 'Extract as Seed' action to Saves in Library
-- Next: #64 (Design mode no-dungeon state).
+- Next: #65 (delete save confirmation dialog).
 
 **Prior session (2026-06-17) — stabilization branch + GitHub issue promotion.**
 - Created branch `stabilization-post-45`.
@@ -98,7 +98,7 @@ reactions. It must not directly mutate authoritative state.
 
 ## Known Failures
 
-None (test suite passes — 2436 tests as of 2026-06-14).
+None (test suite passes — 2433 tests as of 2026-06-17).
 
 ---
 

@@ -549,3 +549,33 @@ def test_set_actor_mini_card_none_clears_portrait_texture(panel, tmp_path):
         panel.set_actor_mini_card(card)
     panel.set_actor_mini_card(None)
     assert panel._portrait_texture is None
+
+
+# ---------------------------------------------------------------------------
+# #64 — clear_messages
+# ---------------------------------------------------------------------------
+
+def test_clear_messages_empties_messages(panel):
+    panel.add_message("dm", "hello")
+    panel.add_message("gm", "world")
+    panel.clear_messages()
+    assert panel._messages == []
+
+
+def test_clear_messages_resets_scroll_offset(panel):
+    panel._scroll_offset = 42.0
+    panel.clear_messages()
+    assert panel._scroll_offset == 0.0
+
+
+def test_clear_messages_clears_label_cache(panel):
+    panel._label_cache = {0: MagicMock(), 1: MagicMock()}
+    panel.clear_messages()
+    assert panel._label_cache == {}
+
+
+def test_clear_messages_clears_action_cards(panel):
+    panel.add_action_card("Talvas", "I study the runes", ["STUDY"])
+    panel.clear_messages()
+    assert panel._action_cards == {}
+    assert panel._active_card_index is None
