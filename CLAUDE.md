@@ -199,6 +199,11 @@ Only if:
 - implementing LLM-facing interfaces or proposal validation
 - checking what the LLM may or must not do
 
+## MONSTER_REACTION_DESIGN.md
+Only if:
+- designing or implementing monster reactions / threat behavior (Phase 53)
+- checking how monsters react in fights, the engine/LLM authority split, or boss phases
+
 ---
 
 # Workflow (TDD)

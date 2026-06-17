@@ -2,11 +2,37 @@
 
 ## Phase
 
-Phase: 46 — Not yet defined
-Status: **PENDING**
+Phase: 46 — Inventory System (not yet started)
+Status: **PENDING** — design reviewed, ready to define `spec/PHASE_46_*.md`
 
 Previous: Phase 45 complete (2026-06-14). 2436 tests passing.
 Spec: `spec/PHASE_45_CAMPAIGN_PIPELINE.md`
+
+**Last session (2026-06-17) — added Phase 53 + sequencing review.** All design/docs only, no
+code:
+- **New Phase 53 — Threat Behavior & Monster Reactions.** Full design in
+  `spec/MONSTER_REACTION_DESIGN.md`; draft card on GitHub Project #1; roadmap table extended to
+  46–53 in `IMPLEMENTATION_PHASES_33_ONWARDS.md`; spec-loading row added to `CLAUDE.md`.
+  Decisions: monsters never roll; engine bounds the eligible reaction set + all magnitudes, LLM
+  selects one by `reaction_id` and narrates; depth-by-rank (standard = Model A instinct+tiers,
+  elite/boss = Model B + clock-threshold boss phases); activates the inert `npc_reaction`
+  channel. Hard deps all done (P34/35/36) — kept last as a soft "after Phase 50".
+- **Sequencing review of 46–53.** Ordering is topologically valid — no phase precedes a hard
+  dep, no renumbering needed. Recorded as the "Phase Dependencies & Sequencing (46–53)" matrix
+  in `IMPLEMENTATION_PHASES_33_ONWARDS.md` (spine = `46→47→48→50`, `46→49→50`, `49→52`; 51 + 53
+  are flexible pull-on-demand depth phases).
+
+**Prior session (2026-06-17) — Phases 46–52 design review.** Logical coherence, Arcade
+feasibility, design gaps. Sequencing sound; fits the architecture; no Arcade blockers.
+Resolutions folded into the GitHub draft-issue bodies + the spec mirror
+(`IMPLEMENTATION_PHASES_33_ONWARDS.md` → "Key design resolutions (2026-06-17 review)").
+Three blocking resolutions to honour when building:
+- **Player Commands vs LLM proposals** — new `rpg/command.py` (engine-authoritative) for
+  move/pick-up/equip/activate/fulfil-milestone; the proposal union stays LLM-advisory only.
+- **Adverbs → dice-pool deltas + side-effect flags** (no position/effect axis exists).
+- **Recedable intimacy clock** — add signed `tick_clock` + `monotonic: bool = True` on
+  `ClockState` (existing clocks default `monotonic=True`, unchanged).
+No code changed yet; implementation begins when Phase 46 is defined.
 
 ---
 
@@ -72,7 +98,8 @@ Phase 42 and earlier are complete. Full history in `spec/HISTORY.md`.
 
 - Provider: OpenAI (`gpt-4o`); `OPENAI_API_KEY` must be set.
 - Phase specs: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (current); index at `spec/IMPLEMENTATION_PHASES.md`.
-- Roadmap for Phases 46–52 (planned): GitHub Projects `ghostpencil/dungeon-daddy` #1, mirrored in the "Planned Roadmap — Phases 46–52" section of `IMPLEMENTATION_PHASES_33_ONWARDS.md`. Next: Phase 46 (Inventory).
+- Roadmap for Phases 46–53 (planned): GitHub Projects `ghostpencil/dungeon-daddy` #1, mirrored in the "Planned Roadmap — Phases 46–53" section of `IMPLEMENTATION_PHASES_33_ONWARDS.md`. Next: Phase 46 (Inventory). Issue bodies hold the per-phase detail and (as of 2026-06-17) the folded-in design resolutions; a detailed `spec/PHASE_46_*.md` is written when Phase 46 starts.
+- Phase 53 (Threat Behavior & Monster Reactions, planned 2026-06-17): instinct-driven, engine-bounded monster reactions with no enemy turn; bosses escalate via clock thresholds. Full design in `spec/MONSTER_REACTION_DESIGN.md`; summary in `IMPLEMENTATION_PHASES_33_ONWARDS.md`.
 - Spec loading rules and skills: `CLAUDE.md` (canonical source).
 - `protagonist` actor is in `seed_data/campaigns/the-crucible/rpg_seed.json`; `--force` resets its stress tracks.
 - Example campaign manifest: `examples/campaign_manifests/bone-cathedral.json` (validates and seeds cleanly; 2 memory seeds).

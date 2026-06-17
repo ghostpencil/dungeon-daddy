@@ -1159,7 +1159,7 @@ landing/hub view. Post-phase: entire top-level menu bar removed; 4-pill navigati
 publish service, play loads saves, Library view, one-time migration, startup integration.
 
 
-# Planned Roadmap — Phases 46–52
+# Planned Roadmap — Phases 46–53
 
 These phases are **defined on the GitHub Projects roadmap** (`ghostpencil/dungeon-daddy`,
 project #1) and are **not yet implemented**. Numbering and scope below mirror that board.
@@ -1174,6 +1174,44 @@ A detailed `spec/PHASE_NN_*.md` is written when each phase actually starts.
 | 50 | Hybrid Action Model | Structured **Verb · Noun · Adverb** action input; LLM narrates only |
 | 51 | Talk to the Dungeon | Intimacy-gated freeform channel at resonance points |
 | 52 | Milestone Advancement | Playbook beats, ranks to 5, ability unlocks |
+| 53 | Threat Behavior & Monster Reactions | Instinct-driven, engine-bounded monster reactions (no enemy turn); boss phases via clock thresholds |
+
+## Phase Dependencies & Sequencing (46–53)
+
+Reviewed 2026-06-17 (after adding Phase 53). **The ordering is topologically valid — every
+hard dependency points backward to a lower phase number, so no phase is sequenced ahead of a
+prerequisite. No renumbering is required.** The matrix below is sourced from each card's stated
+"Depends on:" line on GitHub Project #1.
+
+| Phase | Hard deps (within 46–53) | Points back? |
+|---|---|---|
+| 46 Inventory | none (foundation; first builds `rpg/command.py`) | ✓ |
+| 47 Room Contents | 46 | ✓ |
+| 48 Dungeon Navigation | 47 | ✓ |
+| 49 Starting Playbooks | 46 | ✓ |
+| 50 Hybrid Action Model | 47, 48, 49 | ✓ |
+| 51 Talk to the Dungeon | none (adds its own recedable-clock support) | ✓ |
+| 52 Milestone Advancement | 49 | ✓ |
+| 53 Monster Reactions | none hard (P34/35/36, all complete); *soft* "after 50" | ✓ |
+
+**The roadmap is two parts:**
+
+- **Tight spine (must stay ordered):** `46 → 47 → 48 → 50`, plus `46 → 49 → 50`, plus
+  `49 → 52`. Every edge points forward; these phases cannot be reordered among themselves.
+- **Flexible depth phases (no spine dependency):** **51** and **53**. Neither depends on the
+  46→50 spine, so both are effectively "pull-on-demand" — they sit at the end by default but
+  could slot in earlier whenever a playtest needs that depth.
+
+**Notes:**
+- **`rpg/command.py` forward reference (accepted, not a bug).** The Player-Command module is
+  *first built* in Phase 46 but its *canonical framing* is documented in Phase 50 (the
+  "a Card is the input-dual of a Proposal" boundary). Phases 46–48 reference it; this was a
+  deliberate decision in the 2026-06-17 review.
+- **Why Phase 53 stays last.** Its hard dependencies (monster actors P34, world-reaction P35,
+  the `npc_reaction` channel P36) are already complete, so "after Phase 50" is only a *soft*
+  preference: monster reactions ride the **LLM-advisory** channel that Phase 50 canonicalizes
+  when it splits Player Commands from LLM proposals. Building 53 *before* 50 would force Phase
+  50's proposal refactor to carry monster reactions through it (rework), so 53 is kept last.
 
 ## Key sequencing decisions (2026-06-17)
 
@@ -1192,6 +1230,73 @@ A detailed `spec/PHASE_NN_*.md` is written when each phase actually starts.
 - **"How" → "Adverb".** The Phase 50 modifier slot is formalized as an **adverb** (it
   modifies the verb — "pick the lock *carefully*"), giving the grammar **Verb · Noun · Adverb**.
 - Previous numbering: old 49 Hybrid Action Model → 50; old 50 Talk to the Dungeon → 51.
+
+## Key design resolutions (2026-06-17 review)
+
+A design review of the seven phases (logical coherence, Arcade feasibility, gaps) settled the
+following — folded into the GitHub issue bodies for 46–52:
+
+- **Pipeline split (Gap 1).** Player-initiated, engine-authoritative actions (move, pick up,
+  equip, activate object, fulfil milestone) are **Player Commands** in a new `rpg/command.py`
+  module — the input-dual of an `LLMReactionProposal`. The existing proposal union stays the
+  *LLM-advisory* channel and carries only genuine **world reactions** (BlockExit, NPC reactions,
+  clock/stress). This is why no proposal may set `current_room_id`. Phase 50 holds the canonical
+  framing; 46–48 reference it.
+- **Adverbs map to dice + flags, not position/effect (Gap 2).** The roll system is
+  highest-of-d6-pool → outcome tier; it has **no position/effect axis**. Adverb (and movement
+  `how?`) modifier flags are **dice-pool deltas** (`dice:±1`, `push`) plus **world-side-effect
+  flags** (`suppress_entry_ticks`, `force_trap_trigger`, …), with optional momentum interaction.
+- **Recedable intimacy clock (Gap 3).** Phase 51 adds a signed `tick_clock(clock, delta)` and a
+  `monotonic: bool = True` field on `ClockState`. Existing clocks default `monotonic=True`
+  (unchanged); intimacy/relationship clocks set `monotonic=False` so they may recede and do not
+  latch to `completed`. Thresholds read `filled/segments` live.
+- **9 universal verbs incl. `endure`.** Per `RPG_SYSTEM_SPEC.md` the action list has nine verbs;
+  playbooks do not own verbs exclusively (their unique contribution is signature **adverbs** +
+  kit/abilities). Phase 50's "8 verbs" was a miscount.
+- **Combat has no enemy turn.** `RPG_SYSTEM_SPEC.md` makes initiative an explicit non-goal:
+  `fight` resolves a roll against a monster **resistance/threat clock**; monsters surface as nouns.
+
+Also recorded in the issue bodies (should-fix, resolved during the relevant phase):
+
+- **Approval policy (46).** Player Commands apply immediately; world-reaction proposals keep the
+  low-risk-auto / else-draft policy; batch a turn's drafts into one review prompt to avoid fatigue.
+- **ContextBundle room block (47 → 48 → 50).** Today's bundle is actor/memory-keyed; the net-new
+  `current_room` block (objects + loose items, then exits + fog-of-war + resonance) grows additively.
+- **Provisional movement UI (48).** Keep it minimal — Phase 50's Card replaces it; the engine +
+  `how?`→flag mapping is the first-class deliverable.
+- **Milestone-detection gate (52).** Don't spend an LLM call every world reaction — pre-filter on
+  beat-trigger relevance or batch at scene end.
+
+## Phase 53 — Threat Behavior & Monster Reactions (design 2026-06-17)
+
+Full design: **`spec/MONSTER_REACTION_DESIGN.md`**.
+
+Makes monsters feel alive in fights **without** an enemy turn. A monster never rolls and never
+takes a turn; it **reacts** to the player's roll when that roll gives it an opening (one player
+action → one resolution → at most one monster reaction). This honors the same non-goal as the
+combat note above (`RPG_SYSTEM_SPEC.md:17-31`): no initiative, no grid, no damage dice — a
+reaction spends only the existing currencies (stress, clocks, tags).
+
+- **Hybrid authority.** The engine computes the *eligible* reaction set **and every magnitude**;
+  the LLM selects one reaction **by id** and writes the fiction. ("Engine bounds, LLM selects.")
+- **Depth by rank.** `standard` monsters use **Model A** (instinct + a small reaction menu keyed
+  to outcome tier + action tags). `elite`/`boss` use **Model B** = A + boss phases, where
+  resistance-clock thresholds unlock higher reaction tiers. A boss is a Model-A monster with
+  extra tiers — same schema. Full special-abilities (Model C) is out of scope until playtests
+  demand it (`RPG_SYSTEM_SPEC.md:31`).
+- **Catalog-bounded magnitudes.** Reactions carry `severity ∈ {minor,moderate,severe}` (mirrors
+  the fallout catalog); the map to amounts/ticks lives in `BALANCE_NOTES.md`. Authors and the LLM
+  cannot invent numbers.
+- **Activates the inert channel.** Realizes `NpcReactionChange` (exists since Phase 36, never
+  applied): the LLM returns a chosen `reaction_id`, the validator rejects out-of-set ids, and the
+  engine applies the precomputed effect. Deterministic highest-priority fallback when the LLM
+  omits/returns an invalid choice.
+- **No double-application.** A fired reaction *is* the consequence and suppresses the generic
+  stress-routing path in `world_reaction.py` for that resolution; the generic path still runs
+  when no monster reaction is eligible. Additive, not a rewrite.
+- **Dependencies.** Foundations exist today (monster actors P34, world-reaction P35,
+  `npc_reaction` channel P36). Cleanest after Phase 50 canonicalizes the Player-Command vs
+  LLM-advisory split, since reactions ride the LLM-advisory channel.
 
 ---
 
