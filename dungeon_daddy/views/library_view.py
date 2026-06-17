@@ -104,7 +104,12 @@ class LibraryView(arcade.View):
         self.window.launch_save_game(slug)
 
     def on_delete_save(self, slug: str) -> None:
-        self.window.delete_save(slug)
+        confirmed = self.window._ask_yes_no(
+            "Delete Save",
+            f"Delete save '{slug}'? This cannot be undone.",
+        )
+        if confirmed:
+            self.window.delete_save(slug)
 
     # ------------------------------------------------------------------
     # Layout helpers

@@ -116,13 +116,28 @@ def test_on_play_save_calls_window():
 
 
 # ---------------------------------------------------------------------------
-# Cycle 10 — on_delete_save calls window.delete_save
+# Cycle 10 — on_delete_save shows confirmation dialog before deleting
 # ---------------------------------------------------------------------------
 
-def test_on_delete_save_calls_window():
+def test_on_delete_save_confirmed_calls_window():
     view = _view_with_window()
+    view.window._ask_yes_no.return_value = True
     view.on_delete_save("save-1")
     view.window.delete_save.assert_called_once_with("save-1")
+
+
+def test_on_delete_save_cancelled_does_not_delete():
+    view = _view_with_window()
+    view.window._ask_yes_no.return_value = False
+    view.on_delete_save("save-1")
+    view.window.delete_save.assert_not_called()
+
+
+def test_on_delete_save_asks_before_deleting():
+    view = _view_with_window()
+    view.window._ask_yes_no.return_value = True
+    view.on_delete_save("save-1")
+    view.window._ask_yes_no.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
