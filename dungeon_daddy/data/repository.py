@@ -5,7 +5,7 @@ import importlib.resources
 import json
 import logging
 import tempfile
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from dungeon_daddy.data.models import ContextDocType, Dungeon, SessionState
@@ -63,6 +63,14 @@ class DungeonRepository:
     # ------------------------------------------------------------------
     # Session state
     # ------------------------------------------------------------------
+
+    def get_last_played(self, name: str) -> datetime | None:
+        """Return mtime of session.json as a datetime, or None if it doesn't exist."""
+        assert self._dir is not None
+        path = self._dir / name / "session.json"
+        if not path.exists():
+            return None
+        return datetime.fromtimestamp(path.stat().st_mtime)
 
     def load_session(self, name: str) -> SessionState | None:
         """Load session state if it exists, else return None. Returns None on corrupt data."""

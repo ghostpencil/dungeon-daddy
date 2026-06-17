@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 import arcade
 
@@ -51,6 +52,7 @@ class LibraryView(arcade.View):
         self._dungeon_list: list[str] = []
         self._seed_list: list[str] = []
         self._save_list: list[str] = []
+        self._save_meta: dict[str, datetime | None] = {}
 
     # ------------------------------------------------------------------
     # Data sources
@@ -76,10 +78,20 @@ class LibraryView(arcade.View):
             return []
         return self._save_repo.list_campaigns()
 
+    def _refresh_save_meta(self) -> None:
+        if self._save_repo is None:
+            self._save_meta = {}
+            return
+        self._save_meta = {
+            slug: self._save_repo.get_last_played(slug)
+            for slug in self._save_list
+        }
+
     def _refresh(self) -> None:
         self._dungeon_list = self.dungeon_slugs()
         self._seed_list = self.seed_slugs()
         self._save_list = self.save_slugs()
+        self._refresh_save_meta()
 
     # ------------------------------------------------------------------
     # Card actions — delegate to window
@@ -110,6 +122,9 @@ class LibraryView(arcade.View):
         )
         if confirmed:
             self.window.delete_save(slug)
+
+    def on_extract_seed(self, slug: str) -> None:
+        self.window.extract_seed(slug)
 
     # ------------------------------------------------------------------
     # Layout helpers
@@ -220,10 +235,15 @@ class LibraryView(arcade.View):
         self._draw_card_buttons(["Edit", "Publish"], x, cy, accent)
 
     def _draw_save_card(self, slug: str, x: float, cy: float, w: float, accent) -> None:
-        self._draw_card_title(slug, x, cy)
-        self._draw_card_buttons(["Play", "Delete"], x, cy, accent)
+        dt = self._save_meta.get(slug)
+        if dt is not None:
+            subtitle = "Played: " + dt.strftime("%b %d, %Y")
+        else:
+            subtitle = "Never played"
+        self._draw_card_title(slug, x, cy, subtitle=subtitle)
+        self._draw_card_buttons(["Play", "Extract", "Delete"], x, cy, accent)
 
-    def _draw_card_title(self, slug: str, x: float, cy: float) -> None:
+    def _draw_card_title(self, slug: str, x: float, cy: float, subtitle: str | None = None) -> None:
         top = cy + _CARD_H / 2
         display = slug.replace("-", " ").title()
         arcade.draw_text(
@@ -231,8 +251,9 @@ class LibraryView(arcade.View):
             font_size=TEXT_LG, font_name=FONT_SERIF,
             anchor_x="left", anchor_y="center",
         )
+        line2 = subtitle if subtitle is not None else slug
         arcade.draw_text(
-            slug, x + PAD_MD, top - 36, INK_4,
+            line2, x + PAD_MD, top - 36, INK_4,
             font_size=TEXT_SM, font_name=FONT_MONO,
             anchor_x="left", anchor_y="center",
         )
@@ -284,8 +305,8 @@ class LibraryView(arcade.View):
              [self.on_open_dungeon, self.on_new_seed]),
             (self._seed_list, ["Edit", "Publish"],
              [self.on_edit_seed, self.on_publish]),
-            (self._save_list, ["Play", "Delete"],
-             [self.on_play_save, self.on_delete_save]),
+            (self._save_list, ["Play", "Extract", "Delete"],
+             [self.on_play_save, self.on_extract_seed, self.on_delete_save]),
         ]
 
         for col_i, (slugs, labels, actions) in enumerate(sections):

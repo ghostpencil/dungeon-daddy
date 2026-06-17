@@ -443,3 +443,20 @@ class DungeonDaddyWindow(arcade.Window):
         if save_dir.exists():
             shutil.rmtree(save_dir)
             _log.info("Deleted save: %s", save_slug)
+
+    def extract_seed(self, save_slug: str) -> None:
+        """Extract a save game's campaign manifest back into the seed library."""
+        from dungeon_daddy.campaign.manifest import CampaignManifest
+
+        if self._save_repo._dir is None:
+            return
+        campaign_path = self._save_repo._dir / save_slug / "campaign.json"
+        if not campaign_path.exists():
+            self._show_info("Extract as Seed", f"No campaign data found for '{save_slug}'.")
+            return
+        manifest = CampaignManifest.model_validate_json(
+            campaign_path.read_text(encoding="utf-8")
+        )
+        self._seed_library.save(manifest)
+        _log.info("Extracted seed from save: %s", save_slug)
+        self._show_info("Extract as Seed", f"'{save_slug}' saved as a campaign seed.")
