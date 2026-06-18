@@ -159,3 +159,54 @@ class FalloutRecord(BaseModel):
     status: Literal["active", "resolved", "escalated"] = "active"
     mechanical_hooks: dict[str, Any] = Field(default_factory=dict)
     markdown_path: str | None = None
+
+
+class ItemFeature(BaseModel):
+    feature_id: str
+    item_id: str
+    feature_type: Literal["new_action", "rating_modifier"]
+    action_key: str
+    modifier: int | None = None
+
+    @model_validator(mode="after")
+    def check_modifier_consistency(self) -> "ItemFeature":
+        if self.feature_type == "rating_modifier" and self.modifier is None:
+            raise ValueError("rating_modifier feature requires a non-null modifier")
+        if self.feature_type == "new_action" and self.modifier is not None:
+            raise ValueError("new_action feature must have modifier=None")
+        return self
+
+
+class Item(BaseModel):
+    item_id: str
+    campaign_id: str
+    slug: str
+    display_name: str
+    item_type: Literal["class_kit", "dungeon_item", "equipped_gear"]
+    description: str
+    owner_actor_id: str | None = None
+    level_id: str | None = None
+    status: Literal["active", "consumed", "inert", "lost"] = "active"
+    charges_current: int | None = None
+    charges_max: int | None = None
+    is_equipped: bool = False
+    features: list[ItemFeature] = Field(default_factory=list)
+
+    @field_validator("description")
+    @classmethod
+    def description_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("description must not be empty")
+        return v
+
+    @model_validator(mode="after")
+    def check_item_invariants(self) -> "Item":
+        if self.item_type == "class_kit":
+            if self.charges_max is None or self.charges_max < 1:
+                raise ValueError("class_kit requires charges_max >= 1")
+            current = self.charges_current if self.charges_current is not None else 0
+            if not (0 <= current <= self.charges_max):
+                raise ValueError("class_kit charges_current must be 0..charges_max")
+        if self.item_type in ("class_kit", "dungeon_item") and self.features:
+            raise ValueError(f"{self.item_type} must not carry features")
+        return self

@@ -6,7 +6,7 @@ from pathlib import Path
 import duckdb
 
 from dungeon_daddy.memory.models import DomainEvent
-from dungeon_daddy.rpg.models import FactionState, FalloutRecord
+from dungeon_daddy.rpg.models import FactionState, FalloutRecord, Item
 
 
 def _ensure_migration_table(conn: duckdb.DuckDBPyConnection) -> None:
@@ -849,6 +849,158 @@ class MemoryRepository:
             [new_rep, faction_id],
         )
         return new_rep
+
+    # ------------------------------------------------------------------
+    # Items
+    # ------------------------------------------------------------------
+
+    def save_item(self, item: Item) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO items (
+                item_id, campaign_id, slug, display_name, item_type,
+                description, owner_actor_id, level_id, status,
+                charges_current, charges_max, is_equipped
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (item_id) DO UPDATE SET
+                slug            = excluded.slug,
+                display_name    = excluded.display_name,
+                item_type       = excluded.item_type,
+                description     = excluded.description,
+                owner_actor_id  = excluded.owner_actor_id,
+                level_id        = excluded.level_id,
+                status          = excluded.status,
+                charges_current = excluded.charges_current,
+                charges_max     = excluded.charges_max,
+                is_equipped     = excluded.is_equipped
+            """,
+            [
+                item.item_id,
+                item.campaign_id,
+                item.slug,
+                item.display_name,
+                item.item_type,
+                item.description,
+                item.owner_actor_id,
+                item.level_id,
+                item.status,
+                item.charges_current,
+                item.charges_max,
+                item.is_equipped,
+            ],
+        )
+        self._conn.execute(
+            "DELETE FROM item_features WHERE item_id = ?", [item.item_id]
+        )
+        for f in item.features:
+            self._conn.execute(
+                """
+                INSERT INTO item_features (feature_id, item_id, feature_type, action_key, modifier)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                [f.feature_id, f.item_id, f.feature_type, f.action_key, f.modifier],
+            )
+
+    def get_items(self, campaign_id: str) -> list[dict]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT item_id, campaign_id, slug, display_name, item_type,
+                   description, owner_actor_id, level_id, status,
+                   charges_current, charges_max, is_equipped
+            FROM items WHERE campaign_id = ?
+            ORDER BY display_name
+            """,
+            [campaign_id],
+        ).fetchall()
+        return [self._item_row_to_dict(r) for r in rows]
+
+    def get_items_by_actor(self, actor_id: str) -> list[dict]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT item_id, campaign_id, slug, display_name, item_type,
+                   description, owner_actor_id, level_id, status,
+                   charges_current, charges_max, is_equipped
+            FROM items WHERE owner_actor_id = ?
+            ORDER BY display_name
+            """,
+            [actor_id],
+        ).fetchall()
+        return [self._item_row_to_dict(r) for r in rows]
+
+    def _item_row_to_dict(self, r: tuple) -> dict:
+        assert self._conn is not None
+        item_id = r[0]
+        feature_rows = self._conn.execute(
+            """
+            SELECT feature_id, item_id, feature_type, action_key, modifier
+            FROM item_features WHERE item_id = ?
+            ORDER BY feature_id
+            """,
+            [item_id],
+        ).fetchall()
+        features = [
+            {
+                "feature_id": fr[0],
+                "item_id": fr[1],
+                "feature_type": fr[2],
+                "action_key": fr[3],
+                "modifier": fr[4],
+            }
+            for fr in feature_rows
+        ]
+        return {
+            "item_id": r[0],
+            "campaign_id": r[1],
+            "slug": r[2],
+            "display_name": r[3],
+            "item_type": r[4],
+            "description": r[5],
+            "owner_actor_id": r[6],
+            "level_id": r[7],
+            "status": r[8],
+            "charges_current": r[9],
+            "charges_max": r[10],
+            "is_equipped": r[11],
+            "features": features,
+        }
+
+    def update_item_status(self, item_id: str, status: str) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            "UPDATE items SET status = ? WHERE item_id = ?", [status, item_id]
+        )
+
+    def update_item_charges(self, item_id: str, charges_current: int) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            "UPDATE items SET charges_current = ? WHERE item_id = ?",
+            [charges_current, item_id],
+        )
+
+    def update_item_equipped(self, item_id: str, is_equipped: bool) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            "UPDATE items SET is_equipped = ? WHERE item_id = ?",
+            [is_equipped, item_id],
+        )
+
+    def update_item_owner(self, item_id: str, owner_actor_id: str | None) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            "UPDATE items SET owner_actor_id = ? WHERE item_id = ?",
+            [owner_actor_id, item_id],
+        )
+
+    def update_item_slug(self, item_id: str, new_slug: str) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            "UPDATE items SET slug = ? WHERE item_id = ?",
+            [new_slug, item_id],
+        )
 
     def close(self) -> None:
         if self._conn is not None:

@@ -2,13 +2,28 @@
 
 ## Phase
 
-Phase: Stabilization — Post-Phase 45 polish (COMPLETE)
-Status: **STABILIZATION DONE** — branch `stabilization-post-45`; all 6 items complete; merge to main and start Phase 46.
+Phase: **46 — Inventory System (COMPLETE)**
+Status: All 10 slices complete. Branch `phase-46-inventory-system`. 2555 tests passing.
 
-Previous: Phase 45 complete (2026-06-14). 2436 tests passing.
-Next: Phase 46 — Inventory System (PENDING, `spec/PHASE_46_*.md` to be written when stabilization merges)
+Previous: Phase 45 complete (2026-06-14). Stabilization post-45 complete (2026-06-17).
+Spec: `spec/PHASE_46_INVENTORY_SYSTEM.md`. Issue [#70](https://github.com/ghostpencil/dungeon-daddy/issues/70).
+Next: Phase 47 — Items in Rooms.
 
-**Last session (2026-06-17) — #65, #66, #67, and #68 complete; stabilization done.**
+**Last session (2026-06-17) — Phase 46 Slices 1–10 complete. Phase 46 DONE.**
+- **Slice 10 DONE** — Manifest + seed: `ItemFeatureManifest` + `ItemManifest` added to `dungeon_daddy/campaign/manifest.py`; `CampaignManifest.items` field added. `_seed_item` added to `dungeon_daddy/campaign/seeder.py` following `_seed_faction` idempotent pattern — skips existing unless `force`, `dry_run` counts only, `owner_slug` resolves to `actor:{campaign_slug}:{owner_slug}`, `charges_current` initialises to `charges_max`. Wired into `seed_from_manifest()`. 8 new tests; 2555 passing.
+- **Slice 9 DONE** — Character Sheet Panel UI: `set_inventory(kits, dungeon_items, equipped)` added to `CharacterSheetPanel`. Stores three lists; draw() renders KITS section (pip tracks for charges_current/charges_max reusing existing pip constants), ITEMS section (name + status color + `[L]` tag for level-bound), GEAR section (feature badges: `FIGHT +1` for rating_modifier, `VANISH [new]` for new_action). 5 new tests; 2547 passing.
+- **Slice 8 DONE** — World-reaction item proposals: `GrantItemChange`, `StripItemChange`, `TransformItemChange` added to `ProposedChange` union in `proposal.py`. Validator gains `known_item_ids`, `known_item_slugs`, `dungeon_item_counts` params with branches for all three. Applier applies each immediately (grant → `update_item_owner`; strip → `update_item_status("lost")`; transform → `update_item_slug`); each emits its domain event (`item.granted`, `item.stripped`, `item.transformed`) + `proposal.applied`. New `update_item_slug` added to `MemoryRepository`. 18 new tests; 2542 passing.
+- **Slice 7 DONE** — Context bundle inventory: `inventory: dict[str, Any]` added to `ContextBundle`; `_fetch_inventory(repo)` added to `ContextBundleBuilder.build()`. Per focus actor: kits (active class_kits), dungeon_items (all statuses + `level_bound` flag), equipped (is_equipped gear with features), `effective_actions` (base + equipped rating_modifier via `compute_effective_ratings`). 7 new tests; 2524 passing.
+
+**Prior session (2026-06-17) — Phase 46 Slices 1–6 complete. Slice 7 was next.**
+- **Slice 6 DONE** — Engine effect: `mark_level_items_inert(repo, campaign_id, level_id) -> list[str]` added to `service.py`. Queries all campaign items, sets `status="inert"` for active items whose `level_id` matches, returns affected ids. 2 new tests (happy path: two items marked; guard: different level and non-active items skipped); 2517 passing. Trigger wired in Phase 48.
+- **Slice 5 DONE** — Equipped gear commands: `EquipItem` + `UnequipItem` added to `command.py` (`PlayerCommand` union now covers all 6 commands). Validator branch (shared for both): rejects unknown item, non-`equipped_gear` type, inactive status, no owner. Applier: `EquipItem` → `update_item_equipped(True)` + `item.equipped` event; `UnequipItem` → `update_item_equipped(False)` + `item.unequipped` event. `compute_effective_ratings(actor_id, base_ratings, repo) -> dict[str, int]` added to `service.py` — sums base + equipped `rating_modifier` features at read time, leaving stored base ratings untouched. 19 new tests; 2515 passing.
+- **Slice 4 DONE** — Dungeon item commands: `ConsumeItem`, `GiveItem`, `TakeItem` added to `command.py` (full `PlayerCommand` union now covers all 4 commands). Validator gains branches for each: `ConsumeItem` rejects unknown/inactive; `GiveItem` rejects unknown item, unknown target, non-PC target, and target at dungeon-item cap (≤ 10); `TakeItem` rejects unknown and unowned. Applier applies mutations immediately: `item.consumed` / `item.transferred` / `item.removed` events. 20 new tests; 2496 passing.
+- **Slice 3 DONE** — Player Command channel: `dungeon_daddy/rpg/command.py` (`ConsumeKitCharge` + `PlayerCommand` union); `command_validator.py` (`validate_command` → `CommandValidationResult`; rejects unknown item, non-kit, inactive, zero-charge; emits `command.rejected` event); `command_applier.py` (`apply_command` → `CommandApplyResult`; decrements charges, emits `kit.charge_consumed`; no-op on rejection); `refresh_kits(repo, actor_id)` added to `service.py` (restores active class_kit charges to max, skips inactive). `tests/unit/rpg/conftest.py` adds shared repo fixture. 10 new tests; 2476 passing.
+- **Slice 2 DONE** — `save_item` (upsert + feature child-row replace), `get_items`, `get_items_by_actor`, `update_item_status`, `update_item_charges`, `update_item_equipped`, `update_item_owner` added to `MemoryRepository`. 9 new tests (round-trip, upsert dedup, actor-scoped query, feature nesting, feature replace on upsert, all 4 updaters); 2466 passing.
+- **Slice 1 DONE** — `ItemFeature` + `Item` Pydantic models added to `dungeon_daddy/rpg/models.py`; migration `dungeon_daddy/data/migrations/008_items.sql` creates `items` + `item_features` tables. Invariants enforced: non-empty description, `class_kit` requires `charges_max ≥ 1` and `0 ≤ charges_current ≤ charges_max`, `class_kit`/`dungeon_item` reject features, `rating_modifier` requires non-null `modifier`, `new_action` requires `modifier=None`. 10 new tests; 2457 passing.
+
+**Prior session (2026-06-17) — #65, #66, #67, and #68 complete; stabilization done.**
 - **#68 DONE** — Library: 'Extract' button on Save cards extracts the save's `campaign.json` back into the seed library. `LibraryView.on_extract_seed()` delegates to `window.extract_seed(slug)`; `window.extract_seed()` loads the manifest from the save dir and calls `seed_library.save()`. Save cards now show ["Play", "Extract", "Delete"] buttons. 3 new tests; 2447 passing.
 - **#67 DONE** — Library: show last-played date on Save cards. Added `DungeonRepository.get_last_played(slug)` (returns `session.json` mtime as `datetime | None`); `LibraryView._refresh_save_meta()` builds a per-slug lookup; `_draw_save_card()` renders "Played: Jun 17, 2026" or "Never played" in place of the slug line. 4 new tests; 2444 passing.
 - **#66 DONE** — Play mode: prompt to save session on navigate away to Library. `on_mouse_press` in `PlayView` now calls `_ask_yes_no` when the Library pill is clicked with an active session; cancelling keeps the user in Play. No-session and non-Library pill clicks are unchanged. 5 new tests; 2440 passing.
@@ -99,7 +114,7 @@ reactions. It must not directly mutate authoritative state.
 
 ## Known Failures
 
-None (test suite passes — 2447 tests as of 2026-06-17).
+None (test suite passes — 2555 tests as of 2026-06-17).
 
 ---
 
@@ -113,7 +128,7 @@ Phase 42 and earlier are complete. Full history in `spec/HISTORY.md`.
 
 - Provider: OpenAI (`gpt-4o`); `OPENAI_API_KEY` must be set.
 - Phase specs: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (current); index at `spec/IMPLEMENTATION_PHASES.md`.
-- Roadmap for Phases 46–53 (planned): GitHub Projects `ghostpencil/dungeon-daddy` #1, mirrored in the "Planned Roadmap — Phases 46–53" section of `IMPLEMENTATION_PHASES_33_ONWARDS.md`. Next: Phase 46 (Inventory). Issue bodies hold the per-phase detail and (as of 2026-06-17) the folded-in design resolutions; a detailed `spec/PHASE_46_*.md` is written when Phase 46 starts.
+- Roadmap for Phases 47–53 (planned): GitHub Projects `ghostpencil/dungeon-daddy` #1, mirrored in the "Planned Roadmap — Phases 46–53" section of `IMPLEMENTATION_PHASES_33_ONWARDS.md`. Next: Phase 47 (Items in Rooms). Issue bodies hold the per-phase detail and the folded-in design resolutions; a detailed `spec/PHASE_47_*.md` is written when Phase 47 starts.
 - Phase 53 (Threat Behavior & Monster Reactions, planned 2026-06-17): instinct-driven, engine-bounded monster reactions with no enemy turn; bosses escalate via clock thresholds. Full design in `spec/MONSTER_REACTION_DESIGN.md`; summary in `IMPLEMENTATION_PHASES_33_ONWARDS.md`.
 - Spec loading rules and skills: `CLAUDE.md` (canonical source).
 - `protagonist` actor is defined in `seed_data/campaigns/the-crucible/rpg_seed.json` (use `--seed-pack` + `--force` to reset stress tracks); the generic `seed_campaign()` path no longer creates a placeholder actor.

@@ -9,12 +9,12 @@ Load only the file that covers the phase you are working on.
 | [IMPLEMENTATION_PHASES_11_18.md](IMPLEMENTATION_PHASES_11_18.md) | 11–18 + Post-18 | Complete |
 | [IMPLEMENTATION_PHASES_19_25.md](IMPLEMENTATION_PHASES_19_25.md) | 19–25 (Map Layout) | Complete |
 | [IMPLEMENTATION_PHASES_26_32.md](IMPLEMENTATION_PHASES_26_32.md) | 26–32 (RPG + Memory Foundation) | Complete |
-| [IMPLEMENTATION_PHASES_33_ONWARDS.md](IMPLEMENTATION_PHASES_33_ONWARDS.md) | 33–52 (Active Play Loop + Future Roadmap) | 33–45 Complete; 46–52 planned |
+| [IMPLEMENTATION_PHASES_33_ONWARDS.md](IMPLEMENTATION_PHASES_33_ONWARDS.md) | 33–53 (Active Play Loop + Future Roadmap) | 33–46 Complete; 47–53 planned |
 
 ## Current phase
 
-Phases 1–45 are complete. **Phases 46–52 are defined on the GitHub roadmap
-(planned, not yet implemented)** — see the "Planned Roadmap — Phases 46–52" section in
-`IMPLEMENTATION_PHASES_33_ONWARDS.md`. **Next up: Phase 46 (Inventory System).**
+Phases 1–46 are complete. **Phases 47–53 are defined on the GitHub roadmap
+(planned, not yet implemented)** — see the "Planned Roadmap — Phases 47–53" section in
+`IMPLEMENTATION_PHASES_33_ONWARDS.md`. **Next up: Phase 47 (Items in Rooms).**
 
 See `IMPLEMENTATION_PHASES_33_ONWARDS.md` for the full spec.

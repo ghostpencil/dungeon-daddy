@@ -6,7 +6,15 @@ from dataclasses import dataclass, field
 
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.rpg.proposal import AdjustReputationChange, ApplyConsequenceChange, CreateMemoryChange, ProposedChange
+from dungeon_daddy.rpg.proposal import (
+    AdjustReputationChange,
+    ApplyConsequenceChange,
+    CreateMemoryChange,
+    GrantItemChange,
+    ProposedChange,
+    StripItemChange,
+    TransformItemChange,
+)
 from dungeon_daddy.rpg.proposal_validator import ValidationResult
 
 
@@ -90,6 +98,73 @@ def apply_low_risk_proposals(
         elif isinstance(change, ApplyConsequenceChange):
             # Deterministic reaction is authoritative for stress; skip to prevent duplication.
             result.skipped.append(change)
+        elif isinstance(change, GrantItemChange):
+            items = repo.get_items(campaign_id)
+            match = next((i for i in items if i["slug"] == change.item_slug), None)
+            if match is None:
+                result.skipped.append(change)
+            else:
+                repo.update_item_owner(match["item_id"], change.to_actor_id)
+                event = DomainEvent(
+                    event_id=str(uuid.uuid4()),
+                    campaign_id=campaign_id,
+                    event_type="item.granted",
+                    payload={
+                        "item_slug": change.item_slug,
+                        "to_actor_id": change.to_actor_id,
+                        "reason": change.reason,
+                    },
+                )
+                repo.insert_domain_event(event)
+                applied_event = DomainEvent(
+                    event_id=str(uuid.uuid4()),
+                    campaign_id=campaign_id,
+                    event_type="proposal.applied",
+                    payload={"kind": change.kind, "reason": change.reason},
+                )
+                repo.insert_domain_event(applied_event)
+                result.applied.append(change)
+                result.events.append(event)
+        elif isinstance(change, StripItemChange):
+            repo.update_item_status(change.item_id, "lost")
+            event = DomainEvent(
+                event_id=str(uuid.uuid4()),
+                campaign_id=campaign_id,
+                event_type="item.stripped",
+                payload={"item_id": change.item_id, "reason": change.reason},
+            )
+            repo.insert_domain_event(event)
+            applied_event = DomainEvent(
+                event_id=str(uuid.uuid4()),
+                campaign_id=campaign_id,
+                event_type="proposal.applied",
+                payload={"kind": change.kind, "reason": change.reason},
+            )
+            repo.insert_domain_event(applied_event)
+            result.applied.append(change)
+            result.events.append(event)
+        elif isinstance(change, TransformItemChange):
+            repo.update_item_slug(change.item_id, change.new_slug)
+            event = DomainEvent(
+                event_id=str(uuid.uuid4()),
+                campaign_id=campaign_id,
+                event_type="item.transformed",
+                payload={
+                    "item_id": change.item_id,
+                    "new_slug": change.new_slug,
+                    "reason": change.reason,
+                },
+            )
+            repo.insert_domain_event(event)
+            applied_event = DomainEvent(
+                event_id=str(uuid.uuid4()),
+                campaign_id=campaign_id,
+                event_type="proposal.applied",
+                payload={"kind": change.kind, "reason": change.reason},
+            )
+            repo.insert_domain_event(applied_event)
+            result.applied.append(change)
+            result.events.append(event)
         else:
             result.skipped.append(change)
 

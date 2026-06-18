@@ -1158,8 +1158,26 @@ landing/hub view. Post-phase: entire top-level menu bar removed; 4-pill navigati
 9 TDD slices (0â€”8): config dirs, dungeon library wiring, seed library, seed persistence,
 publish service, play loads saves, Library view, one-time migration, startup integration.
 
+## Phase 46 — Inventory System (COMPLETE)
 
-# Planned Roadmap — Phases 46–53
+**Status: Complete (2026-06-17) — 2555 tests passing**
+Spec: `spec/PHASE_46_INVENTORY_SYSTEM.md`
+Branch: `phase-46-inventory-system`
+
+Narrative-first inventory with three item categories: **Class Kits** (repeatable class
+capabilities with charge tracks), **Dungeon Items** (significant stateful objects with a
+≤ 10 cap), and **Equipped Gear** (modifies ratings at read time; `new_action` features
+stored for Phase 50). Introduces the **Player Command** channel (`rpg/command.py`) — the
+engine-authoritative input-dual of `LLMReactionProposal`. World-driven item changes
+(`GrantItemChange`, `StripItemChange`, `TransformItemChange`) stay on the LLM-advisory
+proposal channel. Migration `008_items.sql` creates `items` + `item_features` tables.
+`CharacterSheetPanel.set_inventory()` renders KITS/ITEMS/GEAR sections. Manifest +
+seeder support via `ItemManifest` / `CampaignManifest.items`.
+
+10 TDD slices; 2555 tests passing.
+
+
+# Planned Roadmap — Phases 47–53
 
 These phases are **defined on the GitHub Projects roadmap** (`ghostpencil/dungeon-daddy`,
 project #1) and are **not yet implemented**. Numbering and scope below mirror that board.
@@ -1167,7 +1185,6 @@ A detailed `spec/PHASE_NN_*.md` is written when each phase actually starts.
 
 | Phase | Title | One-line scope |
 |---|---|---|
-| 46 | Inventory System | Class Kits, Dungeon Items, Equipped Gear — narrative-first, no junk items |
 | 47 | Room Contents | Items in rooms + interactive objects with a state machine |
 | 48 | Dungeon Navigation | Room exits, party location, level connectors |
 | 49 | Starting Playbooks | Class foundations: ratings, tracks, kit, **tags**, **signature adverbs**, starting abilities |
@@ -1176,19 +1193,18 @@ A detailed `spec/PHASE_NN_*.md` is written when each phase actually starts.
 | 52 | Milestone Advancement | Playbook beats, ranks to 5, ability unlocks |
 | 53 | Threat Behavior & Monster Reactions | Instinct-driven, engine-bounded monster reactions (no enemy turn); boss phases via clock thresholds |
 
-## Phase Dependencies & Sequencing (46–53)
+## Phase Dependencies & Sequencing (47–53)
 
-Reviewed 2026-06-17 (after adding Phase 53). **The ordering is topologically valid — every
-hard dependency points backward to a lower phase number, so no phase is sequenced ahead of a
-prerequisite. No renumbering is required.** The matrix below is sourced from each card's stated
-"Depends on:" line on GitHub Project #1.
+Reviewed 2026-06-17 (after adding Phase 53; Phase 46 now complete). **The ordering is
+topologically valid — every hard dependency points backward to a lower phase number, so no
+phase is sequenced ahead of a prerequisite. No renumbering is required.** The matrix below
+is sourced from each card's stated "Depends on:" line on GitHub Project #1.
 
-| Phase | Hard deps (within 46–53) | Points back? |
+| Phase | Hard deps | Points back? |
 |---|---|---|
-| 46 Inventory | none (foundation; first builds `rpg/command.py`) | ✓ |
-| 47 Room Contents | 46 | ✓ |
+| 47 Room Contents | 46 (complete) | ✓ |
 | 48 Dungeon Navigation | 47 | ✓ |
-| 49 Starting Playbooks | 46 | ✓ |
+| 49 Starting Playbooks | 46 (complete) | ✓ |
 | 50 Hybrid Action Model | 47, 48, 49 | ✓ |
 | 51 Talk to the Dungeon | none (adds its own recedable-clock support) | ✓ |
 | 52 Milestone Advancement | 49 | ✓ |
@@ -1196,10 +1212,10 @@ prerequisite. No renumbering is required.** The matrix below is sourced from eac
 
 **The roadmap is two parts:**
 
-- **Tight spine (must stay ordered):** `46 → 47 → 48 → 50`, plus `46 → 49 → 50`, plus
-  `49 → 52`. Every edge points forward; these phases cannot be reordered among themselves.
+- **Tight spine (must stay ordered):** `47 → 48 → 50`, plus `49 → 50`, plus `49 → 52`.
+  Every edge points forward; these phases cannot be reordered among themselves.
 - **Flexible depth phases (no spine dependency):** **51** and **53**. Neither depends on the
-  46→50 spine, so both are effectively "pull-on-demand" — they sit at the end by default but
+  47→50 spine, so both are effectively "pull-on-demand" — they sit at the end by default but
   could slot in earlier whenever a playtest needs that depth.
 
 **Notes:**

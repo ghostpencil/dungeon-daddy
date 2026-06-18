@@ -17,6 +17,9 @@ class CharacterSheetPanel:
         self._actor: ActorState | None = None
         self._fallout: list[FalloutRecord] = []
         self._momentum: int = 0
+        self._kits: list[dict] = []
+        self._dungeon_items: list[dict] = []
+        self._equipped: list[dict] = []
         self._x = self._y = self._w = self._h = 0.0
 
     def set_actor(self, actor: ActorState | None) -> None:
@@ -27,6 +30,16 @@ class CharacterSheetPanel:
 
     def set_momentum(self, value: int) -> None:
         self._momentum = value
+
+    def set_inventory(
+        self,
+        kits: list[dict],
+        dungeon_items: list[dict],
+        equipped: list[dict],
+    ) -> None:
+        self._kits = list(kits)
+        self._dungeon_items = list(dungeon_items)
+        self._equipped = list(equipped)
 
     def setup(self, x: float, y: float, w: float, h: float) -> None:
         self._x, self._y, self._w, self._h = x, y, w, h
@@ -131,3 +144,90 @@ class CharacterSheetPanel:
                 if col >= 3:
                     col = 0
                     row_y -= TEXT_SM + PAD_SM
+
+        cur_y = row_y - PAD_MD * 2 if self._actor.actions else cur_y - PAD_SM
+
+        # --- Class kits ---
+        if self._kits:
+            arcade.draw_text(
+                "KITS", x + PAD_MD, cur_y, TEAL,
+                font_size=TEXT_SM, font_name=FONT_UI, bold=True, anchor_y="top",
+            )
+            cur_y -= TEXT_SM + PAD_SM
+
+            for kit in self._kits:
+                cur_c = kit.get("charges_current", 0)
+                max_c = kit.get("charges_max", 0)
+                at_max = cur_c >= max_c
+                arcade.draw_text(
+                    kit.get("display_name", kit.get("slug", "")),
+                    x + PAD_MD, cur_y, INK_2,
+                    font_size=TEXT_SM, font_name=FONT_UI, anchor_y="top",
+                )
+                cur_y -= TEXT_SM + 2
+
+                pip_x = x + PAD_MD
+                pip_y = cur_y - _PIP_H
+                for i in range(max_c):
+                    pip_color = TEAL if i < cur_c else (EMBER if at_max else BG_3)
+                    arcade.draw_rect_filled(
+                        arcade.XYWH(pip_x + _PIP_W / 2, pip_y + _PIP_H / 2, _PIP_W, _PIP_H),
+                        pip_color,
+                    )
+                    pip_x += _PIP_W + _PIP_GAP
+                cur_y -= _PIP_H + PAD_SM
+
+        # --- Dungeon items ---
+        if self._dungeon_items:
+            cur_y -= PAD_SM
+            arcade.draw_text(
+                "ITEMS", x + PAD_MD, cur_y, INK_2,
+                font_size=TEXT_SM, font_name=FONT_UI, bold=True, anchor_y="top",
+            )
+            cur_y -= TEXT_SM + PAD_SM
+
+            for item in self._dungeon_items:
+                name = item.get("display_name", item.get("slug", ""))
+                status = item.get("status", "active")
+                level_bound = item.get("level_bound", False)
+                suffix = " [L]" if level_bound else ""
+                color = INK_3 if status != "active" else INK_2
+                arcade.draw_text(
+                    f"{name}{suffix}",
+                    x + PAD_MD, cur_y, color,
+                    font_size=TEXT_SM, font_name=FONT_UI, anchor_y="top",
+                )
+                cur_y -= TEXT_SM + PAD_SM
+
+        # --- Equipped gear ---
+        if self._equipped:
+            cur_y -= PAD_SM
+            arcade.draw_text(
+                "GEAR", x + PAD_MD, cur_y, VIOLET,
+                font_size=TEXT_SM, font_name=FONT_UI, bold=True, anchor_y="top",
+            )
+            cur_y -= TEXT_SM + PAD_SM
+
+            for gear in self._equipped:
+                name = gear.get("display_name", gear.get("slug", ""))
+                arcade.draw_text(
+                    name, x + PAD_MD, cur_y, INK_2,
+                    font_size=TEXT_SM, font_name=FONT_UI, anchor_y="top",
+                )
+                cur_y -= TEXT_SM + 2
+
+                for feat in gear.get("features", []):
+                    ftype = feat.get("feature_type", "")
+                    action = feat.get("action_key", "").upper()
+                    if ftype == "rating_modifier":
+                        mod = feat.get("modifier", 0)
+                        sign = "+" if mod >= 0 else ""
+                        badge = f"  {action} {sign}{mod}"
+                    else:
+                        badge = f"  {action} [new]"
+                    arcade.draw_text(
+                        badge, x + PAD_MD, cur_y, INK_3,
+                        font_size=TEXT_SM, font_name=FONT_UI, anchor_y="top",
+                    )
+                    cur_y -= TEXT_SM + 2
+                cur_y -= PAD_SM

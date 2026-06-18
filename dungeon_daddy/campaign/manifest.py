@@ -58,6 +58,24 @@ class ClockManifest(BaseModel):
         return self
 
 
+class ItemFeatureManifest(BaseModel):
+    feature_type: Literal["new_action", "rating_modifier"]
+    action_key: str
+    modifier: int | None = None
+
+
+class ItemManifest(BaseModel):
+    slug: str
+    display_name: str
+    item_type: Literal["class_kit", "dungeon_item", "equipped_gear"]
+    description: str
+    owner_slug: str | None = None
+    level_id: str | None = None
+    charges_max: int | None = None
+    is_equipped: bool = False
+    features: list[ItemFeatureManifest] = Field(default_factory=list)
+
+
 class CampaignManifest(BaseModel):
     slug: str
     title: str
@@ -70,3 +88,4 @@ class CampaignManifest(BaseModel):
     clocks: list[ClockManifest] = Field(default_factory=list)
     memory_seeds: list[str] = Field(default_factory=list)
     room_threats: list[dict] = Field(default_factory=list)
+    items: list[ItemManifest] = Field(default_factory=list)
