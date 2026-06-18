@@ -367,3 +367,24 @@ def test_clone_dungeon_does_not_copy_session_or_campaign_data(tmp_path):
     assert not (tmp_path / "dest_campaign" / "campaign.duckdb").exists()
     assert not (tmp_path / "dest_campaign" / "memory").exists()
     assert not (tmp_path / "dest_campaign" / "rpg-memory").exists()
+
+
+# ---------------------------------------------------------------------------
+# get_last_played — returns mtime of session.json, or None if absent
+# ---------------------------------------------------------------------------
+
+def test_get_last_played_returns_none_when_no_session(tmp_path):
+    from dungeon_daddy.data.repository import DungeonRepository
+    repo = DungeonRepository(campaigns_dir=tmp_path)
+    (tmp_path / "my-save").mkdir()
+    assert repo.get_last_played("my-save") is None
+
+
+def test_get_last_played_returns_datetime_when_session_exists(tmp_path):
+    from datetime import datetime
+    from dungeon_daddy.data.models import SessionState
+    from dungeon_daddy.data.repository import DungeonRepository
+    repo = DungeonRepository(campaigns_dir=tmp_path)
+    repo.save_session(SessionState(dungeon_id="my-save"))
+    result = repo.get_last_played("my-save")
+    assert isinstance(result, datetime)

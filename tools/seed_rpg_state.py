@@ -107,9 +107,7 @@ class _CampaignSeedSpec:
         self.title = title
         self.campaign_id = f"campaign:{slug}"
 
-        self.pc_actors = [
-            {"slug": "protagonist", "display_name": "Protagonist", "concept": "[seed] player-controlled actor"},
-        ]
+        self.pc_actors: list[dict] = []
         self.npc_actors = [
             {"slug": "dungeon-presence", "display_name": "Dungeon Presence", "actor_type": "dungeon",
              "concept": "[seed] dungeon-controlled presence"},
@@ -169,6 +167,11 @@ def _apply_seed(campaign_dir: Path, result: SeedResult) -> None:
     for actor_spec in spec.pc_actors:
         _upsert_actor(repo, campaign_id, slug, actor_spec["slug"],
                       actor_spec["display_name"], "pc", actor_spec.get("concept"), result)
+
+    if not spec.pc_actors:
+        result.warnings.append(
+            "No player-controlled actors seeded — use --seed-pack to add real actors"
+        )
 
     # NPC/dungeon actors
     for actor_spec in spec.npc_actors:

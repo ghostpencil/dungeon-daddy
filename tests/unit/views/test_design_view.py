@@ -3,7 +3,8 @@ from unittest.mock import MagicMock, patch
 
 from dungeon_daddy.data.models import DesignMode, Dungeon, DungeonMeta, Level
 from dungeon_daddy.llm.agents.wizard_agent import DungeonBrief
-from dungeon_daddy.views.design_view import DesignView, LLMResult
+from dungeon_daddy.llm.provider import LLMMessage
+from dungeon_daddy.views.design_view import DesignView, LLMResult, _WIZARD_GREETING
 
 # ---------------------------------------------------------------------------
 # LLMResult dataclass
@@ -1000,3 +1001,75 @@ def test_level_result_success_resets_retries():
         view.on_update(0.0)
 
     assert view._generation_retries == 0
+
+
+# ---------------------------------------------------------------------------
+# #64 — reset_to_wizard: clears all session state
+# ---------------------------------------------------------------------------
+
+def _make_view_with_real_chat() -> DesignView:
+    """DesignView with a real ChatPanel so clear_messages() is actually exercised."""
+    from dungeon_daddy.ui.panels.chat_panel import ChatPanel
+    view = _make_view()
+    view._chat = ChatPanel(on_send=lambda text: None)
+    return view
+
+
+def test_reset_to_wizard_clears_chat_messages():
+    view = _make_view_with_real_chat()
+    view._chat.add_message("dm", "Old message from last session")
+    view._chat.add_message("gm", "Player reply")
+
+    view.reset_to_wizard()
+
+    # Exactly one message: the new greeting
+    assert len(view._chat._messages) == 1
+    assert _WIZARD_GREETING in view._chat._messages[0].content
+
+
+def test_reset_to_wizard_resets_wizard_history():
+    view = _make_view_with_real_chat()
+    view._wizard_history = [LLMMessage(role="user", content="old context")]
+
+    view.reset_to_wizard()
+
+    assert view._wizard_history == []
+
+
+def test_reset_to_wizard_resets_design_history():
+    view = _make_view_with_real_chat()
+    view._design_history = [LLMMessage(role="user", content="old edit chat")]
+
+    view.reset_to_wizard()
+
+    assert view._design_history == []
+
+
+def test_reset_to_wizard_resets_generation_state():
+    view = _make_view_with_real_chat()
+    view._brief = _make_brief()
+    view._current_level = 3
+    view._generation_retries = 2
+    view._awaiting_name_choice = True
+    view._context_overwrite_confirmed = True
+
+    view.reset_to_wizard()
+
+    assert view._brief is None
+    assert view._current_level == 1
+    assert view._generation_retries == 0
+    assert view._awaiting_name_choice is False
+    assert view._context_overwrite_confirmed is False
+
+
+def test_reset_to_wizard_adds_greeting_after_clear():
+    view = _make_view_with_real_chat()
+    view._chat.add_message("dm", "Stale greeting from prior session")
+    view._chat.add_message("gm", "Some user reply")
+
+    view.reset_to_wizard()
+
+    # Only the new greeting — not the stale one
+    contents = [m.content for m in view._chat._messages]
+    assert contents.count(_WIZARD_GREETING) == 1
+    assert "Stale greeting" not in " ".join(contents)

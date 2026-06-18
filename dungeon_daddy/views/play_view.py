@@ -423,6 +423,13 @@ class PlayView(arcade.View):
             return
         pill = title_bar_mode_at(x, y, self.window)
         if pill and pill != "play":
+            if pill == "library" and self._dungeon is not None:
+                confirmed = self.window._ask_yes_no(
+                    "Return to Library",
+                    "Your session progress is saved. Return to Library?",
+                )
+                if not confirmed:
+                    return
             self.window.switch_mode(pill)
             return
         # RPG panel toggle button (title bar)

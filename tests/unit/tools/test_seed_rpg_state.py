@@ -48,15 +48,14 @@ def test_first_apply_creates_duckdb(tmp_path: Path) -> None:
     assert (campaign_dir / "campaign.duckdb").exists()
 
 
-def test_first_apply_creates_pc_actor(tmp_path: Path) -> None:
+def test_no_pc_actor_without_seed_pack(tmp_path: Path) -> None:
     campaign_dir = _make_campaign_dir(tmp_path)
     seed_campaign(campaign_dir, dry_run=False)
     repo = _open_repo(campaign_dir)
     slug = "test-campaign"
     actor = repo.get_actor(f"actor:{slug}:protagonist")
     repo.close()
-    assert actor is not None
-    assert actor["actor_type"] == "pc"
+    assert actor is None
 
 
 def test_first_apply_creates_npc_actors(tmp_path: Path) -> None:
@@ -71,26 +70,24 @@ def test_first_apply_creates_npc_actors(tmp_path: Path) -> None:
     assert monster is not None and monster["actor_type"] == "monster"
 
 
-def test_first_apply_creates_stress_tracks_for_pc(tmp_path: Path) -> None:
+def test_no_stress_tracks_without_seed_pack(tmp_path: Path) -> None:
     campaign_dir = _make_campaign_dir(tmp_path)
     seed_campaign(campaign_dir, dry_run=False)
     repo = _open_repo(campaign_dir)
     slug = "test-campaign"
     tracks = repo.get_actor_stress_tracks(f"actor:{slug}:protagonist")
     repo.close()
-    track_keys = {t["track_key"] for t in tracks}
-    assert {"body", "composure", "bonds", "weird"}.issubset(track_keys)
+    assert tracks == []
 
 
-def test_first_apply_creates_action_ratings_for_pc(tmp_path: Path) -> None:
+def test_no_action_ratings_without_seed_pack(tmp_path: Path) -> None:
     campaign_dir = _make_campaign_dir(tmp_path)
     seed_campaign(campaign_dir, dry_run=False)
     repo = _open_repo(campaign_dir)
     slug = "test-campaign"
     ratings = repo.get_actor_action_ratings(f"actor:{slug}:protagonist")
     repo.close()
-    action_keys = {r["action_key"] for r in ratings}
-    assert {"fight", "move", "tinker", "study", "focus", "sway", "sense", "channel", "endure"}.issubset(action_keys)
+    assert ratings == []
 
 
 def test_first_apply_creates_clocks(tmp_path: Path) -> None:
@@ -119,7 +116,12 @@ def test_first_apply_result_reports_created_count(tmp_path: Path) -> None:
     campaign_dir = _make_campaign_dir(tmp_path)
     result = seed_campaign(campaign_dir, dry_run=False)
     assert result.created > 0
-    assert result.warnings == []
+
+
+def test_no_pc_actors_emits_warning(tmp_path: Path) -> None:
+    campaign_dir = _make_campaign_dir(tmp_path)
+    result = seed_campaign(campaign_dir, dry_run=False)
+    assert any("player-controlled" in w.lower() for w in result.warnings)
 
 
 # ---------------------------------------------------------------------------

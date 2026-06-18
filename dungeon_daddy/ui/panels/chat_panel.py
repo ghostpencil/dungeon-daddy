@@ -256,6 +256,14 @@ class ChatPanel:
     # Data / state
     # ------------------------------------------------------------------
 
+    def clear_messages(self) -> None:
+        self._messages.clear()
+        self._scroll_offset = 0.0
+        self._label_cache.clear()
+        self._action_cards.clear()
+        self._active_card_index = None
+        self._active_card_button_rects = []
+
     def add_message(self, role: str, content: str) -> None:
         self._messages.append(ChatMessage(role=role, content=content))  # type: ignore[arg-type]
         self._scroll_to_bottom()

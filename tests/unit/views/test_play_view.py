@@ -527,3 +527,65 @@ def test_dm_result_appends_to_dm_history(make_play_view):
     assert len(view._dm_history) == 1
     assert view._dm_history[0].role == "assistant"
     assert view._dm_history[0].content == "You see a door."
+
+
+# ---------------------------------------------------------------------------
+# #66 — navigate to Library from Play mode prompts to save session
+# ---------------------------------------------------------------------------
+
+def test_navigate_to_library_with_session_asks_confirmation(make_play_view):
+    level = _level(rooms=[], connections=[])
+    dungeon = _saved_dungeon([level])
+    view = make_play_view(dungeon=dungeon, state=_state())
+    view.window._ask_yes_no.return_value = True
+
+    with patch("dungeon_daddy.views.play_view.title_bar_mode_at", return_value="library"):
+        view.on_mouse_press(500, 10, arcade.MOUSE_BUTTON_LEFT, 0)
+
+    view.window._ask_yes_no.assert_called_once()
+
+
+def test_navigate_to_library_confirmed_switches_mode(make_play_view):
+    level = _level(rooms=[], connections=[])
+    dungeon = _saved_dungeon([level])
+    view = make_play_view(dungeon=dungeon, state=_state())
+    view.window._ask_yes_no.return_value = True
+
+    with patch("dungeon_daddy.views.play_view.title_bar_mode_at", return_value="library"):
+        view.on_mouse_press(500, 10, arcade.MOUSE_BUTTON_LEFT, 0)
+
+    view.window.switch_mode.assert_called_once_with("library")
+
+
+def test_navigate_to_library_cancelled_does_not_switch(make_play_view):
+    level = _level(rooms=[], connections=[])
+    dungeon = _saved_dungeon([level])
+    view = make_play_view(dungeon=dungeon, state=_state())
+    view.window._ask_yes_no.return_value = False
+
+    with patch("dungeon_daddy.views.play_view.title_bar_mode_at", return_value="library"):
+        view.on_mouse_press(500, 10, arcade.MOUSE_BUTTON_LEFT, 0)
+
+    view.window.switch_mode.assert_not_called()
+
+
+def test_navigate_to_library_no_session_switches_immediately(make_play_view):
+    view = make_play_view()  # no dungeon/state
+
+    with patch("dungeon_daddy.views.play_view.title_bar_mode_at", return_value="library"):
+        view.on_mouse_press(500, 10, arcade.MOUSE_BUTTON_LEFT, 0)
+
+    view.window._ask_yes_no.assert_not_called()
+    view.window.switch_mode.assert_called_once_with("library")
+
+
+def test_navigate_to_non_library_pill_switches_immediately(make_play_view):
+    level = _level(rooms=[], connections=[])
+    dungeon = _saved_dungeon([level])
+    view = make_play_view(dungeon=dungeon, state=_state())
+
+    with patch("dungeon_daddy.views.play_view.title_bar_mode_at", return_value="design"):
+        view.on_mouse_press(500, 10, arcade.MOUSE_BUTTON_LEFT, 0)
+
+    view.window._ask_yes_no.assert_not_called()
+    view.window.switch_mode.assert_called_once_with("design")

@@ -116,13 +116,28 @@ def test_on_play_save_calls_window():
 
 
 # ---------------------------------------------------------------------------
-# Cycle 10 — on_delete_save calls window.delete_save
+# Cycle 10 — on_delete_save shows confirmation dialog before deleting
 # ---------------------------------------------------------------------------
 
-def test_on_delete_save_calls_window():
+def test_on_delete_save_confirmed_calls_window():
     view = _view_with_window()
+    view.window._ask_yes_no.return_value = True
     view.on_delete_save("save-1")
     view.window.delete_save.assert_called_once_with("save-1")
+
+
+def test_on_delete_save_cancelled_does_not_delete():
+    view = _view_with_window()
+    view.window._ask_yes_no.return_value = False
+    view.on_delete_save("save-1")
+    view.window.delete_save.assert_not_called()
+
+
+def test_on_delete_save_asks_before_deleting():
+    view = _view_with_window()
+    view.window._ask_yes_no.return_value = True
+    view.on_delete_save("save-1")
+    view.window._ask_yes_no.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -133,3 +148,47 @@ def test_on_new_dungeon_calls_window():
     view = _view_with_window()
     view.on_new_dungeon()
     view.window.new_dungeon.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Cycle 12 — _refresh() builds _save_meta from save_repo.get_last_played()
+# ---------------------------------------------------------------------------
+
+def test_refresh_populates_save_meta_with_last_played(tmp_path):
+    from datetime import datetime
+    from dungeon_daddy.data.repository import DungeonRepository
+    from dungeon_daddy.data.models import SessionState
+
+    repo = DungeonRepository(campaigns_dir=tmp_path)
+    # save-a has a session, save-b does not
+    repo.save_session(SessionState(dungeon_id="save-a"))
+    (tmp_path / "save-b").mkdir()
+    (tmp_path / "save-b" / "dungeon.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "save-a" / "dungeon.json").write_text("{}", encoding="utf-8")
+
+    view = _make_view()
+    view.set_sources(dungeon_repo=MagicMock(), seed_library=MagicMock(), save_repo=repo)
+    view._save_list = ["save-a", "save-b"]
+    view._refresh_save_meta()
+
+    assert isinstance(view._save_meta["save-a"], datetime)
+    assert view._save_meta["save-b"] is None
+
+
+def test_refresh_save_meta_empty_when_no_saves():
+    view = _make_view()
+    repo = MagicMock()
+    view.set_sources(dungeon_repo=None, seed_library=None, save_repo=repo)
+    view._save_list = []
+    view._refresh_save_meta()
+    assert view._save_meta == {}
+
+
+# ---------------------------------------------------------------------------
+# Cycle 13 — on_extract_seed calls window.extract_seed
+# ---------------------------------------------------------------------------
+
+def test_on_extract_seed_calls_window():
+    view = _view_with_window()
+    view.on_extract_seed("save-1")
+    view.window.extract_seed.assert_called_once_with("save-1")

@@ -2,13 +2,28 @@
 
 ## Phase
 
-Phase: 46 — Inventory System (not yet started)
-Status: **PENDING** — design reviewed, ready to define `spec/PHASE_46_*.md`
+Phase: Stabilization — Post-Phase 45 polish (COMPLETE)
+Status: **STABILIZATION DONE** — branch `stabilization-post-45`; all 6 items complete; merge to main and start Phase 46.
 
 Previous: Phase 45 complete (2026-06-14). 2436 tests passing.
-Spec: `spec/PHASE_45_CAMPAIGN_PIPELINE.md`
+Next: Phase 46 — Inventory System (PENDING, `spec/PHASE_46_*.md` to be written when stabilization merges)
 
-**Last session (2026-06-17) — added Phase 53 + sequencing review.** All design/docs only, no
+**Last session (2026-06-17) — #65, #66, #67, and #68 complete; stabilization done.**
+- **#68 DONE** — Library: 'Extract' button on Save cards extracts the save's `campaign.json` back into the seed library. `LibraryView.on_extract_seed()` delegates to `window.extract_seed(slug)`; `window.extract_seed()` loads the manifest from the save dir and calls `seed_library.save()`. Save cards now show ["Play", "Extract", "Delete"] buttons. 3 new tests; 2447 passing.
+- **#67 DONE** — Library: show last-played date on Save cards. Added `DungeonRepository.get_last_played(slug)` (returns `session.json` mtime as `datetime | None`); `LibraryView._refresh_save_meta()` builds a per-slug lookup; `_draw_save_card()` renders "Played: Jun 17, 2026" or "Never played" in place of the slug line. 4 new tests; 2444 passing.
+- **#66 DONE** — Play mode: prompt to save session on navigate away to Library. `on_mouse_press` in `PlayView` now calls `_ask_yes_no` when the Library pill is clicked with an active session; cancelling keeps the user in Play. No-session and non-Library pill clicks are unchanged. 5 new tests; 2440 passing.
+- **#65 DONE** — Confirmation dialog before deleting a save game. `on_delete_save` in `LibraryView` now calls `window._ask_yes_no` before delegating to `window.delete_save`; cancelled confirmation leaves the save intact. 3 new tests (replace old single test); 2435 passing.
+- All 6 stabilization items complete. Ready to merge to main and start Phase 46.
+
+**Prior session (2026-06-17) — #64 complete; 4 stabilization items remain.**
+- **#64 DONE** — Design mode: handle no-dungeon-loaded state gracefully. Fixed two bugs: (1) `on_show_view` was adding wizard greeting even on first-visit in edit mode; (2) `reset_to_wizard()` left stale chat messages, LLM histories, and generation state across sessions. Added `ChatPanel.clear_messages()` and updated `reset_to_wizard()` to clear all session state before re-greeting. 9 new tests; 2433 passing.
+- **#63 DONE** — Removed hardcoded `Protagonist` PC actor from `_CampaignSeedSpec` in `tools/seed_rpg_state.py`. Generic `seed_campaign()` path now emits a warning directing users to `--seed-pack`. Tests updated (25 passing). Committed on `stabilization-post-45`.
+
+**Prior session (2026-06-17) — stabilization branch + GitHub issue promotion.**
+- Created branch `stabilization-post-45`.
+- Promoted 6 post-Phase-45 draft cards to real GitHub issues (#63–#68) with `stabilization` label; deleted the original drafts from the project board.
+
+**Prior session (2026-06-17) — added Phase 53 + sequencing review.** All design/docs only, no
 code:
 - **New Phase 53 — Threat Behavior & Monster Reactions.** Full design in
   `spec/MONSTER_REACTION_DESIGN.md`; draft card on GitHub Project #1; roadmap table extended to
@@ -84,7 +99,7 @@ reactions. It must not directly mutate authoritative state.
 
 ## Known Failures
 
-None (test suite passes — 2436 tests as of 2026-06-14).
+None (test suite passes — 2447 tests as of 2026-06-17).
 
 ---
 
@@ -101,7 +116,7 @@ Phase 42 and earlier are complete. Full history in `spec/HISTORY.md`.
 - Roadmap for Phases 46–53 (planned): GitHub Projects `ghostpencil/dungeon-daddy` #1, mirrored in the "Planned Roadmap — Phases 46–53" section of `IMPLEMENTATION_PHASES_33_ONWARDS.md`. Next: Phase 46 (Inventory). Issue bodies hold the per-phase detail and (as of 2026-06-17) the folded-in design resolutions; a detailed `spec/PHASE_46_*.md` is written when Phase 46 starts.
 - Phase 53 (Threat Behavior & Monster Reactions, planned 2026-06-17): instinct-driven, engine-bounded monster reactions with no enemy turn; bosses escalate via clock thresholds. Full design in `spec/MONSTER_REACTION_DESIGN.md`; summary in `IMPLEMENTATION_PHASES_33_ONWARDS.md`.
 - Spec loading rules and skills: `CLAUDE.md` (canonical source).
-- `protagonist` actor is in `seed_data/campaigns/the-crucible/rpg_seed.json`; `--force` resets its stress tracks.
+- `protagonist` actor is defined in `seed_data/campaigns/the-crucible/rpg_seed.json` (use `--seed-pack` + `--force` to reset stress tracks); the generic `seed_campaign()` path no longer creates a placeholder actor.
 - Example campaign manifest: `examples/campaign_manifests/bone-cathedral.json` (validates and seeds cleanly; 2 memory seeds).
 - `tools/seed_rpg_state.py`: `actor_type="faction"` entries routed to `repo.save_faction()`; faction clock `owner_actor_id` cleared.
 - Live campaigns migrated (2026-06-13): `The Crucible` — `desert-djinn-fragment` moved from `actors` to `factions` table.
