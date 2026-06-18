@@ -70,10 +70,31 @@ class ItemManifest(BaseModel):
     item_type: Literal["class_kit", "dungeon_item", "equipped_gear"]
     description: str
     owner_slug: str | None = None
+    room_id: str | None = None
     level_id: str | None = None
     charges_max: int | None = None
     is_equipped: bool = False
     features: list[ItemFeatureManifest] = Field(default_factory=list)
+
+
+class ObjectTransitionManifest(BaseModel):
+    from_state: str
+    to_state: str
+    trigger: str
+    requires_item_slug: str | None = None
+    spawns_item_slug: str | None = None
+    advances_clock_slug: str | None = None
+
+
+class RoomObjectManifest(BaseModel):
+    slug: str
+    display_name: str
+    room_id: str
+    level_id: str
+    archetype: Literal["container", "door", "mechanism", "structure", "trap", "lore_fixture", "resource"]
+    description: str
+    initial_state: str
+    transitions: list[ObjectTransitionManifest] = Field(default_factory=list)
 
 
 class CampaignManifest(BaseModel):
@@ -89,3 +110,4 @@ class CampaignManifest(BaseModel):
     memory_seeds: list[str] = Field(default_factory=list)
     room_threats: list[dict] = Field(default_factory=list)
     items: list[ItemManifest] = Field(default_factory=list)
+    room_objects: list[RoomObjectManifest] = Field(default_factory=list)

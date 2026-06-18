@@ -40,6 +40,9 @@ _ADD_BTN_W: float = 70.0
 _ADD_BTN_H: float = 22.0
 _ADD_BTN_PAD: float = 8.0
 
+# Back affordance occupies the left portion of the header (breadcrumb text).
+_BACK_ZONE_W: float = 200.0
+
 # Actor type → chip colour key
 _ACTOR_CHIP: dict[str, str] = {
     "pc": "violet",
@@ -67,6 +70,7 @@ _SECTION_LABELS: dict[str, str] = {
     "clocks":      "CLOCKS",
     "threats":     "THREATS",
     "lore":        "LORE",
+    "rooms":       "ROOMS",
     "validation":  "VALIDATION",
 }
 
@@ -88,7 +92,7 @@ class CampaignListPanel:
 
     def _card_top(self, index: int) -> float:
         top_of_list = self._y + self._h - HEADER_H
-        return top_of_list - index * (CARD_H + GAP) - self._scroll_offset
+        return top_of_list - index * (CARD_H + GAP) + self._scroll_offset
 
     # ------------------------------------------------------------------
     # Hit-test helpers
@@ -127,6 +131,14 @@ class CampaignListPanel:
         return (cx - _ADD_BTN_W / 2 <= x <= cx + _ADD_BTN_W / 2 and
                 cy - _ADD_BTN_H / 2 <= y <= cy + _ADD_BTN_H / 2)
 
+    def back_btn_at(self, x: float, y: float) -> bool:
+        """Hit-test the breadcrumb/back zone in the left of the header strip."""
+        header_top = self._y + self._h
+        header_bot = header_top - HEADER_H
+        if not (header_bot <= y <= header_top):
+            return False
+        return self._x <= x <= self._x + _BACK_ZONE_W
+
     # ------------------------------------------------------------------
     # Drawing
     # ------------------------------------------------------------------
@@ -136,6 +148,7 @@ class CampaignListPanel:
         section: str | None,
         items: list,
         hovered_index: int | None = None,
+        breadcrumb: str | None = None,
     ) -> None:
         px, py, pw, ph = self._x, self._y, self._w, self._h
 
@@ -146,9 +159,17 @@ class CampaignListPanel:
         header_cy = py + ph - HEADER_H / 2
         arcade.draw_rect_filled(arcade.XYWH(px + pw / 2, header_cy, pw, HEADER_H), BG_2)
 
-        section_label = _SECTION_LABELS.get(section or "", "")
-        if section_label:
-            draw_kicker(section_label, px + PAD_MD, header_cy)
+        if breadcrumb:
+            # Drill-down view: show a clickable back/breadcrumb in the kicker spot.
+            arcade.draw_text(
+                f"‹ {breadcrumb}", px + PAD_MD, header_cy, TEAL,
+                font_size=TEXT_SM, font_name=FONT_MONO,
+                anchor_x="left", anchor_y="center",
+            )
+        else:
+            section_label = _SECTION_LABELS.get(section or "", "")
+            if section_label:
+                draw_kicker(section_label, px + PAD_MD, header_cy)
 
         # "+ ADD" button in header
         right = px + pw
@@ -179,18 +200,23 @@ class CampaignListPanel:
         panel_top = py + ph - HEADER_H
         panel_bot = py
 
-        for i, item in enumerate(items):
-            card_top = self._card_top(i)
-            card_bot = card_top - CARD_H
-            # Skip fully off-screen cards
-            if card_top < panel_bot or card_bot > panel_top:
-                continue
-            card_cy = (card_top + card_bot) / 2
-            self._draw_card(
-                section, item, i,
-                card_x, card_cy, card_w, CARD_H,
-                hovered=(i == hovered_index),
-            )
+        ctx = arcade.get_window().ctx
+        old_scissor = ctx.scissor
+        ctx.scissor = (int(px), int(py), int(pw), int(ph - HEADER_H))
+        try:
+            for i, item in enumerate(items):
+                card_top = self._card_top(i)
+                card_bot = card_top - CARD_H
+                if card_top < panel_bot or card_bot > panel_top:
+                    continue
+                card_cy = (card_top + card_bot) / 2
+                self._draw_card(
+                    section, item, i,
+                    card_x, card_cy, card_w, CARD_H,
+                    hovered=(i == hovered_index),
+                )
+        finally:
+            ctx.scissor = old_scissor
 
     def _draw_card(
         self,
@@ -213,6 +239,11 @@ class CampaignListPanel:
             self._draw_threat_card(item, x, cy, w, h, hovered)
         elif section == "lore":
             self._draw_lore_card(item, x, cy, w, h, hovered)
+        elif section == "rooms":
+            if hasattr(item, "archetype"):  # RoomObjectManifest
+                self._draw_room_object_card(item, x, cy, w, h, hovered)
+            else:  # Room from dungeon
+                self._draw_room_card(item, x, cy, w, h)
         elif section == "validation":
             self._draw_validation_card(item, x, cy, w, h)
 
@@ -386,5 +417,41 @@ class CampaignListPanel:
         arcade.draw_text(
             msg_short, x + PAD_MD, cy,
             EMBER, font_size=TEXT_SM, font_name=FONT_MONO,
+            anchor_x="left", anchor_y="center",
+        )
+
+    def _draw_room_card(
+        self, room: object, x: float, cy: float, w: float, h: float,
+    ) -> None:
+        top = cy + h / 2
+        name = str(getattr(room, "name", "?"))
+        room_id = str(getattr(room, "id", ""))
+        arcade.draw_text(
+            name, x + PAD_MD, top - 18,
+            INK_1, font_size=TEXT_2XL, font_name=FONT_SERIF,
+            anchor_x="left", anchor_y="center",
+        )
+        arcade.draw_text(
+            room_id, x + PAD_MD, top - 40,
+            INK_3, font_size=TEXT_SM, font_name=FONT_MONO,
+            anchor_x="left", anchor_y="center",
+        )
+
+    def _draw_room_object_card(
+        self, obj: object, x: float, cy: float, w: float, h: float, hovered: bool,
+    ) -> None:
+        top = cy + h / 2
+        name = str(getattr(obj, "display_name", "?"))
+        archetype = str(getattr(obj, "archetype", ""))
+        state = str(getattr(obj, "current_state", getattr(obj, "initial_state", "")))
+        arcade.draw_text(
+            name, x + PAD_MD, top - 18,
+            INK_1, font_size=TEXT_2XL, font_name=FONT_SERIF,
+            anchor_x="left", anchor_y="center",
+        )
+        draw_chip(archetype.upper(), x + w - PAD_MD - 52, top - 18, "teal", width=80)
+        arcade.draw_text(
+            state, x + PAD_MD, top - 40,
+            INK_3, font_size=TEXT_SM, font_name=FONT_MONO,
             anchor_x="left", anchor_y="center",
         )

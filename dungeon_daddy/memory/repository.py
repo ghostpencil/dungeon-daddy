@@ -861,9 +861,9 @@ class MemoryRepository:
             INSERT INTO items (
                 item_id, campaign_id, slug, display_name, item_type,
                 description, owner_actor_id, level_id, status,
-                charges_current, charges_max, is_equipped
+                charges_current, charges_max, is_equipped, room_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (item_id) DO UPDATE SET
                 slug            = excluded.slug,
                 display_name    = excluded.display_name,
@@ -874,7 +874,8 @@ class MemoryRepository:
                 status          = excluded.status,
                 charges_current = excluded.charges_current,
                 charges_max     = excluded.charges_max,
-                is_equipped     = excluded.is_equipped
+                is_equipped     = excluded.is_equipped,
+                room_id         = excluded.room_id
             """,
             [
                 item.item_id,
@@ -889,6 +890,7 @@ class MemoryRepository:
                 item.charges_current,
                 item.charges_max,
                 item.is_equipped,
+                item.room_id,
             ],
         )
         self._conn.execute(
@@ -909,7 +911,7 @@ class MemoryRepository:
             """
             SELECT item_id, campaign_id, slug, display_name, item_type,
                    description, owner_actor_id, level_id, status,
-                   charges_current, charges_max, is_equipped
+                   charges_current, charges_max, is_equipped, room_id
             FROM items WHERE campaign_id = ?
             ORDER BY display_name
             """,
@@ -923,11 +925,26 @@ class MemoryRepository:
             """
             SELECT item_id, campaign_id, slug, display_name, item_type,
                    description, owner_actor_id, level_id, status,
-                   charges_current, charges_max, is_equipped
+                   charges_current, charges_max, is_equipped, room_id
             FROM items WHERE owner_actor_id = ?
             ORDER BY display_name
             """,
             [actor_id],
+        ).fetchall()
+        return [self._item_row_to_dict(r) for r in rows]
+
+    def get_items_by_room(self, campaign_id: str, room_id: str) -> list[dict]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT item_id, campaign_id, slug, display_name, item_type,
+                   description, owner_actor_id, level_id, status,
+                   charges_current, charges_max, is_equipped, room_id
+            FROM items
+            WHERE campaign_id = ? AND room_id = ? AND owner_actor_id IS NULL
+            ORDER BY display_name
+            """,
+            [campaign_id, room_id],
         ).fetchall()
         return [self._item_row_to_dict(r) for r in rows]
 
@@ -965,6 +982,7 @@ class MemoryRepository:
             "charges_current": r[9],
             "charges_max": r[10],
             "is_equipped": r[11],
+            "room_id": r[12] if len(r) > 12 else None,
             "features": features,
         }
 
@@ -1000,6 +1018,13 @@ class MemoryRepository:
         self._conn.execute(
             "UPDATE items SET slug = ? WHERE item_id = ?",
             [new_slug, item_id],
+        )
+
+    def update_item_room(self, item_id: str, room_id: str | None) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            "UPDATE items SET room_id = ? WHERE item_id = ?",
+            [room_id, item_id],
         )
 
     # ------------------------------------------------------------------

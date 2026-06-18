@@ -1,7 +1,16 @@
 import pytest
 from pydantic import ValidationError
 
-from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, ClockManifest, FactionManifest, ItemFeatureManifest, ItemManifest
+from dungeon_daddy.campaign.manifest import (
+    ActorManifest,
+    CampaignManifest,
+    ClockManifest,
+    FactionManifest,
+    ItemFeatureManifest,
+    ItemManifest,
+    ObjectTransitionManifest,
+    RoomObjectManifest,
+)
 
 
 def test_actor_manifest_parses_required_fields():
@@ -192,3 +201,83 @@ def test_campaign_manifest_accepts_items_list():
     assert isinstance(campaign.items[0], ItemManifest)
     assert campaign.items[0].slug == "lockpick-kit"
     assert campaign.items[0].owner_slug == "valeria"
+
+
+def test_item_manifest_room_id_defaults_to_none():
+    item = ItemManifest(
+        slug="gold-coin", display_name="Gold Coin",
+        item_type="dungeon_item", description="A shiny coin.",
+    )
+    assert item.room_id is None
+
+
+def test_item_manifest_accepts_room_id():
+    item = ItemManifest(
+        slug="gold-coin", display_name="Gold Coin",
+        item_type="dungeon_item", description="A shiny coin.",
+        room_id="room:cathedral:nave",
+    )
+    assert item.room_id == "room:cathedral:nave"
+
+
+def test_room_object_manifest_parses_required_fields():
+    obj = RoomObjectManifest(
+        slug="iron-chest",
+        display_name="Iron Chest",
+        room_id="room:cathedral:nave",
+        level_id="level:cathedral:ground",
+        archetype="container",
+        description="A heavy iron chest.",
+        initial_state="sealed",
+    )
+    assert obj.slug == "iron-chest"
+    assert obj.initial_state == "sealed"
+    assert obj.transitions == []
+
+
+def test_room_object_manifest_accepts_transitions():
+    obj = RoomObjectManifest(
+        slug="iron-chest",
+        display_name="Iron Chest",
+        room_id="room:cathedral:nave",
+        level_id="level:cathedral:ground",
+        archetype="container",
+        description="A chest.",
+        initial_state="sealed",
+        transitions=[
+            ObjectTransitionManifest(
+                from_state="sealed", to_state="opened", trigger="open",
+                spawns_item_slug="gold-coin",
+            )
+        ],
+    )
+    assert len(obj.transitions) == 1
+    assert obj.transitions[0].spawns_item_slug == "gold-coin"
+    assert obj.transitions[0].requires_item_slug is None
+
+
+def test_campaign_manifest_room_objects_defaults_to_empty():
+    campaign = CampaignManifest(slug="x", title="X", dungeon_slug="x")
+    assert campaign.room_objects == []
+
+
+def test_campaign_manifest_accepts_room_objects():
+    campaign = CampaignManifest(
+        slug="bone-cathedral",
+        title="The Bone Cathedral",
+        dungeon_slug="bone-cathedral",
+        room_objects=[
+            RoomObjectManifest(
+                slug="iron-chest",
+                display_name="Iron Chest",
+                room_id="room:cathedral:nave",
+                level_id="level:cathedral:ground",
+                archetype="container",
+                description="A chest.",
+                initial_state="sealed",
+            )
+        ],
+    )
+    assert len(campaign.room_objects) == 1
+    assert isinstance(campaign.room_objects[0], RoomObjectManifest)
+    assert campaign.room_objects[0].slug == "iron-chest"

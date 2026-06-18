@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from dungeon_daddy.campaign.manifest import FactionManifest
+from dungeon_daddy.campaign.manifest import FactionManifest, RoomObjectManifest
 from dungeon_daddy.ui.panels.campaign_edit_panel import CampaignEditPanel
 from dungeon_daddy.ui.panels.campaign_nav_panel import CampaignNavPanel
 from dungeon_daddy.ui.panels.campaign_list_panel import CampaignListPanel
@@ -33,6 +33,9 @@ def _edit_panel() -> CampaignEditPanel:
     panel._extra_data = {}
     panel._number_values = {}
     panel._number_label_centers = {}
+    panel._choice_values = {}
+    panel._choice_options = {}
+    panel._choice_label_centers = {}
     return panel
 
 
@@ -174,9 +177,10 @@ def test_item_at_returns_none_outside_panel_x():
 
 def test_item_at_scroll_offset_aware():
     p = _list_panel(3)
-    p.set_scroll_offset(88)  # shift cards up by 88px
-    assert p.item_at(400, 234) == 0
-    assert p.item_at(400, 146) == 1
+    # offset=88 shifts cards UP: card 0 scrolls above panel, card 1 occupies top slot
+    p.set_scroll_offset(88)
+    assert p.item_at(400, 322) == 1
+    assert p.item_at(400, 234) == 2
 
 
 # ---------------------------------------------------------------------------
@@ -205,9 +209,9 @@ def test_delete_zone_at_returns_none_outside_zone():
 
 def test_delete_zone_at_scroll_offset_aware():
     p = _list_panel(3)
+    # offset=88 shifts cards UP: card 1 top = 362, zone y ∈ [334, 354]
     p.set_scroll_offset(88)
-    # item 0 top after scroll = 362-88=274; zone y ∈ [250, 266]
-    assert p.delete_zone_at(664, 258) == 0
+    assert p.delete_zone_at(664, 344) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -227,6 +231,40 @@ def test_add_btn_at_centre_returns_true():
 def test_add_btn_at_body_of_panel_returns_false():
     p = _list_panel(3)
     assert p.add_btn_at(400, 322) is False
+
+
+# ---------------------------------------------------------------------------
+# CampaignListPanel.back_btn_at — Phase 47 rooms drill-down back affordance
+# ---------------------------------------------------------------------------
+#
+# Panel: x=220, y=0, w=460, h=400
+# Header band: y ∈ [362, 400]; back zone x ∈ [220, 420]
+
+
+def test_back_btn_at_in_header_left_zone_returns_true():
+    p = _list_panel(0)
+    assert p.back_btn_at(300, 380) is True
+
+
+def test_back_btn_at_below_header_returns_false():
+    p = _list_panel(0)
+    assert p.back_btn_at(300, 200) is False
+
+
+def test_back_btn_at_in_add_button_area_returns_false():
+    p = _list_panel(0)
+    assert p.back_btn_at(637, 381) is False
+
+
+def test_draw_with_breadcrumb_renders_room_name(mocker):
+    p = _list_panel(0)
+    mocker.patch("arcade.draw_rect_filled")
+    mocker.patch("arcade.draw_rect_outline")
+    mocker.patch("dungeon_daddy.ui.panels.campaign_list_panel.draw_kicker")
+    mock_text = mocker.patch("arcade.draw_text")
+    p.draw("rooms", [], None, breadcrumb="Entry Hall")
+    all_text = [str(c.args[0]) for c in mock_text.call_args_list]
+    assert any("Entry Hall" in t for t in all_text)
 
 
 # ---------------------------------------------------------------------------
@@ -360,3 +398,166 @@ def test_collect_faction_inputs_converts_reputation_idx_to_tier_name():
     assert data["reputation"] == "allied"
     assert "reputation_idx" not in data
     assert data["tier"] == "3"
+
+
+# ---------------------------------------------------------------------------
+# CampaignEditPanel — Slice 9: room object form
+# ---------------------------------------------------------------------------
+
+
+def _make_room_object(**kwargs: object) -> RoomObjectManifest:
+    defaults: dict = dict(
+        slug="locked-chest",
+        display_name="Locked Chest",
+        room_id="room-01",
+        level_id="level-01",
+        archetype="container",
+        description="A heavy iron chest.",
+        initial_state="sealed",
+    )
+    defaults.update(kwargs)
+    return RoomObjectManifest(**defaults)
+
+
+def _call_show_room_object(
+    panel: CampaignEditPanel, obj: RoomObjectManifest, *, is_new: bool = False
+) -> None:
+    mock_widget = MagicMock()
+    mock_widget.text = ""
+    with (
+        patch("arcade.gui.UIInputText", return_value=mock_widget),
+        patch("arcade.gui.UIFlatButton", return_value=MagicMock()),
+    ):
+        panel.show_room_object(obj, lambda d: None, lambda: None, is_new=is_new)
+
+
+def test_show_room_object_sets_mode():
+    panel = _edit_panel()
+    _call_show_room_object(panel, _make_room_object())
+    assert panel.mode == "room_object"
+
+
+def test_show_room_object_new_sets_mode_new_room_object():
+    panel = _edit_panel()
+    _call_show_room_object(panel, _make_room_object(), is_new=True)
+    assert panel.mode == "new_room_object"
+
+
+def test_room_object_form_text_inputs_present():
+    panel = _edit_panel()
+    _call_show_room_object(panel, _make_room_object())
+    for key in ("display_name", "description", "initial_state"):
+        assert key in panel._inputs, f"Expected input '{key}' in panel._inputs"
+
+
+def test_room_object_form_has_no_slug_input():
+    # Slug is system-generated from the name, not user-entered.
+    panel = _edit_panel()
+    _call_show_room_object(panel, _make_room_object())
+    assert "slug" not in panel._inputs
+
+
+def test_room_object_form_has_archetype_picker():
+    panel = _edit_panel()
+    _call_show_room_object(panel, _make_room_object(archetype="door"))
+    assert "archetype" in panel._choice_values
+    assert panel._choice_options["archetype"] == [
+        "container", "door", "mechanism", "structure", "trap", "lore_fixture", "resource",
+    ]
+    assert panel._choice_values["archetype"] == 1  # door is index 1
+
+
+def test_collect_room_object_inputs_uses_selected_archetype():
+    panel = _edit_panel()
+    _call_show_room_object(panel, _make_room_object(archetype="container"))
+    panel._choice_values["archetype"] = 2  # mechanism
+    data = panel._collect_inputs()
+    assert data["archetype"] == "mechanism"
+    assert any(r["trigger"] == "activate" for r in data["transitions"])
+
+
+def test_collect_room_object_inputs_generates_slug_for_new():
+    panel = _edit_panel()
+    _call_show_room_object(panel, _make_room_object(slug="", display_name=""), is_new=True)
+    panel._inputs["display_name"].text = "Cargo Crate"
+    data = panel._collect_inputs()
+    assert data["slug"] == "cargo-crate"
+
+
+def test_collect_room_object_inputs_preserves_slug_for_edit():
+    panel = _edit_panel()
+    _call_show_room_object(panel, _make_room_object(slug="locked-chest", display_name="Locked Chest"))
+    panel._inputs["display_name"].text = "Totally Renamed"
+    data = panel._collect_inputs()
+    assert data["slug"] == "locked-chest"
+
+
+def test_room_object_form_archetype_in_extra_data():
+    panel = _edit_panel()
+    _call_show_room_object(panel, _make_room_object(archetype="door"))
+    assert panel._extra_data.get("archetype") == "door"
+
+
+def test_room_object_form_room_and_level_in_extra_data():
+    panel = _edit_panel()
+    _call_show_room_object(panel, _make_room_object(room_id="room-42", level_id="level-02"))
+    assert panel._extra_data.get("room_id") == "room-42"
+    assert panel._extra_data.get("level_id") == "level-02"
+
+
+def test_collect_room_object_inputs_returns_archetype_room_transitions():
+    panel = _edit_panel()
+    _call_show_room_object(panel, _make_room_object(archetype="mechanism", room_id="room-01"))
+    data = panel._collect_inputs()
+    assert data["archetype"] == "mechanism"
+    assert data["room_id"] == "room-01"
+    assert "transitions" in data
+
+
+def test_room_object_form_default_transitions_populated_for_container():
+    panel = _edit_panel()
+    _call_show_room_object(panel, _make_room_object(archetype="container"))
+    transitions = panel._extra_data.get("transitions", [])
+    assert len(transitions) > 0
+
+
+# ---------------------------------------------------------------------------
+# default_transitions_for_archetype helper
+# ---------------------------------------------------------------------------
+
+
+def test_default_transitions_container_has_sealed_to_opened():
+    from dungeon_daddy.ui.panels.campaign_edit_panel import default_transitions_for_archetype
+    t = default_transitions_for_archetype("container")
+    assert any(r["from_state"] == "sealed" and r["to_state"] == "opened" for r in t)
+
+
+def test_default_transitions_door_has_closed_to_open():
+    from dungeon_daddy.ui.panels.campaign_edit_panel import default_transitions_for_archetype
+    t = default_transitions_for_archetype("door")
+    assert any(r["from_state"] == "closed" and r["to_state"] == "open" for r in t)
+
+
+def test_default_transitions_unknown_archetype_returns_empty():
+    from dungeon_daddy.ui.panels.campaign_edit_panel import default_transitions_for_archetype
+    assert default_transitions_for_archetype("nonexistent") == []
+
+
+# ---------------------------------------------------------------------------
+# CampaignListPanel — rooms section
+# ---------------------------------------------------------------------------
+
+
+def test_section_labels_includes_rooms_key():
+    from dungeon_daddy.ui.panels.campaign_list_panel import _SECTION_LABELS
+    assert "rooms" in _SECTION_LABELS
+
+
+def test_draw_card_rooms_with_room_object_routes_to_room_object_card(mocker):
+    p = _list_panel(1)
+    mock_ro_card = mocker.patch.object(p, "_draw_room_object_card")
+    mocker.patch("dungeon_daddy.ui.panels.campaign_list_panel.draw_rounded_rect")
+    mocker.patch("arcade.draw_text")
+    obj = _make_room_object()
+    p._draw_card("rooms", obj, 0, 220, 300, 460, 80, hovered=False)
+    mock_ro_card.assert_called_once()

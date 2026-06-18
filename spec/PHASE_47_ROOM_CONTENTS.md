@@ -1,8 +1,16 @@
 # Phase 47 — Room Contents: Items in Rooms + Interactive Objects
 
-**Status: In progress** (Slices 1–2 complete)
+**Status: COMPLETE** (all 9 slices + post-slice UI fixes; 2673 tests passing, 2026-06-18)
 GitHub issue: [#72](https://github.com/ghostpencil/dungeon-daddy/issues/72)
 Branch: `phase-47-items-in-rooms`
+
+> **Post-slice UI fixes (2026-06-18, 3 rounds).** After Slice 9 shipped, three rounds of
+> Campaign-UI bug/UX fixes landed on the same branch (see `PROJECT_INDEX.md` for detail):
+> (1) four render/wiring bugs (rooms section empty, scroll direction, header overlap, room
+> click); (2) the rooms **drill-down** was only half-wired — fixed the count badge, added
+> back-navigation (breadcrumb), and wired `+ ADD` / save / delete for room objects; (3)
+> room-object **form UX** — slug is now system-generated from the name, and archetype is a
+> `[<] CONTAINER [>]` cycle picker. Real dropdowns are deferred to Phase 50's VNA cards.
 
 > This spec was reconstructed from issue #72 (promoted from the Phase 47 roadmap draft card on
 > 2026-06-18) after Slices 1–2 had already shipped. It documents the canonical design, audits
@@ -385,22 +393,23 @@ track (5) — that can be sequenced either way; this spec keeps the issue order.
    on `items`; 7 archetypes; non-empty description; tables in `EXPECTED_TABLES`.
 2. ✅ **Repository object CRUD.** `save_room_object` (+ transition child rows), `get_room_object`,
    `get_objects_by_room`, `update_object_state`. Round-trip, upsert dedup, transition replace.
-3. **State transition validation.** `ActivateObject` validator: valid `(from_state, trigger)`
+3. ✅ **State transition validation.** `ActivateObject` validator: valid `(from_state, trigger)`
    match, `requires_item_slug` present in actor inventory, invalid transition rejected. (No
    side-effects yet.)
-4. **Transition side-effects.** `ActivateObject` applier: `update_object_state`; spawn item into
+4. ✅ **Transition side-effects.** `ActivateObject` applier: `update_object_state`; spawn item into
    room (decision #3); advance clock by slug; emit `object.transitioned` / `item.spawned` /
    `clock.advanced`.
-5. **`PickUpItem` / `DropItem` commands.** Validator (loose-item + cap), applier
+5. ✅ **`PickUpItem` / `DropItem` commands.** Validator (loose-item + cap), applier
    (`update_item_owner` + `update_item_room`), `item.picked_up` / `item.dropped`.
-6. **`ActivateObject` end-to-end.** Validate → apply → side-effects integration over a real repo
+6. ✅ **`ActivateObject` end-to-end.** Validate → apply → side-effects integration over a real repo
    (locked container with key → opened → spawns item → ticks clock).
-7. **Manifest + seed.** `ItemManifest.room_id`, `RoomObjectManifest`,
+7. ✅ **Manifest + seed.** `ItemManifest.room_id`, `RoomObjectManifest`,
    `CampaignManifest.room_objects`; `_seed_item` loose path + `_seed_room_object`; idempotent
    (`dry_run`/`force`).
-8. **Context bundle `current_room` block.** `current_room_id` param + `_fetch_current_room`
+8. ✅ **Context bundle `current_room` block.** `current_room_id` param + `_fetch_current_room`
    (objects + loose items); empty when no room id.
-9. **Campaign Seed editor UI.** Room picker, item placement, object form.
+9. ✅ **Campaign Seed editor UI.** Room picker, item placement, object form. *(Post-slice UI fixes
+   completed the drill-down navigation and form UX — see the header note.)*
 
 > Slices 3–6 replace the issue's "proposal type" wording with the Command-channel design
 > (decision #1). Transition side-effects (4) are engine-internal, not proposals (decision #2).

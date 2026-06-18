@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dungeon_daddy.rpg.command import ActivateObject, ConsumeItem, ConsumeKitCharge, EquipItem, GiveItem, TakeItem, UnequipItem
+from dungeon_daddy.rpg.command import ActivateObject, ConsumeItem, ConsumeKitCharge, DropItem, EquipItem, GiveItem, PickUpItem, TakeItem, UnequipItem
 from dungeon_daddy.rpg.command_validator import validate_command
 from dungeon_daddy.rpg.models import Item, ObjectTransition, RoomObject
 
@@ -390,5 +390,105 @@ class TestActivateObjectValidation:
         )
         repo.save_item(key)
         result = validate_command(_activate(), repo, CAMPAIGN)
+        assert result.accepted
+        assert result.rejection_events == []
+
+
+LOOSE_ITEM_ID = "item:test:gem"
+ROOM_ID_A = "room:test:vault"
+
+
+def _loose_item(item_id: str = LOOSE_ITEM_ID, status: str = "active", owner: str | None = None, room_id: str | None = ROOM_ID_A) -> Item:
+    return Item(
+        item_id=item_id,
+        campaign_id=CAMPAIGN,
+        slug=item_id.split(":")[-1],
+        display_name="Gem",
+        item_type="dungeon_item",
+        description="A sparkling gem.",
+        status=status,  # type: ignore[arg-type]
+        owner_actor_id=owner,
+        room_id=room_id,
+    )
+
+
+class TestPickUpItemValidation:
+    def test_rejects_unknown_item(self, repo) -> None:
+        _save_pc(repo, ACTOR_A)
+        result = validate_command(PickUpItem(item_id=LOOSE_ITEM_ID, actor_id=ACTOR_A), repo, CAMPAIGN)
+        assert not result.accepted
+        assert result.rejection_events[0].event_type == "command.rejected"
+
+    def test_rejects_non_dungeon_item(self, repo) -> None:
+        kit = Item(
+            item_id=LOOSE_ITEM_ID, campaign_id=CAMPAIGN, slug="gem",
+            display_name="Gem", item_type="class_kit", description="A kit.",
+            charges_max=1, charges_current=1,
+        )
+        repo.save_item(kit)
+        _save_pc(repo, ACTOR_A)
+        result = validate_command(PickUpItem(item_id=LOOSE_ITEM_ID, actor_id=ACTOR_A), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "dungeon_item" in (result.rejection_reason or "")
+
+    def test_rejects_inactive_item(self, repo) -> None:
+        repo.save_item(_loose_item(status="inert"))
+        _save_pc(repo, ACTOR_A)
+        result = validate_command(PickUpItem(item_id=LOOSE_ITEM_ID, actor_id=ACTOR_A), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "not active" in (result.rejection_reason or "")
+
+    def test_rejects_already_owned_item(self, repo) -> None:
+        repo.save_item(_loose_item(owner=ACTOR_B))
+        _save_pc(repo, ACTOR_A)
+        result = validate_command(PickUpItem(item_id=LOOSE_ITEM_ID, actor_id=ACTOR_A), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "already owned" in (result.rejection_reason or "")
+
+    def test_rejects_unknown_actor(self, repo) -> None:
+        repo.save_item(_loose_item())
+        result = validate_command(PickUpItem(item_id=LOOSE_ITEM_ID, actor_id=ACTOR_A), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "Unknown actor" in (result.rejection_reason or "")
+
+    def test_rejects_non_pc_actor(self, repo) -> None:
+        repo.save_item(_loose_item())
+        _save_npc(repo, ACTOR_A)
+        result = validate_command(PickUpItem(item_id=LOOSE_ITEM_ID, actor_id=ACTOR_A), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "not a player character" in (result.rejection_reason or "")
+
+    def test_rejects_actor_at_cap(self, repo) -> None:
+        repo.save_item(_loose_item())
+        _save_pc(repo, ACTOR_A)
+        for i in range(10):
+            repo.save_item(_loose_item(item_id=f"item:test:filler-{i}", room_id=None, owner=ACTOR_A))
+        result = validate_command(PickUpItem(item_id=LOOSE_ITEM_ID, actor_id=ACTOR_A), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "cap" in (result.rejection_reason or "")
+
+    def test_accepts_valid_loose_item(self, repo) -> None:
+        repo.save_item(_loose_item())
+        _save_pc(repo, ACTOR_A)
+        result = validate_command(PickUpItem(item_id=LOOSE_ITEM_ID, actor_id=ACTOR_A), repo, CAMPAIGN)
+        assert result.accepted
+        assert result.rejection_events == []
+
+
+class TestDropItemValidation:
+    def test_rejects_unknown_item(self, repo) -> None:
+        result = validate_command(DropItem(item_id=LOOSE_ITEM_ID, room_id=ROOM_ID_A), repo, CAMPAIGN)
+        assert not result.accepted
+        assert result.rejection_events[0].event_type == "command.rejected"
+
+    def test_rejects_unowned_item(self, repo) -> None:
+        repo.save_item(_loose_item(owner=None))
+        result = validate_command(DropItem(item_id=LOOSE_ITEM_ID, room_id=ROOM_ID_A), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "no owner" in (result.rejection_reason or "")
+
+    def test_accepts_owned_item(self, repo) -> None:
+        repo.save_item(_loose_item(owner=ACTOR_A, room_id=None))
+        result = validate_command(DropItem(item_id=LOOSE_ITEM_ID, room_id=ROOM_ID_A), repo, CAMPAIGN)
         assert result.accepted
         assert result.rejection_events == []

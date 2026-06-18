@@ -38,6 +38,18 @@ class UnequipItem(BaseModel):
     item_id: str
 
 
+class PickUpItem(BaseModel):
+    kind: Literal["pick_up_item"] = "pick_up_item"
+    item_id: str
+    actor_id: str
+
+
+class DropItem(BaseModel):
+    kind: Literal["drop_item"] = "drop_item"
+    item_id: str
+    room_id: str
+
+
 class ActivateObject(BaseModel):
     kind: Literal["activate_object"] = "activate_object"
     object_id: str
@@ -46,6 +58,6 @@ class ActivateObject(BaseModel):
 
 
 PlayerCommand = Annotated[
-    Union[ConsumeKitCharge, ConsumeItem, GiveItem, TakeItem, EquipItem, UnequipItem, ActivateObject],
+    Union[ConsumeKitCharge, ConsumeItem, GiveItem, TakeItem, EquipItem, UnequipItem, PickUpItem, DropItem, ActivateObject],
     Field(discriminator="kind"),
 ]

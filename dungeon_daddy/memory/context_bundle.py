@@ -17,12 +17,14 @@ class ContextBundleBuilder:
         mode: Literal["run_scene", "recap", "room_revisit", "fallout_resolution"],
         focus_actor_ids: list[str],
         token_budget: int,
+        current_room_id: str | None = None,
     ) -> None:
         self._campaign_id = campaign_id
         self._scene_id = scene_id
         self._mode = mode
         self._focus_actor_ids = focus_actor_ids
         self._token_budget = token_budget
+        self._current_room_id = current_room_id
 
     def build(self, repo: MemoryRepository) -> ContextBundle:
         memory_cards, must_remember, provenance = self._fetch_memories(repo)
@@ -39,6 +41,7 @@ class ContextBundleBuilder:
             must_remember=must_remember,
             faction_reputations=self._fetch_faction_reputations(repo),
             inventory=self._fetch_inventory(repo),
+            current_room=self._fetch_current_room(repo),
             provenance=provenance,
         )
 
@@ -156,6 +159,35 @@ class ContextBundleBuilder:
                 ),
             }
         return result
+
+    def _fetch_current_room(self, repo: MemoryRepository) -> dict:
+        if self._current_room_id is None:
+            return {}
+        objects = repo.get_objects_by_room(self._campaign_id, self._current_room_id)
+        raw_items = repo.get_items_by_room(self._campaign_id, self._current_room_id)
+        return {
+            "room_id": self._current_room_id,
+            "objects": [
+                {
+                    "slug": o["slug"],
+                    "display_name": o["display_name"],
+                    "archetype": o["archetype"],
+                    "current_state": o["current_state"],
+                    "description": o["description"],
+                }
+                for o in objects
+            ],
+            "loose_items": [
+                {
+                    "slug": i["slug"],
+                    "display_name": i["display_name"],
+                    "description": i["description"],
+                    "status": i["status"],
+                }
+                for i in raw_items
+                if i["item_type"] == "dungeon_item"
+            ],
+        }
 
     def _fetch_scene_brief(self, repo: MemoryRepository) -> dict:
         if self._scene_id is None:
