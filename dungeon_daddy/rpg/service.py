@@ -8,6 +8,7 @@ from dungeon_daddy.rpg.clocks import advance_clock, create_clock
 from dungeon_daddy.rpg.stress import create_default_stress_tracks, is_track_filled, mark_stress
 from dungeon_daddy.rpg.world_reaction import compute_world_reaction
 from dungeon_daddy.memory.models import DomainEvent
+from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.models import (
     ActionRequest,
     ActionResolution,
@@ -107,3 +108,43 @@ class RpgService:
             },
         )
         return updated, event
+
+
+def refresh_kits(repo: MemoryRepository, actor_id: str) -> list[str]:
+    """Set charges_current = charges_max for the actor's active class_kit items."""
+    refreshed: list[str] = []
+    for item in repo.get_items_by_actor(actor_id):
+        if item["item_type"] == "class_kit" and item["status"] == "active":
+            repo.update_item_charges(item["item_id"], item["charges_max"])
+            refreshed.append(item["item_id"])
+    return refreshed
+
+
+def mark_level_items_inert(
+    repo: MemoryRepository,
+    campaign_id: str,
+    level_id: str,
+) -> list[str]:
+    """Set status='inert' for all active items bound to the given level."""
+    affected: list[str] = []
+    for item in repo.get_items(campaign_id):
+        if item["level_id"] == level_id and item["status"] == "active":
+            repo.update_item_status(item["item_id"], "inert")
+            affected.append(item["item_id"])
+    return affected
+
+
+def compute_effective_ratings(
+    actor_id: str,
+    base_ratings: dict[str, int],
+    repo: MemoryRepository,
+) -> dict[str, int]:
+    """Return base action ratings plus modifiers from the actor's equipped gear features."""
+    effective = dict(base_ratings)
+    for item in repo.get_items_by_actor(actor_id):
+        if item["item_type"] == "equipped_gear" and item.get("is_equipped"):
+            for feature in item.get("features", []):
+                if feature["feature_type"] == "rating_modifier":
+                    key = feature["action_key"]
+                    effective[key] = effective.get(key, 0) + feature["modifier"]
+    return effective

@@ -11,9 +11,12 @@ from dungeon_daddy.rpg.proposal import (
     AdvanceClockChange,
     AdjustReputationChange,
     ApplyConsequenceChange,
+    GrantItemChange,
     LLMReactionProposal,
     NpcReactionChange,
     ProposedChange,
+    StripItemChange,
+    TransformItemChange,
 )
 
 _log = logging.getLogger(__name__)
@@ -40,11 +43,17 @@ def validate_proposal(
     known_actor_ids: set[str] | None = None,
     player_actor_ids: set[str] | None = None,
     known_faction_slugs: set[str] | None = None,
+    known_item_ids: set[str] | None = None,
+    known_item_slugs: set[str] | None = None,
+    dungeon_item_counts: dict[str, int] | None = None,
 ) -> ValidationResult:
     result = ValidationResult(source=proposal.source)
     actor_ids = known_actor_ids or set()
     player_ids = player_actor_ids or set()
     faction_slugs = known_faction_slugs or set()
+    item_ids = known_item_ids or set()
+    item_slugs = known_item_slugs or set()
+    di_counts = dungeon_item_counts or {}
 
     for change in proposal.proposed_changes:
         rejection_reason: str | None = None
@@ -63,6 +72,19 @@ def validate_proposal(
         elif isinstance(change, AdjustReputationChange):
             if change.faction_slug not in faction_slugs:
                 rejection_reason = f"Unknown faction slug: {change.faction_slug}"
+        elif isinstance(change, GrantItemChange):
+            if change.to_actor_id not in actor_ids:
+                rejection_reason = f"Unknown actor reference: {change.to_actor_id}"
+            elif change.item_slug not in item_slugs:
+                rejection_reason = f"Unknown item slug: {change.item_slug}"
+            elif di_counts.get(change.to_actor_id, 0) >= 10:
+                rejection_reason = f"Actor at dungeon-item cap: {change.to_actor_id}"
+        elif isinstance(change, StripItemChange):
+            if change.item_id not in item_ids:
+                rejection_reason = f"Unknown item reference: {change.item_id}"
+        elif isinstance(change, TransformItemChange):
+            if change.item_id not in item_ids:
+                rejection_reason = f"Unknown item reference: {change.item_id}"
 
         if rejection_reason is not None:
             _log.info("Proposal rejected [%s]: %s", change.kind, rejection_reason)

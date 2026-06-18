@@ -8,6 +8,8 @@ from dungeon_daddy.rpg.models import (
     ActorState,
     ClockState,
     FalloutRecord,
+    Item,
+    ItemFeature,
     ReactionClockLine,
     ReactionStressLine,
     StressTrack,
@@ -330,3 +332,117 @@ class TestFalloutRecord:
                 summary="S",
             )
             assert f.severity == s
+
+
+class TestItem:
+    def test_constructs_with_required_fields(self) -> None:
+        item = Item(
+            item_id="item:camp-1:torch",
+            campaign_id="camp-1",
+            slug="torch",
+            display_name="Torch",
+            item_type="dungeon_item",
+            description="A simple torch that lights the way.",
+        )
+        assert item.item_id == "item:camp-1:torch"
+        assert item.status == "active"
+        assert item.is_equipped is False
+        assert item.features == []
+
+    def test_empty_description_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            Item(
+                item_id="item:c:x",
+                campaign_id="c",
+                slug="x",
+                display_name="X",
+                item_type="dungeon_item",
+                description="",
+            )
+
+    def test_class_kit_requires_charges_max(self) -> None:
+        with pytest.raises(ValidationError):
+            Item(
+                item_id="item:c:kit",
+                campaign_id="c",
+                slug="kit",
+                display_name="Kit",
+                item_type="class_kit",
+                description="A healer kit.",
+                charges_max=0,
+                charges_current=0,
+            )
+
+    def test_class_kit_charges_current_cannot_exceed_max(self) -> None:
+        with pytest.raises(ValidationError):
+            Item(
+                item_id="item:c:kit",
+                campaign_id="c",
+                slug="kit",
+                display_name="Kit",
+                item_type="class_kit",
+                description="A healer kit.",
+                charges_max=3,
+                charges_current=4,
+            )
+
+    def test_dungeon_item_cannot_carry_features(self) -> None:
+        with pytest.raises(ValidationError):
+            Item(
+                item_id="item:c:stone",
+                campaign_id="c",
+                slug="stone",
+                display_name="Stone",
+                item_type="dungeon_item",
+                description="A magic stone.",
+                features=[
+                    ItemFeature(
+                        feature_id="f1",
+                        item_id="item:c:stone",
+                        feature_type="new_action",
+                        action_key="throw",
+                    )
+                ],
+            )
+
+    def test_equipped_gear_accepts_features(self) -> None:
+        item = Item(
+            item_id="item:c:sword",
+            campaign_id="c",
+            slug="sword",
+            display_name="Sword",
+            item_type="equipped_gear",
+            description="A sharp blade.",
+            features=[
+                ItemFeature(
+                    feature_id="f1",
+                    item_id="item:c:sword",
+                    feature_type="rating_modifier",
+                    action_key="fight",
+                    modifier=1,
+                )
+            ],
+        )
+        assert len(item.features) == 1
+
+
+class TestItemFeature:
+    def test_rating_modifier_requires_modifier(self) -> None:
+        with pytest.raises(ValidationError):
+            ItemFeature(
+                feature_id="f1",
+                item_id="item:c:sword",
+                feature_type="rating_modifier",
+                action_key="fight",
+                modifier=None,
+            )
+
+    def test_new_action_requires_modifier_none(self) -> None:
+        with pytest.raises(ValidationError):
+            ItemFeature(
+                feature_id="f1",
+                item_id="item:c:sword",
+                feature_type="new_action",
+                action_key="cleave",
+                modifier=1,
+            )

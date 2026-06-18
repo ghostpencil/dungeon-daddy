@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, FactionManifest
+from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, FactionManifest, ItemManifest
 from dungeon_daddy.memory.repository import MemoryRepository
 
 
@@ -48,6 +48,9 @@ def seed_from_manifest(
 
     for faction in manifest.factions:
         _seed_faction(faction, repo, campaign_id, slug, result, dry_run=dry_run)
+
+    for item in manifest.items:
+        _seed_item(item, repo, campaign_id, slug, result, dry_run=dry_run, force=force)
 
     return result
 
@@ -179,6 +182,68 @@ def _seed_faction(
             tags=faction.tags,
         ))
         result.created += 1
+    else:
+        result.skipped += 1
+
+
+def _item_id(campaign_slug: str, item_slug: str) -> str:
+    return f"item:{campaign_slug}:{item_slug}"
+
+
+def _seed_item(
+    item: ItemManifest,
+    repo: MemoryRepository,
+    campaign_id: str,
+    campaign_slug: str,
+    result: SeedResult,
+    dry_run: bool,
+    force: bool,
+) -> None:
+    from dungeon_daddy.rpg.models import Item, ItemFeature
+
+    item_id = _item_id(campaign_slug, item.slug)
+    existing_ids = {i["item_id"] for i in repo.get_items(campaign_id)}
+
+    if dry_run:
+        result.created += 1 if item_id not in existing_ids else 0
+        result.skipped += 0 if item_id not in existing_ids else 1
+        return
+
+    owner_actor_id = (
+        _actor_id(campaign_slug, item.owner_slug) if item.owner_slug else None
+    )
+    charges_current = item.charges_max if item.charges_max is not None else None
+    features = [
+        ItemFeature(
+            feature_id=f"feat:{item_id}:{f.action_key}:{f.feature_type}",
+            item_id=item_id,
+            feature_type=f.feature_type,
+            action_key=f.action_key,
+            modifier=f.modifier,
+        )
+        for f in item.features
+    ]
+    domain_item = Item(
+        item_id=item_id,
+        campaign_id=campaign_id,
+        slug=item.slug,
+        display_name=item.display_name,
+        item_type=item.item_type,
+        description=item.description,
+        owner_actor_id=owner_actor_id,
+        level_id=item.level_id,
+        charges_max=item.charges_max,
+        charges_current=charges_current,
+        is_equipped=item.is_equipped,
+        features=features,
+    )
+
+    if item_id not in existing_ids:
+        repo.save_item(domain_item)
+        result.created += 1
+    elif force:
+        repo.save_item(domain_item)
+        result.updated += 1
     else:
         result.skipped += 1
 

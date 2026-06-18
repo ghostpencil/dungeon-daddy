@@ -149,3 +149,69 @@ def test_tags_from_actor():
     panel.set_actor(actor)
     assert "scoundrel" in panel._actor.tags
     assert "blade" in panel._actor.tags
+
+
+# ---------------------------------------------------------------------------
+# Slice 9 — inventory: set_inventory / state storage
+# ---------------------------------------------------------------------------
+
+def test_inventory_defaults_empty():
+    panel = _panel()
+    assert panel._kits == []
+    assert panel._dungeon_items == []
+    assert panel._equipped == []
+
+
+def test_set_inventory_stores_kits():
+    panel = _panel()
+    kits = [{"slug": "healer-kit", "display_name": "Healer Kit", "charges_current": 2, "charges_max": 3}]
+    panel.set_inventory(kits=kits, dungeon_items=[], equipped=[])
+    assert len(panel._kits) == 1
+    assert panel._kits[0]["slug"] == "healer-kit"
+    assert panel._kits[0]["charges_current"] == 2
+    assert panel._kits[0]["charges_max"] == 3
+
+
+def test_set_inventory_stores_dungeon_items():
+    panel = _panel()
+    items = [
+        {"slug": "amulet", "display_name": "Amulet of Truth", "status": "active", "level_bound": True},
+        {"slug": "coin", "display_name": "Strange Coin", "status": "active", "level_bound": False},
+    ]
+    panel.set_inventory(kits=[], dungeon_items=items, equipped=[])
+    assert len(panel._dungeon_items) == 2
+    assert panel._dungeon_items[0]["level_bound"] is True
+    assert panel._dungeon_items[1]["level_bound"] is False
+
+
+def test_set_inventory_replaces_previous():
+    panel = _panel()
+    panel.set_inventory(
+        kits=[{"slug": "k1", "display_name": "K1", "charges_current": 1, "charges_max": 2}],
+        dungeon_items=[{"slug": "d1", "display_name": "D1", "status": "active", "level_bound": False}],
+        equipped=[],
+    )
+    panel.set_inventory(kits=[], dungeon_items=[], equipped=[])
+    assert panel._kits == []
+    assert panel._dungeon_items == []
+
+
+def test_set_inventory_stores_equipped_with_features():
+    panel = _panel()
+    gear = [
+        {
+            "slug": "iron-sword",
+            "display_name": "Iron Sword",
+            "features": [{"feature_type": "rating_modifier", "action_key": "fight", "modifier": 1}],
+        },
+        {
+            "slug": "shadow-cloak",
+            "display_name": "Shadow Cloak",
+            "features": [{"feature_type": "new_action", "action_key": "vanish", "modifier": None}],
+        },
+    ]
+    panel.set_inventory(kits=[], dungeon_items=[], equipped=gear)
+    assert len(panel._equipped) == 2
+    assert panel._equipped[0]["features"][0]["action_key"] == "fight"
+    assert panel._equipped[0]["features"][0]["modifier"] == 1
+    assert panel._equipped[1]["features"][0]["feature_type"] == "new_action"

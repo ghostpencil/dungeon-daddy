@@ -47,6 +47,26 @@ class AdjustReputationChange(BaseModel):
     reason: str
 
 
+class GrantItemChange(BaseModel):
+    kind: Literal["grant_item"] = "grant_item"
+    item_slug: str
+    to_actor_id: str
+    reason: str
+
+
+class StripItemChange(BaseModel):
+    kind: Literal["strip_item"] = "strip_item"
+    item_id: str
+    reason: str
+
+
+class TransformItemChange(BaseModel):
+    kind: Literal["transform_item"] = "transform_item"
+    item_id: str
+    new_slug: str
+    reason: str
+
+
 ProposedChange = Annotated[
     Union[
         AdvanceClockChange,
@@ -54,6 +74,9 @@ ProposedChange = Annotated[
         CreateMemoryChange,
         NpcReactionChange,
         AdjustReputationChange,
+        GrantItemChange,
+        StripItemChange,
+        TransformItemChange,
     ],
     Field(discriminator="kind"),
 ]

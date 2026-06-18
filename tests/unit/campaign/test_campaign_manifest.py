@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, ClockManifest, FactionManifest
+from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, ClockManifest, FactionManifest, ItemFeatureManifest, ItemManifest
 
 
 def test_actor_manifest_parses_required_fields():
@@ -137,3 +137,58 @@ def test_campaign_manifest_round_trips_to_json():
     assert restored.slug == original.slug
     assert restored.world_actors[0].slug == "valeria"
     assert restored.clocks[0].slug == "doom-clock"
+
+
+def test_item_manifest_parses_minimal_fields():
+    item = ItemManifest(
+        slug="lockpick-kit",
+        display_name="Lockpick Kit",
+        item_type="class_kit",
+        description="A well-used set of picks.",
+        charges_max=3,
+    )
+    assert item.slug == "lockpick-kit"
+    assert item.item_type == "class_kit"
+    assert item.description == "A well-used set of picks."
+    assert item.owner_slug is None
+    assert item.features == []
+
+
+def test_item_manifest_parses_with_feature():
+    item = ItemManifest(
+        slug="shadow-blade",
+        display_name="Shadow Blade",
+        item_type="equipped_gear",
+        description="A blade that hides in shadow.",
+        features=[
+            ItemFeatureManifest(feature_type="rating_modifier", action_key="fight", modifier=1),
+            ItemFeatureManifest(feature_type="new_action", action_key="vanish"),
+        ],
+    )
+    assert len(item.features) == 2
+    assert item.features[0].feature_type == "rating_modifier"
+    assert item.features[0].modifier == 1
+    assert item.features[1].feature_type == "new_action"
+    assert item.features[1].modifier is None
+
+
+def test_campaign_manifest_accepts_items_list():
+    campaign = CampaignManifest(
+        slug="bone-cathedral",
+        title="The Bone Cathedral",
+        dungeon_slug="bone-cathedral",
+        items=[
+            ItemManifest(
+                slug="lockpick-kit",
+                display_name="Lockpick Kit",
+                item_type="class_kit",
+                description="A well-used set of picks.",
+                charges_max=3,
+                owner_slug="valeria",
+            )
+        ],
+    )
+    assert len(campaign.items) == 1
+    assert isinstance(campaign.items[0], ItemManifest)
+    assert campaign.items[0].slug == "lockpick-kit"
+    assert campaign.items[0].owner_slug == "valeria"

@@ -6,6 +6,7 @@ from typing import Literal
 from dungeon_daddy.memory.models import ContextBundle, MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.memory.retrieval import MemoryRetriever
+from dungeon_daddy.rpg.service import compute_effective_ratings
 
 
 class ContextBundleBuilder:
@@ -37,6 +38,7 @@ class ContextBundleBuilder:
             memory_cards=memory_cards,
             must_remember=must_remember,
             faction_reputations=self._fetch_faction_reputations(repo),
+            inventory=self._fetch_inventory(repo),
             provenance=provenance,
         )
 
@@ -106,6 +108,54 @@ class ContextBundleBuilder:
             for f in factions
             if f["status"] == "active"
         ]
+
+    def _fetch_inventory(self, repo: MemoryRepository) -> dict:
+        result: dict = {}
+        for actor_id in self._focus_actor_ids:
+            items = repo.get_items_by_actor(actor_id)
+            base_ratings = {
+                r["action_key"]: r["rating"]
+                for r in repo.get_actor_action_ratings(actor_id)
+            }
+            kits = [
+                {
+                    "slug": i["slug"],
+                    "display_name": i["display_name"],
+                    "charges_current": i["charges_current"],
+                    "charges_max": i["charges_max"],
+                }
+                for i in items
+                if i["item_type"] == "class_kit" and i["status"] == "active"
+            ]
+            dungeon_items = [
+                {
+                    "slug": i["slug"],
+                    "display_name": i["display_name"],
+                    "description": i["description"],
+                    "status": i["status"],
+                    "level_bound": i["level_id"] is not None,
+                }
+                for i in items
+                if i["item_type"] == "dungeon_item"
+            ]
+            equipped = [
+                {
+                    "slug": i["slug"],
+                    "display_name": i["display_name"],
+                    "features": i.get("features", []),
+                }
+                for i in items
+                if i["item_type"] == "equipped_gear" and i.get("is_equipped")
+            ]
+            result[actor_id] = {
+                "kits": kits,
+                "dungeon_items": dungeon_items,
+                "equipped": equipped,
+                "effective_actions": compute_effective_ratings(
+                    actor_id, base_ratings, repo
+                ),
+            }
+        return result
 
     def _fetch_scene_brief(self, repo: MemoryRepository) -> dict:
         if self._scene_id is None:
