@@ -413,12 +413,24 @@ class DungeonDaddyWindow(arcade.Window):
         self._campaign_view.set_seed_library(self._seed_library)
         self._campaign_view.load_manifest(manifest)
         self._campaign_view.is_dirty = True
+        try:
+            dungeon = self._dungeon_repo.load(dungeon_slug)
+            self._campaign_view.set_dungeon(dungeon)
+        except Exception:
+            _log.warning("Could not load dungeon '%s' for campaign view", dungeon_slug)
         self.switch_mode("campaign")
 
     def edit_seed(self, seed_slug: str) -> None:
         """Load an existing campaign seed into Campaign mode for editing."""
         self._campaign_view.set_seed_library(self._seed_library)
         self._campaign_view.load_seed(seed_slug)
+        dungeon_slug = self._campaign_view.attached_dungeon_slug
+        if dungeon_slug:
+            try:
+                dungeon = self._dungeon_repo.load(dungeon_slug)
+                self._campaign_view.set_dungeon(dungeon)
+            except Exception:
+                _log.warning("Could not load dungeon '%s' for campaign view", dungeon_slug)
         self.switch_mode("campaign")
 
     def publish_and_play(self, seed_slug: str) -> None:

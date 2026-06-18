@@ -8,7 +8,9 @@ from dungeon_daddy.campaign.manifest import (
     CampaignManifest,
     ClockManifest,
     FactionManifest,
+    RoomObjectManifest,
 )
+from dungeon_daddy.data.models import Dungeon, DungeonMeta, Level, Room
 
 from dungeon_daddy.views.campaign_view import CampaignView
 
@@ -638,3 +640,321 @@ def test_save_and_load_seed_round_trip(tmp_path):
     assert view2.manifest.dungeon_slug == "bone-cathedral"
     assert view2.manifest.title == "Test Campaign"
     assert view2.is_dirty is False
+
+
+# ---------------------------------------------------------------------------
+# Slice 9 — Rooms section + room object CRUD
+# ---------------------------------------------------------------------------
+
+
+def _minimal_dungeon() -> Dungeon:
+    room = Room(id="room-01", num=1, name="Entry Hall", x=0, y=0, w=10, h=10, type="room", note="")
+    level = Level(
+        id=1, name="Level 1", summary="", ecology="", loop="",
+        width=100, height=100, entries=[], rooms=[room], connections=[],
+    )
+    return Dungeon(
+        meta=DungeonMeta(title="Test Dungeon", theme="", setting="", party="", quest=""),
+        levels=[level],
+    )
+
+
+def _make_room_object_v(slug: str = "iron-chest", room_id: str = "room-01") -> RoomObjectManifest:
+    return RoomObjectManifest(
+        slug=slug,
+        display_name=slug.replace("-", " ").title(),
+        room_id=room_id,
+        level_id="level-01",
+        archetype="container",
+        description="A sturdy chest.",
+        initial_state="sealed",
+    )
+
+
+def test_rooms_in_campaign_sections():
+    assert "rooms" in CampaignView._SECTIONS
+
+
+def test_set_dungeon_stores_dungeon():
+    view = _make_view()
+    dungeon = _minimal_dungeon()
+    view.set_dungeon(dungeon)
+    assert view._dungeon is dungeon
+
+
+def test_set_selected_room_updates_state():
+    view = _make_view()
+    view.set_selected_room("room-01")
+    assert view._selected_room_id == "room-01"
+
+
+def test_set_selected_room_none_clears_selection():
+    view = _make_view()
+    view.set_selected_room("room-01")
+    view.set_selected_room(None)
+    assert view._selected_room_id is None
+
+
+def test_add_room_object_appends_to_manifest():
+    view = _make_view()
+    view.load_manifest(_minimal_manifest())
+    obj = _make_room_object_v()
+    view.add_room_object(obj)
+    assert obj in view.manifest.room_objects
+
+
+def test_add_room_object_marks_dirty():
+    view = _make_view()
+    view.load_manifest(_minimal_manifest())
+    view.add_room_object(_make_room_object_v())
+    assert view.is_dirty
+
+
+def test_remove_room_object_removes_by_slug():
+    view = _make_view()
+    m = _minimal_manifest()
+    obj = _make_room_object_v(slug="iron-chest")
+    m.room_objects.append(obj)
+    view.load_manifest(m)
+    view.remove_room_object("iron-chest")
+    assert all(o.slug != "iron-chest" for o in view.manifest.room_objects)
+
+
+def test_remove_room_object_marks_dirty():
+    view = _make_view()
+    m = _minimal_manifest()
+    m.room_objects.append(_make_room_object_v(slug="iron-chest"))
+    view.load_manifest(m)
+    view.remove_room_object("iron-chest")
+    assert view.is_dirty
+
+
+def test_section_items_rooms_no_dungeon_returns_empty():
+    view = _make_view()
+    view.load_manifest(_minimal_manifest())
+    view.set_active_section("rooms")
+    assert view._section_items() == []
+
+
+def test_section_items_rooms_no_room_selected_returns_dungeon_rooms():
+    view = _make_view()
+    view.load_manifest(_minimal_manifest())
+    view.set_dungeon(_minimal_dungeon())
+    view.set_active_section("rooms")
+    items = view._section_items()
+    assert len(items) == 1
+    assert items[0].id == "room-01"
+
+
+def test_section_items_rooms_room_selected_returns_objects():
+    view = _make_view()
+    m = _minimal_manifest()
+    obj = _make_room_object_v(slug="iron-chest", room_id="room-01")
+    m.room_objects.append(obj)
+    view.load_manifest(m)
+    view.set_active_section("rooms")
+    view.set_selected_room("room-01")
+    items = view._section_items()
+    assert obj in items
+
+
+def test_section_items_rooms_filters_objects_by_room():
+    view = _make_view()
+    m = _minimal_manifest()
+    obj1 = _make_room_object_v(slug="obj-1", room_id="room-01")
+    obj2 = _make_room_object_v(slug="obj-2", room_id="room-02")
+    m.room_objects.extend([obj1, obj2])
+    view.load_manifest(m)
+    view.set_active_section("rooms")
+    view.set_selected_room("room-01")
+    items = view._section_items()
+    assert obj1 in items
+    assert obj2 not in items
+
+
+def test_section_counts_rooms_top_level_counts_dungeon_rooms():
+    # At the top level (no room drilled into) the badge reflects the number of
+    # dungeon rooms shown, not the number of placed room objects.
+    view = _make_view()
+    m = _minimal_manifest()
+    m.room_objects.append(_make_room_object_v())
+    view.load_manifest(m)
+    view.set_dungeon(_minimal_dungeon())
+    counts = view._section_counts()
+    assert "rooms" in counts
+    assert counts["rooms"] == 1  # one dungeon room
+
+
+def test_section_counts_rooms_top_level_no_dungeon_is_zero():
+    view = _make_view()
+    view.load_manifest(_minimal_manifest())
+    counts = view._section_counts()
+    assert counts["rooms"] == 0
+
+
+def test_section_counts_rooms_when_room_selected_counts_objects():
+    view = _make_view()
+    m = _minimal_manifest()
+    m.room_objects.append(_make_room_object_v(slug="iron-chest", room_id="room-01"))
+    m.room_objects.append(_make_room_object_v(slug="oak-door", room_id="room-02"))
+    view.load_manifest(m)
+    view.set_dungeon(_minimal_dungeon())
+    view.set_active_section("rooms")
+    view.set_selected_room("room-01")
+    counts = view._section_counts()
+    assert counts["rooms"] == 1  # only objects in room-01
+
+
+def test_select_room_drills_into_room():
+    from unittest.mock import MagicMock
+    view = _make_view()
+    view.load_manifest(_minimal_manifest())
+    view.set_dungeon(_minimal_dungeon())
+    view.set_active_section("rooms")
+    view._edit_panel = MagicMock()
+    view._select_item_at(0)
+    assert view._selected_room_id == "room-01"
+
+
+def test_select_room_object_opens_edit_form():
+    from unittest.mock import MagicMock
+    view = _make_view()
+    m = _minimal_manifest()
+    obj = _make_room_object_v(slug="iron-chest", room_id="room-01")
+    m.room_objects.append(obj)
+    view.load_manifest(m)
+    view.set_dungeon(_minimal_dungeon())
+    view.set_active_section("rooms")
+    view.set_selected_room("room-01")
+    view._edit_panel = MagicMock()
+    view._select_item_at(0)
+    view._edit_panel.show_room_object.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Phase 47 rooms drill-down — add / save / delete / back navigation fixes
+# ---------------------------------------------------------------------------
+
+
+def test_start_new_item_rooms_with_room_selected_opens_new_form():
+    from unittest.mock import MagicMock
+    view = _make_view()
+    view.load_manifest(_minimal_manifest())
+    view.set_dungeon(_minimal_dungeon())
+    view.set_active_section("rooms")
+    view.set_selected_room("room-01")
+    view._edit_panel = MagicMock()
+    view._start_new_item()
+    view._edit_panel.show_room_object.assert_called_once()
+    args, kwargs = view._edit_panel.show_room_object.call_args
+    blank = args[0]
+    assert blank.room_id == "room-01"
+    assert blank.level_id == "1"  # derived from dungeon level containing room
+    assert kwargs.get("is_new") is True
+
+
+def test_start_new_item_rooms_no_room_selected_is_noop():
+    from unittest.mock import MagicMock
+    view = _make_view()
+    view.load_manifest(_minimal_manifest())
+    view.set_dungeon(_minimal_dungeon())
+    view.set_active_section("rooms")
+    view._edit_panel = MagicMock()
+    view._start_new_item()
+    view._edit_panel.show_room_object.assert_not_called()
+
+
+def test_on_form_save_new_room_object_adds_to_manifest():
+    from unittest.mock import MagicMock
+    view = _make_view()
+    view.load_manifest(_minimal_manifest())
+    view.set_active_section("rooms")
+    view.set_selected_room("room-01")
+    view._edit_panel = MagicMock()
+    view._edit_panel.mode = "new_room_object"
+    data = {
+        "slug": "iron-chest", "display_name": "Iron Chest",
+        "room_id": "room-01", "level_id": "1",
+        "archetype": "container", "description": "A sturdy chest.",
+        "initial_state": "sealed", "transitions": [],
+    }
+    view._on_form_save(data)
+    assert any(o.slug == "iron-chest" for o in view.manifest.room_objects)
+    assert view.is_dirty
+
+
+def test_on_form_save_edit_room_object_updates_fields():
+    from unittest.mock import MagicMock
+    view = _make_view()
+    m = _minimal_manifest()
+    m.room_objects.append(_make_room_object_v(slug="iron-chest", room_id="room-01"))
+    view.load_manifest(m)
+    view.set_active_section("rooms")
+    view.set_selected_room("room-01")
+    view._selected_item_index = 0
+    view._edit_panel = MagicMock()
+    view._edit_panel.mode = "room_object"
+    data = {
+        "slug": "iron-chest", "display_name": "Rusty Chest",
+        "room_id": "room-01", "level_id": "1",
+        "archetype": "container", "description": "Now rusty.",
+        "initial_state": "sealed", "transitions": [],
+    }
+    view._on_form_save(data)
+    updated = view.manifest.room_objects[0]
+    assert updated.display_name == "Rusty Chest"
+    assert updated.description == "Now rusty."
+
+
+def test_delete_item_at_rooms_removes_object():
+    from unittest.mock import MagicMock
+    view = _make_view()
+    m = _minimal_manifest()
+    m.room_objects.append(_make_room_object_v(slug="iron-chest", room_id="room-01"))
+    view.load_manifest(m)
+    view.set_active_section("rooms")
+    view.set_selected_room("room-01")
+    view._edit_panel = MagicMock()
+    view._delete_item_at(0)
+    assert all(o.slug != "iron-chest" for o in view.manifest.room_objects)
+
+
+def test_back_button_click_deselects_room():
+    from unittest.mock import MagicMock
+    view = _make_view()
+    view.load_manifest(_minimal_manifest())
+    view.set_dungeon(_minimal_dungeon())
+    view.set_active_section("rooms")
+    view.set_selected_room("room-01")
+    view.window = MagicMock(width=1400, height=900)
+    view._edit_panel = MagicMock()
+    nav = MagicMock()
+    nav.section_at.return_value = None
+    nav.save_btn_at.return_value = False
+    view._nav_panel = nav
+    lp = MagicMock()
+    lp.back_btn_at.return_value = True
+    lp.add_btn_at.return_value = False
+    lp.delete_zone_at.return_value = None
+    lp.item_at.return_value = None
+    view._list_panel = lp
+    view.on_mouse_press(300, 400, 1, 0)
+    assert view._selected_room_id is None
+
+
+def test_nav_section_click_resets_selected_room():
+    from unittest.mock import MagicMock
+    view = _make_view()
+    view.load_manifest(_minimal_manifest())
+    view.set_dungeon(_minimal_dungeon())
+    view.set_active_section("rooms")
+    view.set_selected_room("room-01")
+    view.window = MagicMock(width=1400, height=900)
+    view._edit_panel = MagicMock()
+    nav = MagicMock()
+    nav.section_at.return_value = "monsters"
+    view._nav_panel = nav
+    view._list_panel = MagicMock()
+    view.on_mouse_press(50, 400, 1, 0)
+    assert view._selected_room_id is None
+    assert view.active_section == "monsters"

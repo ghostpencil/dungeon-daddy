@@ -83,3 +83,52 @@ def test_seed_item_owner_slug_resolves_to_actor_id(repo: MemoryRepository) -> No
 
     items = repo.get_items("campaign:bone-cathedral")
     assert items[0]["owner_actor_id"] == "actor:bone-cathedral:valeria"
+
+
+def _manifest_with_loose_item() -> CampaignManifest:
+    return CampaignManifest(
+        slug="bone-cathedral",
+        title="The Bone Cathedral",
+        dungeon_slug="bone-cathedral",
+        items=[
+            ItemManifest(
+                slug="gold-coin",
+                display_name="Gold Coin",
+                item_type="dungeon_item",
+                description="A shiny coin.",
+                room_id="room:cathedral:nave",
+            )
+        ],
+    )
+
+
+def test_seed_item_room_id_seeds_loose_in_room(repo: MemoryRepository) -> None:
+    manifest = _manifest_with_loose_item()
+    result = seed_from_manifest(manifest, repo, campaign_id="campaign:bone-cathedral")
+
+    assert result.created == 1
+    items = repo.get_items("campaign:bone-cathedral")
+    assert items[0]["room_id"] == "room:cathedral:nave"
+    assert items[0]["owner_actor_id"] is None
+
+
+def test_seed_item_with_both_owner_and_room_id_prefers_owner(repo: MemoryRepository) -> None:
+    manifest = CampaignManifest(
+        slug="bone-cathedral",
+        title="The Bone Cathedral",
+        dungeon_slug="bone-cathedral",
+        items=[
+            ItemManifest(
+                slug="gold-coin",
+                display_name="Gold Coin",
+                item_type="dungeon_item",
+                description="A coin.",
+                owner_slug="valeria",
+                room_id="room:cathedral:nave",
+            )
+        ],
+    )
+    seed_from_manifest(manifest, repo, campaign_id="campaign:bone-cathedral")
+
+    items = repo.get_items("campaign:bone-cathedral")
+    assert items[0]["owner_actor_id"] == "actor:bone-cathedral:valeria"

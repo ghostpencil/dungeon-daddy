@@ -2,14 +2,114 @@
 
 ## Phase
 
-Phase: **46 — Inventory System (COMPLETE)**
-Status: All 10 slices complete. Branch `phase-46-inventory-system`. 2555 tests passing.
+Phase: **47 — Room Contents (COMPLETE)**
+Status: All 9 slices done + post-slice UI fixes (3 rounds). Branch `phase-47-items-in-rooms`. 2673 tests passing.
+Spec: `spec/PHASE_47_ROOM_CONTENTS.md` (GitHub issue [#72](https://github.com/ghostpencil/dungeon-daddy/issues/72)).
 
-Previous: Phase 45 complete (2026-06-14). Stabilization post-45 complete (2026-06-17).
-Spec: `spec/PHASE_46_INVENTORY_SYSTEM.md`. Issue [#70](https://github.com/ghostpencil/dungeon-daddy/issues/70).
-Next: Phase 47 — Items in Rooms.
+Previous: Phase 46 complete (2026-06-17). Branch `phase-46-inventory-system`.
+Next phase: **Phase 48 — Dungeon Navigation**.
 
-**Last session (2026-06-17) — Phase 46 Slices 1–10 complete. Phase 46 DONE.**
+---
+
+### Next session — start Phase 48
+
+**Step 0 — Close Phase 47.**
+Open a PR for `phase-47-items-in-rooms → main` and merge it. All 2673 tests pass; no known failures.
+
+**Step 1 — Branch.**
+```
+git checkout main && git pull
+git checkout -b phase-48-dungeon-navigation
+```
+
+**Step 2 — Promote GitHub issue.**
+On GitHub Projects #1 promote the Phase 48 draft card → real issue, apply label `phase-48`.
+
+**Step 3 — Write the spec.**
+Create `spec/PHASE_48_DUNGEON_NAVIGATION.md`. Reconcile the GitHub issue body with the 2026-06-17 design review notes below.
+
+**What Phase 48 must deliver** (from `IMPLEMENTATION_PHASES_33_ONWARDS.md` + Phase 47 out-of-scope list):
+
+- **`MoveToRoom` Player Command** — `actor_id`, `room_id`. Engine-authoritative; validates that `room_id` is reachable from the party's current room (an exit/connection exists in the dungeon data). Applies: update `party_location` in repo, emit `party.moved`.
+- **Party location state** — `party_location: str | None` persisted in the campaign repo (new DB column or table). `set_party_location()` / `get_party_location()` helpers.
+- **Party-presence gate** — `PickUpItem` and `ActivateObject` validators gain: reject when acting actor's party location ≠ item's `room_id` / object's `room_id`. Additive; Phase 47 validators currently skip this check.
+- **`mark_level_items_inert` trigger** — call `RpgService.mark_level_items_inert(repo, campaign_id, level_id)` when the party exits a level (detected in `MoveToRoom` applier by comparing old-level vs new-level).
+- **`current_room` context block extended** — `_fetch_current_room` in `context_bundle.py` gains `exits: [{room_id, connection_type}]` (from dungeon Connection objects) + `visited: bool` for each exit target. Phase 48 wires real `current_room_id` from `party_location` (Phase 47 still requires caller to pass it explicitly).
+- **Room-visit fog-of-war** — track which rooms the party has entered (`visited_rooms: set[str]` in repo). `MoveToRoom` applier marks target room visited.
+
+**Design constraints to lock in the spec:**
+- `MoveToRoom` is a **Player Command** (not a proposal) — same channel as Phase 46/47.
+- Provisional movement UI (minimal): Phase 50's Verb·Noun·Adverb Card input replaces it; keep Phase 48 UI thin.
+- No diagonal/multi-hop movement this phase — one room at a time.
+- Fog-of-war affects the `current_room` context block (exits annotated as `visited: bool`), not the dungeon template itself.
+- `party_location` is campaign-scoped (one location per campaign, not per actor — party moves together).
+
+**Step 4 — TDD.**
+Invoke the TDD skill, read `spec/TESTING.md` first (per CLAUDE.md). Suggested slice order:
+1. Party location model + persistence (`party_location` column, `get/set_party_location`)
+2. `MoveToRoom` command — validator (reachability check against dungeon connections)
+3. `MoveToRoom` applier — update location, emit `party.moved`, mark visited, trigger `mark_level_items_inert` on level change
+4. Party-presence gate on `PickUpItem` / `ActivateObject` validators
+5. `current_room` context block extended with exits + fog-of-war
+6. `MoveToRoom` manifest + seed (starting room in manifest)
+7. Campaign UI — movement panel (provisional, minimal)
+
+---
+
+**Last session (2026-06-18) — Phase 47 room-object form UX (round 3). Phase 47 DONE.**
+- User feedback on the new-object form: slug should be system-generated, archetype should be selectable.
+- **Slug auto-generated** — removed the SLUG input from `_build_room_object_form` (`campaign_edit_panel.py`). `_slugify()` module helper + new logic in `_collect_room_object_inputs`: slug derived from NAME on create (`"Iron Chest" → iron-chest`), preserved unchanged on edit (original stashed in `_extra_data["slug"]`). View `_on_form_save` rooms-new branch guards empty slug (nameless object not saved).
+- **Archetype cycle picker** — replaced the static `ARCHETYPE: CONTAINER` label with a `[<] CONTAINER [>]` picker cycling all 7 archetypes (Arcade has no clean native dropdown; matches the app's existing `[-]/[+]` picker idiom). New generic choice-picker infra on `CampaignEditPanel`: `_choice_values` / `_choice_options` / `_choice_label_centers` (cleared in `clear()`, rendered in `draw()`), `_choice_row()` builder. `_collect_room_object_inputs` treats the choice index as source of truth and re-derives default transitions for the selected archetype.
+- 6 new/updated panel tests; 2673 passing. (Note: dropdowns deferred to Phase 50 VNA cards — see memory `project_phase50_vna_dropdowns`.)
+
+**Last session (2026-06-18) — Phase 47 rooms drill-down UI fixes (round 2). Phase 47 DONE.**
+- Slice 9's room drill-down rendered the top-level room list but the *inner* level (objects inside a room) was unwired — `_start_new_item`, `_on_form_save`, `_delete_item_at` all lacked a `rooms` branch, and there was no way to leave a room.
+- **Count badge** — `_section_counts()["rooms"]` now mirrors the visible list: dungeon-room count at the top level, placed-object count once drilled in (was always `len(room_objects)`, showing `0`).
+- **Back navigation** — `CampaignListPanel.back_btn_at()` + `draw(..., breadcrumb=...)` renders a clickable `‹ <Room Name>` in the header; `CampaignView.on_mouse_press` clears `_selected_room_id` on breadcrumb click and on any nav-section click. Helpers `_room_name()` / `_level_id_for_room()` added.
+- **+ ADD / save / delete wired** — `_start_new_item` rooms branch opens a blank `RoomObjectManifest` (room_id + level_id auto-derived); `_on_form_save` adds (new) / updates (edit); `_delete_item_at` removes via `remove_room_object`.
+- 12 new/updated tests (panel + view); corrected the existing count test that encoded the buggy `len(room_objects)` behavior.
+
+**Last session (2026-06-18) — Phase 47 post-slice UI bug fixes (4 bugs). Phase 47 DONE.**
+- **Bug fix: ROOMS section always empty** — `new_seed_from_dungeon()` and `edit_seed()` in `window.py` loaded the manifest but never called `campaign_view.set_dungeon()`, so `_dungeon` stayed `None` and `_section_items()` returned `[]` for the rooms section. Both methods now load the dungeon via `_dungeon_repo.load(slug)` and call `set_dungeon()` after the manifest. 2 new tests in `test_window.py`; guard: `attached_dungeon_slug=None` added to existing edit_seed test.
+- **Bug fix: Scroll direction inverted** — `_card_top()` in `campaign_list_panel.py` subtracted `scroll_offset`, pushing cards DOWN (lower y) instead of UP. Changed to `+ scroll_offset`. Updated 2 scroll-aware hit-test assertions whose expected y-values were built on the wrong sign.
+- **Bug fix: Cards overlap header when scrolled** — `CampaignListPanel.draw()` now wraps the card loop in a scissor rect `(px, py, pw, ph - HEADER_H)` using `arcade.get_window().ctx.scissor` (same pattern as `map_panel.py`). No new tests (render-only).
+- **Bug fix: Clicking a room does nothing** — `_select_item_at()` had no "rooms" branch. Added: when `_selected_room_id is None`, clicking a dungeon room calls `set_selected_room(room.id)` (drill-down); when a room is already selected, clicking a room object opens `show_room_object` form. 2 new tests in `test_campaign_view.py`.
+- **Hotfix: `UnboundLocalError` on campaign load** — `import arcade` inside `draw()` shadowed the module-level import, breaking all earlier `arcade.*` calls in the same function scope. Removed the local import.
+- 4 net new tests; 2655 passing.
+
+**Last session (2026-06-18) — Phase 47 Slice 9 complete. Phase 47 DONE.**
+- **Slice 9 DONE** — Campaign Seed editor UI. `CampaignEditPanel.show_room_object()` + `_build_room_object_form()` + `_collect_room_object_inputs()` added; `_collect_inputs()` dispatches to it for modes `room_object`/`new_room_object`. Form inputs: slug, display_name, description, initial_state; `_extra_data`: room_id, level_id, archetype, transitions (pre-populated via `default_transitions_for_archetype()`). `default_transitions_for_archetype()` module-level function with default SMs for all 7 archetypes. `CampaignListPanel`: "rooms" added to `_SECTION_LABELS`; `_draw_room_card()` (Room from dungeon) + `_draw_room_object_card()` (RoomObjectManifest); `_draw_card()` dispatches for "rooms" section by duck-typing (hasattr archetype). `CampaignView`: "rooms" added to `_SECTIONS`; `_init_state()` gains `_dungeon: Dungeon | None` + `_selected_room_id: str | None`; `set_dungeon()`, `set_selected_room()`, `add_room_object()`, `remove_room_object()` added; `_section_items()` for "rooms": no room selected → flattened dungeon rooms, room selected → objects filtered by room_id; `_section_counts()["rooms"]` = `len(room_objects)`. 25 new tests; 2651 passing.
+
+**Last session (2026-06-18) — Phase 47 Slice 8 complete.**
+- **Slice 8 DONE** — Context bundle `current_room` block. `ContextBundle.current_room: dict[str, Any]` field added to `models.py`. `ContextBundleBuilder.__init__` gains `current_room_id: str | None = None`; `build()` wires `_fetch_current_room(repo)`. Method returns `{}` when no room id; when set returns `{room_id, objects: [{slug, display_name, archetype, current_state, description}], loose_items: [{slug, display_name, description, status}]}`. Uses existing `get_objects_by_room` + `get_items_by_room`; filters `loose_items` to `item_type == "dungeon_item"`. New test file `tests/unit/memory/test_context_bundle_current_room.py` (6 tests). 2626 passing.
+
+**Last session (2026-06-18) — Phase 47 Slice 7 complete.**
+- **Slice 7 DONE** — Manifest + seed. `ItemManifest.room_id: str | None = None` added (loose item placement). `ObjectTransitionManifest` + `RoomObjectManifest` Pydantic models added to `manifest.py`; `CampaignManifest.room_objects` field added. `_seed_item` extended with loose path: when `room_id` set and no `owner_slug`, item seeds with `room_id` set and `owner_actor_id=None`; owner wins when both set. `_seed_room_object` added to `seeder.py` following `_seed_faction` idempotent pattern (skip/force/dry_run); derives `object_id="obj:{slug}:{object_slug}"`, `transition_id="tr:{slug}:{object_slug}:{i}"`, sets `current_state=initial_state`. Wired into `seed_from_manifest()`. 13 new tests (5 manifest, 2 seeder-item, 5 seeder-room-objects, 1 dry_run extra covered); 2620 passing.
+
+**Last session (2026-06-18) — Phase 47 Slice 6 complete.**
+- **Slice 6 DONE** — `ActivateObject` end-to-end integration test. `tests/integration/test_activate_object_e2e.py` (3 tests): (1) full pipeline success — validate accepts, apply fires `object.transitioned` + `item.spawned` + `clock.advanced`, repo state updated; (2) rejected command is no-op — missing key → validate rejects → zero events, object stays "locked", clock unchanged; (3) chained activate → pickup — after open spawns coin into room, `PickUpItem` validates + applies, coin owned by actor, `room_id` cleared. No new production code needed (Slices 3–5 already complete). 3 new tests; 2607 passing.
+
+**Last session (2026-06-18) — Phase 47 Slice 5 complete.**
+- **Slice 5 DONE** — `PickUpItem` + `DropItem` commands. Both added to `PlayerCommand` union in `command.py`. Validator branches: `PickUpItem` rejects unknown item, non-`dungeon_item`, inactive, already-owned, unknown actor, non-PC actor, actor at cap (≥10); accepts otherwise. `DropItem` rejects unknown item, unowned; accepts otherwise. Applier: `PickUpItem` → `update_item_owner(actor_id)` + `update_item_room(None)` + `item.picked_up` event; `DropItem` → `update_item_owner(None)` + `update_item_room(room_id)` + `item.dropped` event. Bug fix: `save_item` was not persisting `room_id` (field missing from INSERT); fixed + 1 new regression test. 16 new tests; 2604 passing.
+
+**Last session (2026-06-18) — Phase 47 Slice 4 complete.**
+- **Slice 4 DONE** — `ActivateObject` applier: `update_object_state(to_state)` + deterministic side-effects. Spawn: find unplaced inert item by `spawns_item_slug` (`owner_actor_id=None`, `room_id=None`), set `room_id=object.room_id` + `status="active"`, emit `item.spawned`; missing/already-placed slug is a logged no-op. Clock: find clock whose `clock_id` ends with `:{slug}`, tick via `RpgService.advance_clock`, persist via `update_clock_progress`, emit `clock.advanced`; missing slug is a logged no-op. Always emits `object.transitioned`. New repo helpers: `get_items_by_room(campaign_id, room_id)` (loose items only — `owner_actor_id IS NULL`), `update_item_room(item_id, room_id|None)`. Also updated `get_items` / `get_items_by_actor` / `_item_row_to_dict` to include `room_id` (index 12). 9 new tests; 2582 passing.
+
+**Last session (2026-06-18) — Phase 47 Slice 3 complete.**
+- **Slice 3 DONE** — State transition validation. `ActivateObject` command (`object_id`, `actor_id`, `trigger`) added to `rpg/command.py` and the `PlayerCommand` union. `validate_command` branch in `command_validator.py`: rejects unknown object; rejects when no transition matches `(from_state == current_state, trigger)`; rejects when the transition's `requires_item_slug` is not in the acting actor's **active** inventory (checks `get_items_by_actor`, slug + `status=="active"`). Accepts otherwise; rejections emit `command.rejected`. No side-effects (Slice 4). 8 new tests (7 in `test_command_validator.py`, 1 instantiation in `test_command.py`); 2579 passing.
+- Committed Slices 1–2 (were uncommitted): models + migration `009_room_objects.sql` + repository CRUD. Added `*.duckdb` to `.gitignore`.
+
+**Prior session (2026-06-18) — Phase 47 spec + issue promotion (no code).**
+- Promoted the Phase 47 roadmap **draft card → GitHub issue [#72](https://github.com/ghostpencil/dungeon-daddy/issues/72)** (`convertProjectV2DraftIssueItemToIssue`); created + applied the `phase-47` label.
+- Wrote **`spec/PHASE_47_ROOM_CONTENTS.md`** (none existed previously — confirmed via git history). Reconciles issue #72 with the 2026-06-17 review and locks 8 design decisions: room interactions are Player Commands (not proposals); transition side-effects are engine-internal deterministic; spawned items are pre-seeded inert rows; no party-location gate this phase (Phase 48); item placement extends `ItemManifest.room_id`; `current_room` context block is provided not discovered.
+- **Audited Slices 1–2 against the design — both ✅, no rework.** Notes (non-blocking): `UNIQUE(campaign_id, slug)` on `room_objects` (consistent w/ items); `update_object_state` landed a slice early (harmless); `ObjectTransition` validity checked dynamically in Slice 3 (correct). 61 slice tests pass.
+- Locked **slice ordering to issue #72** (Objects track first): next is Slice 3 — State transition validation.
+
+**Prior session (2026-06-18) — Phase 47 Slice 2 complete.**
+- **Slice 2 DONE** — `save_room_object` (upsert + transition child-row replace), `get_room_object` (by object_id), `get_objects_by_room` (by campaign_id + room_id), `update_object_state` (set current_state), `_room_object_row_to_dict` added to `MemoryRepository`. `RoomObject` import added to `repository.py`. New test file `tests/unit/memory/test_room_object_repository.py` (7 tests: round-trip, upsert dedup, room filter, empty-room guard, transitions nested, transitions replace on upsert, state update). 7 new tests; 2571 passing.
+- **Slice 1 DONE** — `RoomObject` + `ObjectTransition` Pydantic models added to `dungeon_daddy/rpg/models.py`; `ObjectArchetype` Literal type (7 archetypes: container, door, mechanism, structure, trap, lore_fixture, resource); `RoomObject.description` non-empty validator. `Item.room_id: str | None = None` added. Migration `dungeon_daddy/data/migrations/009_room_objects.sql` creates `room_objects` + `object_transitions` tables; adds `room_id` column to `items`. `EXPECTED_TABLES` in `test_rpg_memory_migrations.py` updated; `test_items_table_has_room_id_column` added. 9 new tests; 2564 passing.
+
+**Prior session (2026-06-17) — Phase 46 Slices 1–10 complete. Phase 46 DONE.**
 - **Slice 10 DONE** — Manifest + seed: `ItemFeatureManifest` + `ItemManifest` added to `dungeon_daddy/campaign/manifest.py`; `CampaignManifest.items` field added. `_seed_item` added to `dungeon_daddy/campaign/seeder.py` following `_seed_faction` idempotent pattern — skips existing unless `force`, `dry_run` counts only, `owner_slug` resolves to `actor:{campaign_slug}:{owner_slug}`, `charges_current` initialises to `charges_max`. Wired into `seed_from_manifest()`. 8 new tests; 2555 passing.
 - **Slice 9 DONE** — Character Sheet Panel UI: `set_inventory(kits, dungeon_items, equipped)` added to `CharacterSheetPanel`. Stores three lists; draw() renders KITS section (pip tracks for charges_current/charges_max reusing existing pip constants), ITEMS section (name + status color + `[L]` tag for level-bound), GEAR section (feature badges: `FIGHT +1` for rating_modifier, `VANISH [new]` for new_action). 5 new tests; 2547 passing.
 - **Slice 8 DONE** — World-reaction item proposals: `GrantItemChange`, `StripItemChange`, `TransformItemChange` added to `ProposedChange` union in `proposal.py`. Validator gains `known_item_ids`, `known_item_slugs`, `dungeon_item_counts` params with branches for all three. Applier applies each immediately (grant → `update_item_owner`; strip → `update_item_status("lost")`; transform → `update_item_slug`); each emits its domain event (`item.granted`, `item.stripped`, `item.transformed`) + `proposal.applied`. New `update_item_slug` added to `MemoryRepository`. 18 new tests; 2542 passing.
@@ -114,7 +214,7 @@ reactions. It must not directly mutate authoritative state.
 
 ## Known Failures
 
-None (test suite passes — 2555 tests as of 2026-06-17).
+None (test suite passes — 2673 tests as of 2026-06-18).
 
 ---
 
@@ -128,7 +228,8 @@ Phase 42 and earlier are complete. Full history in `spec/HISTORY.md`.
 
 - Provider: OpenAI (`gpt-4o`); `OPENAI_API_KEY` must be set.
 - Phase specs: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (current); index at `spec/IMPLEMENTATION_PHASES.md`.
-- Roadmap for Phases 47–53 (planned): GitHub Projects `ghostpencil/dungeon-daddy` #1, mirrored in the "Planned Roadmap — Phases 46–53" section of `IMPLEMENTATION_PHASES_33_ONWARDS.md`. Next: Phase 47 (Items in Rooms). Issue bodies hold the per-phase detail and the folded-in design resolutions; a detailed `spec/PHASE_47_*.md` is written when Phase 47 starts.
+- Roadmap for Phases 47–53 (planned): GitHub Projects `ghostpencil/dungeon-daddy` #1, mirrored in the "Planned Roadmap — Phases 46–53" section of `IMPLEMENTATION_PHASES_33_ONWARDS.md`. Issue bodies hold the per-phase detail and the folded-in design resolutions; a detailed `spec/PHASE_NN_*.md` is written when each phase starts.
+- Phase 47 spec: `spec/PHASE_47_ROOM_CONTENTS.md` (GitHub issue [#72](https://github.com/ghostpencil/dungeon-daddy/issues/72), label `phase-47`). Written 2026-06-18 after Slices 1–2 shipped; reconciles issue #72 with the 2026-06-17 review (room interactions are Player Commands, not proposals; transition side-effects are engine-internal) and contains an as-built audit of Slices 1–2 (both ✅). Slice order follows issue #72 (Objects track — transition validation — before the Items-in-rooms pickup track).
 - Phase 53 (Threat Behavior & Monster Reactions, planned 2026-06-17): instinct-driven, engine-bounded monster reactions with no enemy turn; bosses escalate via clock thresholds. Full design in `spec/MONSTER_REACTION_DESIGN.md`; summary in `IMPLEMENTATION_PHASES_33_ONWARDS.md`.
 - Spec loading rules and skills: `CLAUDE.md` (canonical source).
 - `protagonist` actor is defined in `seed_data/campaigns/the-crucible/rpg_seed.json` (use `--seed-pack` + `--force` to reset stress tracks); the generic `seed_campaign()` path no longer creates a placeholder actor.

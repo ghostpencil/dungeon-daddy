@@ -1176,8 +1176,28 @@ seeder support via `ItemManifest` / `CampaignManifest.items`.
 
 10 TDD slices; 2555 tests passing.
 
+## Phase 47 — Room Contents (COMPLETE)
 
-# Planned Roadmap — Phases 47–53
+**Status: Complete (2026-06-18) — 2673 tests passing**
+Spec: `spec/PHASE_47_ROOM_CONTENTS.md` (GitHub issue [#72](https://github.com/ghostpencil/dungeon-daddy/issues/72))
+Branch: `phase-47-items-in-rooms`
+
+Place **items** and **interactive objects** into rooms per campaign seed (the dungeon
+template stays generic). Loose items (`dungeon_item` with `owner_actor_id = None` + `room_id`)
+can be picked up / dropped; **objects** are room fixtures with a per-archetype **state
+machine** — activating one can change state, **spawn a pre-seeded item** into the room, and
+**advance a clock**, all as engine-internal deterministic side-effects. Room interactions are
+**Player Commands** (`PickUpItem` / `DropItem` / `ActivateObject`), not LLM proposals;
+side-effects fire inside the command applier. No party-location gate this phase (Phase 48).
+New `current_room` context block (objects + loose items) provided via optional
+`current_room_id`. Migration `009_room_objects.sql`; `RoomObjectManifest` +
+`CampaignManifest.room_objects`; Campaign Seed editor gains a room → objects drill-down.
+
+9 TDD slices + 3 rounds of post-slice Campaign-UI bug/UX fixes (rooms drill-down navigation,
+auto-generated slug, archetype cycle picker). 2673 tests passing.
+
+
+# Planned Roadmap — Phases 48–53
 
 These phases are **defined on the GitHub Projects roadmap** (`ghostpencil/dungeon-daddy`,
 project #1) and are **not yet implemented**. Numbering and scope below mirror that board.
@@ -1185,7 +1205,7 @@ A detailed `spec/PHASE_NN_*.md` is written when each phase actually starts.
 
 | Phase | Title | One-line scope |
 |---|---|---|
-| 47 | Room Contents | Items in rooms + interactive objects with a state machine |
+| 47 | Room Contents | Items in rooms + interactive objects with a state machine — **COMPLETE** |
 | 48 | Dungeon Navigation | Room exits, party location, level connectors |
 | 49 | Starting Playbooks | Class foundations: ratings, tracks, kit, **tags**, **signature adverbs**, starting abilities |
 | 50 | Hybrid Action Model | Structured **Verb · Noun · Adverb** action input; LLM narrates only |
@@ -1202,8 +1222,8 @@ is sourced from each card's stated "Depends on:" line on GitHub Project #1.
 
 | Phase | Hard deps | Points back? |
 |---|---|---|
-| 47 Room Contents | 46 (complete) | ✓ |
-| 48 Dungeon Navigation | 47 | ✓ |
+| 47 Room Contents | 46 (complete) | ✓ (complete) |
+| 48 Dungeon Navigation | 47 (complete) | ✓ |
 | 49 Starting Playbooks | 46 (complete) | ✓ |
 | 50 Hybrid Action Model | 47, 48, 49 | ✓ |
 | 51 Talk to the Dungeon | none (adds its own recedable-clock support) | ✓ |

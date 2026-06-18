@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, FactionManifest, ItemManifest
+from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, FactionManifest, ItemManifest, RoomObjectManifest
 from dungeon_daddy.memory.repository import MemoryRepository
 
 
@@ -51,6 +51,9 @@ def seed_from_manifest(
 
     for item in manifest.items:
         _seed_item(item, repo, campaign_id, slug, result, dry_run=dry_run, force=force)
+
+    for room_object in manifest.room_objects:
+        _seed_room_object(room_object, repo, campaign_id, slug, result, dry_run=dry_run, force=force)
 
     return result
 
@@ -223,6 +226,7 @@ def _seed_item(
         )
         for f in item.features
     ]
+    room_id = None if owner_actor_id else item.room_id
     domain_item = Item(
         item_id=item_id,
         campaign_id=campaign_id,
@@ -231,6 +235,7 @@ def _seed_item(
         item_type=item.item_type,
         description=item.description,
         owner_actor_id=owner_actor_id,
+        room_id=room_id,
         level_id=item.level_id,
         charges_max=item.charges_max,
         charges_current=charges_current,
@@ -246,6 +251,69 @@ def _seed_item(
         result.updated += 1
     else:
         result.skipped += 1
+
+
+def _object_id(campaign_slug: str, object_slug: str) -> str:
+    return f"obj:{campaign_slug}:{object_slug}"
+
+
+def _transition_id(campaign_slug: str, object_slug: str, index: int) -> str:
+    return f"tr:{campaign_slug}:{object_slug}:{index}"
+
+
+def _seed_room_object(
+    room_object: RoomObjectManifest,
+    repo: MemoryRepository,
+    campaign_id: str,
+    campaign_slug: str,
+    result: SeedResult,
+    dry_run: bool,
+    force: bool,
+) -> None:
+    from dungeon_daddy.rpg.models import ObjectTransition, RoomObject
+
+    obj_id = _object_id(campaign_slug, room_object.slug)
+    existing = repo.get_room_object(obj_id)
+
+    if dry_run:
+        result.created += 1 if existing is None else 0
+        result.skipped += 0 if existing is None else 1
+        return
+
+    if existing is not None and not force:
+        result.skipped += 1
+        return
+
+    transitions = [
+        ObjectTransition(
+            transition_id=_transition_id(campaign_slug, room_object.slug, i),
+            object_id=obj_id,
+            from_state=t.from_state,
+            to_state=t.to_state,
+            trigger=t.trigger,
+            requires_item_slug=t.requires_item_slug,
+            spawns_item_slug=t.spawns_item_slug,
+            advances_clock_slug=t.advances_clock_slug,
+        )
+        for i, t in enumerate(room_object.transitions)
+    ]
+    domain_obj = RoomObject(
+        object_id=obj_id,
+        campaign_id=campaign_id,
+        room_id=room_object.room_id,
+        level_id=room_object.level_id,
+        slug=room_object.slug,
+        display_name=room_object.display_name,
+        archetype=room_object.archetype,
+        description=room_object.description,
+        current_state=room_object.initial_state,
+        transitions=transitions,
+    )
+    repo.save_room_object(domain_obj)
+    if existing is None:
+        result.created += 1
+    else:
+        result.updated += 1
 
 
 def _seed_memory(

@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass, field
 
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.rpg.command import ConsumeItem, ConsumeKitCharge, EquipItem, GiveItem, PlayerCommand, TakeItem, UnequipItem
+from dungeon_daddy.rpg.command import ActivateObject, ConsumeItem, ConsumeKitCharge, DropItem, EquipItem, GiveItem, PickUpItem, PlayerCommand, TakeItem, UnequipItem
 from dungeon_daddy.rpg.command_validator import CommandValidationResult
+from dungeon_daddy.rpg.models import ClockState
+from dungeon_daddy.rpg.service import RpgService
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -100,5 +105,100 @@ def apply_command(
                 payload={"item_id": command.item_id},
             )
         )
+
+    elif isinstance(command, PickUpItem):
+        repo.update_item_owner(command.item_id, command.actor_id)
+        repo.update_item_room(command.item_id, None)
+        result.events.append(
+            DomainEvent(
+                event_id=str(uuid.uuid4()),
+                campaign_id=campaign_id,
+                event_type="item.picked_up",
+                payload={"item_id": command.item_id, "actor_id": command.actor_id},
+            )
+        )
+
+    elif isinstance(command, DropItem):
+        repo.update_item_owner(command.item_id, None)
+        repo.update_item_room(command.item_id, command.room_id)
+        result.events.append(
+            DomainEvent(
+                event_id=str(uuid.uuid4()),
+                campaign_id=campaign_id,
+                event_type="item.dropped",
+                payload={"item_id": command.item_id, "room_id": command.room_id},
+            )
+        )
+
+    elif isinstance(command, ActivateObject):
+        obj = repo.get_room_object(command.object_id)
+        if obj is None:
+            return result
+        transition = next(
+            (
+                t for t in obj["transitions"]
+                if t["from_state"] == obj["current_state"] and t["trigger"] == command.trigger
+            ),
+            None,
+        )
+        if transition is None:
+            return result
+
+        repo.update_object_state(command.object_id, transition["to_state"])
+        result.events.append(
+            DomainEvent(
+                event_id=str(uuid.uuid4()),
+                campaign_id=campaign_id,
+                event_type="object.transitioned",
+                payload={
+                    "object_id": command.object_id,
+                    "from_state": obj["current_state"],
+                    "to_state": transition["to_state"],
+                    "trigger": command.trigger,
+                },
+            )
+        )
+
+        spawns_slug = transition.get("spawns_item_slug")
+        if spawns_slug:
+            all_items = repo.get_items(campaign_id)
+            target = next(
+                (
+                    i for i in all_items
+                    if i["slug"] == spawns_slug
+                    and i.get("owner_actor_id") is None
+                    and i.get("room_id") is None
+                ),
+                None,
+            )
+            if target is not None:
+                repo.update_item_room(target["item_id"], obj["room_id"])
+                repo.update_item_status(target["item_id"], "active")
+                result.events.append(
+                    DomainEvent(
+                        event_id=str(uuid.uuid4()),
+                        campaign_id=campaign_id,
+                        event_type="item.spawned",
+                        payload={"item_id": target["item_id"], "slug": spawns_slug, "room_id": obj["room_id"]},
+                    )
+                )
+            else:
+                _log.info("Spawn no-op: no unplaced inert item with slug '%s'", spawns_slug)
+
+        advances_slug = transition.get("advances_clock_slug")
+        if advances_slug:
+            clocks = repo.get_clocks(campaign_id)
+            clock_dict = next(
+                (c for c in clocks if c["clock_id"].endswith(f":{advances_slug}")),
+                None,
+            )
+            if clock_dict is not None:
+                clock = ClockState(**clock_dict)
+                service = RpgService()
+                updated_clock, clock_event = service.advance_clock(clock, ticks=1)
+                repo.update_clock_progress(clock_dict["clock_id"], updated_clock.filled, updated_clock.status)
+                result.events.append(clock_event)
+            else:
+                _log.info("Clock advance no-op: no clock with slug '%s'", advances_slug)
 
     return result

@@ -43,6 +43,9 @@ Thumbs.db
 # Presentation — PDF only, exclude source PPTX
 presentation/*.pptx
 
+# Local databases
+*.duckdb
+
 # Logs
 *.log
 

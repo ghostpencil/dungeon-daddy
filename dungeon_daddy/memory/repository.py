@@ -6,7 +6,7 @@ from pathlib import Path
 import duckdb
 
 from dungeon_daddy.memory.models import DomainEvent
-from dungeon_daddy.rpg.models import FactionState, FalloutRecord, Item
+from dungeon_daddy.rpg.models import FactionState, FalloutRecord, Item, RoomObject
 
 
 def _ensure_migration_table(conn: duckdb.DuckDBPyConnection) -> None:
@@ -861,9 +861,9 @@ class MemoryRepository:
             INSERT INTO items (
                 item_id, campaign_id, slug, display_name, item_type,
                 description, owner_actor_id, level_id, status,
-                charges_current, charges_max, is_equipped
+                charges_current, charges_max, is_equipped, room_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (item_id) DO UPDATE SET
                 slug            = excluded.slug,
                 display_name    = excluded.display_name,
@@ -874,7 +874,8 @@ class MemoryRepository:
                 status          = excluded.status,
                 charges_current = excluded.charges_current,
                 charges_max     = excluded.charges_max,
-                is_equipped     = excluded.is_equipped
+                is_equipped     = excluded.is_equipped,
+                room_id         = excluded.room_id
             """,
             [
                 item.item_id,
@@ -889,6 +890,7 @@ class MemoryRepository:
                 item.charges_current,
                 item.charges_max,
                 item.is_equipped,
+                item.room_id,
             ],
         )
         self._conn.execute(
@@ -909,7 +911,7 @@ class MemoryRepository:
             """
             SELECT item_id, campaign_id, slug, display_name, item_type,
                    description, owner_actor_id, level_id, status,
-                   charges_current, charges_max, is_equipped
+                   charges_current, charges_max, is_equipped, room_id
             FROM items WHERE campaign_id = ?
             ORDER BY display_name
             """,
@@ -923,11 +925,26 @@ class MemoryRepository:
             """
             SELECT item_id, campaign_id, slug, display_name, item_type,
                    description, owner_actor_id, level_id, status,
-                   charges_current, charges_max, is_equipped
+                   charges_current, charges_max, is_equipped, room_id
             FROM items WHERE owner_actor_id = ?
             ORDER BY display_name
             """,
             [actor_id],
+        ).fetchall()
+        return [self._item_row_to_dict(r) for r in rows]
+
+    def get_items_by_room(self, campaign_id: str, room_id: str) -> list[dict]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT item_id, campaign_id, slug, display_name, item_type,
+                   description, owner_actor_id, level_id, status,
+                   charges_current, charges_max, is_equipped, room_id
+            FROM items
+            WHERE campaign_id = ? AND room_id = ? AND owner_actor_id IS NULL
+            ORDER BY display_name
+            """,
+            [campaign_id, room_id],
         ).fetchall()
         return [self._item_row_to_dict(r) for r in rows]
 
@@ -965,6 +982,7 @@ class MemoryRepository:
             "charges_current": r[9],
             "charges_max": r[10],
             "is_equipped": r[11],
+            "room_id": r[12] if len(r) > 12 else None,
             "features": features,
         }
 
@@ -1001,6 +1019,144 @@ class MemoryRepository:
             "UPDATE items SET slug = ? WHERE item_id = ?",
             [new_slug, item_id],
         )
+
+    def update_item_room(self, item_id: str, room_id: str | None) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            "UPDATE items SET room_id = ? WHERE item_id = ?",
+            [room_id, item_id],
+        )
+
+    # ------------------------------------------------------------------
+    # Room Objects
+    # ------------------------------------------------------------------
+
+    def save_room_object(self, obj: RoomObject) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO room_objects (
+                object_id, campaign_id, room_id, level_id, slug,
+                display_name, archetype, description, current_state
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (object_id) DO UPDATE SET
+                room_id      = excluded.room_id,
+                level_id     = excluded.level_id,
+                slug         = excluded.slug,
+                display_name = excluded.display_name,
+                archetype    = excluded.archetype,
+                description  = excluded.description,
+                current_state = excluded.current_state
+            """,
+            [
+                obj.object_id,
+                obj.campaign_id,
+                obj.room_id,
+                obj.level_id,
+                obj.slug,
+                obj.display_name,
+                obj.archetype,
+                obj.description,
+                obj.current_state,
+            ],
+        )
+        self._conn.execute(
+            "DELETE FROM object_transitions WHERE object_id = ?", [obj.object_id]
+        )
+        for t in obj.transitions:
+            self._conn.execute(
+                """
+                INSERT INTO object_transitions (
+                    transition_id, object_id, from_state, to_state,
+                    trigger, requires_item_slug, spawns_item_slug, advances_clock_slug
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    t.transition_id,
+                    t.object_id,
+                    t.from_state,
+                    t.to_state,
+                    t.trigger,
+                    t.requires_item_slug,
+                    t.spawns_item_slug,
+                    t.advances_clock_slug,
+                ],
+            )
+
+    def get_room_object(self, object_id: str) -> dict | None:
+        assert self._conn is not None
+        row = self._conn.execute(
+            """
+            SELECT object_id, campaign_id, room_id, level_id, slug,
+                   display_name, archetype, description, current_state
+            FROM room_objects WHERE object_id = ?
+            """,
+            [object_id],
+        ).fetchone()
+        if row is None:
+            return None
+        return self._room_object_row_to_dict(row)
+
+    def get_objects_by_room(self, campaign_id: str, room_id: str) -> list[dict]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT object_id, campaign_id, room_id, level_id, slug,
+                   display_name, archetype, description, current_state
+            FROM room_objects
+            WHERE campaign_id = ? AND room_id = ?
+            ORDER BY display_name
+            """,
+            [campaign_id, room_id],
+        ).fetchall()
+        return [self._room_object_row_to_dict(r) for r in rows]
+
+    def update_object_state(self, object_id: str, new_state: str) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            "UPDATE room_objects SET current_state = ? WHERE object_id = ?",
+            [new_state, object_id],
+        )
+
+    def _room_object_row_to_dict(self, r: tuple) -> dict:
+        assert self._conn is not None
+        object_id = r[0]
+        t_rows = self._conn.execute(
+            """
+            SELECT transition_id, object_id, from_state, to_state,
+                   trigger, requires_item_slug, spawns_item_slug, advances_clock_slug
+            FROM object_transitions WHERE object_id = ?
+            ORDER BY transition_id
+            """,
+            [object_id],
+        ).fetchall()
+        transitions = [
+            {
+                "transition_id": tr[0],
+                "object_id": tr[1],
+                "from_state": tr[2],
+                "to_state": tr[3],
+                "trigger": tr[4],
+                "requires_item_slug": tr[5],
+                "spawns_item_slug": tr[6],
+                "advances_clock_slug": tr[7],
+            }
+            for tr in t_rows
+        ]
+        return {
+            "object_id": r[0],
+            "campaign_id": r[1],
+            "room_id": r[2],
+            "level_id": r[3],
+            "slug": r[4],
+            "display_name": r[5],
+            "archetype": r[6],
+            "description": r[7],
+            "current_state": r[8],
+            "transitions": transitions,
+        }
 
     def close(self) -> None:
         if self._conn is not None:

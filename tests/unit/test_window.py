@@ -323,14 +323,38 @@ def test_new_seed_from_dungeon_loads_manifest_into_campaign_view():
     win.switch_mode.assert_called_once_with("campaign")
 
 
+def test_new_seed_from_dungeon_sets_dungeon_on_campaign_view():
+    dungeon = _make_dungeon(save_name="haunted-fort")
+    win = _make_window_for_library(dungeon)
+    win._dungeon_repo.load.return_value = dungeon
+
+    win.new_seed_from_dungeon("haunted-fort")
+
+    win._dungeon_repo.load.assert_called_with("haunted-fort")
+    win._campaign_view.set_dungeon.assert_called_once_with(dungeon)
+
+
 def test_edit_seed_loads_seed_and_switches_to_campaign():
     win = _make_window_for_library()
+    win._campaign_view.attached_dungeon_slug = None
 
     win.edit_seed("undead-lords")
 
     win._campaign_view.set_seed_library.assert_called_once_with(win._seed_library)
     win._campaign_view.load_seed.assert_called_once_with("undead-lords")
     win.switch_mode.assert_called_once_with("campaign")
+
+
+def test_edit_seed_sets_dungeon_when_manifest_has_dungeon_slug():
+    dungeon = _make_dungeon(save_name="haunted-fort")
+    win = _make_window_for_library(dungeon)
+    win._dungeon_repo.load.return_value = dungeon
+    win._campaign_view.attached_dungeon_slug = "haunted-fort"
+
+    win.edit_seed("undead-lords")
+
+    win._dungeon_repo.load.assert_called_with("haunted-fort")
+    win._campaign_view.set_dungeon.assert_called_once_with(dungeon)
 
 
 def test_publish_and_play_calls_publish_then_launch(tmp_path):

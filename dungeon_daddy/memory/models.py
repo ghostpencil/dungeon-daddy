@@ -54,4 +54,5 @@ class ContextBundle(BaseModel):
     memory_cards: list[dict[str, Any]] = Field(default_factory=list)
     faction_reputations: list[dict[str, Any]] = Field(default_factory=list)
     inventory: dict[str, Any] = Field(default_factory=dict)
+    current_room: dict[str, Any] = Field(default_factory=dict)
     provenance: dict[str, Any] = Field(default_factory=dict)

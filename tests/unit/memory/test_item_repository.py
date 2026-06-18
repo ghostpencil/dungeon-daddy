@@ -173,3 +173,46 @@ class TestItemUpdaters:
         result = repo.get_items_by_actor("actor:test:rogue")
         assert len(result) == 1
         assert result[0]["item_id"] == "item:test:sword"
+
+
+class TestItemRoomHelpers:
+    def test_save_item_persists_room_id(self, repo: MemoryRepository) -> None:
+        item = Item(
+            item_id="item:test:gem",
+            campaign_id="campaign:test",
+            slug="gem",
+            display_name="Gem",
+            item_type="dungeon_item",
+            description="A sparkling gem.",
+            room_id="room:dungeon:vault",
+        )
+        repo.save_item(item)
+        result = repo.get_items("campaign:test")[0]
+        assert result["room_id"] == "room:dungeon:vault"
+
+    def test_update_item_room_sets_and_clears(self, repo: MemoryRepository) -> None:
+        repo.save_item(_dungeon_item(owner_actor_id=None))
+        repo.update_item_room("item:test:sword", "room:dungeon:entry")
+        result = repo.get_items("campaign:test")[0]
+        assert result["room_id"] == "room:dungeon:entry"
+
+        repo.update_item_room("item:test:sword", None)
+        result = repo.get_items("campaign:test")[0]
+        assert result["room_id"] is None
+
+    def test_get_items_by_room(self, repo: MemoryRepository) -> None:
+        gem = _dungeon_item(item_id="item:test:gem", slug="gem", owner_actor_id=None)
+        repo.save_item(gem)
+        repo.update_item_room("item:test:gem", "room:dungeon:vault")
+
+        key = _dungeon_item(item_id="item:test:key", slug="key", owner_actor_id=None)
+        repo.save_item(key)
+        repo.update_item_room("item:test:key", "room:dungeon:entry")
+
+        owned = _dungeon_item(item_id="item:test:sword", slug="sword", owner_actor_id="actor:test:hero")
+        repo.save_item(owned)
+        repo.update_item_room("item:test:sword", "room:dungeon:vault")
+
+        results = repo.get_items_by_room("campaign:test", "room:dungeon:vault")
+        assert len(results) == 1
+        assert results[0]["item_id"] == "item:test:gem"

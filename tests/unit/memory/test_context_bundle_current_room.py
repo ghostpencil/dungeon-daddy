@@ -1,0 +1,144 @@
+from __future__ import annotations
+
+from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
+from dungeon_daddy.memory.models import ContextBundle
+from dungeon_daddy.memory.repository import MemoryRepository
+from dungeon_daddy.rpg.models import Item, RoomObject, ObjectTransition
+
+
+class TestContextBundleCurrentRoomField:
+    def test_context_bundle_has_current_room_field(self) -> None:
+        bundle = ContextBundle(
+            bundle_id="b1",
+            campaign_id="camp_001",
+            mode="run_scene",
+        )
+        assert bundle.current_room == {}
+
+
+class TestContextBundleCurrentRoomBuilder:
+    def test_no_room_id_returns_empty_current_room(
+        self, repo: MemoryRepository
+    ) -> None:
+        bundle = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+        ).build(repo)
+        assert bundle.current_room == {}
+
+    def test_loose_dungeon_item_in_room_appears_in_loose_items(
+        self, repo: MemoryRepository
+    ) -> None:
+        repo.save_item(Item(
+            item_id="item:c1:gold-coin",
+            campaign_id="camp_001",
+            slug="gold-coin",
+            display_name="Gold Coin",
+            item_type="dungeon_item",
+            description="A shiny coin.",
+            room_id="room:level-01:antechamber",
+            status="active",
+        ))
+
+        bundle = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+            current_room_id="room:level-01:antechamber",
+        ).build(repo)
+
+        assert len(bundle.current_room["loose_items"]) == 1
+        item = bundle.current_room["loose_items"][0]
+        assert item["slug"] == "gold-coin"
+        assert item["display_name"] == "Gold Coin"
+        assert item["description"] == "A shiny coin."
+        assert item["status"] == "active"
+
+    def test_owned_item_excluded_from_loose_items(
+        self, repo: MemoryRepository
+    ) -> None:
+        repo.save_item(Item(
+            item_id="item:c1:dagger",
+            campaign_id="camp_001",
+            slug="dagger",
+            display_name="Dagger",
+            item_type="dungeon_item",
+            description="A short blade.",
+            owner_actor_id="actor:c1:mara",
+            room_id=None,
+        ))
+
+        bundle = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+            current_room_id="room:level-01:antechamber",
+        ).build(repo)
+
+        assert bundle.current_room["loose_items"] == []
+
+    def test_object_in_room_appears_in_objects_with_correct_fields(
+        self, repo: MemoryRepository
+    ) -> None:
+        repo.save_room_object(RoomObject(
+            object_id="obj:c1:iron-chest",
+            campaign_id="camp_001",
+            room_id="room:level-01:antechamber",
+            level_id="level-01",
+            slug="iron-chest",
+            display_name="Iron Chest",
+            archetype="container",
+            description="A heavy iron chest.",
+            current_state="sealed",
+            transitions=[
+                ObjectTransition(
+                    transition_id="tr:c1:iron-chest:0",
+                    object_id="obj:c1:iron-chest",
+                    from_state="sealed",
+                    to_state="opened",
+                    trigger="open",
+                )
+            ],
+        ))
+
+        bundle = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+            current_room_id="room:level-01:antechamber",
+        ).build(repo)
+
+        assert len(bundle.current_room["objects"]) == 1
+        obj = bundle.current_room["objects"][0]
+        assert obj["slug"] == "iron-chest"
+        assert obj["display_name"] == "Iron Chest"
+        assert obj["archetype"] == "container"
+        assert obj["current_state"] == "sealed"
+        assert obj["description"] == "A heavy iron chest."
+        assert "transitions" not in obj
+
+    def test_room_id_with_no_contents_returns_empty_lists(
+        self, repo: MemoryRepository
+    ) -> None:
+        bundle = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+            current_room_id="room:level-01:antechamber",
+        ).build(repo)
+        assert bundle.current_room == {
+            "room_id": "room:level-01:antechamber",
+            "objects": [],
+            "loose_items": [],
+        }

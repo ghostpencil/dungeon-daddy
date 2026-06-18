@@ -8,7 +8,8 @@ from pathlib import Path
 import arcade
 import arcade.gui
 
-from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, ClockManifest, FactionManifest
+from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, ClockManifest, FactionManifest, ObjectTransitionManifest, RoomObjectManifest
+from dungeon_daddy.data.models import Dungeon
 from dungeon_daddy.campaign.seed_library import CampaignSeedLibrary
 from dungeon_daddy.campaign.validator import ManifestError, validate_manifest
 from dungeon_daddy.ui.chrome import draw_title_bar, title_bar_mode_at
@@ -73,6 +74,7 @@ class CampaignView(arcade.View):
         "clocks",
         "threats",
         "lore",
+        "rooms",
         "validation",
     ]
 
@@ -93,6 +95,8 @@ class CampaignView(arcade.View):
         self.is_dirty: bool = False
         self._validation_result: list[ManifestError] | None = None
         self._seed_library: CampaignSeedLibrary | None = None
+        self._dungeon: Dungeon | None = None
+        self._selected_room_id: str | None = None
 
     # ------------------------------------------------------------------
     # View lifecycle
@@ -143,7 +147,12 @@ class CampaignView(arcade.View):
             self._section_counts(),
             self.is_dirty,
         )
-        self._list_panel.draw(self.active_section, items, self._hovered_card_index)
+        breadcrumb = None
+        if self.active_section == "rooms" and self._selected_room_id is not None:
+            breadcrumb = self._room_name(self._selected_room_id) or self._selected_room_id
+        self._list_panel.draw(
+            self.active_section, items, self._hovered_card_index, breadcrumb,
+        )
         self._edit_panel.draw()
         self._manager.draw()
 
@@ -162,6 +171,7 @@ class CampaignView(arcade.View):
         section = self._nav_panel.section_at(x, y)
         if section is not None:
             self.set_active_section(section)
+            self.set_selected_room(None)
             self._clear_selection()
             if section == "validation":
                 self.run_validation()
@@ -170,6 +180,11 @@ class CampaignView(arcade.View):
             self.save_seed()
             return
 
+        if (self.active_section == "rooms" and self._selected_room_id is not None
+                and self._list_panel.back_btn_at(x, y)):
+            self.set_selected_room(None)
+            self._clear_selection()
+            return
         if self._list_panel.add_btn_at(x, y):
             self._start_new_item()
             return
@@ -240,6 +255,14 @@ class CampaignView(arcade.View):
         elif s == "threats":
             threat = item if isinstance(item, dict) else {}
             self._edit_panel.show_threat(threat, self._on_form_save, self._clear_selection)
+        elif s == "rooms":
+            if self._selected_room_id is None:
+                room_id = getattr(item, "id", None)
+                if room_id:
+                    self.set_selected_room(room_id)
+                    self._selected_item_index = None
+            else:
+                self._edit_panel.show_room_object(item, self._on_form_save, self._clear_selection)
 
     def _start_new_item(self) -> None:
         if self.manifest is None:
@@ -259,6 +282,23 @@ class CampaignView(arcade.View):
             self._edit_panel.show_lore("", self._on_form_save, self._clear_selection, is_new=True)
         elif s == "threats":
             self._edit_panel.show_threat({}, self._on_form_save, self._clear_selection, is_new=True)
+        elif s == "rooms":
+            # Room objects are authored inside a room; rooms themselves come from
+            # the attached dungeon and are not added here.
+            if self._selected_room_id is None:
+                return
+            blank_obj = RoomObjectManifest(
+                slug="",
+                display_name="",
+                room_id=self._selected_room_id,
+                level_id=self._level_id_for_room(self._selected_room_id),
+                archetype="container",
+                description="",
+                initial_state="",
+            )
+            self._edit_panel.show_room_object(
+                blank_obj, self._on_form_save, self._clear_selection, is_new=True,
+            )
 
     def _delete_item_at(self, idx: int) -> None:
         s = self.active_section
@@ -276,6 +316,10 @@ class CampaignView(arcade.View):
         elif s == "threats":
             real_idx = self.manifest.room_threats.index(item)
             self.remove_room_threat(real_idx)
+        elif s == "rooms":
+            # Only placed room objects are deletable; dungeon rooms are not.
+            if self._selected_room_id is not None:
+                self.remove_room_object(item.slug)
         self._clear_selection()
 
     def _on_form_save(self, data: dict) -> None:
@@ -386,6 +430,39 @@ class CampaignView(arcade.View):
                         "description": data.get("description", ""),
                     }
                     self.is_dirty = True
+        elif s == "rooms":
+            if is_new:
+                try:
+                    transitions = [
+                        ObjectTransitionManifest(**t)
+                        for t in data.get("transitions", [])
+                    ]
+                    obj = RoomObjectManifest(
+                        slug=data.get("slug", ""),
+                        display_name=data.get("display_name", ""),
+                        room_id=data.get("room_id", ""),
+                        level_id=data.get("level_id", ""),
+                        archetype=data.get("archetype", "container"),
+                        description=data.get("description", ""),
+                        initial_state=data.get("initial_state", ""),
+                        transitions=transitions,
+                    )
+                    if obj.slug:
+                        self.add_room_object(obj)
+                    else:
+                        _log.warning("Room object needs a name; not saved")
+                except Exception as exc:
+                    _log.warning("Room object save failed: %s", exc)
+            elif self._selected_item_index is not None:
+                items = self._section_items()
+                if self._selected_item_index < len(items):
+                    existing = items[self._selected_item_index]
+                    existing.display_name = data.get("display_name", existing.display_name)
+                    existing.description = data.get("description", existing.description)
+                    existing.initial_state = data.get("initial_state", existing.initial_state)
+                    if data.get("archetype"):
+                        existing.archetype = data["archetype"]
+                    self.is_dirty = True
         self._clear_selection()
 
     def _clear_selection(self) -> None:
@@ -493,6 +570,23 @@ class CampaignView(arcade.View):
         self._validation_result = validate_manifest(self.manifest)
         return self._validation_result
 
+    def set_dungeon(self, dungeon: Dungeon) -> None:
+        self._dungeon = dungeon
+
+    def set_selected_room(self, room_id: str | None) -> None:
+        self._selected_room_id = room_id
+
+    def add_room_object(self, obj: RoomObjectManifest) -> None:
+        self.manifest.room_objects.append(obj)
+        self.is_dirty = True
+
+    def remove_room_object(self, slug: str) -> None:
+        for obj in self.manifest.room_objects:
+            if obj.slug == slug:
+                self.manifest.room_objects.remove(obj)
+                self.is_dirty = True
+                return
+
     def save_to_path(self, path: Path) -> None:
         data = self.manifest.model_dump()
         Path(path).write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -506,11 +600,39 @@ class CampaignView(arcade.View):
     # Section helpers
     # ------------------------------------------------------------------
 
+    def _room_name(self, room_id: str) -> str | None:
+        if self._dungeon is None:
+            return None
+        for level in self._dungeon.levels:
+            for room in level.rooms:
+                if room.id == room_id:
+                    return room.name
+        return None
+
+    def _level_id_for_room(self, room_id: str) -> str:
+        if self._dungeon is None:
+            return ""
+        for level in self._dungeon.levels:
+            for room in level.rooms:
+                if room.id == room_id:
+                    return str(level.id)
+        return ""
+
     def _section_counts(self) -> dict[str, int]:
         if self.manifest is None:
             return {}
         m = self.manifest
         ps = set(m.player_side)
+        # The rooms badge mirrors the list currently shown: dungeon rooms at the
+        # top level, or placed objects once a room is drilled into.
+        if self._selected_room_id is not None:
+            rooms_count = sum(
+                1 for o in m.room_objects if o.room_id == self._selected_room_id
+            )
+        elif self._dungeon is not None:
+            rooms_count = sum(len(level.rooms) for level in self._dungeon.levels)
+        else:
+            rooms_count = 0
         return {
             "player_side": sum(1 for a in m.world_actors if a.slug in ps),
             "monsters": sum(
@@ -522,6 +644,7 @@ class CampaignView(arcade.View):
             "clocks": len(m.clocks),
             "threats": len(m.room_threats),
             "lore": len(m.memory_seeds),
+            "rooms": rooms_count,
         }
 
     def _section_items(self) -> list:
@@ -547,6 +670,12 @@ class CampaignView(arcade.View):
             return list(m.room_threats)
         elif s == "lore":
             return list(m.memory_seeds)
+        elif s == "rooms":
+            if self._selected_room_id is not None:
+                return [o for o in m.room_objects if o.room_id == self._selected_room_id]
+            if self._dungeon is None:
+                return []
+            return [room for level in self._dungeon.levels for room in level.rooms]
         elif s == "validation":
             return list(self._validation_result) if self._validation_result is not None else []
         return []
