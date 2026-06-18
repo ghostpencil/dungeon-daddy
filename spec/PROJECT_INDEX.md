@@ -2,14 +2,24 @@
 
 ## Phase
 
-Phase: **46 — Inventory System (COMPLETE)**
-Status: All 10 slices complete. Branch `phase-46-inventory-system`. 2555 tests passing.
+Phase: **47 — Room Contents (IN PROGRESS)**
+Status: Slice 2 of 9 complete. Branch `phase-47-items-in-rooms`. 2571 tests passing.
+Spec: `spec/PHASE_47_ROOM_CONTENTS.md` (GitHub issue [#72](https://github.com/ghostpencil/dungeon-daddy/issues/72)).
 
-Previous: Phase 45 complete (2026-06-14). Stabilization post-45 complete (2026-06-17).
-Spec: `spec/PHASE_46_INVENTORY_SYSTEM.md`. Issue [#70](https://github.com/ghostpencil/dungeon-daddy/issues/70).
-Next: Phase 47 — Items in Rooms.
+Previous: Phase 46 complete (2026-06-17). Branch `phase-46-inventory-system`.
+Next slice (issue #72 ordering): Slice 3 — **State transition validation**. `ActivateObject` Player Command + validator: requested `(from_state, trigger)` must match one of the object's transitions, and `requires_item_slug` (if set) must be in the acting actor's active inventory; invalid transitions rejected with `command.rejected`. No side-effects yet (those land in Slice 4).
 
-**Last session (2026-06-17) — Phase 46 Slices 1–10 complete. Phase 46 DONE.**
+**Last session (2026-06-18) — Phase 47 spec + issue promotion (no code).**
+- Promoted the Phase 47 roadmap **draft card → GitHub issue [#72](https://github.com/ghostpencil/dungeon-daddy/issues/72)** (`convertProjectV2DraftIssueItemToIssue`); created + applied the `phase-47` label.
+- Wrote **`spec/PHASE_47_ROOM_CONTENTS.md`** (none existed previously — confirmed via git history). Reconciles issue #72 with the 2026-06-17 review and locks 8 design decisions: room interactions are Player Commands (not proposals); transition side-effects are engine-internal deterministic; spawned items are pre-seeded inert rows; no party-location gate this phase (Phase 48); item placement extends `ItemManifest.room_id`; `current_room` context block is provided not discovered.
+- **Audited Slices 1–2 against the design — both ✅, no rework.** Notes (non-blocking): `UNIQUE(campaign_id, slug)` on `room_objects` (consistent w/ items); `update_object_state` landed a slice early (harmless); `ObjectTransition` validity checked dynamically in Slice 3 (correct). 61 slice tests pass.
+- Locked **slice ordering to issue #72** (Objects track first): next is Slice 3 — State transition validation.
+
+**Prior session (2026-06-18) — Phase 47 Slice 2 complete.**
+- **Slice 2 DONE** — `save_room_object` (upsert + transition child-row replace), `get_room_object` (by object_id), `get_objects_by_room` (by campaign_id + room_id), `update_object_state` (set current_state), `_room_object_row_to_dict` added to `MemoryRepository`. `RoomObject` import added to `repository.py`. New test file `tests/unit/memory/test_room_object_repository.py` (7 tests: round-trip, upsert dedup, room filter, empty-room guard, transitions nested, transitions replace on upsert, state update). 7 new tests; 2571 passing.
+- **Slice 1 DONE** — `RoomObject` + `ObjectTransition` Pydantic models added to `dungeon_daddy/rpg/models.py`; `ObjectArchetype` Literal type (7 archetypes: container, door, mechanism, structure, trap, lore_fixture, resource); `RoomObject.description` non-empty validator. `Item.room_id: str | None = None` added. Migration `dungeon_daddy/data/migrations/009_room_objects.sql` creates `room_objects` + `object_transitions` tables; adds `room_id` column to `items`. `EXPECTED_TABLES` in `test_rpg_memory_migrations.py` updated; `test_items_table_has_room_id_column` added. 9 new tests; 2564 passing.
+
+**Prior session (2026-06-17) — Phase 46 Slices 1–10 complete. Phase 46 DONE.**
 - **Slice 10 DONE** — Manifest + seed: `ItemFeatureManifest` + `ItemManifest` added to `dungeon_daddy/campaign/manifest.py`; `CampaignManifest.items` field added. `_seed_item` added to `dungeon_daddy/campaign/seeder.py` following `_seed_faction` idempotent pattern — skips existing unless `force`, `dry_run` counts only, `owner_slug` resolves to `actor:{campaign_slug}:{owner_slug}`, `charges_current` initialises to `charges_max`. Wired into `seed_from_manifest()`. 8 new tests; 2555 passing.
 - **Slice 9 DONE** — Character Sheet Panel UI: `set_inventory(kits, dungeon_items, equipped)` added to `CharacterSheetPanel`. Stores three lists; draw() renders KITS section (pip tracks for charges_current/charges_max reusing existing pip constants), ITEMS section (name + status color + `[L]` tag for level-bound), GEAR section (feature badges: `FIGHT +1` for rating_modifier, `VANISH [new]` for new_action). 5 new tests; 2547 passing.
 - **Slice 8 DONE** — World-reaction item proposals: `GrantItemChange`, `StripItemChange`, `TransformItemChange` added to `ProposedChange` union in `proposal.py`. Validator gains `known_item_ids`, `known_item_slugs`, `dungeon_item_counts` params with branches for all three. Applier applies each immediately (grant → `update_item_owner`; strip → `update_item_status("lost")`; transform → `update_item_slug`); each emits its domain event (`item.granted`, `item.stripped`, `item.transformed`) + `proposal.applied`. New `update_item_slug` added to `MemoryRepository`. 18 new tests; 2542 passing.
@@ -114,7 +124,7 @@ reactions. It must not directly mutate authoritative state.
 
 ## Known Failures
 
-None (test suite passes — 2555 tests as of 2026-06-17).
+None (test suite passes — 2564 tests as of 2026-06-18).
 
 ---
 
@@ -128,7 +138,8 @@ Phase 42 and earlier are complete. Full history in `spec/HISTORY.md`.
 
 - Provider: OpenAI (`gpt-4o`); `OPENAI_API_KEY` must be set.
 - Phase specs: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (current); index at `spec/IMPLEMENTATION_PHASES.md`.
-- Roadmap for Phases 47–53 (planned): GitHub Projects `ghostpencil/dungeon-daddy` #1, mirrored in the "Planned Roadmap — Phases 46–53" section of `IMPLEMENTATION_PHASES_33_ONWARDS.md`. Next: Phase 47 (Items in Rooms). Issue bodies hold the per-phase detail and the folded-in design resolutions; a detailed `spec/PHASE_47_*.md` is written when Phase 47 starts.
+- Roadmap for Phases 47–53 (planned): GitHub Projects `ghostpencil/dungeon-daddy` #1, mirrored in the "Planned Roadmap — Phases 46–53" section of `IMPLEMENTATION_PHASES_33_ONWARDS.md`. Issue bodies hold the per-phase detail and the folded-in design resolutions; a detailed `spec/PHASE_NN_*.md` is written when each phase starts.
+- Phase 47 spec: `spec/PHASE_47_ROOM_CONTENTS.md` (GitHub issue [#72](https://github.com/ghostpencil/dungeon-daddy/issues/72), label `phase-47`). Written 2026-06-18 after Slices 1–2 shipped; reconciles issue #72 with the 2026-06-17 review (room interactions are Player Commands, not proposals; transition side-effects are engine-internal) and contains an as-built audit of Slices 1–2 (both ✅). Slice order follows issue #72 (Objects track — transition validation — before the Items-in-rooms pickup track).
 - Phase 53 (Threat Behavior & Monster Reactions, planned 2026-06-17): instinct-driven, engine-bounded monster reactions with no enemy turn; bosses escalate via clock thresholds. Full design in `spec/MONSTER_REACTION_DESIGN.md`; summary in `IMPLEMENTATION_PHASES_33_ONWARDS.md`.
 - Spec loading rules and skills: `CLAUDE.md` (canonical source).
 - `protagonist` actor is defined in `seed_data/campaigns/the-crucible/rpg_seed.json` (use `--seed-pack` + `--force` to reset stress tracks); the generic `seed_campaign()` path no longer creates a placeholder actor.

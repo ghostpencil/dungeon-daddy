@@ -27,6 +27,8 @@ EXPECTED_TABLES = {
     "memory_tags",
     "memory_links",
     "domain_events",
+    "room_objects",
+    "object_transitions",
 }
 
 
@@ -68,6 +70,20 @@ class TestMigrationRunnerIntegration:
         conn.close()
         tables = {row[0] for row in rows}
         assert EXPECTED_TABLES <= tables
+
+    def test_items_table_has_room_id_column(self, tmp_path: Path) -> None:
+        db_path = tmp_path / "dungeon.duckdb"
+        runner = MigrationRunner(migrations_dir=MIGRATIONS_DIR, db_path=db_path)
+        runner.run()
+        conn = duckdb.connect(str(db_path))
+        cols = {
+            row[0]
+            for row in conn.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_name = 'items'"
+            ).fetchall()
+        }
+        conn.close()
+        assert "room_id" in cols
 
 
 class TestMemoryRepositoryIntegration:

@@ -10,8 +10,10 @@ from dungeon_daddy.rpg.models import (
     FalloutRecord,
     Item,
     ItemFeature,
+    ObjectTransition,
     ReactionClockLine,
     ReactionStressLine,
+    RoomObject,
     StressTrack,
     WorldReaction,
 )
@@ -425,6 +427,29 @@ class TestItem:
         )
         assert len(item.features) == 1
 
+    def test_room_id_defaults_to_none(self) -> None:
+        item = Item(
+            item_id="item:c:torch",
+            campaign_id="c",
+            slug="torch",
+            display_name="Torch",
+            item_type="dungeon_item",
+            description="A flickering torch.",
+        )
+        assert item.room_id is None
+
+    def test_room_id_can_be_set(self) -> None:
+        item = Item(
+            item_id="item:c:torch",
+            campaign_id="c",
+            slug="torch",
+            display_name="Torch",
+            item_type="dungeon_item",
+            description="A flickering torch.",
+            room_id="room:entrance",
+        )
+        assert item.room_id == "room:entrance"
+
 
 class TestItemFeature:
     def test_rating_modifier_requires_modifier(self) -> None:
@@ -446,3 +471,94 @@ class TestItemFeature:
                 action_key="cleave",
                 modifier=1,
             )
+
+
+class TestRoomObject:
+    def test_constructs_with_required_fields(self) -> None:
+        obj = RoomObject(
+            object_id="obj:camp-1:chest",
+            campaign_id="camp-1",
+            room_id="room:entrance",
+            level_id="level:1",
+            slug="chest",
+            display_name="Iron Chest",
+            archetype="container",
+            description="A heavy iron chest.",
+            current_state="sealed",
+        )
+        assert obj.object_id == "obj:camp-1:chest"
+        assert obj.archetype == "container"
+        assert obj.transitions == []
+
+    def test_all_archetypes_accepted(self) -> None:
+        for archetype in ("container", "door", "mechanism", "structure", "trap", "lore_fixture", "resource"):
+            obj = RoomObject(
+                object_id="obj:c:x",
+                campaign_id="c",
+                room_id="room:r",
+                level_id="level:1",
+                slug="x",
+                display_name="X",
+                archetype=archetype,
+                description="Some fixture.",
+                current_state="sealed",
+            )
+            assert obj.archetype == archetype
+
+    def test_unknown_archetype_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            RoomObject(
+                object_id="obj:c:x",
+                campaign_id="c",
+                room_id="room:r",
+                level_id="level:1",
+                slug="x",
+                display_name="X",
+                archetype="cursed_idol",
+                description="An idol.",
+                current_state="intact",
+            )
+
+    def test_empty_description_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            RoomObject(
+                object_id="obj:c:x",
+                campaign_id="c",
+                room_id="room:r",
+                level_id="level:1",
+                slug="x",
+                display_name="X",
+                archetype="trap",
+                description="   ",
+                current_state="armed",
+            )
+
+
+class TestObjectTransition:
+    def test_constructs_with_required_fields_optional_defaults_none(self) -> None:
+        t = ObjectTransition(
+            transition_id="tr:1",
+            object_id="obj:c:chest",
+            from_state="sealed",
+            to_state="opened",
+            trigger="open",
+        )
+        assert t.transition_id == "tr:1"
+        assert t.requires_item_slug is None
+        assert t.spawns_item_slug is None
+        assert t.advances_clock_slug is None
+
+    def test_optional_effect_slugs_stored(self) -> None:
+        t = ObjectTransition(
+            transition_id="tr:2",
+            object_id="obj:c:chest",
+            from_state="locked",
+            to_state="unlocked",
+            trigger="unlock",
+            requires_item_slug="iron-key",
+            spawns_item_slug="gold-coin",
+            advances_clock_slug="ritual-clock",
+        )
+        assert t.requires_item_slug == "iron-key"
+        assert t.spawns_item_slug == "gold-coin"
+        assert t.advances_clock_slug == "ritual-clock"

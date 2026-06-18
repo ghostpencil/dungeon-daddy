@@ -185,6 +185,7 @@ class Item(BaseModel):
     item_type: Literal["class_kit", "dungeon_item", "equipped_gear"]
     description: str
     owner_actor_id: str | None = None
+    room_id: str | None = None
     level_id: str | None = None
     status: Literal["active", "consumed", "inert", "lost"] = "active"
     charges_current: int | None = None
@@ -210,3 +211,39 @@ class Item(BaseModel):
         if self.item_type in ("class_kit", "dungeon_item") and self.features:
             raise ValueError(f"{self.item_type} must not carry features")
         return self
+
+
+ObjectArchetype = Literal[
+    "container", "door", "mechanism", "structure", "trap", "lore_fixture", "resource"
+]
+
+
+class ObjectTransition(BaseModel):
+    transition_id: str
+    object_id: str
+    from_state: str
+    to_state: str
+    trigger: str
+    requires_item_slug: str | None = None
+    spawns_item_slug: str | None = None
+    advances_clock_slug: str | None = None
+
+
+class RoomObject(BaseModel):
+    object_id: str
+    campaign_id: str
+    room_id: str
+    level_id: str
+    slug: str
+    display_name: str
+    archetype: ObjectArchetype
+    description: str
+    current_state: str
+    transitions: list[ObjectTransition] = Field(default_factory=list)
+
+    @field_validator("description")
+    @classmethod
+    def description_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("description must not be empty")
+        return v
