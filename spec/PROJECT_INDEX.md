@@ -3,13 +3,17 @@
 ## Phase
 
 Phase: **47 — Room Contents (IN PROGRESS)**
-Status: Slice 2 of 9 complete. Branch `phase-47-items-in-rooms`. 2571 tests passing.
+Status: Slice 3 of 9 complete. Branch `phase-47-items-in-rooms`. 2579 tests passing.
 Spec: `spec/PHASE_47_ROOM_CONTENTS.md` (GitHub issue [#72](https://github.com/ghostpencil/dungeon-daddy/issues/72)).
 
 Previous: Phase 46 complete (2026-06-17). Branch `phase-46-inventory-system`.
-Next slice (issue #72 ordering): Slice 3 — **State transition validation**. `ActivateObject` Player Command + validator: requested `(from_state, trigger)` must match one of the object's transitions, and `requires_item_slug` (if set) must be in the acting actor's active inventory; invalid transitions rejected with `command.rejected`. No side-effects yet (those land in Slice 4).
+Next slice (issue #72 ordering): Slice 4 — **Transition side-effects**. `ActivateObject` applier: `update_object_state(to_state)`; spawn pre-seeded item into the room (decision #3 — find unplaced campaign item by `spawns_item_slug`, set `room_id` + `status="active"`); advance clock by `advances_clock_slug` via existing clock service. Emits `object.transitioned` (+ `item.spawned`, `clock.advanced` when applicable). Needs repo helpers `get_items_by_room` + `update_item_room`.
 
-**Last session (2026-06-18) — Phase 47 spec + issue promotion (no code).**
+**Last session (2026-06-18) — Phase 47 Slice 3 complete.**
+- **Slice 3 DONE** — State transition validation. `ActivateObject` command (`object_id`, `actor_id`, `trigger`) added to `rpg/command.py` and the `PlayerCommand` union. `validate_command` branch in `command_validator.py`: rejects unknown object; rejects when no transition matches `(from_state == current_state, trigger)`; rejects when the transition's `requires_item_slug` is not in the acting actor's **active** inventory (checks `get_items_by_actor`, slug + `status=="active"`). Accepts otherwise; rejections emit `command.rejected`. No side-effects (Slice 4). 8 new tests (7 in `test_command_validator.py`, 1 instantiation in `test_command.py`); 2579 passing.
+- Committed Slices 1–2 (were uncommitted): models + migration `009_room_objects.sql` + repository CRUD. Added `*.duckdb` to `.gitignore`.
+
+**Prior session (2026-06-18) — Phase 47 spec + issue promotion (no code).**
 - Promoted the Phase 47 roadmap **draft card → GitHub issue [#72](https://github.com/ghostpencil/dungeon-daddy/issues/72)** (`convertProjectV2DraftIssueItemToIssue`); created + applied the `phase-47` label.
 - Wrote **`spec/PHASE_47_ROOM_CONTENTS.md`** (none existed previously — confirmed via git history). Reconciles issue #72 with the 2026-06-17 review and locks 8 design decisions: room interactions are Player Commands (not proposals); transition side-effects are engine-internal deterministic; spawned items are pre-seeded inert rows; no party-location gate this phase (Phase 48); item placement extends `ItemManifest.room_id`; `current_room` context block is provided not discovered.
 - **Audited Slices 1–2 against the design — both ✅, no rework.** Notes (non-blocking): `UNIQUE(campaign_id, slug)` on `room_objects` (consistent w/ items); `update_object_state` landed a slice early (harmless); `ObjectTransition` validity checked dynamically in Slice 3 (correct). 61 slice tests pass.
@@ -124,7 +128,7 @@ reactions. It must not directly mutate authoritative state.
 
 ## Known Failures
 
-None (test suite passes — 2564 tests as of 2026-06-18).
+None (test suite passes — 2579 tests as of 2026-06-18).
 
 ---
 

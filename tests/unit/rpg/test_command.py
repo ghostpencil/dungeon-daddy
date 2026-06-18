@@ -1,4 +1,4 @@
-from dungeon_daddy.rpg.command import ConsumeItem, ConsumeKitCharge, EquipItem, GiveItem, TakeItem, UnequipItem
+from dungeon_daddy.rpg.command import ActivateObject, ConsumeItem, ConsumeKitCharge, EquipItem, GiveItem, TakeItem, UnequipItem
 
 
 def test_consume_kit_charge_instantiates() -> None:
@@ -38,3 +38,11 @@ def test_unequip_item_instantiates() -> None:
     cmd = UnequipItem(item_id="item:test:sword")
     assert cmd.kind == "unequip_item"
     assert cmd.item_id == "item:test:sword"
+
+
+def test_activate_object_instantiates() -> None:
+    cmd = ActivateObject(object_id="obj:test:chest", actor_id="actor:test:rogue", trigger="unlock")
+    assert cmd.kind == "activate_object"
+    assert cmd.object_id == "obj:test:chest"
+    assert cmd.actor_id == "actor:test:rogue"
+    assert cmd.trigger == "unlock"

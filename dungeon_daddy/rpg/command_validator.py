@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.rpg.command import ConsumeItem, ConsumeKitCharge, EquipItem, GiveItem, PlayerCommand, TakeItem, UnequipItem
+from dungeon_daddy.rpg.command import ActivateObject, ConsumeItem, ConsumeKitCharge, EquipItem, GiveItem, PlayerCommand, TakeItem, UnequipItem
 
 _log = logging.getLogger(__name__)
 
@@ -153,6 +153,53 @@ def validate_command(
             reason = f"Item has no owner: {command.item_id}"
         else:
             reason = None
+
+        if reason is not None:
+            _log.info("Command rejected [%s]: %s", command.kind, reason)
+            result.rejection_reason = reason
+            result.rejection_events.append(
+                DomainEvent(
+                    event_id=str(uuid.uuid4()),
+                    campaign_id=campaign_id,
+                    event_type="command.rejected",
+                    payload={"kind": command.kind, "reason": reason},
+                )
+            )
+        else:
+            result.accepted = True
+
+    elif isinstance(command, ActivateObject):
+        obj = repo.get_room_object(command.object_id)
+
+        if obj is None:
+            reason = f"Unknown object: {command.object_id}"
+        else:
+            transition = next(
+                (
+                    t
+                    for t in obj["transitions"]
+                    if t["from_state"] == obj["current_state"] and t["trigger"] == command.trigger
+                ),
+                None,
+            )
+            if transition is None:
+                reason = (
+                    f"No transition for trigger '{command.trigger}' from state "
+                    f"'{obj['current_state']}': {command.object_id}"
+                )
+            elif transition["requires_item_slug"] is not None:
+                actor_items = repo.get_items_by_actor(command.actor_id)
+                has_required = any(
+                    i["slug"] == transition["requires_item_slug"] and i["status"] == "active"
+                    for i in actor_items
+                )
+                reason = (
+                    None
+                    if has_required
+                    else f"Missing required item '{transition['requires_item_slug']}': {command.object_id}"
+                )
+            else:
+                reason = None
 
         if reason is not None:
             _log.info("Command rejected [%s]: %s", command.kind, reason)

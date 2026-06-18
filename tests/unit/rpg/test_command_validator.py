@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dungeon_daddy.rpg.command import ConsumeItem, ConsumeKitCharge, EquipItem, GiveItem, TakeItem, UnequipItem
+from dungeon_daddy.rpg.command import ActivateObject, ConsumeItem, ConsumeKitCharge, EquipItem, GiveItem, TakeItem, UnequipItem
 from dungeon_daddy.rpg.command_validator import validate_command
-from dungeon_daddy.rpg.models import Item
+from dungeon_daddy.rpg.models import Item, ObjectTransition, RoomObject
 
 CAMPAIGN = "campaign:test"
 KIT_ID = "item:test:lockpick-kit"
@@ -247,5 +247,148 @@ class TestUnequipItemValidation:
     def test_accepts_valid_equipped_gear(self, repo) -> None:
         repo.save_item(_gear())
         result = validate_command(UnequipItem(item_id=GEAR_ID), repo, CAMPAIGN)
+        assert result.accepted
+        assert result.rejection_events == []
+
+
+OBJECT_ID = "obj:test:iron-chest"
+ROOM_ID = "room:test:vault"
+
+
+def _object(
+    current_state: str = "locked",
+    transitions: list[ObjectTransition] | None = None,
+) -> RoomObject:
+    if transitions is None:
+        transitions = [
+            ObjectTransition(
+                transition_id="tr:test:unlock",
+                object_id=OBJECT_ID,
+                from_state="locked",
+                to_state="unlocked",
+                trigger="unlock",
+            )
+        ]
+    return RoomObject(
+        object_id=OBJECT_ID,
+        campaign_id=CAMPAIGN,
+        room_id=ROOM_ID,
+        level_id="level:test:1",
+        slug="iron-chest",
+        display_name="Iron Chest",
+        archetype="container",
+        description="A heavy iron chest.",
+        current_state=current_state,
+        transitions=transitions,
+    )
+
+
+def _activate(trigger: str = "unlock") -> ActivateObject:
+    return ActivateObject(object_id=OBJECT_ID, actor_id=ACTOR_A, trigger=trigger)
+
+
+class TestActivateObjectValidation:
+    def test_rejects_unknown_object(self, repo) -> None:
+        result = validate_command(_activate(), repo, CAMPAIGN)
+        assert not result.accepted
+        assert len(result.rejection_events) == 1
+        assert result.rejection_events[0].event_type == "command.rejected"
+
+    def test_rejects_unmatched_trigger(self, repo) -> None:
+        repo.save_room_object(_object())
+        result = validate_command(_activate(trigger="force"), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "No transition" in (result.rejection_reason or "")
+
+    def test_rejects_trigger_valid_for_other_state(self, repo) -> None:
+        # 'unlock' exists but only from 'locked'; object is already 'unlocked'
+        repo.save_room_object(_object(current_state="unlocked"))
+        result = validate_command(_activate(trigger="unlock"), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "No transition" in (result.rejection_reason or "")
+
+    def test_rejects_missing_required_item(self, repo) -> None:
+        repo.save_room_object(
+            _object(
+                transitions=[
+                    ObjectTransition(
+                        transition_id="tr:test:unlock",
+                        object_id=OBJECT_ID,
+                        from_state="locked",
+                        to_state="unlocked",
+                        trigger="unlock",
+                        requires_item_slug="brass-key",
+                    )
+                ]
+            )
+        )
+        result = validate_command(_activate(), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "brass-key" in (result.rejection_reason or "")
+
+    def test_rejects_required_item_present_but_inactive(self, repo) -> None:
+        repo.save_room_object(
+            _object(
+                transitions=[
+                    ObjectTransition(
+                        transition_id="tr:test:unlock",
+                        object_id=OBJECT_ID,
+                        from_state="locked",
+                        to_state="unlocked",
+                        trigger="unlock",
+                        requires_item_slug="brass-key",
+                    )
+                ]
+            )
+        )
+        key = Item(
+            item_id="item:test:brass-key",
+            campaign_id=CAMPAIGN,
+            slug="brass-key",
+            display_name="Brass Key",
+            item_type="dungeon_item",
+            description="An ornate brass key.",
+            owner_actor_id=ACTOR_A,
+            status="lost",
+        )
+        repo.save_item(key)
+        result = validate_command(_activate(), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "brass-key" in (result.rejection_reason or "")
+
+    def test_accepts_valid_transition_without_required_item(self, repo) -> None:
+        repo.save_room_object(_object())
+        result = validate_command(_activate(), repo, CAMPAIGN)
+        assert result.accepted
+        assert result.rejection_reason is None
+        assert result.rejection_events == []
+
+    def test_accepts_valid_transition_with_required_item(self, repo) -> None:
+        repo.save_room_object(
+            _object(
+                transitions=[
+                    ObjectTransition(
+                        transition_id="tr:test:unlock",
+                        object_id=OBJECT_ID,
+                        from_state="locked",
+                        to_state="unlocked",
+                        trigger="unlock",
+                        requires_item_slug="brass-key",
+                    )
+                ]
+            )
+        )
+        key = Item(
+            item_id="item:test:brass-key",
+            campaign_id=CAMPAIGN,
+            slug="brass-key",
+            display_name="Brass Key",
+            item_type="dungeon_item",
+            description="An ornate brass key.",
+            owner_actor_id=ACTOR_A,
+            status="active",
+        )
+        repo.save_item(key)
+        result = validate_command(_activate(), repo, CAMPAIGN)
         assert result.accepted
         assert result.rejection_events == []
