@@ -1197,7 +1197,18 @@ New `current_room` context block (objects + loose items) provided via optional
 auto-generated slug, archetype cycle picker). 2673 tests passing.
 
 
-# Planned Roadmap — Phases 48–53
+## Phase 48 — Dungeon Navigation (COMPLETE)
+
+**Status: Complete (2026-06-19) — 2799 tests passing**
+Spec: `spec/PHASE_48_DUNGEON_NAVIGATION.md` (GitHub issue [#74](https://github.com/ghostpencil/dungeon-daddy/issues/74))
+Branch: `phase-48-dungeon-navigation`
+
+Room exits, party location, level connectors, and fog of war. 11 TDD slices:
+`RoomExit` model + migration `010_room_exits.sql`; seed publish (derive exits from dungeon connections + manifest overrides); exit-condition validator (item / object-state / clock / memory); `MoveParty(exit_id, how)` Player Command (validate + apply: location, one-way seal, visited rooms); post-move world reaction (`how?` → modifier flags); level connector transition (`current_level_idx` + `mark_level_items_inert`); `DiscoverExit` + passive hint; `UnlockExit` / `SealExit` / `BlockExit` proposal; room context bundle (`visible_exits`, `locked_exits`, `hidden_exit_hint`, `resonance_point`); provisional EXITS tab in Play Mode (exit-list panel + click-to-move + fog-of-war map); party-presence gate on `PickUpItem` / `ActivateObject` (`party_room_id` keyword param to `validate_command`). Plus `tools/backfill_room_exits.py` for pre-Phase-48 campaigns. 2799 tests passing.
+
+---
+
+# Planned Roadmap — Phases 49–53
 
 These phases are **defined on the GitHub Projects roadmap** (`ghostpencil/dungeon-daddy`,
 project #1) and are **not yet implemented**. Numbering and scope below mirror that board.
@@ -1205,8 +1216,7 @@ A detailed `spec/PHASE_NN_*.md` is written when each phase actually starts.
 
 | Phase | Title | One-line scope |
 |---|---|---|
-| 47 | Room Contents | Items in rooms + interactive objects with a state machine — **COMPLETE** |
-| 48 | Dungeon Navigation | Room exits, party location, level connectors |
+| 48 | Dungeon Navigation | Room exits, party location, level connectors — **COMPLETE** |
 | 49 | Starting Playbooks | Class foundations: ratings, tracks, kit, **tags**, **signature adverbs**, starting abilities |
 | 50 | Hybrid Action Model | Structured **Verb · Noun · Adverb** action input; LLM narrates only |
 | 51 | Talk to the Dungeon | Intimacy-gated freeform channel at resonance points |
@@ -1223,7 +1233,7 @@ is sourced from each card's stated "Depends on:" line on GitHub Project #1.
 | Phase | Hard deps | Points back? |
 |---|---|---|
 | 47 Room Contents | 46 (complete) | ✓ (complete) |
-| 48 Dungeon Navigation | 47 (complete) | ✓ |
+| 48 Dungeon Navigation | 47 (complete) | ✓ (complete) |
 | 49 Starting Playbooks | 46 (complete) | ✓ |
 | 50 Hybrid Action Model | 47, 48, 49 | ✓ |
 | 51 Talk to the Dungeon | none (adds its own recedable-clock support) | ✓ |

@@ -22,6 +22,8 @@ def validate_command(
     command: PlayerCommand,
     repo: MemoryRepository,
     campaign_id: str,
+    *,
+    party_room_id: str | None = None,
 ) -> CommandValidationResult:
     result = CommandValidationResult()
 
@@ -185,6 +187,8 @@ def validate_command(
             reason = f"Unknown actor: {command.actor_id}"
         elif actor.get("actor_type") != "pc":
             reason = f"Actor is not a player character: {command.actor_id}"
+        elif party_room_id is not None and item.get("room_id") != party_room_id:
+            reason = f"Actor is not in the same room as item: {command.item_id}"
         else:
             actor_items = repo.get_items_by_actor(command.actor_id)
             dungeon_item_count = sum(
@@ -236,6 +240,8 @@ def validate_command(
 
         if obj is None:
             reason = f"Unknown object: {command.object_id}"
+        elif party_room_id is not None and obj.get("room_id") != party_room_id:
+            reason = f"Actor is not in the same room as object: {command.object_id}"
         else:
             transition = next(
                 (

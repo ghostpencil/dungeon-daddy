@@ -11,6 +11,7 @@ from dungeon_daddy.rpg.proposal import (
     AdvanceClockChange,
     AdjustReputationChange,
     ApplyConsequenceChange,
+    BlockExitChange,
     GrantItemChange,
     LLMReactionProposal,
     NpcReactionChange,
@@ -46,6 +47,7 @@ def validate_proposal(
     known_item_ids: set[str] | None = None,
     known_item_slugs: set[str] | None = None,
     dungeon_item_counts: dict[str, int] | None = None,
+    known_exit_ids: set[str] | None = None,
 ) -> ValidationResult:
     result = ValidationResult(source=proposal.source)
     actor_ids = known_actor_ids or set()
@@ -54,6 +56,7 @@ def validate_proposal(
     item_ids = known_item_ids or set()
     item_slugs = known_item_slugs or set()
     di_counts = dungeon_item_counts or {}
+    exit_ids = known_exit_ids or set()
 
     for change in proposal.proposed_changes:
         rejection_reason: str | None = None
@@ -85,6 +88,9 @@ def validate_proposal(
         elif isinstance(change, TransformItemChange):
             if change.item_id not in item_ids:
                 rejection_reason = f"Unknown item reference: {change.item_id}"
+        elif isinstance(change, BlockExitChange):
+            if change.exit_id not in exit_ids:
+                rejection_reason = f"Unknown exit reference: {change.exit_id}"
 
         if rejection_reason is not None:
             _log.info("Proposal rejected [%s]: %s", change.kind, rejection_reason)

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable
 
 import arcade
 
@@ -27,7 +28,8 @@ from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyle, GraphRoo
 from dungeon_daddy.map.dungeon_layout.style_resolver import resolve_room_render_style
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_config import VisualHierarchyConfig
 from dungeon_daddy.map.layout_debug_renderer import LayoutDebugRenderer
-from dungeon_daddy.ui.theme import FONT_MONO, FONT_UI, TEAL, TEXT_XS
+from dungeon_daddy.ui.fog_of_war import HIDDEN_LABEL, fog_of_war_label
+from dungeon_daddy.ui.theme import FONT_MONO, FONT_UI, GOLD, TEAL, TEXT_XS
 
 _ROOM_FILL = (30, 35, 45)
 _ROOM_BORDER = (100, 120, 140)
@@ -35,6 +37,7 @@ _CRIT_BORDER = (160, 185, 210)
 _EDGE_COLOR = (80, 100, 130)
 _CRIT_EDGE_COLOR = (120, 150, 180)
 _LABEL_COLOR = (160, 170, 180)
+_LABEL_HOVER_COLOR = (230, 240, 250)  # brighter — matches the hovered connection line
 _LINE_WIDTH = 1
 _SELECTION_WIDTH = 2
 
@@ -113,6 +116,8 @@ class LayoutRenderer:
         selected_room_id: str | None = None,
         view_state: GraphViewState | None = None,
         level: Level | None = None,
+        party_room_id: str | None = None,
+        visited_rooms: Iterable[str] | None = None,
         presentation_config: GraphPresentationConfig | None = None,
         panel_x: float = 20.0,
         panel_y: float = 20.0,
@@ -138,8 +143,11 @@ class LayoutRenderer:
                 for c in level.connections
             }
         self._draw_edges(result, origin_x, origin_y, zoom, cp_result, view_state, conn_metadata)
-        self._draw_rooms(result, origin_x, origin_y, zoom, selected_room_id, cp_result, view_state)
-        self._draw_labels(result, origin_x, origin_y, zoom)
+        self._draw_rooms(
+            result, origin_x, origin_y, zoom, selected_room_id, cp_result, view_state,
+            party_room_id=party_room_id, visited_rooms=visited_rooms,
+        )
+        self._draw_labels(result, origin_x, origin_y, zoom, view_state)
         if result.debug_overlay.enabled:
             self._debug_renderer.draw(result.debug_overlay, origin_x, origin_y, zoom)
         if level is not None:
@@ -232,10 +240,21 @@ class LayoutRenderer:
         selected_room_id: str | None,
         cp_result: CriticalPathPresentationResult,
         view_state: GraphViewState | None = None,
+        party_room_id: str | None = None,
+        visited_rooms: Iterable[str] | None = None,
     ) -> None:
         if self._art is None:
             from dungeon_daddy.map.map_art_assets import MapArtAssets
             self._art = MapArtAssets()
+
+        # Fog of war: hide unvisited rooms' names behind '?'. The party's current
+        # room is always revealed even before it lands in visited_rooms. When
+        # visited_rooms is None the caller opts out and every name is shown.
+        revealed: list[str] | None = None
+        if visited_rooms is not None:
+            revealed = [*visited_rooms]
+            if party_room_id:
+                revealed.append(party_room_id)
 
         connected_ids = _connected_room_ids(result, view_state.selected_room_id) if view_state else set()
 
@@ -277,6 +296,9 @@ class LayoutRenderer:
             if rect.room_id == selected_room_id:
                 arcade.draw_rect_outline(xywh, TEAL, _SELECTION_WIDTH)
 
+            if rect.room_id == party_room_id:
+                self._draw_party_marker(wx, wy, ww, wh, zoom)
+
             frame_key = self._select_frame_key(rect.room_id, selected_room_id, view_state)
             frame_tex = self._art.frames.get(frame_key)
             if frame_tex is not None:
@@ -288,7 +310,12 @@ class LayoutRenderer:
                 )
 
             name = result.room_names.get(rect.room_id, "")
-            label = f"{name}\n{rect.room_id}" if name else rect.room_id
+            if revealed is not None and fog_of_war_label(
+                room_id=rect.room_id, room_name=name, visited_rooms=revealed,
+            ) == HIDDEN_LABEL:
+                label = HIDDEN_LABEL
+            else:
+                label = f"{name}\n{rect.room_id}" if name else rect.room_id
             arcade.draw_text(
                 label, wx + ww / 2, wy + wh / 2,
                 _LABEL_COLOR, font_size=TEXT_XS, font_name=FONT_UI,
@@ -308,6 +335,23 @@ class LayoutRenderer:
                     _LABEL_COLOR, font_size=TEXT_XS - 1, font_name=FONT_UI,
                     anchor_x="center", anchor_y="center",
                 )
+
+    def _draw_party_marker(
+        self, wx: float, wy: float, ww: float, wh: float, zoom: float,
+    ) -> None:
+        """Draw an unmistakable 'the party is here' marker on a room.
+
+        A bright GOLD ring plus a pinned PARTY label — deliberately distinct
+        from the TEAL selection cursor so party location reads at a glance.
+        """
+        ring = arcade.XYWH(wx + ww / 2, wy + wh / 2, ww + 8, wh + 8)
+        arcade.draw_rect_outline(ring, GOLD, 3)
+        arcade.draw_text(
+            "◆ PARTY",
+            wx + ww / 2, wy + wh + 4 * zoom,
+            GOLD, font_size=TEXT_XS, font_name=FONT_UI,
+            anchor_x="center", anchor_y="bottom",
+        )
 
     def _draw_edges(
         self,
@@ -452,13 +496,20 @@ class LayoutRenderer:
         origin_x: float,
         origin_y: float,
         zoom: float,
+        view_state: GraphViewState | None = None,
     ) -> None:
+        hovered_id = view_state.hovered_connection_id if view_state else None
         for lb in result.labels:
             if not lb.text:
                 continue
-            wx = self._wx(lb.x, origin_x, zoom)
-            wy = self._wy(lb.y, origin_y, zoom)
+            color = _LABEL_HOVER_COLOR if lb.connection_id == hovered_id else _LABEL_COLOR
+            # Center the text in its placed box: the box is positioned by the
+            # layout pipeline to clear rooms, so centering keeps the text in the
+            # routed gap instead of pinning it to the box's border-hugging edge.
+            wx = self._wx(lb.x + lb.w / 2, origin_x, zoom)
+            wy = self._wy(lb.y + lb.h / 2, origin_y, zoom)
             arcade.draw_text(
-                lb.text, wx, wy, _LABEL_COLOR,
+                lb.text, wx, wy, color,
                 font_size=TEXT_XS, font_name=FONT_MONO,
+                anchor_x="center", anchor_y="center",
             )

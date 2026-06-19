@@ -6,7 +6,7 @@ from pathlib import Path
 import duckdb
 
 from dungeon_daddy.memory.models import DomainEvent
-from dungeon_daddy.rpg.models import FactionState, FalloutRecord, Item, RoomObject
+from dungeon_daddy.rpg.models import FactionState, FalloutRecord, Item, RoomExit, RoomObject
 
 
 def _ensure_migration_table(conn: duckdb.DuckDBPyConnection) -> None:
@@ -1156,6 +1156,127 @@ class MemoryRepository:
             "description": r[7],
             "current_state": r[8],
             "transitions": transitions,
+        }
+
+    # ------------------------------------------------------------------
+    # Room Exits
+    # ------------------------------------------------------------------
+
+    def save_room_exit(self, exit: RoomExit) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO room_exits (
+                exit_id, campaign_id, from_room_id, to_room_id, level_id,
+                label, exit_type, connector_type, to_level_id, status,
+                requires_item_slug, requires_object_id, requires_object_state,
+                requires_clock_slug, requires_clock_min_filled, requires_memory_slug
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (exit_id) DO UPDATE SET
+                from_room_id            = excluded.from_room_id,
+                to_room_id              = excluded.to_room_id,
+                level_id                = excluded.level_id,
+                label                   = excluded.label,
+                exit_type               = excluded.exit_type,
+                connector_type          = excluded.connector_type,
+                to_level_id             = excluded.to_level_id,
+                status                  = excluded.status,
+                requires_item_slug      = excluded.requires_item_slug,
+                requires_object_id      = excluded.requires_object_id,
+                requires_object_state   = excluded.requires_object_state,
+                requires_clock_slug     = excluded.requires_clock_slug,
+                requires_clock_min_filled = excluded.requires_clock_min_filled,
+                requires_memory_slug    = excluded.requires_memory_slug
+            """,
+            [
+                exit.exit_id,
+                exit.campaign_id,
+                exit.from_room_id,
+                exit.to_room_id,
+                exit.level_id,
+                exit.label,
+                exit.exit_type,
+                exit.connector_type,
+                exit.to_level_id,
+                exit.status,
+                exit.requires_item_slug,
+                exit.requires_object_id,
+                exit.requires_object_state,
+                exit.requires_clock_slug,
+                exit.requires_clock_min_filled,
+                exit.requires_memory_slug,
+            ],
+        )
+
+    def get_exits_by_room(self, campaign_id: str, room_id: str) -> list[dict]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT exit_id, campaign_id, from_room_id, to_room_id, level_id,
+                   label, exit_type, connector_type, to_level_id, status,
+                   requires_item_slug, requires_object_id, requires_object_state,
+                   requires_clock_slug, requires_clock_min_filled, requires_memory_slug
+            FROM room_exits
+            WHERE campaign_id = ? AND from_room_id = ?
+            ORDER BY label
+            """,
+            [campaign_id, room_id],
+        ).fetchall()
+        return [self._room_exit_row_to_dict(r) for r in rows]
+
+    def get_exit_by_id(self, exit_id: str) -> dict | None:
+        assert self._conn is not None
+        row = self._conn.execute(
+            """
+            SELECT exit_id, campaign_id, from_room_id, to_room_id, level_id,
+                   label, exit_type, connector_type, to_level_id, status,
+                   requires_item_slug, requires_object_id, requires_object_state,
+                   requires_clock_slug, requires_clock_min_filled, requires_memory_slug
+            FROM room_exits WHERE exit_id = ?
+            """,
+            [exit_id],
+        ).fetchone()
+        if row is None:
+            return None
+        return self._room_exit_row_to_dict(row)
+
+    def update_exit_status(self, exit_id: str, status: str) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            "UPDATE room_exits SET status = ? WHERE exit_id = ?",
+            [status, exit_id],
+        )
+
+    def get_hidden_exit_count(self, campaign_id: str, room_id: str) -> int:
+        assert self._conn is not None
+        row = self._conn.execute(
+            """
+            SELECT COUNT(*) FROM room_exits
+            WHERE campaign_id = ? AND from_room_id = ? AND status = 'hidden'
+            """,
+            [campaign_id, room_id],
+        ).fetchone()
+        return row[0] if row else 0
+
+    def _room_exit_row_to_dict(self, r: tuple) -> dict:
+        return {
+            "exit_id": r[0],
+            "campaign_id": r[1],
+            "from_room_id": r[2],
+            "to_room_id": r[3],
+            "level_id": r[4],
+            "label": r[5],
+            "exit_type": r[6],
+            "connector_type": r[7],
+            "to_level_id": r[8],
+            "status": r[9],
+            "requires_item_slug": r[10],
+            "requires_object_id": r[11],
+            "requires_object_state": r[12],
+            "requires_clock_slug": r[13],
+            "requires_clock_min_filled": r[14],
+            "requires_memory_slug": r[15],
         }
 
     def close(self) -> None:

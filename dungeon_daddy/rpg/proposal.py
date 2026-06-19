@@ -67,6 +67,12 @@ class TransformItemChange(BaseModel):
     reason: str
 
 
+class BlockExitChange(BaseModel):
+    kind: Literal["block_exit"] = "block_exit"
+    exit_id: str
+    reason: str
+
+
 ProposedChange = Annotated[
     Union[
         AdvanceClockChange,
@@ -77,6 +83,7 @@ ProposedChange = Annotated[
         GrantItemChange,
         StripItemChange,
         TransformItemChange,
+        BlockExitChange,
     ],
     Field(discriminator="kind"),
 ]

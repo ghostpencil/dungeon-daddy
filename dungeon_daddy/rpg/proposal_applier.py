@@ -9,6 +9,7 @@ from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.proposal import (
     AdjustReputationChange,
     ApplyConsequenceChange,
+    BlockExitChange,
     CreateMemoryChange,
     GrantItemChange,
     ProposedChange,
@@ -154,6 +155,24 @@ def apply_low_risk_proposals(
                     "new_slug": change.new_slug,
                     "reason": change.reason,
                 },
+            )
+            repo.insert_domain_event(event)
+            applied_event = DomainEvent(
+                event_id=str(uuid.uuid4()),
+                campaign_id=campaign_id,
+                event_type="proposal.applied",
+                payload={"kind": change.kind, "reason": change.reason},
+            )
+            repo.insert_domain_event(applied_event)
+            result.applied.append(change)
+            result.events.append(event)
+        elif isinstance(change, BlockExitChange):
+            repo.update_exit_status(change.exit_id, "blocked")
+            event = DomainEvent(
+                event_id=str(uuid.uuid4()),
+                campaign_id=campaign_id,
+                event_type="exit.blocked",
+                payload={"exit_id": change.exit_id, "reason": change.reason},
             )
             repo.insert_domain_event(event)
             applied_event = DomainEvent(

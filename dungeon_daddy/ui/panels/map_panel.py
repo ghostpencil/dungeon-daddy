@@ -225,6 +225,10 @@ class MapPanel:
         self._pan_offset_x = map_w / 2 - layout_cx * self._zoom_level
         self._pan_offset_y = map_h / 2 - layout_cy * self._zoom_level
 
+    def set_selected_room(self, room_id: str | None) -> None:
+        """Move the selection cursor (selected frame + detail panel) to a room."""
+        self._selected_room_id = room_id
+
     def set_renderer(self, renderer: GridRenderer) -> None:
         self._renderer = renderer
 
@@ -417,6 +421,8 @@ class MapPanel:
                         self._layout_result, origin_x, origin_y, self._zoom_level,
                         view_state=self._view_state,
                         level=self._level,
+                        party_room_id=self._state.current_room_id,
+                        visited_rooms=self._state.visited_rooms,
                         presentation_config=self._pres_config,
                         panel_x=x + map_w - 320.0,
                         panel_y=y + 20.0,

@@ -29,6 +29,7 @@ EXPECTED_TABLES = {
     "domain_events",
     "room_objects",
     "object_transitions",
+    "room_exits",
 }
 
 

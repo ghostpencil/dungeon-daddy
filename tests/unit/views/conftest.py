@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from dungeon_daddy.data.models import Dungeon, SessionState
+from dungeon_daddy.ui.panels.exit_list_panel import ExitListPanel
 from dungeon_daddy.ui.player_action_state import PlayerActionState
 from dungeon_daddy.views.play_view import PlayView
 
@@ -45,6 +46,8 @@ def make_play_view():
         view._rpg_debug = None
         view._rpg_service = None
         view._mem_repo = None
+        view._rpg_campaign_id = None
+        view._exit_panel = ExitListPanel()
         view._action_state = PlayerActionState()
         return view
     return _factory

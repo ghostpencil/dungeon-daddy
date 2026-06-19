@@ -35,8 +35,9 @@ def _make_rpg_side(active: int = 0):
     char, scene, fallout = MagicMock(), MagicMock(), MagicMock()
     mem = MagicMock()
     action = MagicMock()
+    exit_panel = MagicMock()
     manager = MagicMock()
-    panel = _RpgSidePanel(char, scene, fallout, mem, action, None, manager=manager)
+    panel = _RpgSidePanel(char, scene, fallout, mem, action, exit_panel, None, manager=manager)
     panel._x, panel._y, panel._w, panel._h = 0.0, 0.0, 300.0, 500.0
     panel._tab_rects = []
     panel._active = active

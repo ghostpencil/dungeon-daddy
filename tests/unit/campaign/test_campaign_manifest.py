@@ -9,6 +9,7 @@ from dungeon_daddy.campaign.manifest import (
     ItemFeatureManifest,
     ItemManifest,
     ObjectTransitionManifest,
+    RoomExitSeed,
     RoomObjectManifest,
 )
 
@@ -281,3 +282,44 @@ def test_campaign_manifest_accepts_room_objects():
     assert len(campaign.room_objects) == 1
     assert isinstance(campaign.room_objects[0], RoomObjectManifest)
     assert campaign.room_objects[0].slug == "iron-chest"
+
+
+def test_room_exit_seed_parses_required_fields():
+    seed = RoomExitSeed(
+        from_room_id="room:entrance",
+        to_room_id="room:corridor",
+        label="North Door",
+    )
+    assert seed.from_room_id == "room:entrance"
+    assert seed.to_room_id == "room:corridor"
+    assert seed.label == "North Door"
+    assert seed.exit_type == "door"
+    assert seed.connector_type is None
+    assert seed.status == "open"
+    assert seed.requires_item_slug is None
+
+
+def test_campaign_manifest_room_exits_defaults_to_empty():
+    campaign = CampaignManifest(slug="x", title="X", dungeon_slug="x")
+    assert campaign.room_exits == []
+
+
+def test_campaign_manifest_accepts_room_exits():
+    campaign = CampaignManifest(
+        slug="bone-cathedral",
+        title="The Bone Cathedral",
+        dungeon_slug="bone-cathedral",
+        room_exits=[
+            RoomExitSeed(
+                from_room_id="room:entrance",
+                to_room_id="room:corridor",
+                label="North Door",
+                status="locked",
+                requires_item_slug="iron-key",
+            )
+        ],
+    )
+    assert len(campaign.room_exits) == 1
+    assert isinstance(campaign.room_exits[0], RoomExitSeed)
+    assert campaign.room_exits[0].label == "North Door"
+    assert campaign.room_exits[0].requires_item_slug == "iron-key"
