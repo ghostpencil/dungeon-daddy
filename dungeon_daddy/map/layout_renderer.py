@@ -499,9 +499,13 @@ class LayoutRenderer:
         for lb in result.labels:
             if not lb.text:
                 continue
-            wx = self._wx(lb.x, origin_x, zoom)
-            wy = self._wy(lb.y, origin_y, zoom)
+            # Center the text in its placed box: the box is positioned by the
+            # layout pipeline to clear rooms, so centering keeps the text in the
+            # routed gap instead of pinning it to the box's border-hugging edge.
+            wx = self._wx(lb.x + lb.w / 2, origin_x, zoom)
+            wy = self._wy(lb.y + lb.h / 2, origin_y, zoom)
             arcade.draw_text(
                 lb.text, wx, wy, _LABEL_COLOR,
                 font_size=TEXT_XS, font_name=FONT_MONO,
+                anchor_x="center", anchor_y="center",
             )

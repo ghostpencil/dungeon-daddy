@@ -77,6 +77,23 @@ def test_draw_skips_empty_label_text() -> None:
         mock_arcade.draw_text.assert_not_called()
 
 
+def test_connection_label_drawn_centered_in_box() -> None:
+    """The label text is centered in its placed box (not pinned to the box's
+    bottom-left), so it sits in the routed gap instead of hugging a border."""
+    labels = [_label("a→b", "door", x=100.0, y=50.0)]  # box 60x14
+    result = _result(labels=labels)
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, origin_x=0.0, origin_y=0.0, zoom=1.0)
+
+    call = next(c for c in mock_arcade.draw_text.call_args_list if c.args and c.args[0] == "door")
+    assert call.kwargs.get("anchor_x") == "center"
+    assert call.kwargs.get("anchor_y") == "center"
+    assert call.args[1] == 130.0  # box center x = 100 + 60/2
+    assert call.args[2] == 57.0   # box center y = 50 + 14/2
+
+
 # ---------------------------------------------------------------------------
 # Cycle 5 — zoom is applied to room dimensions
 # ---------------------------------------------------------------------------
