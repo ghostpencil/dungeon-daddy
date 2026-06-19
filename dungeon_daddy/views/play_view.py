@@ -1296,17 +1296,12 @@ class PlayView(arcade.View):
     def _on_level_change(self, delta: int) -> None:
         if self._dungeon is None or self._state is None:
             return
-        new_idx = self._state.current_level_idx + delta
+        current_viewed = getattr(self, "_viewed_level_idx", self._state.current_level_idx)
+        new_idx = current_viewed + delta
         if 0 <= new_idx < len(self._dungeon.levels):
-            self._state.current_level_idx = new_idx
-            self._state.current_room_id = None
-            self._dm_history = []
+            self._viewed_level_idx = new_idx
             level = self._dungeon.levels[new_idx]
-            self._map.load(level, self._state, len(self._dungeon.levels))
-            self._chat.add_message("dm", f"Now on Level {new_idx + 1}: {level.name}.")
-            self._rpg_scene.set_scene(None, None)
-            self._refresh_memory_state()
-            self._sync_debug_level_id()
+            self._map.load(level, self._state, len(self._dungeon.levels), viewed_level_idx=new_idx)
 
     def _on_chat_send(self, text: str) -> None:
         self._chat.add_message("gm", text)

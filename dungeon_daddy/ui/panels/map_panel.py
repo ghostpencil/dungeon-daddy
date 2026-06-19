@@ -141,6 +141,7 @@ class MapPanel:
         self._x = self._y = self._w = self._h = 0.0
         self._level: Level | None = None
         self._state: SessionState | None = None
+        self._viewed_level_idx: int = 0
         self._dungeon_title: str = ""
         self._loop_strip_rects: dict[str, tuple[float, float, float, float]] = {}
         self._active_loop_id: str | None = None
@@ -179,19 +180,25 @@ class MapPanel:
     # State
     # ------------------------------------------------------------------
 
-    def load(self, level: Level, state: SessionState, total_levels: int = 1) -> None:
+    def load(
+        self,
+        level: Level,
+        state: SessionState,
+        total_levels: int = 1,
+        viewed_level_idx: int | None = None,
+    ) -> None:
         self._level = level
         self._state = state
         self._total_levels = total_levels
-        idx = state.current_level_idx + 1
+        self._viewed_level_idx = viewed_level_idx if viewed_level_idx is not None else state.current_level_idx
+        idx = self._viewed_level_idx + 1
         self._stepper.set_label(f"L{idx}")
         self._stepper.set_up_enabled(idx > 1)
         self._stepper.set_down_enabled(idx < total_levels)
         self._layout_result = run_layout_pipeline(level)
-        level_idx = state.current_level_idx
-        if level_idx not in self._level_view_states:
-            self._level_view_states[level_idx] = GraphViewState()
-        self._view_state = self._level_view_states[level_idx]
+        if self._viewed_level_idx not in self._level_view_states:
+            self._level_view_states[self._viewed_level_idx] = GraphViewState()
+        self._view_state = self._level_view_states[self._viewed_level_idx]
         self._zoom_level = _ZOOM_DEFAULT
         self._fit_layout_camera()
         self._active_loop_id = state.active_loop_id
@@ -199,7 +206,8 @@ class MapPanel:
 
     def update_state(self, state: SessionState, total_levels: int) -> None:
         self._state = state
-        idx = state.current_level_idx + 1
+        self._viewed_level_idx = state.current_level_idx
+        idx = self._viewed_level_idx + 1
         self._stepper.set_label(f"L{idx}")
         self._stepper.set_up_enabled(idx > 1)
         self._stepper.set_down_enabled(idx < total_levels)
@@ -421,7 +429,11 @@ class MapPanel:
                         self._layout_result, origin_x, origin_y, self._zoom_level,
                         view_state=self._view_state,
                         level=self._level,
-                        party_room_id=self._state.current_room_id,
+                        party_room_id=(
+                            self._state.current_room_id
+                            if self._viewed_level_idx == self._state.current_level_idx
+                            else None
+                        ),
                         visited_rooms=self._state.visited_rooms,
                         presentation_config=self._pres_config,
                         panel_x=x + map_w - 320.0,
