@@ -1,8 +1,8 @@
 # Phase 48 — Dungeon Navigation: Room Exits, Party Location, and Level Connectors
 
-**Status: PLANNED** (spec written 2026-06-18; no code yet)
+**Status: COMPLETE** (2026-06-19 — 2799 tests passing)
 GitHub issue: [#74](https://github.com/ghostpencil/dungeon-daddy/issues/74) (label `phase-48`)
-Branch: `phase-48-dungeon-navigation`
+Branch: `phase-48-dungeon-navigation` (PR pending → `main`)
 
 > This spec is the reconciliation deliverable for Phase 48 (Step 3 of the Phase-47-closeout
 > plan in `PROJECT_INDEX.md`). It targets the **full** 10-slice scope from issue #74, with the

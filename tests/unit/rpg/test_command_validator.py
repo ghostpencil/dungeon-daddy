@@ -393,6 +393,28 @@ class TestActivateObjectValidation:
         assert result.accepted
         assert result.rejection_events == []
 
+    def test_rejects_when_party_not_in_object_room(self, repo) -> None:
+        repo.save_room_object(_object())  # object is in ROOM_ID
+        result = validate_command(
+            _activate(),
+            repo,
+            CAMPAIGN,
+            party_room_id="room:test:other",
+        )
+        assert not result.accepted
+        assert "not in the same room" in (result.rejection_reason or "")
+
+    def test_accepts_when_party_room_matches_object_room(self, repo) -> None:
+        repo.save_room_object(_object())  # object is in ROOM_ID
+        result = validate_command(
+            _activate(),
+            repo,
+            CAMPAIGN,
+            party_room_id=ROOM_ID,
+        )
+        assert result.accepted
+        assert result.rejection_events == []
+
 
 LOOSE_ITEM_ID = "item:test:gem"
 ROOM_ID_A = "room:test:vault"
@@ -471,6 +493,30 @@ class TestPickUpItemValidation:
         repo.save_item(_loose_item())
         _save_pc(repo, ACTOR_A)
         result = validate_command(PickUpItem(item_id=LOOSE_ITEM_ID, actor_id=ACTOR_A), repo, CAMPAIGN)
+        assert result.accepted
+        assert result.rejection_events == []
+
+    def test_rejects_when_party_not_in_item_room(self, repo) -> None:
+        repo.save_item(_loose_item(room_id=ROOM_ID_A))
+        _save_pc(repo, ACTOR_A)
+        result = validate_command(
+            PickUpItem(item_id=LOOSE_ITEM_ID, actor_id=ACTOR_A),
+            repo,
+            CAMPAIGN,
+            party_room_id="room:test:other",
+        )
+        assert not result.accepted
+        assert "not in the same room" in (result.rejection_reason or "")
+
+    def test_accepts_when_party_room_matches_item_room(self, repo) -> None:
+        repo.save_item(_loose_item(room_id=ROOM_ID_A))
+        _save_pc(repo, ACTOR_A)
+        result = validate_command(
+            PickUpItem(item_id=LOOSE_ITEM_ID, actor_id=ACTOR_A),
+            repo,
+            CAMPAIGN,
+            party_room_id=ROOM_ID_A,
+        )
         assert result.accepted
         assert result.rejection_events == []
 

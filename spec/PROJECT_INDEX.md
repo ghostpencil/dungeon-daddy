@@ -2,8 +2,8 @@
 
 ## Phase
 
-Phase: **48 — Dungeon Navigation (IN PROGRESS)**
-Status: Slice 10 complete + exit backfill tool + manual-UI fixes — Play-mode UI. New `ui/how_chips.build_how_chips(*, max_sense, one_way, ritual_connector, armed_trap_clock)` (contextual chips, restricted to keys in `HOW_MODIFIER_FLAGS`); new `ui/panels/exit_list_panel.ExitListPanel` (display + `_layout()`/`handle_click` hit-testing → click-to-move via `set_move_callback`); new `ui/fog_of_war.fog_of_war_label` wired into `map/graph_renderer.py` (unvisited rooms show `?`, current always revealed). PlayView: new **EXITS** tab (`_TAB_EXITS=5`, `_TAB_DBG`→6) + `_refresh_exits()` + `_on_exit_move(exit_id, how)` → `apply_move_party` → narrate. Plus `tools/backfill_room_exits.py` for pre-Phase-48 campaigns (their `room_exits` table is empty). 2795 tests passing (2026-06-19). Slice 11 (party-presence gate) is all that remains.
+Phase: **48 — Dungeon Navigation (COMPLETE — ready to close)**
+Status: All 11 slices done. 2799 tests passing (2026-06-19). Slice 11 added `party_room_id: str | None = None` (keyword-only) to `validate_command` — when provided, `PickUpItem` rejects if `item["room_id"] != party_room_id` and `ActivateObject` rejects if `obj["room_id"] != party_room_id`. Additive: all existing callers omit the arg and stay green.
 
 **Manual-UI fixes (2026-06-19, this session) — Slice 10 polish:**
 1. **Party-location marker.** The live renderer is `map/layout_renderer.LayoutRenderer` (the `GraphRenderer` in `play_view.py` is only a fallback and *never* drew party location). `LayoutRenderer.draw(..., party_room_id=)` now draws a GOLD ring + "◆ PARTY" pin — distinct from the TEAL *selection* cursor. `MapPanel.draw` passes `state.current_room_id`; new `MapPanel.set_selected_room()`.
@@ -41,16 +41,11 @@ Previous: Phase 47 — Room Contents — COMPLETE (merged to `main`, PR #73, 202
 
 ---
 
-### Next session — Phase 48, Slice 11 (final slice)
+### Next session — Phase 48 close PR, then Phase 49
 
-Read `spec/TESTING.md` first, then invoke the TDD skill (per CLAUDE.md).
-
-**Slice 11 — Party-presence gate (folded-in Phase 47 deferral)**
-
-From the spec (`PHASE_48_DUNGEON_NAVIGATION.md`, locked decision #4):
-- Additive check in the `PickUpItem` / `ActivateObject` validators (`command_validator.py`): reject when the acting actor's party location (`current_room_id`) ≠ the item's / object's `room_id`.
-- Additive only — Phase 47 validators currently skip this check and must stay green.
-- This completes Phase 48; after it, run the full suite and prepare the phase-close PR.
+Phase 48 is feature-complete. Next steps:
+1. Open a phase-close PR for Phase 48 (branch `phase-48-dungeon-navigation` → `main`).
+2. Begin Phase 49 (check `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` for spec).
 
 **Slice 10 — DONE** (provisional exit-list panel + click-to-move + fog-of-war map). Notes:
 - `armed_trap_clock` chip surfacing (`recklessly` for trap rooms) left at default `False` — a minor throwaway-UI gap; the engine flag mapping exists if needed.
