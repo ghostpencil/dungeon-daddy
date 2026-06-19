@@ -3,7 +3,7 @@
 ## Phase
 
 Phase: **48 — Dungeon Navigation (IN PROGRESS)**
-Status: Slice 9 complete — `build_room_context(room_id, campaign_id, session, repo, *, resonance_point=False)` in new `rpg/room_context.py`: returns `visible_exits` (open+discovered), `locked_exits` (locked/blocked/one_way with `reason`+`missing_condition`), `hidden_exit_hint` (delegates to `passive_hidden_exit_hint`), `visited_rooms` (from session), `resonance_point`. 10 new tests. 2747 tests passing (2026-06-18).
+Status: Slice 10 complete — Play-mode UI. New `ui/how_chips.build_how_chips(*, max_sense, one_way, ritual_connector, armed_trap_clock)` (contextual chips, restricted to keys in `HOW_MODIFIER_FLAGS`); new `ui/panels/exit_list_panel.ExitListPanel` (display + `_layout()`/`handle_click` hit-testing → click-to-move via `set_move_callback`); new `ui/fog_of_war.fog_of_war_label` wired into `map/graph_renderer.py` (unvisited rooms show `?`, current always revealed). PlayView: new **EXITS** tab (`_TAB_EXITS=5`, `_TAB_DBG`→6) + `_refresh_exits()` + `_on_exit_move(exit_id, how)` → `apply_move_party` → narrate. 25 new tests. 2772 tests passing (2026-06-19). Slice 11 (party-presence gate) is all that remains.
 Spec: `spec/PHASE_48_DUNGEON_NAVIGATION.md` (full 10-slice scope + folded-in Slice 11).
 
 Previous: Phase 47 — Room Contents — COMPLETE (merged to `main`, PR #73, 2026-06-18). 2673 tests passing.
@@ -29,17 +29,18 @@ Previous: Phase 47 — Room Contents — COMPLETE (merged to `main`, PR #73, 202
 
 ---
 
-### Next session — Phase 48, Slice 10
+### Next session — Phase 48, Slice 11 (final slice)
 
-Read `spec/TESTING.md` first, then invoke the TDD skill (per CLAUDE.md). Work one slice at a time.
+Read `spec/TESTING.md` first, then invoke the TDD skill (per CLAUDE.md).
 
-**Slice 10 — Play-mode UI: provisional exit-list panel + fog-of-war map treatment**
+**Slice 11 — Party-presence gate (folded-in Phase 47 deferral)**
 
-From the spec (`PHASE_48_DUNGEON_NAVIGATION.md`):
-- Add a minimal exit-list panel to Play Mode showing visible exits (label + status), locked exits (greyed, with reason), and a `how?` chip row (cautiously / quickly / boldly / stealthily / etc.).
-- Fog-of-war map: exits to unvisited rooms render as directional arrows with `?` destination; visited rooms render normally.
-- This is **throwaway UI** — the engine and `how?`→flag contract are the durable parts; the panel is replaced by Phase 50's Card primitive.
-- Keep it thin — no polish Phase 50 will delete.
+From the spec (`PHASE_48_DUNGEON_NAVIGATION.md`, locked decision #4):
+- Additive check in the `PickUpItem` / `ActivateObject` validators (`command_validator.py`): reject when the acting actor's party location (`current_room_id`) ≠ the item's / object's `room_id`.
+- Additive only — Phase 47 validators currently skip this check and must stay green.
+- This completes Phase 48; after it, run the full suite and prepare the phase-close PR.
+
+**Slice 10 — DONE** (provisional exit-list panel + click-to-move + fog-of-war map). Note: `armed_trap_clock` chip surfacing (`recklessly` for trap rooms) was left at default `False` — a minor throwaway-UI gap, the engine flag mapping exists if needed.
 
 **Slice order** (full detail in the spec):
 1. `RoomExit` + `RoomExitSeed` models; `room_exits` schema + migration `010_room_exits.sql`

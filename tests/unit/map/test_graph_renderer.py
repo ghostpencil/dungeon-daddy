@@ -130,13 +130,42 @@ def test_connection_line_does_not_start_at_room_center():
 # Room labels
 # ---------------------------------------------------------------------------
 
-def test_room_label_contains_name_and_id():
+def test_visited_room_label_contains_name_and_id():
     renderer = GraphRenderer(cell_px=48)
     room = _room("r1")
     level = _level([room])
+    state = SessionState(dungeon_id="test", current_level_idx=0, visited_rooms=["r1"])
 
     with patch("dungeon_daddy.map.graph_renderer.arcade") as mock_arcade:
-        renderer.draw(level, _state(), 0.0, 0.0)
+        renderer.draw(level, state, 0.0, 0.0)
+
+    text_call = mock_arcade.draw_text.call_args_list[0]
+    assert text_call.args[0] == f"{room.name} ({room.id})"
+
+
+def test_unvisited_room_label_is_fog_question_mark():
+    """Fog of war (Phase 48): an unvisited room hides its name behind '?'."""
+    renderer = GraphRenderer(cell_px=48)
+    level = _level([_room("r1")])
+    state = SessionState(dungeon_id="test", current_level_idx=0, visited_rooms=[])
+
+    with patch("dungeon_daddy.map.graph_renderer.arcade") as mock_arcade:
+        renderer.draw(level, state, 0.0, 0.0)
+
+    text_call = mock_arcade.draw_text.call_args_list[0]
+    assert text_call.args[0] == "?"
+
+
+def test_current_room_label_revealed_even_if_not_in_visited():
+    """The room the party occupies is always revealed."""
+    renderer = GraphRenderer(cell_px=48)
+    room = _room("r1")
+    level = _level([room])
+    state = SessionState(dungeon_id="test", current_level_idx=0,
+                         current_room_id="r1", visited_rooms=[])
+
+    with patch("dungeon_daddy.map.graph_renderer.arcade") as mock_arcade:
+        renderer.draw(level, state, 0.0, 0.0)
 
     text_call = mock_arcade.draw_text.call_args_list[0]
     assert text_call.args[0] == f"{room.name} ({room.id})"

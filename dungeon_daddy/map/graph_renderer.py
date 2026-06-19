@@ -7,6 +7,7 @@ import arcade
 
 from dungeon_daddy.data.models import Level, SessionState
 from dungeon_daddy.map.grid_renderer import GridRenderer
+from dungeon_daddy.ui.fog_of_war import fog_of_war_label
 from dungeon_daddy.ui.theme import (
     FONT_UI,
     INK_1,
@@ -56,8 +57,16 @@ class GraphRenderer(GridRenderer):
             arcade.draw_circle_outline(cx, cy, radius, stroke, 2 if is_current else 1)  # type: ignore[arg-type]
 
             label_color = INK_1 if is_current else INK_2
+            # Fog of war: hide an unvisited room's name behind '?'. The current
+            # room is always revealed even before it lands in visited_rooms.
+            revealed_rooms = [*state.visited_rooms, room.id] if is_current else state.visited_rooms
+            label = fog_of_war_label(
+                room_id=room.id,
+                room_name=f"{room.name} ({room.id})",
+                visited_rooms=revealed_rooms,
+            )
             arcade.draw_text(
-                f"{room.name} ({room.id})", cx, cy, label_color,
+                label, cx, cy, label_color,
                 font_size=TEXT_XS, font_name=FONT_UI,
                 anchor_x="center", anchor_y="center",
             )
