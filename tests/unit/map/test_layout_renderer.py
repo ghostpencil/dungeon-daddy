@@ -94,6 +94,26 @@ def test_connection_label_drawn_centered_in_box() -> None:
     assert call.args[2] == 57.0   # box center y = 50 + 14/2
 
 
+def test_hovered_connection_label_highlighted() -> None:
+    """Hovering a connection highlights its label (matching the line highlight)."""
+    from dungeon_daddy.map.layout_renderer import _LABEL_COLOR, _LABEL_HOVER_COLOR
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+
+    labels = [_label("a→b", "door", x=100.0, y=50.0), _label("c→d", "hall", x=200.0, y=50.0)]
+    result = _result(labels=labels)
+    renderer = LayoutRenderer()
+    view_state = GraphViewState()
+    view_state.hover_connection("a→b")
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, origin_x=0.0, origin_y=0.0, zoom=1.0, view_state=view_state)
+
+    hovered = next(c for c in mock_arcade.draw_text.call_args_list if c.args and c.args[0] == "door")
+    other = next(c for c in mock_arcade.draw_text.call_args_list if c.args and c.args[0] == "hall")
+    assert hovered.args[3] == _LABEL_HOVER_COLOR
+    assert other.args[3] == _LABEL_COLOR
+
+
 # ---------------------------------------------------------------------------
 # Cycle 5 — zoom is applied to room dimensions
 # ---------------------------------------------------------------------------

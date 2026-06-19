@@ -37,6 +37,7 @@ _CRIT_BORDER = (160, 185, 210)
 _EDGE_COLOR = (80, 100, 130)
 _CRIT_EDGE_COLOR = (120, 150, 180)
 _LABEL_COLOR = (160, 170, 180)
+_LABEL_HOVER_COLOR = (230, 240, 250)  # brighter — matches the hovered connection line
 _LINE_WIDTH = 1
 _SELECTION_WIDTH = 2
 
@@ -146,7 +147,7 @@ class LayoutRenderer:
             result, origin_x, origin_y, zoom, selected_room_id, cp_result, view_state,
             party_room_id=party_room_id, visited_rooms=visited_rooms,
         )
-        self._draw_labels(result, origin_x, origin_y, zoom)
+        self._draw_labels(result, origin_x, origin_y, zoom, view_state)
         if result.debug_overlay.enabled:
             self._debug_renderer.draw(result.debug_overlay, origin_x, origin_y, zoom)
         if level is not None:
@@ -495,17 +496,20 @@ class LayoutRenderer:
         origin_x: float,
         origin_y: float,
         zoom: float,
+        view_state: GraphViewState | None = None,
     ) -> None:
+        hovered_id = view_state.hovered_connection_id if view_state else None
         for lb in result.labels:
             if not lb.text:
                 continue
+            color = _LABEL_HOVER_COLOR if lb.connection_id == hovered_id else _LABEL_COLOR
             # Center the text in its placed box: the box is positioned by the
             # layout pipeline to clear rooms, so centering keeps the text in the
             # routed gap instead of pinning it to the box's border-hugging edge.
             wx = self._wx(lb.x + lb.w / 2, origin_x, zoom)
             wy = self._wy(lb.y + lb.h / 2, origin_y, zoom)
             arcade.draw_text(
-                lb.text, wx, wy, _LABEL_COLOR,
+                lb.text, wx, wy, color,
                 font_size=TEXT_XS, font_name=FONT_MONO,
                 anchor_x="center", anchor_y="center",
             )
