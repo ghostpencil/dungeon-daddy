@@ -181,3 +181,49 @@ def test_frame_current_beats_hover_when_both() -> None:
     used_textures = [c.args[0] for c in mock_arcade.draw_texture_rect.call_args_list]
     assert textures["current"] in used_textures
     assert textures["hover"] not in used_textures
+
+
+# ---------------------------------------------------------------------------
+# Party-location marker — icon (position-marker) tinted GOLD, replacing text
+# ---------------------------------------------------------------------------
+
+def test_party_marker_icon_drawn_tinted_gold_for_party_room() -> None:
+    from arcade.types import Color
+
+    from dungeon_daddy.ui.theme import GOLD
+
+    rooms = {"r1": _room("r1")}
+    result = _result(rooms=rooms)
+    renderer = LayoutRenderer()
+    art, _ = _make_art_keyed()
+    party_tex = MagicMock(name="party_marker")
+    art.party_marker = party_tex
+    renderer._art = art
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, origin_x=0.0, origin_y=0.0, zoom=1.0, party_room_id="r1")
+
+    marker_calls = [
+        c for c in mock_arcade.draw_texture_rect.call_args_list
+        if c.args and c.args[0] is party_tex
+    ]
+    assert len(marker_calls) == 1
+    # tint must be a real arcade Color (raw tuple lacks .normalized → crashes at draw)
+    tint = marker_calls[0].kwargs.get("color")
+    assert isinstance(tint, Color)
+    assert tint == Color(*GOLD)
+
+
+def test_party_marker_falls_back_to_text_when_icon_missing() -> None:
+    rooms = {"r1": _room("r1")}
+    result = _result(rooms=rooms)
+    renderer = LayoutRenderer()
+    art, _ = _make_art_keyed()
+    art.party_marker = None
+    renderer._art = art
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, origin_x=0.0, origin_y=0.0, zoom=1.0, party_room_id="r1")
+
+    drawn_texts = [c.args[0] for c in mock_arcade.draw_text.call_args_list if c.args]
+    assert any("PARTY" in str(t) for t in drawn_texts)

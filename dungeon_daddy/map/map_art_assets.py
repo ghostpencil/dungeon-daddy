@@ -11,6 +11,9 @@ _BACKGROUND_PATH = _ASSET_ROOT / "dungeon_daddy_graph_background.png"
 _FRAME_DIR = _ASSET_ROOT / "room_frames"
 _FRAME_NAMES = ("default", "current", "hover", "locked", "memory", "danger")
 
+_ICON_DIR = _ASSET_ROOT.parent / "icons"
+_PARTY_MARKER_PATH = _ICON_DIR / "position-marker.png"
+
 _log = logging.getLogger(__name__)
 
 
@@ -28,11 +31,14 @@ class MapArtAssets:
         self,
         background_path: Path | None = None,
         frame_dir: Path | None = None,
+        icon_path: Path | None = None,
     ) -> None:
         bg = background_path if background_path is not None else _BACKGROUND_PATH
         fd = frame_dir if frame_dir is not None else _FRAME_DIR
+        icon = icon_path if icon_path is not None else _PARTY_MARKER_PATH
         self.background: arcade.Texture | None = _safe_load(bg)
         self.frames: dict[str, arcade.Texture | None] = {
             name: _safe_load(fd / f"frame_{name}.png")
             for name in _FRAME_NAMES
         }
+        self.party_marker: arcade.Texture | None = _safe_load(icon)

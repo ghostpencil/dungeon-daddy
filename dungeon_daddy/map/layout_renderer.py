@@ -54,6 +54,9 @@ _PANEL_FONT_SIZE = 9
 _DEFAULT_ROOM_STYLE = GraphRoomStyleResolver().resolve("unknown")
 _DEFAULT_CONN_STYLE = GraphConnectionStyleResolver().resolve("")
 
+# draw_texture_rect's `color` tint requires an arcade Color, not a raw tuple.
+_GOLD_TINT = arcade.types.Color(*GOLD)
+
 
 def _draw_dashed_segment(
     x1: float, y1: float, x2: float, y2: float,
@@ -341,17 +344,28 @@ class LayoutRenderer:
     ) -> None:
         """Draw an unmistakable 'the party is here' marker on a room.
 
-        A bright GOLD ring plus a pinned PARTY label — deliberately distinct
-        from the TEAL selection cursor so party location reads at a glance.
+        A bright GOLD ring plus a pinned GOLD position-marker icon —
+        deliberately distinct from the TEAL selection cursor so party location
+        reads at a glance. Falls back to a "◆ PARTY" text label if the icon
+        texture is unavailable.
         """
         ring = arcade.XYWH(wx + ww / 2, wy + wh / 2, ww + 8, wh + 8)
         arcade.draw_rect_outline(ring, GOLD, 3)
-        arcade.draw_text(
-            "◆ PARTY",
-            wx + ww / 2, wy + wh + 4 * zoom,
-            GOLD, font_size=TEXT_XS, font_name=FONT_UI,
-            anchor_x="center", anchor_y="bottom",
-        )
+
+        marker = self._art.party_marker if self._art is not None else None
+        if marker is not None:
+            size = max(18.0, 22.0 * zoom)
+            icon_rect = arcade.XYWH(
+                wx + ww / 2, wy + wh + size / 2 + 2 * zoom, size, size
+            )
+            arcade.draw_texture_rect(marker, icon_rect, color=_GOLD_TINT)
+        else:
+            arcade.draw_text(
+                "◆ PARTY",
+                wx + ww / 2, wy + wh + 4 * zoom,
+                GOLD, font_size=TEXT_XS, font_name=FONT_UI,
+                anchor_x="center", anchor_y="bottom",
+            )
 
     def _draw_edges(
         self,
