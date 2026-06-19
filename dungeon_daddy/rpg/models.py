@@ -247,3 +247,22 @@ class RoomObject(BaseModel):
         if not v.strip():
             raise ValueError("description must not be empty")
         return v
+
+
+class RoomExit(BaseModel):
+    exit_id: str
+    campaign_id: str
+    from_room_id: str
+    to_room_id: str
+    level_id: str
+    label: str
+    exit_type: str = "door"
+    connector_type: str | None = None
+    to_level_id: str | None = None
+    status: str = "open"
+    requires_item_slug: str | None = None
+    requires_object_id: str | None = None
+    requires_object_state: str | None = None
+    requires_clock_slug: str | None = None
+    requires_clock_min_filled: int | None = None
+    requires_memory_slug: str | None = None

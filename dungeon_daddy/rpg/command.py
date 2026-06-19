@@ -57,7 +57,13 @@ class ActivateObject(BaseModel):
     trigger: str
 
 
+class MoveParty(BaseModel):
+    kind: Literal["move_party"] = "move_party"
+    exit_id: str
+    how: str = "cautiously"
+
+
 PlayerCommand = Annotated[
-    Union[ConsumeKitCharge, ConsumeItem, GiveItem, TakeItem, EquipItem, UnequipItem, PickUpItem, DropItem, ActivateObject],
+    Union[ConsumeKitCharge, ConsumeItem, GiveItem, TakeItem, EquipItem, UnequipItem, PickUpItem, DropItem, ActivateObject, MoveParty],
     Field(discriminator="kind"),
 ]

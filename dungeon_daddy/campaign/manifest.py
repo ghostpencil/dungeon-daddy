@@ -97,6 +97,22 @@ class RoomObjectManifest(BaseModel):
     transitions: list[ObjectTransitionManifest] = Field(default_factory=list)
 
 
+class RoomExitSeed(BaseModel):
+    from_room_id: str
+    to_room_id: str
+    label: str
+    exit_type: str = "door"
+    connector_type: str | None = None
+    to_level_id: str | None = None
+    status: str = "open"
+    requires_item_slug: str | None = None
+    requires_object_id: str | None = None
+    requires_object_state: str | None = None
+    requires_clock_slug: str | None = None
+    requires_clock_min_filled: int | None = None
+    requires_memory_slug: str | None = None
+
+
 class CampaignManifest(BaseModel):
     slug: str
     title: str
@@ -111,3 +127,4 @@ class CampaignManifest(BaseModel):
     room_threats: list[dict] = Field(default_factory=list)
     items: list[ItemManifest] = Field(default_factory=list)
     room_objects: list[RoomObjectManifest] = Field(default_factory=list)
+    room_exits: list[RoomExitSeed] = Field(default_factory=list)

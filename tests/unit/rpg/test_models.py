@@ -13,6 +13,7 @@ from dungeon_daddy.rpg.models import (
     ObjectTransition,
     ReactionClockLine,
     ReactionStressLine,
+    RoomExit,
     RoomObject,
     StressTrack,
     WorldReaction,
@@ -562,3 +563,61 @@ class TestObjectTransition:
         assert t.requires_item_slug == "iron-key"
         assert t.spawns_item_slug == "gold-coin"
         assert t.advances_clock_slug == "ritual-clock"
+
+
+class TestRoomExit:
+    def test_constructs_with_required_fields_and_defaults(self) -> None:
+        exit_ = RoomExit(
+            exit_id="exit:c:r1:r2",
+            campaign_id="camp-1",
+            from_room_id="room:entrance",
+            to_room_id="room:corridor",
+            level_id="level:1",
+            label="North Door",
+        )
+        assert exit_.exit_id == "exit:c:r1:r2"
+        assert exit_.exit_type == "door"
+        assert exit_.connector_type is None
+        assert exit_.status == "open"
+        assert exit_.requires_item_slug is None
+        assert exit_.requires_object_id is None
+        assert exit_.requires_object_state is None
+        assert exit_.requires_clock_slug is None
+        assert exit_.requires_clock_min_filled is None
+        assert exit_.requires_memory_slug is None
+
+    def test_all_condition_fields_stored(self) -> None:
+        exit_ = RoomExit(
+            exit_id="exit:c:r1:r3",
+            campaign_id="camp-1",
+            from_room_id="room:entrance",
+            to_room_id="room:vault",
+            level_id="level:1",
+            label="Spiral Stair",
+            status="locked",
+            requires_item_slug="iron-key",
+            requires_object_id="obj:c:lever",
+            requires_object_state="pulled",
+            requires_clock_slug="ritual-clock",
+            requires_clock_min_filled=3,
+            requires_memory_slug="found-the-passage",
+        )
+        assert exit_.status == "locked"
+        assert exit_.requires_item_slug == "iron-key"
+        assert exit_.requires_object_id == "obj:c:lever"
+        assert exit_.requires_object_state == "pulled"
+        assert exit_.requires_clock_slug == "ritual-clock"
+        assert exit_.requires_clock_min_filled == 3
+        assert exit_.requires_memory_slug == "found-the-passage"
+
+    def test_connector_type_can_be_set(self) -> None:
+        exit_ = RoomExit(
+            exit_id="exit:c:r1:r4",
+            campaign_id="camp-1",
+            from_room_id="room:level1-bottom",
+            to_room_id="room:level2-top",
+            level_id="level:1",
+            label="Spiral Stair Down",
+            connector_type="stair_down",
+        )
+        assert exit_.connector_type == "stair_down"

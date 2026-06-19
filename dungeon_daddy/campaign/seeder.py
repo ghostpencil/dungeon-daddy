@@ -2,9 +2,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, FactionManifest, ItemManifest, RoomObjectManifest
+from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, FactionManifest, ItemManifest, RoomObjectManifest, RoomExitSeed
 from dungeon_daddy.memory.repository import MemoryRepository
+
+if TYPE_CHECKING:
+    from dungeon_daddy.data.models import Dungeon
 
 
 @dataclass
@@ -28,11 +32,15 @@ def seed_from_manifest(
     campaign_id: str,
     dry_run: bool = False,
     force: bool = False,
+    dungeon: "Dungeon | None" = None,
 ) -> SeedResult:
     """Apply a CampaignManifest to a campaign DB.
 
     Idempotent — existing records are skipped unless force=True.
     dry_run=True returns counts without writing.
+    If dungeon is provided, exits are derived from its connections and overlaid
+    with manifest.room_exits overrides. Without dungeon, manifest.room_exits
+    are seeded directly.
     """
     result = SeedResult()
     slug = manifest.slug
@@ -54,6 +62,8 @@ def seed_from_manifest(
 
     for room_object in manifest.room_objects:
         _seed_room_object(room_object, repo, campaign_id, slug, result, dry_run=dry_run, force=force)
+
+    _seed_exits(manifest, repo, campaign_id, slug, result, dry_run=dry_run, force=force, dungeon=dungeon)
 
     return result
 
@@ -358,3 +368,140 @@ def _seed_memory(
         result.updated += 1
     else:
         result.skipped += 1
+
+
+# ---------------------------------------------------------------------------
+# Room Exits
+# ---------------------------------------------------------------------------
+
+_CONN_TYPE_TO_EXIT_TYPE: dict[str, str] = {
+    "door": "door",
+    "arch": "arch",
+    "archway": "arch",
+    "corridor": "passage",
+    "passage": "passage",
+    "tunnel": "tunnel",
+    "stair": "stair",
+    "stairs": "stair",
+    "staircase": "stair",
+    "shaft": "shaft",
+    "gate": "gate",
+}
+
+_EXIT_TYPE_LABELS: dict[str, str] = {
+    "door": "Door",
+    "arch": "Archway",
+    "passage": "Passage",
+    "tunnel": "Tunnel",
+    "stair": "Stairs",
+    "shaft": "Shaft",
+    "gate": "Gate",
+}
+
+
+def _exit_id(campaign_slug: str, from_room: str, to_room: str) -> str:
+    return f"exit:{campaign_slug}:{from_room}:{to_room}"
+
+
+def _exit_type_for(conn_type: str) -> str:
+    return _CONN_TYPE_TO_EXIT_TYPE.get(conn_type.lower(), "door")
+
+
+def _default_label(exit_type: str) -> str:
+    return _EXIT_TYPE_LABELS.get(exit_type, "Exit")
+
+
+def _seed_exits(
+    manifest: CampaignManifest,
+    repo: MemoryRepository,
+    campaign_id: str,
+    campaign_slug: str,
+    result: SeedResult,
+    dry_run: bool,
+    force: bool,
+    dungeon: "Dungeon | None",
+) -> None:
+    from dungeon_daddy.rpg.models import RoomExit
+
+    # Build override lookup keyed by (from_room_id, to_room_id)
+    overrides: dict[tuple[str, str], RoomExitSeed] = {
+        (s.from_room_id, s.to_room_id): s for s in manifest.room_exits
+    }
+
+    exits_to_seed: list[RoomExit] = []
+
+    if dungeon is not None:
+        for level in dungeon.levels:
+            level_id = f"level:{level.id}"
+            for conn in level.connections:
+                for from_room, to_room in [
+                    (conn.from_room, conn.to_room),
+                    (conn.to_room, conn.from_room),
+                ]:
+                    override = overrides.pop((from_room, to_room), None)
+                    exit_type = _exit_type_for(
+                        override.exit_type if override else conn.type
+                    )
+                    exits_to_seed.append(
+                        RoomExit(
+                            exit_id=_exit_id(campaign_slug, from_room, to_room),
+                            campaign_id=campaign_id,
+                            from_room_id=from_room,
+                            to_room_id=to_room,
+                            level_id=level_id,
+                            label=override.label if override else _default_label(exit_type),
+                            exit_type=exit_type,
+                            connector_type=override.connector_type if override else None,
+                            to_level_id=override.to_level_id if override else None,
+                            status=override.status if override else "open",
+                            requires_item_slug=override.requires_item_slug if override else None,
+                            requires_object_id=override.requires_object_id if override else None,
+                            requires_object_state=override.requires_object_state if override else None,
+                            requires_clock_slug=override.requires_clock_slug if override else None,
+                            requires_clock_min_filled=override.requires_clock_min_filled if override else None,
+                            requires_memory_slug=override.requires_memory_slug if override else None,
+                        )
+                    )
+
+    # Any remaining overrides not matched to a connection are added directly
+    for seed in overrides.values():
+        exit_type = _exit_type_for(seed.exit_type)
+        exits_to_seed.append(
+            RoomExit(
+                exit_id=_exit_id(campaign_slug, seed.from_room_id, seed.to_room_id),
+                campaign_id=campaign_id,
+                from_room_id=seed.from_room_id,
+                to_room_id=seed.to_room_id,
+                level_id="",
+                label=seed.label,
+                exit_type=exit_type,
+                connector_type=seed.connector_type,
+                to_level_id=seed.to_level_id,
+                status=seed.status,
+                requires_item_slug=seed.requires_item_slug,
+                requires_object_id=seed.requires_object_id,
+                requires_object_state=seed.requires_object_state,
+                requires_clock_slug=seed.requires_clock_slug,
+                requires_clock_min_filled=seed.requires_clock_min_filled,
+                requires_memory_slug=seed.requires_memory_slug,
+            )
+        )
+
+    for room_exit in exits_to_seed:
+        existing = repo.get_exits_by_room(campaign_id, room_exit.from_room_id)
+        existing_ids = {e["exit_id"] for e in existing}
+        is_new = room_exit.exit_id not in existing_ids
+
+        if dry_run:
+            result.created += 1 if is_new else 0
+            result.skipped += 0 if is_new else 1
+            continue
+
+        if is_new or force:
+            repo.save_room_exit(room_exit)
+            if is_new:
+                result.created += 1
+            else:
+                result.updated += 1
+        else:
+            result.skipped += 1
