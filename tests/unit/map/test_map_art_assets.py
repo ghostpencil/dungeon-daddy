@@ -77,3 +77,33 @@ def test_warning_logged_exactly_once_per_missing_file(
             MapArtAssets(background_path=missing_bg, frame_dir=tmp_path)
     bg_warnings = [r for r in caplog.records if "no_bg.png" in r.message]
     assert len(bg_warnings) == 1
+
+
+# ---------------------------------------------------------------------------
+# Cycle 6 — party-marker icon loads when file exists
+# ---------------------------------------------------------------------------
+
+def test_party_marker_loads_when_file_exists(tmp_path: Path) -> None:
+    icon = tmp_path / "position-marker.png"
+    icon.write_bytes(b"fake")
+    fake_tex = MagicMock()
+    with patch("dungeon_daddy.map.map_art_assets.arcade") as mock_arcade:
+        mock_arcade.load_texture.return_value = fake_tex
+        assets = MapArtAssets(
+            background_path=tmp_path / "no_bg.png", frame_dir=tmp_path, icon_path=icon
+        )
+    assert assets.party_marker is fake_tex
+
+
+# ---------------------------------------------------------------------------
+# Cycle 7 — party-marker is None when file missing (no crash)
+# ---------------------------------------------------------------------------
+
+def test_party_marker_none_when_file_missing(tmp_path: Path) -> None:
+    with patch("dungeon_daddy.map.map_art_assets.arcade"):
+        assets = MapArtAssets(
+            background_path=tmp_path / "no_bg.png",
+            frame_dir=tmp_path,
+            icon_path=tmp_path / "missing.png",
+        )
+    assert assets.party_marker is None
