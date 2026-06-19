@@ -2,9 +2,9 @@
 
 ## Phase
 
-Phase: **49 — Starting Playbooks (SPEC DRAFTED — not started; no code yet)**
-Status: On `main`. Test suite green — **2803 passing** (2026-06-19). Phase 48 COMPLETE (merged, PR #75).
-Next: **Begin Phase 49 implementation** — start with **Slice 0** (party-marker level-browse bug fix), then the playbook slices.
+Phase: **49 — Starting Playbooks (IN PROGRESS — Slice 0 done)**
+Status: On branch `phase-49`. Test suite green — **2810 passing** (2026-06-19).
+Next: **Slice 1** — Playbook Pydantic schema (`rpg/playbook.py`). TDD per `spec/TESTING.md` + TDD skill.
 
 Spec: `spec/PHASE_49_STARTING_PLAYBOOKS.md` (GitHub issue **#77**, label `phase-49`).
 Prior phase spec: `spec/PHASE_48_DUNGEON_NAVIGATION.md` (full 10-slice scope + folded-in Slice 11).
@@ -18,47 +18,42 @@ Prior phase spec: `spec/PHASE_48_DUNGEON_NAVIGATION.md` (full 10-slice scope + f
 
 ---
 
-## This session (2026-06-19, Phase 49 planning)
+## This session (2026-06-19, Phase 49 Slice 0)
 
-**Phase 49 spec drafted + promoted to a GitHub issue. No code written.**
-- `spec/PHASE_49_STARTING_PLAYBOOKS.md` — start-of-phase reconciliation spec (full scope,
-  data model, seed/publish wiring, UI, 6-slice plan + Slice 0, resolved decisions, exit criteria).
-- GitHub issue **#77** created (new `phase-49` label), body mirrors the spec.
-- Sourced from Project #1 card; no prior Phase 49 issue existed (not a duplicate).
+**Slice 0 COMPLETE** — party marker survives level-stepper browsing. Committed `975a771` on `phase-49`.
 
-**Resolved decisions (the 4 open questions, settled this session):**
-- **R1** new `actor_abilities` table (legacy `abilities` table is dormant — no Python reader/
-  writer — left untouched, no destructive migration).
+- **Root cause fixed:** `_on_level_change` (`play_view.py`) was writing `current_level_idx` and
+  `current_room_id` directly, violating the Phase 48 sole-writer rule. Party location was wiped
+  on every map browse.
+- **Fix:** `_viewed_level_idx` (int, on `PlayView`) tracks which level is displayed. `_on_level_change`
+  updates only `_viewed_level_idx`; party session fields are untouched. `MapPanel.load` accepts an
+  optional `viewed_level_idx` param (defaults to `state.current_level_idx`); `draw` passes
+  `party_room_id=None` when browsing a non-party level; `update_state` syncs the viewed level after
+  a real `MoveParty`. DM history is no longer cleared on map browse.
+- **Tests:** 7 new tests (`test_play_view_level_browse.py` × 4; `test_map_panel_party_marker.py` × 3
+  new); 2 old tests corrected (were asserting the bug as expected behavior).
+
+**Prior this day (already merged):** Phase 49 spec drafted + GitHub issue #77 created; party
+marker uses position-marker icon tinted GOLD (PR #76); `game-icon-finder` skill added.
+
+**Resolved decisions (settled 2026-06-19):**
+- **R1** new `actor_abilities` table (legacy `abilities` table dormant — left untouched).
 - **R2** new module `rpg/playbook.py` (`Playbook` + nested models + `PlaybookLibrary`).
-- **R3** signature adverbs are **derived-live** from `playbook_slug`, never persisted per-actor;
-  only abilities persist (Phase 52 mutates them).
-- **R4** per `BALANCE_NOTES.md`: PC stress capacity = **4** (card's example `body:6` superseded);
-  ratings 0–3; `cost_type="momentum"` schema-only (momentum still untracked).
-
-**Slice 0 — folded-in bug fix (Phase 48 navigation, documented not built).**
-- *Party-location marker lost when browsing levels.* The ▲▼ level-stepper `_on_level_change`
-  (`play_view.py:1296`) writes the party's canonical fields directly
-  (`current_level_idx = new_idx`, `current_room_id = None`), wiping party location and breaking
-  the Phase 48 sole-writer invariant. The map then draws `party_room_id=None` (`map_panel.py:424`).
-- *Fix:* add a view-only `viewed_level_idx` independent of `current_level_idx`; arrows change only
-  the viewed level; draw the marker only when `viewed_level_idx == party_level_idx`; viewed level
-  follows the party on real `MoveParty`/connector moves. May land on its own branch.
-
-**Previously this day (already merged):** party marker uses the game-icons.net **position-marker**
-icon tinted GOLD (PR #76); new global `game-icon-finder` skill. Arcade gotcha:
-`draw_texture_rect(color=...)` needs an `arcade.types.Color`, not a raw RGB tuple — mocked unit
-tests do not catch this.
+- **R3** signature adverbs derived-live from `playbook_slug`, never persisted per-actor.
+- **R4** PC stress capacity = **4**; ratings 0–3; `cost_type="momentum"` schema-only.
 
 ---
 
 ## Outstanding / Next session
 
-1. **Implement Phase 49** (issue #77, spec `spec/PHASE_49_STARTING_PLAYBOOKS.md`). Suggested
-   order: **Slice 0** (party-marker level-browse bug) → Slices 1–4 (engine/data spine) →
-   Slices 5–6 (UI). TDD per `spec/TESTING.md` + TDD skill. Create the `phase-49` branch.
-2. **Uncommitted on `main`:** `spec/PHASE_49_STARTING_PLAYBOOKS.md` (new) + this `PROJECT_INDEX.md`
-   edit. Commit on a branch (repo convention) before starting code.
-3. **Tomb of the Forgotten King save needs the exit backfill** — close the app, then
+1. **Slice 1 — Playbook Pydantic schema.** New `rpg/playbook.py` with `Playbook` + all nested
+   models. Pure model tests (no I/O); validation rules: verb keys ∈ 9 universal verbs, ratings
+   0–3, track keys ∈ `{body,composure,bonds,weird}`, `starting_abilities` slugs resolve within
+   kit+pool, adverb `target_types` from controlled set. Read `spec/TESTING.md` + invoke TDD skill.
+2. **Slice 2 — `PlaybookLibrary` + bundled JSON.** Loader + `data/playbooks.json` with the four
+   playbooks (Fighter, Thief, Priest, Artificer). Parse + validate tests.
+3. **Slices 3–6** — see `spec/PHASE_49_STARTING_PLAYBOOKS.md` slice plan.
+4. **Tomb of the Forgotten King save needs the exit backfill** — close the app, then
    `python -m tools.backfill_room_exits "<save dir>" --force` (rewrites `room_exits`
    plus exit labels/status). The Crucible is already backfilled.
 4. **Optional follow-up (own small slice):** a backfill-on-load step so pre-Phase-48
