@@ -3,7 +3,7 @@
 ## Phase
 
 Phase: **48 — Dungeon Navigation (IN PROGRESS)**
-Status: Slice 10 complete — Play-mode UI. New `ui/how_chips.build_how_chips(*, max_sense, one_way, ritual_connector, armed_trap_clock)` (contextual chips, restricted to keys in `HOW_MODIFIER_FLAGS`); new `ui/panels/exit_list_panel.ExitListPanel` (display + `_layout()`/`handle_click` hit-testing → click-to-move via `set_move_callback`); new `ui/fog_of_war.fog_of_war_label` wired into `map/graph_renderer.py` (unvisited rooms show `?`, current always revealed). PlayView: new **EXITS** tab (`_TAB_EXITS=5`, `_TAB_DBG`→6) + `_refresh_exits()` + `_on_exit_move(exit_id, how)` → `apply_move_party` → narrate. 25 new tests. 2772 tests passing (2026-06-19). Slice 11 (party-presence gate) is all that remains.
+Status: Slice 10 complete + exit backfill tool — Play-mode UI. New `ui/how_chips.build_how_chips(*, max_sense, one_way, ritual_connector, armed_trap_clock)` (contextual chips, restricted to keys in `HOW_MODIFIER_FLAGS`); new `ui/panels/exit_list_panel.ExitListPanel` (display + `_layout()`/`handle_click` hit-testing → click-to-move via `set_move_callback`); new `ui/fog_of_war.fog_of_war_label` wired into `map/graph_renderer.py` (unvisited rooms show `?`, current always revealed). PlayView: new **EXITS** tab (`_TAB_EXITS=5`, `_TAB_DBG`→6) + `_refresh_exits()` + `_on_exit_move(exit_id, how)` → `apply_move_party` → narrate. Plus `tools/backfill_room_exits.py` for pre-Phase-48 campaigns (their `room_exits` table is empty). 28 new tests (25 Slice 10 + 3 backfill). 2775 tests passing (2026-06-19). Slice 11 (party-presence gate) is all that remains.
 Spec: `spec/PHASE_48_DUNGEON_NAVIGATION.md` (full 10-slice scope + folded-in Slice 11).
 
 Previous: Phase 47 — Room Contents — COMPLETE (merged to `main`, PR #73, 2026-06-18). 2673 tests passing.
@@ -40,7 +40,10 @@ From the spec (`PHASE_48_DUNGEON_NAVIGATION.md`, locked decision #4):
 - Additive only — Phase 47 validators currently skip this check and must stay green.
 - This completes Phase 48; after it, run the full suite and prepare the phase-close PR.
 
-**Slice 10 — DONE** (provisional exit-list panel + click-to-move + fog-of-war map). Note: `armed_trap_clock` chip surfacing (`recklessly` for trap rooms) was left at default `False` — a minor throwaway-UI gap, the engine flag mapping exists if needed.
+**Slice 10 — DONE** (provisional exit-list panel + click-to-move + fog-of-war map). Notes:
+- `armed_trap_clock` chip surfacing (`recklessly` for trap rooms) left at default `False` — a minor throwaway-UI gap; the engine flag mapping exists if needed.
+- **Existing campaigns:** fog-of-war needs no change (reads `visited_rooms`; old saves look fully-revealed because they already explored everything — start a fresh save to see `?`). The EXITS panel needs `room_exits`, which only seed at publish (Slice 2). Pre-Phase-48 campaigns have an empty table → run `python -m tools.backfill_room_exits ["<save dir>"] [--dry-run]` (idempotent, additive; reads `campaign_id`/`slug` from the DB). **The Crucible save is already backfilled (36 exits).** Other old saves (e.g. Tomb of the Forgotten King) still need it.
+- Possible follow-up (not started, own small slice): a **backfill-on-load** step in the campaign load/migration path so old campaigns self-heal without the script.
 
 **Slice order** (full detail in the spec):
 1. `RoomExit` + `RoomExitSeed` models; `room_exits` schema + migration `010_room_exits.sql`
@@ -77,7 +80,7 @@ reactions. It must not directly mutate authoritative state.
 
 ## Known Failures
 
-None — test suite passes (2737 tests as of 2026-06-18).
+None — test suite passes (2775 tests as of 2026-06-19).
 
 ---
 
@@ -104,6 +107,7 @@ Per-session implementation logs are in git history and the auto-memory (`project
 - Roadmap for Phases 49–53 (planned): GitHub Projects `ghostpencil/dungeon-daddy` #1, mirrored in `IMPLEMENTATION_PHASES_33_ONWARDS.md`. Issue bodies hold per-phase detail + folded-in design resolutions; a `spec/PHASE_NN_*.md` is written when each phase starts.
 - Phase 53 (Threat Behavior & Monster Reactions, planned): engine-bounded monster reactions, no enemy turn; bosses escalate via clock thresholds. Design: `spec/MONSTER_REACTION_DESIGN.md`.
 - Playtest reports: `python -m tools.playtest_report <db_path> <campaign_id>` (requires `PYTHONPATH=.`).
+- Exit backfill (pre-Phase-48 campaigns): `python -m tools.backfill_room_exits ["<save dir>"] [--dry-run] [--force]`. Close the app first (DuckDB is single-writer). Saves live under `%LOCALAPPDATA%\DungeonDaddy\saves\<name>\`.
 - `protagonist` actor: `seed_data/campaigns/the-crucible/rpg_seed.json` (use `--seed-pack` + `--force` to reset). Generic `seed_campaign()` no longer creates a placeholder actor.
 - Example campaign manifest: `examples/campaign_manifests/bone-cathedral.json` (validates + seeds cleanly).
 - `proposal.applied` / `proposal.rejected` events: call sites must insert `result.rejection_events` into repo with the correct `campaign_id` after `validate_proposal()`.
