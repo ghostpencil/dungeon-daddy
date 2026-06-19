@@ -106,3 +106,22 @@ def test_labels_for_two_edges_do_not_overlap() -> None:
         and lb1.y < lb2.top and lb1.top > lb2.y
     )
     assert not overlapping
+
+
+# ---------------------------------------------------------------------------
+# Cycle 7 — among non-overlapping candidates, prefer the one that clears a
+# room border by a margin (don't hug the border)
+# ---------------------------------------------------------------------------
+
+def test_label_prefers_clearance_over_hugging_a_border() -> None:
+    """The default (first) above-candidate hugs a room just above it; the
+    below-candidate clears all rooms, so it must win even though neither
+    strictly overlaps the room."""
+    edge = _edge("a→b", [(0.0, 0.0), (200.0, 0.0)])
+    # Above-candidate box spans roughly y=[pad, pad+14]; place a room whose
+    # bottom edge sits just above it so the above-candidate is adjacent but not
+    # overlapping. The below-candidate (negative y) is far from any room.
+    rooms = {"ceiling": _room("ceiling", x=0.0, y=24.0, w=200.0, h=100.0)}
+    result = place_labels([edge], rooms, {"a→b": "Door"})
+    lb = result[0]
+    assert lb.y < 0.0

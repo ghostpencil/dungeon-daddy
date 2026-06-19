@@ -12,6 +12,12 @@ from dungeon_daddy.map.dungeon_layout.models import LabelBox, RoomRect, RoutedEd
 
 _PADDING = 8.0
 _FRACTIONS = (0.25, 0.50, 0.75)
+# Clearance margin: a label that doesn't strictly overlap a room but sits within
+# this many layout units of a room border still reads as "hugging" it. Penalize
+# such positions (below the hard room-overlap weight) so the scorer prefers a
+# candidate that clears the border when one exists.
+_BORDER_MARGIN = 6.0
+_BORDER_PENALTY = 200.0
 
 
 def place_labels(
@@ -101,6 +107,13 @@ def _score(
     for room in rooms.values():
         if _rects_overlap(x, y, label_w, label_h, room.x, room.y, room.w, room.h):
             score += 1_000.0
+        elif _rects_overlap(
+            x, y, label_w, label_h,
+            room.x - _BORDER_MARGIN, room.y - _BORDER_MARGIN,
+            room.w + 2 * _BORDER_MARGIN, room.h + 2 * _BORDER_MARGIN,
+        ):
+            # Clears the room but hugs its border — nudge away when possible.
+            score += _BORDER_PENALTY
     for lb in placed:
         if _rects_overlap(x, y, label_w, label_h, lb.x, lb.y, lb.w, lb.h):
             score += 500.0

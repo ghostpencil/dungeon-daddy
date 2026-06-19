@@ -38,8 +38,12 @@ def _dungeon_with_connection(
     from_room: str = "room-a",
     to_room: str = "room-b",
     conn_type: str = "door",
+    layout_connection_role: str | None = None,
 ) -> Dungeon:
-    connection = Connection.model_validate({"from": from_room, "to": to_room, "type": conn_type})
+    payload: dict = {"from": from_room, "to": to_room, "type": conn_type}
+    if layout_connection_role is not None:
+        payload["layout_connection_role"] = layout_connection_role
+    connection = Connection.model_validate(payload)
     level = Level(
         id=1,
         name="Level One",
@@ -70,6 +74,52 @@ def test_connection_derives_two_bidirectional_exits(repo: MemoryRepository) -> N
     assert len(exits_from_b) == 1
     assert exits_from_b[0]["to_room_id"] == "room-a"
     assert exits_from_b[0]["status"] == "open"
+
+
+def test_hall_connection_labeled_hall_not_door(repo: MemoryRepository) -> None:
+    """A 'hall' connection must not silently collapse to a 'Door' exit."""
+    dungeon = _dungeon_with_connection(conn_type="hall")
+    seed_from_manifest(_manifest(), repo, campaign_id=_CAMPAIGN_ID, dungeon=dungeon)
+
+    exits = repo.get_exits_by_room(_CAMPAIGN_ID, "room-a")
+    assert exits[0]["exit_type"] == "hall"
+    assert exits[0]["label"] == "Hall"
+
+
+def test_stair_down_connection_labeled_stairs(repo: MemoryRepository) -> None:
+    dungeon = _dungeon_with_connection(conn_type="stair_down")
+    seed_from_manifest(_manifest(), repo, campaign_id=_CAMPAIGN_ID, dungeon=dungeon)
+
+    exits = repo.get_exits_by_room(_CAMPAIGN_ID, "room-a")
+    assert exits[0]["exit_type"] == "stair"
+    assert exits[0]["label"] == "Stairs"
+
+
+def test_locked_connection_role_derives_locked_status(repo: MemoryRepository) -> None:
+    """A connection flagged layout_connection_role='locked' must seed locked exits."""
+    dungeon = _dungeon_with_connection(layout_connection_role="locked")
+    seed_from_manifest(_manifest(), repo, campaign_id=_CAMPAIGN_ID, dungeon=dungeon)
+
+    exits_from_a = repo.get_exits_by_room(_CAMPAIGN_ID, "room-a")
+    exits_from_b = repo.get_exits_by_room(_CAMPAIGN_ID, "room-b")
+    assert exits_from_a[0]["status"] == "locked"
+    assert exits_from_b[0]["status"] == "locked"
+
+
+def test_secret_connection_role_derives_hidden_status(repo: MemoryRepository) -> None:
+    dungeon = _dungeon_with_connection(layout_connection_role="secret")
+    seed_from_manifest(_manifest(), repo, campaign_id=_CAMPAIGN_ID, dungeon=dungeon)
+
+    exits = repo.get_exits_by_room(_CAMPAIGN_ID, "room-a")
+    assert exits[0]["status"] == "hidden"
+
+
+def test_ordinary_connection_role_stays_open(repo: MemoryRepository) -> None:
+    dungeon = _dungeon_with_connection(layout_connection_role="critical_path")
+    seed_from_manifest(_manifest(), repo, campaign_id=_CAMPAIGN_ID, dungeon=dungeon)
+
+    exits = repo.get_exits_by_room(_CAMPAIGN_ID, "room-a")
+    assert exits[0]["status"] == "open"
 
 
 def test_manifest_override_applied_to_connection_exit(repo: MemoryRepository) -> None:

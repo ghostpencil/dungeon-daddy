@@ -122,6 +122,23 @@ def test_clicking_empty_space_returns_false():
     assert panel.handle_click(1000.0, 1000.0) is False
 
 
+def test_set_current_room_renders_name_and_id(mocker):
+    import arcade
+    mocker.patch.object(arcade, "draw_rect_filled")
+    mocker.patch.object(arcade, "draw_rect_outline")
+    draw_text = mocker.patch.object(arcade, "draw_text")
+
+    panel = _panel()
+    panel.set_current_room("Trap Room", "R5")
+    panel.set_from_context({"visible_exits": [], "locked_exits": [], "hidden_exit_hint": 0})
+    panel.setup(0.0, 0.0, 220.0, 320.0)
+    panel.draw()
+
+    rendered = " | ".join(str(c.args[0]) for c in draw_text.call_args_list)
+    assert "Trap Room" in rendered
+    assert "R5" in rendered
+
+
 def test_draw_renders_labels_and_hint(mocker):
     import arcade
     mocker.patch.object(arcade, "draw_rect_filled")

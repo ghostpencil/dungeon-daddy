@@ -384,6 +384,8 @@ _CONN_TYPE_TO_EXIT_TYPE: dict[str, str] = {
     "stair": "stair",
     "stairs": "stair",
     "staircase": "stair",
+    "stair_down": "stair",
+    "stair_up": "stair",
     "shaft": "shaft",
     "gate": "gate",
 }
@@ -396,7 +398,21 @@ _EXIT_TYPE_LABELS: dict[str, str] = {
     "stair": "Stairs",
     "shaft": "Shaft",
     "gate": "Gate",
+    "hall": "Hall",
 }
+
+# Map a dungeon connection's layout_connection_role to a navigation exit status.
+# Roles not listed here (e.g. critical_path, optional_branch) are ordinary open exits.
+_CONN_ROLE_TO_STATUS: dict[str, str] = {
+    "locked": "locked",
+    "secret": "hidden",
+}
+
+
+def _status_for_role(layout_connection_role: str | None) -> str:
+    if not layout_connection_role:
+        return "open"
+    return _CONN_ROLE_TO_STATUS.get(layout_connection_role.lower(), "open")
 
 
 def _exit_id(campaign_slug: str, from_room: str, to_room: str) -> str:
@@ -404,11 +420,15 @@ def _exit_id(campaign_slug: str, from_room: str, to_room: str) -> str:
 
 
 def _exit_type_for(conn_type: str) -> str:
-    return _CONN_TYPE_TO_EXIT_TYPE.get(conn_type.lower(), "door")
+    # Normalize known synonyms to canonical types; otherwise keep the source
+    # type verbatim rather than collapsing everything unknown to "door"
+    # (which mislabeled hall/hole connections as doors).
+    key = conn_type.lower()
+    return _CONN_TYPE_TO_EXIT_TYPE.get(key, key)
 
 
 def _default_label(exit_type: str) -> str:
-    return _EXIT_TYPE_LABELS.get(exit_type, "Exit")
+    return _EXIT_TYPE_LABELS.get(exit_type, exit_type.replace("_", " ").title())
 
 
 def _seed_exits(
@@ -453,7 +473,7 @@ def _seed_exits(
                             exit_type=exit_type,
                             connector_type=override.connector_type if override else None,
                             to_level_id=override.to_level_id if override else None,
-                            status=override.status if override else "open",
+                            status=override.status if override else _status_for_role(conn.layout_connection_role),
                             requires_item_slug=override.requires_item_slug if override else None,
                             requires_object_id=override.requires_object_id if override else None,
                             requires_object_state=override.requires_object_state if override else None,

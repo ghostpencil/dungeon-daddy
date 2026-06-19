@@ -572,6 +572,7 @@ class PlayView(arcade.View):
         self._refresh_memory_state()
         self._load_player_actors()
         self._sync_debug_level_id()
+        self._focus_party_room()
 
     def load_dungeon_session(self, dungeon: Dungeon) -> None:
         self._is_test_drive = False
@@ -603,6 +604,7 @@ class PlayView(arcade.View):
         self._refresh_memory_state()
         self._load_player_actors()
         self._sync_debug_level_id()
+        self._focus_party_room()
 
     def load_dungeon(self, dungeon: Dungeon) -> None:
         """Alias for load_dungeon_transient — kept until window.py callers are updated."""
@@ -922,20 +924,51 @@ class PlayView(arcade.View):
     # Dungeon navigation (Phase 48) — exit panel + click-to-move
     # ------------------------------------------------------------------
 
+    def _focus_party_room(self) -> None:
+        """Reflect the party's current room in the map + side panels.
+
+        Used on load/resume so the player always opens a save where the party
+        actually is: the room is selected on the map (selection frame + detail
+        overlay) and the chat/scene/exit panels are populated. No narration.
+        """
+        if self._dungeon is None or self._state is None:
+            return
+        room_id = self._state.current_room_id
+        if not room_id:
+            return
+        level = self._dungeon.levels[self._state.current_level_idx]
+        room = {r.id: r for r in level.rooms}.get(room_id)
+        if room is None:
+            return
+        self._map.set_selected_room(room.id)
+        self._chat.set_current_room(room.name, room.note or "", room_id=room.id)
+        self._rpg_scene.set_scene(room.name, str(level.id))
+        self._refresh_exits()
+
     def _refresh_exits(self) -> None:
         """Rebuild the exit-list panel from the room-context bundle."""
         from dungeon_daddy.rpg.room_context import build_room_context
 
         if (self._mem_repo is None or self._rpg_campaign_id is None
                 or self._state is None or not self._state.current_room_id):
+            self._exit_panel.set_current_room(None, None)
             self._exit_panel.set_from_context(
                 {"visible_exits": [], "locked_exits": [], "hidden_exit_hint": 0}
             )
             self._exit_panel.set_how_chips(build_how_chips())
             return
 
+        room_id = self._state.current_room_id
+        room_name: str | None = None
+        if self._dungeon is not None:
+            level = self._dungeon.levels[self._state.current_level_idx]
+            room = {r.id: r for r in level.rooms}.get(room_id)
+            if room is not None:
+                room_name = room.name
+        self._exit_panel.set_current_room(room_name, room_id)
+
         bundle = build_room_context(
-            self._state.current_room_id, self._rpg_campaign_id,
+            room_id, self._rpg_campaign_id,
             self._state, self._mem_repo,
         )
         self._exit_panel.set_from_context(bundle)
@@ -973,6 +1006,9 @@ class PlayView(arcade.View):
             room = {r.id: r for r in level.rooms}.get(self._state.current_room_id)
             self._map.update_state(self._state, len(self._dungeon.levels))
             if room is not None:
+                # Move the selection cursor with the party so the selected frame
+                # and detail/info overlay follow — same treatment as a click.
+                self._map.set_selected_room(room.id)
                 self._chat.set_current_room(room.name, room.note or "", room_id=room.id)
                 self._rpg_scene.set_scene(room.name, str(level.id))
 

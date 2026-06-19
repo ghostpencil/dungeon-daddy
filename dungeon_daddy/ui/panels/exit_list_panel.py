@@ -36,9 +36,16 @@ class ExitListPanel:
         self._how_chips: list[HowChipData] = []
         self._selected_how: str | None = None
         self._on_move: Callable[[str, str], None] | None = None
+        self._current_room_name: str | None = None
+        self._current_room_id: str | None = None
         self._x = self._y = self._w = self._h = 0.0
 
     # -- data -----------------------------------------------------------------
+
+    def set_current_room(self, name: str | None, room_id: str | None) -> None:
+        """Identify the room the party is in, shown at the top of the panel."""
+        self._current_room_name = name
+        self._current_room_id = room_id
 
     def set_from_context(self, bundle: dict) -> None:
         self._visible_exits = list(bundle.get("visible_exits", []))
@@ -82,10 +89,16 @@ class ExitListPanel:
             return rect
 
         headers: list[tuple[str, tuple[float, float, float, float]]] = []
+        room: list[tuple[str, str, tuple[float, float, float, float]]] = []
         exits: list[tuple[str, str, str, tuple[float, float, float, float]]] = []
         locked: list[tuple[str, tuple[float, float, float, float]]] = []
         hint: tuple[str, tuple[float, float, float, float]] | None = None
         chips: list[tuple[str, str, tuple[float, float, float, float]]] = []
+
+        if self._current_room_name:
+            room.append(("name", self._current_room_name, take_row(_LINE_H)))
+            if self._current_room_id:
+                room.append(("id", self._current_room_id, take_row(_LINE_H)))
 
         headers.append(("EXITS", take_row(_LINE_H)))
 
@@ -117,7 +130,7 @@ class ExitListPanel:
                 cx += cw + _CHIP_GAP
             top = chip_top - _CHIP_H - _CHIP_GAP
 
-        return {"headers": headers, "exits": exits, "locked": locked, "hint": hint, "chips": chips}
+        return {"room": room, "headers": headers, "exits": exits, "locked": locked, "hint": hint, "chips": chips}
 
     # -- interaction ----------------------------------------------------------
 
@@ -139,7 +152,7 @@ class ExitListPanel:
     def draw(self) -> None:
         import arcade
         from dungeon_daddy.ui.theme import (
-            BG_1, BG_2, BG_HI, INK_2, INK_3, INK_4, TEAL, LINE,
+            BG_1, BG_2, BG_HI, INK_1, INK_2, INK_3, INK_4, TEAL, LINE,
             FONT_UI, TEXT_SM, TEXT_BASE,
         )
 
@@ -155,6 +168,11 @@ class ExitListPanel:
                 font_size=size, font_name=FONT_UI, anchor_y="top",
             )
 
+        for kind, text, rect in layout["room"]:
+            if kind == "name":
+                _text(text, rect, INK_1, TEXT_BASE)
+            else:
+                _text(text, rect, INK_4)
         for label, rect in layout["headers"]:
             _text(label, rect, INK_3, TEXT_BASE)
         for _eid, label, _status, rect in layout["exits"]:
