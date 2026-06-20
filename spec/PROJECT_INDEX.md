@@ -137,7 +137,7 @@ Recently resolved (both 2026-06-20; kept for provenance — nothing open here no
    `--force` backfill is now a pure no-op here. The Crucible is likewise backfilled. *(Note: the
    `--dry-run` path ignores `--force` — seeder.py:593 only counts new-vs-existing — so a dry-run
    can never preview a force re-write; diff the DB against derived exits instead.)*
-2. ~~**Optional self-heal extension** for stale labels on load.~~ **Resolved 2026-06-20.**
+2. ~~**Optional self-heal extension** for stale labels on load.~~ **Resolved 2026-06-20 (`c028860`).**
    Added `refresh_exit_labels(repo, dungeon_path)` (`campaign/backfill.py`) + narrow
    `MemoryRepository.update_exit_label(exit_id, label, exit_type)`; wired into the save-load
    path (`window.py`) right after `backfill_exits_if_empty`. It re-derives each **existing**
