@@ -51,9 +51,10 @@ class VerbOption:
 
 @dataclass(frozen=True)
 class NounOption:
-    noun_id: str
+    noun_id: str  # the full engine id the command layer needs (object_id/item_id/...)
     label: str
     target_type: str  # one of _VALID_TARGET_TYPES (npc/object/item/room/self/monster)
+    slug: str | None = None  # human-readable identity for display (objects/items only)
 
 
 @dataclass(frozen=True)
@@ -201,19 +202,38 @@ def available_nouns(
     carried items, and always adds the synthetic ``self`` (the actor) and — when the
     context names a room — ``room`` (the current room). The function is *forgiving*:
     any source key absent from ``room_context`` simply contributes nothing.
+
+    For objects and items the ``noun_id`` is the full engine id (``object_id`` /
+    ``item_id``) the command layer needs, with the human-readable ``slug`` kept on
+    the option for display; the remaining sources already key on full ids.
     """
     options: list[NounOption] = []
     for obj in room_context.get("objects", []):
         options.append(
-            NounOption(noun_id=obj["slug"], label=obj["display_name"], target_type="object")
+            NounOption(
+                noun_id=obj["object_id"],
+                label=obj["display_name"],
+                target_type="object",
+                slug=obj["slug"],
+            )
         )
     for item in room_context.get("loose_items", []):
         options.append(
-            NounOption(noun_id=item["slug"], label=item["display_name"], target_type="item")
+            NounOption(
+                noun_id=item["item_id"],
+                label=item["display_name"],
+                target_type="item",
+                slug=item["slug"],
+            )
         )
     for item in actor.get("carried_items", []):
         options.append(
-            NounOption(noun_id=item["slug"], label=item["display_name"], target_type="item")
+            NounOption(
+                noun_id=item["item_id"],
+                label=item["display_name"],
+                target_type="item",
+                slug=item["slug"],
+            )
         )
     for npc in room_context.get("npcs", []):
         options.append(

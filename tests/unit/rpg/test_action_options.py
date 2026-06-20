@@ -72,19 +72,31 @@ def _nouns(room_context, actor=_ACTOR):
 
 
 def test_room_object_becomes_object_noun():
-    nouns = _nouns({"objects": [{"slug": "iron-chest", "display_name": "Iron Chest"}]})
-    assert NounOption(noun_id="iron-chest", label="Iron Chest", target_type="object") in nouns
+    nouns = _nouns({"objects": [
+        {"object_id": "obj:c1:iron-chest", "slug": "iron-chest", "display_name": "Iron Chest"}
+    ]})
+    assert NounOption(
+        noun_id="obj:c1:iron-chest", slug="iron-chest", label="Iron Chest", target_type="object"
+    ) in nouns
 
 
 def test_loose_item_becomes_item_noun():
-    nouns = _nouns({"loose_items": [{"slug": "gold-coin", "display_name": "Gold Coin"}]})
-    assert NounOption(noun_id="gold-coin", label="Gold Coin", target_type="item") in nouns
+    nouns = _nouns({"loose_items": [
+        {"item_id": "item:c1:gold-coin", "slug": "gold-coin", "display_name": "Gold Coin"}
+    ]})
+    assert NounOption(
+        noun_id="item:c1:gold-coin", slug="gold-coin", label="Gold Coin", target_type="item"
+    ) in nouns
 
 
 def test_carried_item_becomes_item_noun():
-    actor = {**_ACTOR, "carried_items": [{"slug": "dagger", "display_name": "Dagger"}]}
+    actor = {**_ACTOR, "carried_items": [
+        {"item_id": "item:c1:dagger", "slug": "dagger", "display_name": "Dagger"}
+    ]}
     nouns = _nouns({}, actor)
-    assert NounOption(noun_id="dagger", label="Dagger", target_type="item") in nouns
+    assert NounOption(
+        noun_id="item:c1:dagger", slug="dagger", label="Dagger", target_type="item"
+    ) in nouns
 
 
 def test_npc_becomes_npc_noun():

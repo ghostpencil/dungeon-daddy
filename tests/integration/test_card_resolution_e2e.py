@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from dungeon_daddy.data.models import SessionState
+from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.action_options import (
     ActionCard,
@@ -23,8 +24,10 @@ from dungeon_daddy.rpg.action_options import (
     validate_card,
 )
 from dungeon_daddy.rpg.action_resolution import resolve_card
-from dungeon_daddy.rpg.command import MoveParty
-from dungeon_daddy.rpg.models import RoomExit
+from dungeon_daddy.rpg.command import ActivateObject, MoveParty, PickUpItem
+from dungeon_daddy.rpg.command_applier import apply_command
+from dungeon_daddy.rpg.command_validator import validate_command
+from dungeon_daddy.rpg.models import Item, ObjectTransition, RoomExit, RoomObject
 from dungeon_daddy.rpg.move_party import apply_move_party
 
 MIGRATIONS_DIR = (
@@ -82,3 +85,100 @@ def test_move_card_flows_through_grammar_into_engine(repo: MemoryRepository) -> 
     assert result.accepted is True
     assert new_session.current_room_id == ROOM_B
     assert result.modifier_flags == {"suppress_entry_ticks", "trap_chance:-1"}
+
+
+def _room_context(repo: MemoryRepository) -> dict:
+    """The real ``current_room`` block — proves the noun_id carries the full id."""
+    return ContextBundleBuilder(
+        campaign_id=CAMPAIGN_ID,
+        scene_id=None,
+        mode="run_scene",
+        focus_actor_ids=[],
+        token_budget=500,
+        current_room_id=ROOM_A,
+    ).build(repo).current_room
+
+
+def test_pickup_card_flows_through_grammar_into_engine(repo: MemoryRepository) -> None:
+    repo.save_actor(
+        ACTOR["actor_id"], CAMPAIGN_ID, "pc", "mara", "Mara", "active", room_id=ROOM_A
+    )
+    repo.save_item(Item(
+        item_id="item:c1:gold-coin",
+        campaign_id=CAMPAIGN_ID,
+        slug="gold-coin",
+        display_name="Gold Coin",
+        item_type="dungeon_item",
+        description="A shiny coin.",
+        room_id=ROOM_A,
+        status="active",
+    ))
+
+    options = CardOptions(
+        verbs=available_verbs([]),
+        nouns=available_nouns(_room_context(repo), ACTOR),
+        adverbs=available_adverbs("fighter", target_type="item", world_flags=set()),
+    )
+
+    # The noun the provider surfaced carries the full item_id, not the slug.
+    card = ActionCard(verb="pick-up", noun_id="item:c1:gold-coin", adverb="cautiously")
+    assert validate_card(card, options) is None
+
+    cmd = resolve_card(card, actor_id=ACTOR["actor_id"])
+    assert cmd == PickUpItem(item_id="item:c1:gold-coin", actor_id=ACTOR["actor_id"])
+
+    vresult = validate_command(cmd, repo, CAMPAIGN_ID, party_room_id=ROOM_A)
+    assert vresult.accepted is True
+    apply_command(cmd, vresult, repo, CAMPAIGN_ID)
+
+    picked = next(i for i in repo.get_items(CAMPAIGN_ID) if i["item_id"] == "item:c1:gold-coin")
+    assert picked["owner_actor_id"] == ACTOR["actor_id"]
+    assert picked["room_id"] is None
+
+
+def test_activate_card_flows_through_grammar_into_engine(repo: MemoryRepository) -> None:
+    repo.save_actor(
+        ACTOR["actor_id"], CAMPAIGN_ID, "pc", "mara", "Mara", "active", room_id=ROOM_A
+    )
+    repo.save_room_object(RoomObject(
+        object_id="obj:c1:iron-chest",
+        campaign_id=CAMPAIGN_ID,
+        room_id=ROOM_A,
+        level_id="level:1",
+        slug="iron-chest",
+        display_name="Iron Chest",
+        archetype="container",
+        description="A heavy iron chest.",
+        current_state="sealed",
+        transitions=[
+            ObjectTransition(
+                transition_id="tr:c1:iron-chest:0",
+                object_id="obj:c1:iron-chest",
+                from_state="sealed",
+                to_state="opened",
+                trigger="open",
+            )
+        ],
+    ))
+
+    options = CardOptions(
+        verbs=available_verbs([]),
+        nouns=available_nouns(_room_context(repo), ACTOR),
+        adverbs=available_adverbs("fighter", target_type="object", world_flags=set()),
+    )
+
+    # The noun the provider surfaced carries the full object_id, not the slug.
+    card = ActionCard(verb="activate", noun_id="obj:c1:iron-chest", adverb="cautiously")
+    assert validate_card(card, options) is None
+
+    cmd = resolve_card(card, actor_id=ACTOR["actor_id"], trigger="open")
+    assert cmd == ActivateObject(
+        object_id="obj:c1:iron-chest", actor_id=ACTOR["actor_id"], trigger="open"
+    )
+
+    vresult = validate_command(cmd, repo, CAMPAIGN_ID, party_room_id=ROOM_A)
+    assert vresult.accepted is True
+    apply_command(cmd, vresult, repo, CAMPAIGN_ID)
+
+    obj = repo.get_room_object("obj:c1:iron-chest")
+    assert obj["current_state"] == "opened"

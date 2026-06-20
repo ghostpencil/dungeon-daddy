@@ -54,6 +54,7 @@ class TestContextBundleCurrentRoomBuilder:
 
         assert len(bundle.current_room["loose_items"]) == 1
         item = bundle.current_room["loose_items"][0]
+        assert item["item_id"] == "item:c1:gold-coin"
         assert item["slug"] == "gold-coin"
         assert item["display_name"] == "Gold Coin"
         assert item["description"] == "A shiny coin."
@@ -119,6 +120,7 @@ class TestContextBundleCurrentRoomBuilder:
 
         assert len(bundle.current_room["objects"]) == 1
         obj = bundle.current_room["objects"][0]
+        assert obj["object_id"] == "obj:c1:iron-chest"
         assert obj["slug"] == "iron-chest"
         assert obj["display_name"] == "Iron Chest"
         assert obj["archetype"] == "container"

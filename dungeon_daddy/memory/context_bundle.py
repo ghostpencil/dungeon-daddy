@@ -176,6 +176,7 @@ class ContextBundleBuilder:
             "room_id": self._current_room_id,
             "objects": [
                 {
+                    "object_id": o["object_id"],
                     "slug": o["slug"],
                     "display_name": o["display_name"],
                     "archetype": o["archetype"],
@@ -186,6 +187,7 @@ class ContextBundleBuilder:
             ],
             "loose_items": [
                 {
+                    "item_id": i["item_id"],
                     "slug": i["slug"],
                     "display_name": i["display_name"],
                     "description": i["description"],
