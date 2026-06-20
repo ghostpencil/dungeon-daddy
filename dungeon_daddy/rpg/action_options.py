@@ -16,8 +16,10 @@ plus the actor playbook's signature adverbs filtered by the noun's ``target_type
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Collection, Iterable, Mapping
+
+from pydantic import BaseModel
 
 from dungeon_daddy.rpg.models import ActorAbility
 from dungeon_daddy.rpg.move_party import HOW_MODIFIER_FLAGS
@@ -43,6 +45,52 @@ class AdverbOption:
     adverb: str
     label: str
     kind: str  # "universal" | "signature"
+
+
+class ActionCard(BaseModel):
+    """The player's structured action declaration: a Verb · Noun · Adverb grammar.
+
+    The input-dual of an ``LLMReactionProposal`` — the player declares an action
+    through bounded, engine-offered choices that :func:`validate_card` checks
+    against the sets the providers offered for the current room/actor.
+    """
+
+    verb: str
+    noun_id: str
+    adverb: str
+
+
+@dataclass(frozen=True)
+class CardOptions:
+    """The engine-offered sets a Card is validated against (Slices 1–3 output)."""
+
+    verbs: list[VerbOption] = field(default_factory=list)
+    nouns: list[NounOption] = field(default_factory=list)
+    adverbs: list[AdverbOption] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class CardError:
+    """Why a Card was rejected: which slot was out of bounds and a reason string."""
+
+    field: str  # "verb" | "noun" | "adverb"
+    reason: str
+
+
+def validate_card(card: ActionCard, options: CardOptions) -> CardError | None:
+    """Reject a Card whose verb/noun/adverb is not in the offered sets.
+
+    Engine-bounded, mirroring proposal validation: a Card may only name a
+    choice the providers actually surfaced for the current room/actor. Returns
+    the first :class:`CardError` found, or ``None`` when the Card is in bounds.
+    """
+    if card.verb not in {v.verb for v in options.verbs}:
+        return CardError(field="verb", reason=f"Verb not offered: {card.verb}")
+    if card.noun_id not in {n.noun_id for n in options.nouns}:
+        return CardError(field="noun", reason=f"Noun not offered: {card.noun_id}")
+    if card.adverb not in {a.adverb for a in options.adverbs}:
+        return CardError(field="adverb", reason=f"Adverb not offered: {card.adverb}")
+    return None
 
 
 # Universal adverb surfacing (mirrors the Phase 48 ``ui/how_chips`` logic, which

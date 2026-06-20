@@ -1,10 +1,14 @@
 from dungeon_daddy.rpg.action_options import (
+    ActionCard,
     AdverbOption,
+    CardError,
+    CardOptions,
     NounOption,
     VerbOption,
     available_adverbs,
     available_nouns,
     available_verbs,
+    validate_card,
 )
 from dungeon_daddy.rpg.models import ActorAbility
 
@@ -167,3 +171,49 @@ def test_adverb_surfaced_both_universally_and_as_signature_is_not_duplicated():
     assert recklessly == [
         AdverbOption(adverb="recklessly", label="Recklessly", kind="universal")
     ]
+
+
+# --------------------------------------------------------------------------
+# Card model + validation (Slice 4)
+# --------------------------------------------------------------------------
+
+_OPTIONS = CardOptions(
+    verbs=[
+        VerbOption(verb="fight", label="Fight", kind="universal"),
+        VerbOption(verb="vanish", label="Vanish", kind="class"),
+    ],
+    nouns=[
+        NounOption(noun_id="actor:c1:ghoul", label="Pale Ghoul", target_type="monster"),
+    ],
+    adverbs=[
+        AdverbOption(adverb="boldly", label="Boldly", kind="universal"),
+    ],
+)
+
+
+def test_action_card_constructs_with_verb_noun_adverb():
+    card = ActionCard(verb="fight", noun_id="actor:c1:ghoul", adverb="boldly")
+    assert (card.verb, card.noun_id, card.adverb) == ("fight", "actor:c1:ghoul", "boldly")
+
+
+def test_validate_card_accepts_card_within_offered_sets():
+    card = ActionCard(verb="fight", noun_id="actor:c1:ghoul", adverb="boldly")
+    assert validate_card(card, _OPTIONS) is None
+
+
+def test_validate_card_rejects_verb_not_offered():
+    card = ActionCard(verb="teleport", noun_id="actor:c1:ghoul", adverb="boldly")
+    err = validate_card(card, _OPTIONS)
+    assert isinstance(err, CardError) and err.field == "verb"
+
+
+def test_validate_card_rejects_noun_not_offered():
+    card = ActionCard(verb="fight", noun_id="actor:c1:nobody", adverb="boldly")
+    err = validate_card(card, _OPTIONS)
+    assert isinstance(err, CardError) and err.field == "noun"
+
+
+def test_validate_card_rejects_adverb_not_offered():
+    card = ActionCard(verb="fight", noun_id="actor:c1:ghoul", adverb="sneakily")
+    err = validate_card(card, _OPTIONS)
+    assert isinstance(err, CardError) and err.field == "adverb"

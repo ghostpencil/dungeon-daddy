@@ -3,21 +3,17 @@
 ## Phase
 
 Phase: **50 — Hybrid Action Model (BUILD — in progress)**
-Status: On branch **`phase-50`** (decision made: **build Phase 50 on top of** the 4 cleanup
-commits — *not* PR'd separately). Slices 1 **and 2** of 8 complete. Full suite green
-(**2887 passing**, 2026-06-20; up from 2870 at phase start).
+Status: On branch **`phase-50`** (not pushed). Slices **1–4 of 8** complete. Suite green.
 
-`phase-50` holds 4 *pre-phase cleanup* commits on top of `main` (`8599eb7`), **not pushed**,
-then new Phase 50 work:
-- `fa54b20` feat(load): self-heal empty `room_exits` on save load
-- `9be98cd` test(play-view): fix stale `_load_player_actors` setup
-- `21256ef` feat(play-view): surface Recklessly chip for armed-trap rooms
-- `00fb1c8` docs(index): refresh PROJECT_INDEX
-- `da3c2b6` feat(phase-50): action Card verb provider + spec (Slice 1)
+Spec: **`spec/PHASE_50_HYBRID_ACTION_MODEL.md`** (8-slice plan, no GitHub issue yet).
+Roadmap: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (Phase 50 rows). Prior phase spec:
+`spec/PHASE_49_STARTING_PLAYBOOKS.md` (GitHub issue **#77**).
 
-Spec: **`spec/PHASE_50_HYBRID_ACTION_MODEL.md`** (authored this session; 8-slice plan, no
-GitHub issue yet). Roadmap: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (Phase 50 rows).
-Prior phase spec: `spec/PHASE_49_STARTING_PLAYBOOKS.md` (GitHub issue **#77**, label `phase-49`).
+Phase 50 commits (on top of pre-phase cleanup, all on `phase-50`):
+- `da3c2b6` Slice 1 — verb provider + spec
+- `48447a0` Slice 2 — noun provider + actor room-presence
+- `0f99981` Slice 3 — adverb provider
+- Slice 4 — `ActionCard` model + `validate_card` (this session, pending commit)
 
 **Phase 48 locked decisions** (still relevant — Phase 50 reuses the `how?` contract):
 - `MoveParty(exit_id, how)` is a **Player Command** in `rpg/command.py` (not a proposal).
@@ -38,36 +34,30 @@ Full detail: `spec/PHASE_49_STARTING_PLAYBOOKS.md` + git `94c5fcb`.
 
 ## Outstanding / Next session
 
-**START HERE → Phase 50 Slice 3 — Adverb provider.** In `dungeon_daddy/rpg/action_options.py`
-add `available_adverbs(playbook_slug, *, target_type, world_flags) -> list[AdverbOption]`:
-universal pool filtered to `HOW_MODIFIER_FLAGS` keys (`rpg/move_party.py:16`) + the playbook's
-signature adverbs filtered by `target_type`. Reuse the `how_chips` surfacing logic where it
-overlaps. Then Slice 4 (Card model + validation), Slice 5 (Card → PlayerCommand), Slice 6
-(Card → action roll), Slice 7 (UI VNA dropdown panel — per auto-memory
+**START HERE → Phase 50 Slice 5 — Card → PlayerCommand resolution.** Add `resolve_card(card,
+...)` mapping a Card whose verb is an engine mutation to the right `PlayerCommand`
+(`move`→`MoveParty(how=adverb)`, pick up→`PickUpItem`, activate→`ActivateObject`,
+equip→`EquipItem`, …), carrying the adverb through as `how`. *(unit + 1 integration)*.
+Open question to resolve at slice start: verb→command map location — new
+`rpg/action_resolution.py` vs. extending `command.py` (lean: new module). Then Slice 6 (Card
+→ action roll), Slice 7 (UI VNA dropdown panel — per auto-memory
 `project_phase50_vna_dropdowns`), Slice 8 (wire into PlayView, retire `how_chips`).
-Full slice plan + locked contracts table in **`spec/PHASE_50_HYBRID_ACTION_MODEL.md`**.
 
-**Slice 2 — DONE (uncommitted).** Noun provider + **NPC/monster room-presence** (the spec's
-"add room-presence now" decision this session, since `ActorState`/`actors` had no room
-location). Changes:
-- Migration **`012_actor_room.sql`** — `ALTER TABLE actors ADD COLUMN room_id TEXT` (nullable,
-  mirrors `Item.room_id`). `ActorState.room_id` field; `save_actor`/`get_actor`/
-  `get_actors_by_campaign` persist+return it; new `get_actors_by_room(campaign_id, room_id,
-  actor_types=None)` repo getter.
-- `_fetch_current_room` (`memory/context_bundle.py`) now also emits `npcs`, `monsters`
-  (via `get_actors_by_room`), and `exits` (via `get_exits_by_room`). Block shape grew —
-  `test_context_bundle_current_room` updated.
-- `available_nouns(room_context, actor) -> list[NounOption(noun_id,label,target_type)]` —
-  *forgiving*: objects→`object`, loose+carried items→`item`, npcs→`npc`, monsters→`monster`,
-  exits→`room` (noun_id=exit_id), synthetic `self` (always) + `room` (when room_id present).
-  Absent source keys contribute nothing. 9 tests in `tests/unit/rpg/test_action_options.py`.
+**Slice 4 done (this session):** `ActionCard(verb, noun_id, adverb)` Pydantic model,
+`CardOptions(verbs, nouns, adverbs)` bundle, `CardError(field, reason)`, and
+`validate_card(card, options) -> CardError | None` — all in `rpg/action_options.py`. The
+validator rejects the first slot (verb→noun→adverb order) not in the offered sets,
+engine-bounded mirror of proposal validation. The three feeding providers are done (Slices
+1–3, same module). Full slice plan + locked contracts in
+**`spec/PHASE_50_HYBRID_ACTION_MODEL.md`**.
 
-**Slice 1 — DONE (committed `da3c2b6`).** `dungeon_daddy/rpg/action_options.py`
-`available_verbs(actor_abilities) -> list[VerbOption]`: 9 universal verbs (always,
-`kind="universal"`, reads canonical `playbook._UNIVERSAL_VERBS`) + class verbs from
-`ActorAbility` rows with `surfaces_as_verb=True` (`kind="class"`, label=`display_name`).
-3 tests in `tests/unit/rpg/test_action_options.py`. Interface kept minimal — no room/playbook
-gating yet (add when a test demands it).
+**Slice 3 design note (carry forward):** `available_adverbs` is **self-contained in the
+engine** — it mirrors the `ui/how_chips` surfacing logic but depends only on
+`rpg.move_party.HOW_MODIFIER_FLAGS`, *not* on `ui/how_chips` (that would invert the rpg→ui
+layering). `how_chips` is retired in Slice 8, so the small overlap is intentional and
+temporary. World-flag gates: `stealthily`←`can_sense`, `deliberately`←`one_way`,
+`reverently`←`ritual_connector`, `recklessly`←`armed_trap`. Signature adverbs are deduped
+against the universal set.
 
 Still open (not blocking Phase 50):
 1. **Tomb of the Forgotten King** save needs an exit-label re-write — close the app, then
