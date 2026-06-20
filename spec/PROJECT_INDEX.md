@@ -3,7 +3,8 @@
 ## Phase
 
 Phase: **50 — Hybrid Action Model (BUILD — in progress)**
-Status: On branch **`phase-50`** (not pushed). Slices **1–5 of 8** complete. Suite green (2913).
+Status: On branch **`phase-50`** (not pushed). Slices **1–5 of 8** complete; **Slice 5.1**
+(noun id-scheme fix) inserted next. Suite green (2913).
 
 Spec: **`spec/PHASE_50_HYBRID_ACTION_MODEL.md`** (8-slice plan, no GitHub issue yet).
 Roadmap: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (Phase 50 rows). Prior phase spec:
@@ -35,23 +36,28 @@ Full detail: `spec/PHASE_49_STARTING_PLAYBOOKS.md` + git `94c5fcb`.
 
 ## Outstanding / Next session
 
-**START HERE → Phase 50 Slice 6 — Card → action roll resolution.** For non-command verbs
+**START HERE → Phase 50 Slice 5.1 — noun id-scheme fix (slug → full id).** A gap found while
+writing the Slice 5 integration test: the `current_room` context block
+(`memory/context_bundle.py:177-196`) keys **objects and loose items by `slug`**, but
+`ActivateObject`/`PickUpItem`/`EquipItem` need the full `object_id`/`item_id`. So
+`available_nouns` surfaces slugs as `noun_id`, and `resolve_card` faithfully passes them
+through — meaning those three commands would receive a slug where the engine expects a full
+id. **`move` already works end-to-end** (the noun_id *is* the `exit_id`; npcs/monsters
+already carry `actor_id`), so only the object/loose-item/carried-item noun paths need fixing.
+*Plan:* have `_fetch_current_room` (and the carried-items source) include the full
+`object_id`/`item_id`, switch `available_nouns` to emit those as `noun_id` (keep `slug`/label
+for display), then add the object + item integration coverage that Slice 5 could not write
+(resolve_card → validate_command → apply_command actually transitions an object / picks up an
+item). Watch for downstream readers of the object/item `noun_id` that assumed a slug.
+*(unit + integration; TDD).* Recorded in the Slice 5 commit message too.
+
+**THEN → Phase 50 Slice 6 — Card → action roll resolution.** For non-command verbs
 (`fight`/`study`/`sway`/…, where `resolve_card` returns `None`), build the dice pool (actor
 rating + adverb `dice:±N` flags + momentum), roll, return outcome tier + applied
 world-side-effect flags. Reuse the existing roll module — **confirm its entry point first**
 (open question 2: does Card resolution call the roller directly or emit a "roll request"?).
 *(unit + 1 integration)*. Then Slice 7 (UI VNA dropdown panel — per auto-memory
 `project_phase50_vna_dropdowns`), Slice 8 (wire into PlayView, retire `how_chips`).
-
-**⚠ Carry-forward gap found in Slice 5 (fix before pick-up/equip/activate run live):** the
-`current_room` context block (`memory/context_bundle.py:177-196`) keys **objects and loose
-items by `slug`**, but `ActivateObject`/`PickUpItem`/`EquipItem` need the full
-`object_id`/`item_id`. So `available_nouns` surfaces slugs as `noun_id`, and `resolve_card`
-faithfully passes them through — meaning those three commands would receive a slug where the
-engine expects a full id. **`move` works end-to-end** (the noun_id *is* the `exit_id`; npcs/
-monsters already carry `actor_id`). Fix = have the noun provider surface full ids for
-objects/items (a Slice 2 id-scheme correction), then add object/item integration coverage.
-The Slice 5 commit message records this too.
 
 **Slice 5 done (this session) — `68d7060`:** new `rpg/action_resolution.py` with
 `resolve_card(card, *, actor_id, trigger=None) -> PlayerCommand | None`:
