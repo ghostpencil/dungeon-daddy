@@ -112,14 +112,24 @@ temporary. World-flag gates: `stealthily`←`can_sense`, `deliberately`←`one_w
 `reverently`←`ritual_connector`, `recklessly`←`armed_trap`. Signature adverbs are deduped
 against the universal set.
 
-Still open (not blocking Phase 50):
-1. **Tomb of the Forgotten King** save needs an exit-label re-write — close the app, then
-   `python -m tools.backfill_room_exits "<save dir>" --force` (rewrites `room_exits` labels/status).
-   This `--force` re-write is **separate** from the on-load self-heal (which only fires for **empty**
-   exit tables — both current saves already have 36 exits). The Crucible is already backfilled.
-2. **Optional self-heal extension:** the on-load backfill only fills *empty* tables; it does not
-   correct stale labels/status (that still needs the manual `--force` script). Could fold a
-   label-refresh into load if it becomes a recurring pain.
+Recently resolved (both 2026-06-20; kept for provenance — nothing open here now):
+1. ~~**Tomb of the Forgotten King** save needs an exit-label re-write.~~ **Resolved 2026-06-20.**
+   Verified the save's 36 `room_exits` already match the current seeder output exactly
+   (`exit_type`/`label`/`status` all aligned — 0 diffs vs derived-from-`dungeon.json`), so the
+   `--force` backfill is now a pure no-op here. The Crucible is likewise backfilled. *(Note: the
+   `--dry-run` path ignores `--force` — seeder.py:593 only counts new-vs-existing — so a dry-run
+   can never preview a force re-write; diff the DB against derived exits instead.)*
+2. ~~**Optional self-heal extension** for stale labels on load.~~ **Resolved 2026-06-20.**
+   Added `refresh_exit_labels(repo, dungeon_path)` (`campaign/backfill.py`) + narrow
+   `MemoryRepository.update_exit_label(exit_id, label, exit_type)`; wired into the save-load
+   path (`window.py`) right after `backfill_exits_if_empty`. It re-derives each **existing**
+   exit's `label`/`exit_type` from `dungeon.json` and updates only where they differ.
+   **Deliberately never touches `status`** — that is live runtime state mutated by
+   `discover_exit`/`unlock_exit`/`seal_exit`/`block_exit` (via `update_exit_status`), so a
+   status refresh on load would clobber discovered/unlocked/sealed exits. Status corrections
+   therefore remain the manual `--force` script's job. Tests:
+   `tests/unit/campaign/test_backfill_exits.py` (corrects stale label, **preserves runtime
+   status**, no-op when correct, never creates missing rows).
 
 ---
 

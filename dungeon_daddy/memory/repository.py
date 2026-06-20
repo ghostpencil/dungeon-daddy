@@ -1292,6 +1292,14 @@ class MemoryRepository:
             [status, exit_id],
         )
 
+    def update_exit_label(self, exit_id: str, label: str, exit_type: str) -> None:
+        """Update only the cosmetic label/exit_type, never the runtime status."""
+        assert self._conn is not None
+        self._conn.execute(
+            "UPDATE room_exits SET label = ?, exit_type = ? WHERE exit_id = ?",
+            [label, exit_type, exit_id],
+        )
+
     def get_hidden_exit_count(self, campaign_id: str, room_id: str) -> int:
         assert self._conn is not None
         row = self._conn.execute(
