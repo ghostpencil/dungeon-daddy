@@ -354,6 +354,8 @@ class DungeonDaddyWindow(arcade.Window):
                 mem_repo = MemoryRepository(db_path)
                 mem_repo.initialize_schema(_MIGRATIONS_DIR)
                 campaign_id = f"campaign:{_slugify(save_name)}"
+                from dungeon_daddy.campaign.backfill import backfill_exits_if_empty
+                backfill_exits_if_empty(mem_repo, campaign_dir / "dungeon.json")
         self._play_view.set_rpg_context(mem_repo, campaign_id, portraits_dir=portraits_dir)
 
     def launch_test_drive(self, dungeon: Dungeon) -> None:
