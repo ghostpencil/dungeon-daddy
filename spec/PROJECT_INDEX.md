@@ -8,11 +8,12 @@ commits — *not* PR'd separately). Slice 1 of 8 complete. Suite green (Slice-1 
 full suite was **2870 passing** at phase start, 2026-06-20).
 
 `phase-50` holds 4 *pre-phase cleanup* commits on top of `main` (`8599eb7`), **not pushed**,
-then new Phase 50 work (spec + Slice 1, **uncommitted** as of this save):
+then new Phase 50 work:
 - `fa54b20` feat(load): self-heal empty `room_exits` on save load
 - `9be98cd` test(play-view): fix stale `_load_player_actors` setup
 - `21256ef` feat(play-view): surface Recklessly chip for armed-trap rooms
 - `00fb1c8` docs(index): refresh PROJECT_INDEX
+- `da3c2b6` feat(phase-50): action Card verb provider + spec (Slice 1)
 
 Spec: **`spec/PHASE_50_HYBRID_ACTION_MODEL.md`** (authored this session; 8-slice plan, no
 GitHub issue yet). Roadmap: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (Phase 50 rows).
@@ -50,12 +51,12 @@ Slice 5 (Card → PlayerCommand), Slice 6 (Card → action roll), Slice 7 (UI VN
 per auto-memory `project_phase50_vna_dropdowns`), Slice 8 (wire into PlayView, retire `how_chips`).
 Full slice plan + locked contracts table in **`spec/PHASE_50_HYBRID_ACTION_MODEL.md`**.
 
-**Slice 1 — DONE this session (uncommitted).** `dungeon_daddy/rpg/action_options.py`
+**Slice 1 — DONE (committed `da3c2b6`).** `dungeon_daddy/rpg/action_options.py`
 `available_verbs(actor_abilities) -> list[VerbOption]`: 9 universal verbs (always,
 `kind="universal"`, reads canonical `playbook._UNIVERSAL_VERBS`) + class verbs from
 `ActorAbility` rows with `surfaces_as_verb=True` (`kind="class"`, label=`display_name`).
 3 tests in `tests/unit/rpg/test_action_options.py`. Interface kept minimal — no room/playbook
-gating yet (add when a test demands it). **Commit the spec + Slice 1 next session.**
+gating yet (add when a test demands it).
 
 Still open (not blocking Phase 50):
 1. **Tomb of the Forgotten King** save needs an exit-label re-write — close the app, then
