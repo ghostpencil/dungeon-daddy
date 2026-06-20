@@ -1,12 +1,16 @@
 # Phase 49 — Starting Playbooks: Class Foundations (Verbs + Adverbs)
 
-**Status: DRAFT (spec only — no code yet)** — written 2026-06-19; open questions resolved
-2026-06-19 (see Resolved decisions R1–R4). Ready for implementation.
+**Status: COMPLETE** — implemented 2026-06-19; all 7 slices (0–6) done; 57 new tests; 2867 total
+passing. Branch: `phase-49`. Committed `94c5fcb`.
 GitHub issue: [#77](https://github.com/ghostpencil/dungeon-daddy/issues/77) (label `phase-49`).
 Sourced from `ghostpencil/dungeon-daddy` Project #1 card "Phase 49: Starting Playbooks —
 Class Foundations (Verbs + Adverbs)".
-Branch (proposed): `phase-49-starting-playbooks`
 Depends on: Phase 46 (Inventory / Class Kits) — complete. Phase 48 — complete.
+
+**Post-implementation decision:** each playbook grants its kit ability **and its first pool
+ability** as starting abilities; the remaining `ability_pool` entries are locked until Phase 52
+milestones. `starting_abilities` in `data/playbooks.json` reflects this (two slugs each).
+The seeder already handled pool entries in `starting_abilities` via `source="playbook_start"`.
 
 > This is the start-of-phase reconciliation spec. It targets the full scope from the Project #1
 > card, with the codebase as-built and the 2026-06-17 design review folded in as locked
@@ -246,22 +250,15 @@ to the renderer. (Read `spec/UI_TESTING.md` / `spec/TESTING.md` first.)
 Each slice is one behavior, tests first. Read `spec/TESTING.md` and invoke the TDD skill before
 each new test file (per CLAUDE.md).
 
-0. **Bug fix — party marker survives level browsing** (Phase 48 navigation; see the folded-in
-   bug-fix section above). View-only `viewed_level_idx`; stepper no longer mutates party
-   location; marker gated to the party's level. Do this before the playbook slices.
-1. **Playbook schema (Pydantic).** `Playbook` + nested models in `rpg/` with validation
-   (verb/track/rating/slug rules). Pure model tests; no I/O.
-2. **`PlaybookLibrary`.** Load bundled `data/playbooks.json`; `list()` / `get(slug)`; the four
-   bundled playbooks parse and validate. Add the JSON asset in this slice.
-3. **`actor_abilities` schema + repo CRUD** (migration `011`, `actors.playbook_slug` column).
-   Save/get/delete; JSON roundtrip of `target_types`; migration applies on a fresh + existing DB.
-4. **Seed-publish wiring.** `_seed_actor` applies a playbook: ratings/tracks/tags, kit Item,
-   `playbook_slug`, `actor_abilities` rows. Idempotent + `--force` + dry-run parity. Integration
-   test through the real seeder + repo (per TESTING.md integration boundary).
-5. **Character creation UI** — playbook picker + auto-populated, read-only actor form in the
-   Seed editor. UI behavior test (`spec/UI_TESTING.md`).
-6. **Character Sheet panel** — render playbook, tags, signature adverbs, starting abilities.
-   UI behavior test.
+0. ✅ **Bug fix — party marker survives level browsing** (Phase 48 navigation). View-only
+   `viewed_level_idx`; stepper no longer mutates party location; marker gated to the party's level.
+1. ✅ **Playbook schema (Pydantic).** `Playbook` + nested models with validation. 11 tests.
+2. ✅ **`PlaybookLibrary`.** Bundled `data/playbooks.json`; `list()` / `get(slug)`. 7 tests.
+3. ✅ **`actor_abilities` schema + repo CRUD** (migration `011`). 8 tests.
+4. ✅ **Seed-publish wiring.** `_seed_actor` applies playbook: ratings/tracks/tags, kit Item,
+   `playbook_slug`, `actor_abilities` rows. 9 tests.
+5. ✅ **Character creation UI** — playbook picker in Seed editor. 12 tests.
+6. ✅ **Character Sheet panel** — PLAYBOOK / ADVERBS / ABILITIES sections. 10 tests.
 
 Slice 0 is an independent Phase-48 navigation bug fix (folded in by request); it can land on
 its own or first on the phase branch. Slices 1–4 are the engine/data spine (the Phase-50-enabling
@@ -304,10 +301,10 @@ deliverable). Slices 5–6 are UI and could be split to a follow-up if the spine
 
 ## Exit criteria
 
-- Four bundled playbooks load and validate via `PlaybookLibrary`.
-- Publishing a campaign whose actor names a `playbook_slug` seeds ratings, tracks, kit Item,
+- [x] Four bundled playbooks load and validate via `PlaybookLibrary`.
+- [x] Publishing a campaign whose actor names a `playbook_slug` seeds ratings, tracks, kit Item,
   tags, `playbook_slug`, and `actor_abilities` rows — idempotently.
-- Pre-Phase-49 saves load unchanged (no playbook, empty ability set).
-- Seed editor can create an actor from a playbook (rigid auto-populate); Character Sheet shows
+- [x] Pre-Phase-49 saves load unchanged (no playbook, empty ability set).
+- [x] Seed editor can create an actor from a playbook (rigid auto-populate); Character Sheet shows
   playbook, tags, signature adverbs, starting abilities.
-- Full suite green; new behavior covered by tests written test-first.
+- [x] Full suite green (2867 passing); new behavior covered by tests written test-first.
