@@ -3,8 +3,8 @@
 ## Phase
 
 Phase: **50 — Hybrid Action Model (BUILD — in progress)**
-Status: On branch **`phase-50`** (not pushed). Slices **1–6 + 5.1 of 8** complete;
-**Slice 7** (UI VNA dropdown panel) next. Suite green (2921).
+Status: On branch **`phase-50`** (not pushed). Slices **1–7 + 5.1 of 8** complete;
+**Slice 8** (wire `VnaActionPanel` into PlayView, retire `how_chips`) next. Suite green (2941).
 
 Spec: **`spec/PHASE_50_HYBRID_ACTION_MODEL.md`** (8-slice plan, no GitHub issue yet).
 Roadmap: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (Phase 50 rows). Prior phase spec:
@@ -18,6 +18,7 @@ Phase 50 commits (on top of pre-phase cleanup, all on `phase-50`):
 - `68d7060` Slice 5 — Card → `PlayerCommand` resolution (`rpg/action_resolution.py`)
 - `e9a339b` Slice 5.1 — noun `noun_id` now the full `object_id`/`item_id`
 - `971f8ca` Slice 6 — Card → action roll resolution (`resolve_card_roll`)
+- `40a72a3` Slice 7 — `VnaActionPanel` (VNA Card panel + dropdowns)
 
 **Phase 48 locked decisions** (still relevant — Phase 50 reuses the `how?` contract):
 - `MoveParty(exit_id, how)` is a **Player Command** in `rpg/command.py` (not a proposal).
@@ -38,30 +39,47 @@ Full detail: `spec/PHASE_49_STARTING_PLAYBOOKS.md` + git `94c5fcb`.
 
 ## Outstanding / Next session
 
-**START HERE → Phase 50 Slice 7 — UI VNA dropdown panel.** Build a Verb·Noun·Adverb panel
-of **real dropdowns/comboboxes** (per auto-memory `project_phase50_vna_dropdowns`), driven by
-the Slice 1–3 providers (`available_verbs`/`available_nouns`/`available_adverbs` in
-`rpg/action_options.py`); submit builds an `ActionCard` → `validate_card` → Slice 5
-(`resolve_card`) / Slice 6 (`resolve_card_roll`) resolution. *(ui-test harness — read
-`spec/UI_TESTING.md`)*.
+**START HERE → Phase 50 Slice 8 — wire `VnaActionPanel` into PlayView + retire `how_chips`.**
+Swap the Slice 7 panel into the action surface and remove the provisional `how?` chip flow
+once the panel covers its cases (movement must keep working).
 
-Concrete pointers for Slice 7 (gathered this session — verify before relying):
-- **Widget:** `arcade.gui.UIDropdown(*, x, y, width=150, height=30, default=None,
-  options=list[str|None], primary_style/dropdown_style/active_style=None)`; emits `on_change`
-  (it **exists** in arcade 3.3.3 — see [[feedback_arcade_gui]]). Dropdown options are plain
-  strings, so map label↔slug when building/reading the widget.
-- **What it replaces:** the provisional `how?` chip strip — `dungeon_daddy/ui/how_chips.py`
+Concrete pointers for Slice 8 (gathered this session — verify before relying):
+- **Panel to wire:** `dungeon_daddy/ui/panels/vna_action_panel.py` (`VnaActionPanel`). It
+  exposes `set_context(*, actor_abilities, room_context, actor, playbook_slug, world_flags,
+  library=None)` (calls the Slice 1–3 providers, defaults each slot, computes adverbs for the
+  default noun), `select_*` / `select_*_by_label` / `*_labels()` / `selected_*_label()` (the
+  dropdown adapter — `UIDropdown` options are plain strings), `build_card()`, and `submit()`
+  (validates via `validate_card`; on success fires `set_submit_callback(card)`, else stores
+  `_last_error: CardError`). It already has `setup_widget(manager,x,y,w,h)` /
+  `teardown_widget(manager)` / `draw(x,y,w,h)` matching the `_RpgSidePanel` convention
+  (`play_view.py:185-213`), building 3 `UIDropdown`s + a SUBMIT button. **The Arcade widget
+  build is unverified visually** — exercise it via the ui-test harness / a manual run and
+  expect layout polish (the `draw()` label rows vs. dropdown y-offsets are approximate).
+- **Submit → resolution:** on the `set_submit_callback`, route the `ActionCard` through Slice
+  5 `resolve_card(...)` (mutation verbs → `PlayerCommand`) / Slice 6 `resolve_card_roll(...)`
+  (skill verbs → roll). `resolve_card` returns `None` for skill verbs, so try it first then
+  fall back to the roll path.
+- **What to retire:** the `how?` chip strip — `dungeon_daddy/ui/how_chips.py`
   (`build_how_chips`), surfaced via `ExitListPanel.set_how_chips` and called from
-  `PlayView._refresh_exits` (`views/play_view.py:973`, calls at `:983`/`:1010`). Existing
-  action UI to mirror/replace: `dungeon_daddy/ui/panels/player_action_panel.py`
-  (`PlayerActionPanel`, currently a verb-button + momentum/push UI feeding
-  `ActionRequest`).
-- **Wiring target:** `PlayView` constructs `self._rpg_action`/`self._exit_panel`
-  (`play_view.py:357-358`); Slice 8 does the full PlayView swap + retires `how_chips`.
-- Adverb dropdown needs `target_type` (from the chosen noun's `NounOption.target_type`) +
-  `world_flags` to call `available_adverbs` — so Noun selection must refresh the Adverb list.
+  `PlayView._refresh_exits` (`views/play_view.py:983`/`:1010`). The current action UI being
+  replaced: `dungeon_daddy/ui/panels/player_action_panel.py` (`PlayerActionPanel`, the
+  `_TAB_ACTION` tab in `_RpgSidePanel`, `play_view.py:357`/`:189`/`:209`).
+- **`set_context` inputs in PlayView:** `actor_abilities` from the live `actor_abilities`
+  table; `room_context` from `build_room_context(...)` (already built in `_refresh_exits`);
+  `actor` dict needs `actor_id`/`display_name`/`carried_items`; `playbook_slug` from the
+  actor; `world_flags` mirror the `_refresh_exits` chip gates (`can_sense`/`one_way`/
+  `ritual_connector`/`armed_trap`).
 
-Then Slice 8 (wire into PlayView, retire `how_chips`).
+**Slice 7 done — `VnaActionPanel` (`40a72a3`).** New `dungeon_daddy/ui/panels/vna_action_panel.py`:
+the Play-mode Verb·Noun·Adverb Card panel. Pure-logic core is unit-tested without Arcade
+(`tests/unit/ui/panels/test_vna_action_panel.py`, 16 tests): `set_context` populates the
+Slice 1–3 provider option sets and defaults each slot; `select_noun` **recomputes the adverb
+pool** from the chosen noun's `target_type`; a label↔slug adapter feeds plain-string
+`UIDropdown`s; `submit()` builds + validates an `ActionCard` (`validate_card`) and either fires
+the submit callback or stores a `CardError` (out-of-bounds slot blocks dispatch — engine-bounded).
+The Arcade `setup_widget`/`teardown_widget`/`draw` build (3 `UIDropdown`s + SUBMIT, matching the
+`_RpgSidePanel` convention) ships in the same file but is **not yet visually verified** — Slice 8
+wires it into PlayView and polishes layout. Suite green (2941).
 
 **Slice 6 done (this session) — Card → action roll resolution.** Added
 `resolve_card_roll(card, *, campaign_id, actor, momentum_spend=0, push_yourself=False,
