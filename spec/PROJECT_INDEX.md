@@ -4,8 +4,8 @@
 
 Phase: **50 — Hybrid Action Model (BUILD — in progress)**
 Status: On branch **`phase-50`** (decision made: **build Phase 50 on top of** the 4 cleanup
-commits — *not* PR'd separately). Slice 1 of 8 complete. Suite green (Slice-1 file: 3 passing;
-full suite was **2870 passing** at phase start, 2026-06-20).
+commits — *not* PR'd separately). Slices 1 **and 2** of 8 complete. Full suite green
+(**2887 passing**, 2026-06-20; up from 2870 at phase start).
 
 `phase-50` holds 4 *pre-phase cleanup* commits on top of `main` (`8599eb7`), **not pushed**,
 then new Phase 50 work:
@@ -38,14 +38,29 @@ Full detail: `spec/PHASE_49_STARTING_PLAYBOOKS.md` + git `94c5fcb`.
 
 ## Outstanding / Next session
 
-**START HERE → Phase 50 Slice 2 — Noun provider.** In `dungeon_daddy/rpg/action_options.py`
-add `available_nouns(room_context, actor) -> list[NounOption]`, each carrying `target_type`
-(`npc/object/item/room/self/monster`). Sources: room objects, loose items, carried items,
-NPCs/monsters, exits, plus synthetic `self` + `room`. Read the Phase 47/48 `current_room`
-context block — no new query. Then Slice 3 (adverb provider), Slice 4 (Card model + validation),
-Slice 5 (Card → PlayerCommand), Slice 6 (Card → action roll), Slice 7 (UI VNA dropdown panel —
-per auto-memory `project_phase50_vna_dropdowns`), Slice 8 (wire into PlayView, retire `how_chips`).
+**START HERE → Phase 50 Slice 3 — Adverb provider.** In `dungeon_daddy/rpg/action_options.py`
+add `available_adverbs(playbook_slug, *, target_type, world_flags) -> list[AdverbOption]`:
+universal pool filtered to `HOW_MODIFIER_FLAGS` keys (`rpg/move_party.py:16`) + the playbook's
+signature adverbs filtered by `target_type`. Reuse the `how_chips` surfacing logic where it
+overlaps. Then Slice 4 (Card model + validation), Slice 5 (Card → PlayerCommand), Slice 6
+(Card → action roll), Slice 7 (UI VNA dropdown panel — per auto-memory
+`project_phase50_vna_dropdowns`), Slice 8 (wire into PlayView, retire `how_chips`).
 Full slice plan + locked contracts table in **`spec/PHASE_50_HYBRID_ACTION_MODEL.md`**.
+
+**Slice 2 — DONE (uncommitted).** Noun provider + **NPC/monster room-presence** (the spec's
+"add room-presence now" decision this session, since `ActorState`/`actors` had no room
+location). Changes:
+- Migration **`012_actor_room.sql`** — `ALTER TABLE actors ADD COLUMN room_id TEXT` (nullable,
+  mirrors `Item.room_id`). `ActorState.room_id` field; `save_actor`/`get_actor`/
+  `get_actors_by_campaign` persist+return it; new `get_actors_by_room(campaign_id, room_id,
+  actor_types=None)` repo getter.
+- `_fetch_current_room` (`memory/context_bundle.py`) now also emits `npcs`, `monsters`
+  (via `get_actors_by_room`), and `exits` (via `get_exits_by_room`). Block shape grew —
+  `test_context_bundle_current_room` updated.
+- `available_nouns(room_context, actor) -> list[NounOption(noun_id,label,target_type)]` —
+  *forgiving*: objects→`object`, loose+carried items→`item`, npcs→`npc`, monsters→`monster`,
+  exits→`room` (noun_id=exit_id), synthetic `self` (always) + `room` (when room_id present).
+  Absent source keys contribute nothing. 9 tests in `tests/unit/rpg/test_action_options.py`.
 
 **Slice 1 — DONE (committed `da3c2b6`).** `dungeon_daddy/rpg/action_options.py`
 `available_verbs(actor_abilities) -> list[VerbOption]`: 9 universal verbs (always,

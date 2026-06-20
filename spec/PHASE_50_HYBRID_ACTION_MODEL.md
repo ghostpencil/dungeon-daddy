@@ -69,10 +69,13 @@ The adverb contributes **dice-pool deltas + world-side-effect flags** in both pa
 *, room_context) -> list[VerbOption]`. Universal verbs always present; class verbs appended
 from abilities with `surfaces_as_verb=true`. Pure function, no DB. *(unit)*
 
-**Slice 2 — Noun provider.** `available_nouns(room_context, actor) -> list[NounOption]`,
-each carrying `target_type`. Sources: room objects, loose items, carried items, NPCs/
-monsters, exits, plus synthetic `self` and `room`. Reads the Phase 47/48 `current_room`
-context block; no new query. *(unit)*
+**Slice 2 — Noun provider.** *(DONE)* `available_nouns(room_context, actor) ->
+list[NounOption]`, each carrying `target_type`. Sources: room objects, loose items, carried
+items, NPCs/monsters, exits, plus synthetic `self` and `room`. **Scope note:** the
+`current_room` block had no NPC/monster presence, so this slice also added actor
+room-presence (migration `012_actor_room.sql`: `actors.room_id`; `get_actors_by_room`) and
+enriched `_fetch_current_room` with `npcs`/`monsters`/`exits` — *not* the original "no new
+query" plan. Provider is forgiving of absent source keys. *(unit)*
 
 **Slice 3 — Adverb provider.** `available_adverbs(playbook_slug, *, target_type,
 world_flags) -> list[AdverbOption]`. Universal pool filtered to keys in `HOW_MODIFIER_FLAGS`

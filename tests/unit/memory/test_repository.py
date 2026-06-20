@@ -137,6 +137,52 @@ class TestMemoryRepository:
         repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
         repo.initialize_schema(MIGRATIONS_DIR)
         assert repo.get_actors_by_campaign("nonexistent") == []
+
+    def test_save_actor_persists_room_id(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.save_actor(
+            "a1", "camp-A", "npc", "warden", "The Warden", "active",
+            room_id="room:level-01:antechamber",
+        )
+        actor = repo.get_actor("a1")
+        repo.close()
+        assert actor is not None
+        assert actor["room_id"] == "room:level-01:antechamber"
+
+    def test_save_actor_defaults_room_id_to_none(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.save_actor("a1", "camp-A", "pc", "hero", "Elara", "active")
+        actor = repo.get_actor("a1")
+        repo.close()
+        assert actor is not None
+        assert actor["room_id"] is None
+
+    def test_get_actors_by_room_filters_by_room(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.save_actor("a1", "camp-A", "npc", "warden", "Warden", "active",
+                        room_id="room:1")
+        repo.save_actor("a2", "camp-A", "monster", "ghoul", "Ghoul", "active",
+                        room_id="room:2")
+        repo.save_actor("a3", "camp-A", "npc", "ghost", "Ghost", "active",
+                        room_id=None)
+        actors = repo.get_actors_by_room("camp-A", "room:1")
+        repo.close()
+        assert {a["actor_id"] for a in actors} == {"a1"}
+
+    def test_get_actors_by_room_filters_by_actor_types(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.save_actor("a1", "camp-A", "npc", "warden", "Warden", "active",
+                        room_id="room:1")
+        repo.save_actor("a2", "camp-A", "monster", "ghoul", "Ghoul", "active",
+                        room_id="room:1")
+        actors = repo.get_actors_by_room("camp-A", "room:1", actor_types=["monster"])
+        repo.close()
+        assert {a["actor_id"] for a in actors} == {"a2"}
+        assert actors[0]["room_id"] == "room:1"
         repo.close()
 
     def test_migration_006_converts_old_memory_statuses(self, tmp_path: Path) -> None:

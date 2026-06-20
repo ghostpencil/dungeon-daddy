@@ -165,6 +165,13 @@ class ContextBundleBuilder:
             return {}
         objects = repo.get_objects_by_room(self._campaign_id, self._current_room_id)
         raw_items = repo.get_items_by_room(self._campaign_id, self._current_room_id)
+        npcs = repo.get_actors_by_room(
+            self._campaign_id, self._current_room_id, actor_types=["npc"]
+        )
+        monsters = repo.get_actors_by_room(
+            self._campaign_id, self._current_room_id, actor_types=["monster"]
+        )
+        exits = repo.get_exits_by_room(self._campaign_id, self._current_room_id)
         return {
             "room_id": self._current_room_id,
             "objects": [
@@ -187,6 +194,26 @@ class ContextBundleBuilder:
                 for i in raw_items
                 if i["item_type"] == "dungeon_item"
             ],
+            "npcs": [self._actor_noun(a) for a in npcs],
+            "monsters": [self._actor_noun(a) for a in monsters],
+            "exits": [
+                {
+                    "exit_id": e["exit_id"],
+                    "label": e["label"],
+                    "status": e["status"],
+                    "to_room_id": e["to_room_id"],
+                }
+                for e in exits
+            ],
+        }
+
+    @staticmethod
+    def _actor_noun(actor: dict) -> dict:
+        return {
+            "actor_id": actor["actor_id"],
+            "slug": actor["slug"],
+            "display_name": actor["display_name"],
+            "status": actor["status"],
         }
 
     def _fetch_scene_brief(self, repo: MemoryRepository) -> dict:
