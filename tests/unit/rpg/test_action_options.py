@@ -1,6 +1,8 @@
 from dungeon_daddy.rpg.action_options import (
+    AdverbOption,
     NounOption,
     VerbOption,
+    available_adverbs,
     available_nouns,
     available_verbs,
 )
@@ -106,3 +108,62 @@ def test_self_present_even_without_room_context():
 def test_empty_context_yields_only_self():
     nouns = _nouns({})
     assert nouns == [NounOption(noun_id="actor:c1:mara", label="Mara", target_type="self")]
+
+
+# --------------------------------------------------------------------------
+# Adverb provider (Slice 3)
+# --------------------------------------------------------------------------
+
+# "fighter" playbook signature adverbs (data/playbooks.json):
+#   recklessly -> [monster, object], brutally -> [monster],
+#   with-discipline -> [monster, npc]
+_BASE_UNIVERSAL_ADVERBS = {"cautiously", "quickly", "boldly"}
+
+
+def test_universal_base_adverbs_always_present():
+    advs = available_adverbs("fighter", target_type="object", world_flags=set())
+    universal = {a.adverb for a in advs if a.kind == "universal"}
+    assert _BASE_UNIVERSAL_ADVERBS <= universal
+    assert all(a.kind == "universal" for a in advs if a.adverb in _BASE_UNIVERSAL_ADVERBS)
+
+
+def test_conditional_universal_adverb_absent_without_world_flag():
+    advs = available_adverbs("fighter", target_type="object", world_flags=set())
+    assert all(a.adverb != "stealthily" for a in advs)
+
+
+def test_conditional_universal_adverb_surfaces_with_world_flag():
+    advs = available_adverbs("fighter", target_type="object", world_flags={"can_sense"})
+    assert AdverbOption(adverb="stealthily", label="Stealthily", kind="universal") in advs
+
+
+def test_signature_adverb_surfaces_for_matching_target_type():
+    # fighter's "brutally" targets [monster]
+    advs = available_adverbs("fighter", target_type="monster", world_flags=set())
+    assert AdverbOption(adverb="brutally", label="Brutally", kind="signature") in advs
+
+
+def test_signature_adverb_absent_for_non_matching_target_type():
+    # fighter's "brutally" targets [monster] only — not object
+    advs = available_adverbs("fighter", target_type="object", world_flags=set())
+    assert all(a.adverb != "brutally" for a in advs)
+
+
+def test_multiword_signature_adverb_label_is_title_cased():
+    # fighter's "with-discipline" targets [monster, npc]
+    advs = available_adverbs("fighter", target_type="npc", world_flags=set())
+    assert AdverbOption(
+        adverb="with-discipline", label="With Discipline", kind="signature"
+    ) in advs
+
+
+def test_adverb_surfaced_both_universally_and_as_signature_is_not_duplicated():
+    # fighter's "recklessly" is a signature adverb (monster/object) AND a
+    # universal adverb gated by the armed-trap world flag — surface it once.
+    advs = available_adverbs(
+        "fighter", target_type="monster", world_flags={"armed_trap"}
+    )
+    recklessly = [a for a in advs if a.adverb == "recklessly"]
+    assert recklessly == [
+        AdverbOption(adverb="recklessly", label="Recklessly", kind="universal")
+    ]

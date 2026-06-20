@@ -9,14 +9,19 @@ The noun provider surfaces the **Noun** slot: the concrete targets in the actor'
 room (objects, loose items, NPCs, monsters, exits), the actor's carried items, plus the
 synthetic ``self`` and ``room`` targets. It reads the enriched ``current_room`` context
 block and is forgiving of absent source keys.
+
+The adverb provider surfaces the **Adverb** slot: the universal adverb pool (base adverbs
+plus world-flag-gated ones, restricted to engine-resolvable ``HOW_MODIFIER_FLAGS`` keys)
+plus the actor playbook's signature adverbs filtered by the noun's ``target_type``.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from typing import Collection, Iterable, Mapping
 
 from dungeon_daddy.rpg.models import ActorAbility
-from dungeon_daddy.rpg.playbook import _UNIVERSAL_VERBS
+from dungeon_daddy.rpg.move_party import HOW_MODIFIER_FLAGS
+from dungeon_daddy.rpg.playbook import PlaybookLibrary, _UNIVERSAL_VERBS
 
 
 @dataclass(frozen=True)
@@ -33,6 +38,35 @@ class NounOption:
     target_type: str  # one of _VALID_TARGET_TYPES (npc/object/item/room/self/monster)
 
 
+@dataclass(frozen=True)
+class AdverbOption:
+    adverb: str
+    label: str
+    kind: str  # "universal" | "signature"
+
+
+# Universal adverb surfacing (mirrors the Phase 48 ``ui/how_chips`` logic, which
+# Slice 8 retires). Base adverbs are always offered; the rest surface only when
+# the named world-context flag is present. Restricted at call time to keys the
+# engine's ``HOW_MODIFIER_FLAGS`` table can actually resolve.
+_BASE_ADVERBS: tuple[str, ...] = ("cautiously", "quickly", "boldly")
+_CONDITIONAL_ADVERBS: dict[str, str] = {
+    "stealthily": "can_sense",
+    "deliberately": "one_way",
+    "reverently": "ritual_connector",
+    "recklessly": "armed_trap",
+}
+
+_DEFAULT_LIBRARY: PlaybookLibrary | None = None
+
+
+def _default_library() -> PlaybookLibrary:
+    global _DEFAULT_LIBRARY
+    if _DEFAULT_LIBRARY is None:
+        _DEFAULT_LIBRARY = PlaybookLibrary()
+    return _DEFAULT_LIBRARY
+
+
 def available_verbs(actor_abilities: Iterable[ActorAbility]) -> list[VerbOption]:
     options = [
         VerbOption(verb=verb, label=verb.capitalize(), kind="universal")
@@ -43,6 +77,49 @@ def available_verbs(actor_abilities: Iterable[ActorAbility]) -> list[VerbOption]
         for ability in actor_abilities
         if ability.surfaces_as_verb
     )
+    return options
+
+
+def available_adverbs(
+    playbook_slug: str,
+    *,
+    target_type: str,
+    world_flags: Collection[str],
+    library: PlaybookLibrary | None = None,
+) -> list[AdverbOption]:
+    """Surface the choices for the **Adverb** slot of an action Card.
+
+    The universal pool mirrors the Phase 48 ``how_chips`` surfacing logic: the
+    base adverbs (``cautiously``/``quickly``/``boldly``) plus the conditional
+    ones that ``world_flags`` enables — restricted to keys the engine's
+    ``HOW_MODIFIER_FLAGS`` table can resolve. Signature adverbs from the
+    playbook are appended when they apply to ``target_type``.
+    """
+    flags = set(world_flags)
+    universal = list(_BASE_ADVERBS)
+    universal.extend(
+        adverb
+        for adverb, gate in _CONDITIONAL_ADVERBS.items()
+        if gate in flags
+    )
+    options = [
+        AdverbOption(adverb=adverb, label=adverb.capitalize(), kind="universal")
+        for adverb in universal
+        if adverb in HOW_MODIFIER_FLAGS
+    ]
+
+    playbook = (library or _default_library()).get(playbook_slug)
+    surfaced = {opt.adverb for opt in options}
+    for sig in playbook.signature_adverbs:
+        if target_type in sig.target_types and sig.slug not in surfaced:
+            options.append(
+                AdverbOption(
+                    adverb=sig.slug,
+                    label=sig.slug.replace("-", " ").title(),
+                    kind="signature",
+                )
+            )
+            surfaced.add(sig.slug)
     return options
 
 
