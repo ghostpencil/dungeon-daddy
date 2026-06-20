@@ -38,11 +38,30 @@ Full detail: `spec/PHASE_49_STARTING_PLAYBOOKS.md` + git `94c5fcb`.
 
 ## Outstanding / Next session
 
-**START HERE → Phase 50 Slice 7 — UI VNA dropdown panel.** Replace the provisional
-`how_chips` strip with a Verb·Noun·Adverb panel of **real dropdowns/comboboxes** (per
-auto-memory `project_phase50_vna_dropdowns`), driven by the Slice 1–3 providers; submit
-builds a Card → `validate_card` → Slice 5 (`resolve_card`) / Slice 6 (`resolve_card_roll`)
-resolution. *(ui-test harness)*. Then Slice 8 (wire into PlayView, retire `how_chips`).
+**START HERE → Phase 50 Slice 7 — UI VNA dropdown panel.** Build a Verb·Noun·Adverb panel
+of **real dropdowns/comboboxes** (per auto-memory `project_phase50_vna_dropdowns`), driven by
+the Slice 1–3 providers (`available_verbs`/`available_nouns`/`available_adverbs` in
+`rpg/action_options.py`); submit builds an `ActionCard` → `validate_card` → Slice 5
+(`resolve_card`) / Slice 6 (`resolve_card_roll`) resolution. *(ui-test harness — read
+`spec/UI_TESTING.md`)*.
+
+Concrete pointers for Slice 7 (gathered this session — verify before relying):
+- **Widget:** `arcade.gui.UIDropdown(*, x, y, width=150, height=30, default=None,
+  options=list[str|None], primary_style/dropdown_style/active_style=None)`; emits `on_change`
+  (it **exists** in arcade 3.3.3 — see [[feedback_arcade_gui]]). Dropdown options are plain
+  strings, so map label↔slug when building/reading the widget.
+- **What it replaces:** the provisional `how?` chip strip — `dungeon_daddy/ui/how_chips.py`
+  (`build_how_chips`), surfaced via `ExitListPanel.set_how_chips` and called from
+  `PlayView._refresh_exits` (`views/play_view.py:973`, calls at `:983`/`:1010`). Existing
+  action UI to mirror/replace: `dungeon_daddy/ui/panels/player_action_panel.py`
+  (`PlayerActionPanel`, currently a verb-button + momentum/push UI feeding
+  `ActionRequest`).
+- **Wiring target:** `PlayView` constructs `self._rpg_action`/`self._exit_panel`
+  (`play_view.py:357-358`); Slice 8 does the full PlayView swap + retires `how_chips`.
+- Adverb dropdown needs `target_type` (from the chosen noun's `NounOption.target_type`) +
+  `world_flags` to call `available_adverbs` — so Noun selection must refresh the Adverb list.
+
+Then Slice 8 (wire into PlayView, retire `how_chips`).
 
 **Slice 6 done (this session) — Card → action roll resolution.** Added
 `resolve_card_roll(card, *, campaign_id, actor, momentum_spend=0, push_yourself=False,
