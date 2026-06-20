@@ -16,7 +16,7 @@ Phase 50 commits (on top of pre-phase cleanup, all on `phase-50`):
 - `0f99981` Slice 3 — adverb provider
 - `9c3b65a` Slice 4 — `ActionCard` model + `validate_card`
 - `68d7060` Slice 5 — Card → `PlayerCommand` resolution (`rpg/action_resolution.py`)
-- *(this commit)* Slice 5.1 — noun `noun_id` now the full `object_id`/`item_id`
+- `e9a339b` Slice 5.1 — noun `noun_id` now the full `object_id`/`item_id`
 
 **Phase 48 locked decisions** (still relevant — Phase 50 reuses the `how?` contract):
 - `MoveParty(exit_id, how)` is a **Player Command** in `rpg/command.py` (not a proposal).
