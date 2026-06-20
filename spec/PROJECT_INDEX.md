@@ -2,9 +2,15 @@
 
 ## Phase
 
-Phase: **49 — Starting Playbooks (COMPLETE — all 6 slices done)**
-Status: On branch `phase-49`. Test suite green — **2867 passing** (2026-06-19).
-Next: **Phase 50** — Action Model / verb-adverb picker. See `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`.
+Phase: **49 — Starting Playbooks (COMPLETE — merged to `main` via PR #78)**
+Status: On branch **`phase-50`** (not yet started Phase 50 work). Test suite green —
+**2870 passing** (2026-06-20). `phase-50` holds 3 *pre-phase cleanup* commits on top of `main`
+(`8599eb7`), **not pushed**:
+- `fa54b20` feat(load): self-heal empty `room_exits` on save load
+- `9be98cd` test(play-view): fix stale `_load_player_actors` setup
+- `21256ef` feat(play-view): surface Recklessly chip for armed-trap rooms (+ this index)
+
+Next: **Phase 50 — Hybrid Action Model** (verb-adverb picker). See below + `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`.
 
 Spec: `spec/PHASE_49_STARTING_PLAYBOOKS.md` (GitHub issue **#77**, label `phase-49`).
 Prior phase spec: `spec/PHASE_48_DUNGEON_NAVIGATION.md` (full 10-slice scope + folded-in Slice 11).
@@ -32,25 +38,33 @@ Key decisions locked this phase:
 
 ## Outstanding / Next session
 
-1. **Tomb of the Forgotten King** save needs exit backfill — close the app, then
-   `python -m tools.backfill_room_exits "<save dir>" --force` (rewrites `room_exits` plus exit
-   labels/status). This `--force` *label re-write* is separate from the new on-load self-heal
-   (which only fires for **empty** exit tables — both current saves already have 36 exits).
-   The Crucible is already backfilled.
-2. ~~Backfill-on-load self-heal~~ **DONE (2026-06-19)** — `dungeon_daddy/campaign/backfill.py`
-   `backfill_exits_if_empty(repo, dungeon_path)` derives exits from `dungeon.json` only when
-   `room_exits` is empty; wired into `window._attach_rpg_context`. Never raises (load is never
-   blocked). 5 tests (`tests/unit/campaign/test_backfill_exits.py` + 1 window wiring test).
-3. ~~Stale Phase-49 `test_play_view_bundle` failures~~ **FIXED (2026-06-20)** — both tests now
-   wire `_rpg_char`/`_rpg_fallout` + a `set_actors` side-effect, exercising the real
-   `set_party` → `_refresh_right_panel_from_actors` path.
-4. ~~`armed_trap_clock` chip surfacing (`recklessly` for trap rooms)~~ **DONE (2026-06-20)** —
-   `_refresh_exits` now sets `armed_trap_clock=` from whether the current room holds a
-   `RoomObject` with `archetype=="trap"` and `current_state=="armed"` (the trap state machine's
-   armed state), surfacing the **Recklessly** chip (engine flag `force_trap_trigger`). 2 tests in
-   `tests/unit/views/test_play_view_exits.py`.
-4. **Next: Phase 50 — Hybrid Action Model.** Read `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`
-   (Phase 50 section) and open `spec/PHASE_50_HYBRID_ACTION_MODEL.md` at phase start.
+**START HERE → Phase 50 — Hybrid Action Model.** First read `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`
+(Phase 50 section), then open/author `spec/PHASE_50_HYBRID_ACTION_MODEL.md`. Reuses the Phase 48
+`how?` contract (modifier flags). UI note: the VNA card input wants **real dropdowns/comboboxes**,
+not the cycle picker (see auto-memory `project_phase50_vna_dropdowns`). Decide first whether to
+land/PR the `phase-50` cleanup commits or build Phase 50 on top of them on this same branch.
+
+Still open (not blocking Phase 50):
+1. **Tomb of the Forgotten King** save needs an exit-label re-write — close the app, then
+   `python -m tools.backfill_room_exits "<save dir>" --force` (rewrites `room_exits` labels/status).
+   This `--force` re-write is **separate** from the on-load self-heal (which only fires for **empty**
+   exit tables — both current saves already have 36 exits). The Crucible is already backfilled.
+2. **Optional self-heal extension:** the on-load backfill only fills *empty* tables; it does not
+   correct stale labels/status (that still needs the manual `--force` script). Could fold a
+   label-refresh into load if it becomes a recurring pain.
+
+### Done this session (2026-06-20) — on `phase-50`, uncommitted-then-committed
+- **Backfill-on-load self-heal** (`fa54b20`): `dungeon_daddy/campaign/backfill.py`
+  `backfill_exits_if_empty(repo, dungeon_path)` derives exits from `dungeon.json` only when
+  `room_exits` is empty; wired into `window._attach_rpg_context`; never raises. 5 tests
+  (`tests/unit/campaign/test_backfill_exits.py` + 1 `test_window.py` wiring test).
+- **Stale Phase-49 test fix** (`9be98cd`): `test_play_view_bundle` 2 failures fixed — wire
+  `_rpg_char`/`_rpg_fallout` + `set_actors` side-effect so the real
+  `set_party` → `_refresh_right_panel_from_actors` path runs.
+- **Recklessly chip for armed traps** (`21256ef`): `_refresh_exits` sets `armed_trap_clock=` from
+  whether the current room holds a `RoomObject` with `archetype=="trap"` and
+  `current_state=="armed"` (engine flag `force_trap_trigger`). 2 tests in
+  `tests/unit/views/test_play_view_exits.py`.
 
 ---
 
