@@ -6,7 +6,7 @@ from pathlib import Path
 import duckdb
 
 from dungeon_daddy.memory.models import DomainEvent
-from dungeon_daddy.rpg.models import FactionState, FalloutRecord, Item, RoomExit, RoomObject
+from dungeon_daddy.rpg.models import ActorAbility, FactionState, FalloutRecord, Item, RoomExit, RoomObject
 
 
 def _ensure_migration_table(conn: duckdb.DuckDBPyConnection) -> None:
@@ -144,26 +144,33 @@ class MemoryRepository:
         slug: str,
         display_name: str,
         status: str = "active",
+        playbook_slug: str | None = None,
+        tags: list[str] | None = None,
     ) -> None:
+        import json as _json
         assert self._conn is not None
         self._conn.execute(
             """
-            INSERT INTO actors (actor_id, campaign_id, actor_type, slug, display_name, status)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO actors (actor_id, campaign_id, actor_type, slug, display_name, status, playbook_slug, tags)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (actor_id) DO UPDATE SET
-                actor_type   = excluded.actor_type,
-                slug         = excluded.slug,
-                display_name = excluded.display_name,
-                status       = excluded.status
+                actor_type    = excluded.actor_type,
+                slug          = excluded.slug,
+                display_name  = excluded.display_name,
+                status        = excluded.status,
+                playbook_slug = excluded.playbook_slug,
+                tags          = excluded.tags
             """,
-            [actor_id, campaign_id, actor_type, slug, display_name, status],
+            [actor_id, campaign_id, actor_type, slug, display_name, status, playbook_slug,
+             _json.dumps(tags or [])],
         )
 
     def get_actor(self, actor_id: str) -> dict | None:
+        import json as _json
         assert self._conn is not None
         row = self._conn.execute(
             """
-            SELECT actor_id, campaign_id, actor_type, slug, display_name, status
+            SELECT actor_id, campaign_id, actor_type, slug, display_name, status, playbook_slug, tags
             FROM actors WHERE actor_id = ?
             """,
             [actor_id],
@@ -177,13 +184,16 @@ class MemoryRepository:
             "slug": row[3],
             "display_name": row[4],
             "status": row[5],
+            "playbook_slug": row[6],
+            "tags": _json.loads(row[7]) if row[7] else [],
         }
 
     def get_actors_by_campaign(self, campaign_id: str) -> list[dict]:
         assert self._conn is not None
         rows = self._conn.execute(
             """
-            SELECT actor_id, campaign_id, actor_type, slug, display_name, status
+            SELECT actor_id, campaign_id, actor_type, slug, display_name, status,
+                   playbook_slug
             FROM actors WHERE campaign_id = ?
             """,
             [campaign_id],
@@ -196,6 +206,7 @@ class MemoryRepository:
                 "slug": row[3],
                 "display_name": row[4],
                 "status": row[5],
+                "playbook_slug": row[6] if len(row) > 6 else None,
             }
             for row in rows
         ]
@@ -1278,6 +1289,74 @@ class MemoryRepository:
             "requires_clock_min_filled": r[14],
             "requires_memory_slug": r[15],
         }
+
+    # ------------------------------------------------------------------
+    # Actor Abilities
+    # ------------------------------------------------------------------
+
+    def save_actor_ability(self, ability: ActorAbility) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO actor_abilities (
+                actor_id, ability_slug, display_name, description,
+                source, surfaces_as_verb, target_types, cost_type, cost_amount
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (actor_id, ability_slug) DO UPDATE SET
+                display_name     = excluded.display_name,
+                description      = excluded.description,
+                source           = excluded.source,
+                surfaces_as_verb = excluded.surfaces_as_verb,
+                target_types     = excluded.target_types,
+                cost_type        = excluded.cost_type,
+                cost_amount      = excluded.cost_amount
+            """,
+            [
+                ability.actor_id,
+                ability.ability_slug,
+                ability.display_name,
+                ability.description,
+                ability.source,
+                ability.surfaces_as_verb,
+                json.dumps(ability.target_types),
+                ability.cost_type,
+                ability.cost_amount,
+            ],
+        )
+
+    def get_actor_abilities(self, actor_id: str) -> list[ActorAbility]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT actor_id, ability_slug, display_name, description,
+                   source, surfaces_as_verb, target_types, cost_type, cost_amount
+            FROM actor_abilities WHERE actor_id = ?
+            ORDER BY ability_slug
+            """,
+            [actor_id],
+        ).fetchall()
+        return [
+            ActorAbility(
+                actor_id=r[0],
+                ability_slug=r[1],
+                display_name=r[2],
+                description=r[3],
+                source=r[4],
+                surfaces_as_verb=bool(r[5]),
+                target_types=json.loads(r[6]) if r[6] else [],
+                cost_type=r[7],
+                cost_amount=r[8],
+            )
+            for r in rows
+        ]
+
+    def delete_actor_ability(self, actor_id: str, ability_slug: str) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            "DELETE FROM actor_abilities WHERE actor_id = ? AND ability_slug = ?",
+            [actor_id, ability_slug],
+        )
 
     def close(self) -> None:
         if self._conn is not None:

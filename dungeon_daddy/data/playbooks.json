@@ -1,0 +1,228 @@
+[
+  {
+    "slug": "fighter",
+    "display_name": "Fighter",
+    "starting_action_ratings": {
+      "fight": 2,
+      "endure": 2,
+      "move": 1,
+      "tinker": 0,
+      "study": 0,
+      "focus": 0,
+      "sway": 0,
+      "sense": 0,
+      "channel": 0
+    },
+    "starting_stress_tracks": [
+      {"track_key": "body", "capacity": 4},
+      {"track_key": "composure", "capacity": 4},
+      {"track_key": "bonds", "capacity": 4},
+      {"track_key": "weird", "capacity": 4}
+    ],
+    "starting_kit": {
+      "slug": "combat-gear",
+      "display_name": "Combat Gear",
+      "description": "A fighter's standard combat loadout: shield, blades, and armour repair tools.",
+      "charges_max": 3,
+      "abilities": [
+        {
+          "slug": "shield-bash",
+          "display_name": "Shield Bash",
+          "description": "Slam with your shield to stagger or push back a foe.",
+          "surfaces_as_verb": false,
+          "target_types": ["monster"],
+          "cost_type": "none",
+          "cost_amount": 0
+        }
+      ]
+    },
+    "tags": ["warrior", "frontline"],
+    "signature_adverbs": [
+      {"slug": "recklessly", "target_types": ["monster", "object"]},
+      {"slug": "brutally", "target_types": ["monster"]},
+      {"slug": "with-discipline", "target_types": ["monster", "npc"]}
+    ],
+    "starting_abilities": ["shield-bash", "iron-will"],
+    "ability_pool": [
+      {
+        "slug": "iron-will",
+        "display_name": "Iron Will",
+        "description": "Shrug off a level of body stress through sheer grit.",
+        "surfaces_as_verb": false,
+        "target_types": ["self"],
+        "cost_type": "active_stress",
+        "cost_amount": 1
+      }
+    ],
+    "beats": []
+  },
+  {
+    "slug": "thief",
+    "display_name": "Thief",
+    "starting_action_ratings": {
+      "move": 2,
+      "tinker": 2,
+      "sense": 1,
+      "fight": 0,
+      "endure": 0,
+      "study": 0,
+      "focus": 0,
+      "sway": 0,
+      "channel": 0
+    },
+    "starting_stress_tracks": [
+      {"track_key": "body", "capacity": 4},
+      {"track_key": "composure", "capacity": 4},
+      {"track_key": "bonds", "capacity": 4},
+      {"track_key": "weird", "capacity": 4}
+    ],
+    "starting_kit": {
+      "slug": "thieves-tools",
+      "display_name": "Thieves' Tools",
+      "description": "Lock picks, wire, chalk, a small mirror, and a coil of thin rope.",
+      "charges_max": 4,
+      "abilities": [
+        {
+          "slug": "pick-lock",
+          "display_name": "Pick Lock",
+          "description": "Open a lock without the key using your tools.",
+          "surfaces_as_verb": false,
+          "target_types": ["object"],
+          "cost_type": "none",
+          "cost_amount": 0
+        }
+      ]
+    },
+    "tags": ["rogue", "scout"],
+    "signature_adverbs": [
+      {"slug": "silently", "target_types": ["npc", "monster", "object"]},
+      {"slug": "deftly", "target_types": ["object", "item"]},
+      {"slug": "unseen", "target_types": ["npc", "monster"]}
+    ],
+    "starting_abilities": ["pick-lock", "vanish"],
+    "ability_pool": [
+      {
+        "slug": "vanish",
+        "display_name": "Vanish",
+        "description": "Slip into shadows and disappear from notice.",
+        "surfaces_as_verb": true,
+        "target_types": ["self"],
+        "cost_type": "active_stress",
+        "cost_amount": 1
+      }
+    ],
+    "beats": []
+  },
+  {
+    "slug": "priest",
+    "display_name": "Priest",
+    "starting_action_ratings": {
+      "channel": 2,
+      "study": 2,
+      "focus": 1,
+      "fight": 0,
+      "move": 0,
+      "tinker": 0,
+      "endure": 0,
+      "sway": 0,
+      "sense": 0
+    },
+    "starting_stress_tracks": [
+      {"track_key": "body", "capacity": 4},
+      {"track_key": "composure", "capacity": 4},
+      {"track_key": "bonds", "capacity": 4},
+      {"track_key": "weird", "capacity": 4}
+    ],
+    "starting_kit": {
+      "slug": "holy-kit",
+      "display_name": "Holy Kit",
+      "description": "A reliquary, prayer beads, anointing oil, and a holy symbol.",
+      "charges_max": 3,
+      "abilities": [
+        {
+          "slug": "lay-on-hands",
+          "display_name": "Lay On Hands",
+          "description": "Channel divine power to ease one level of stress on a willing creature.",
+          "surfaces_as_verb": true,
+          "target_types": ["self", "npc"],
+          "cost_type": "active_stress",
+          "cost_amount": 1
+        }
+      ]
+    },
+    "tags": ["divine", "healer"],
+    "signature_adverbs": [
+      {"slug": "reverently", "target_types": ["npc", "object", "room"]},
+      {"slug": "austerely", "target_types": ["npc", "self"]}
+    ],
+    "starting_abilities": ["lay-on-hands", "consecrate"],
+    "ability_pool": [
+      {
+        "slug": "consecrate",
+        "display_name": "Consecrate",
+        "description": "Bless a room, warding against dark forces for the rest of the scene.",
+        "surfaces_as_verb": true,
+        "target_types": ["room"],
+        "cost_type": "none",
+        "cost_amount": 0
+      }
+    ],
+    "beats": []
+  },
+  {
+    "slug": "artificer",
+    "display_name": "Artificer",
+    "starting_action_ratings": {
+      "tinker": 2,
+      "focus": 2,
+      "study": 1,
+      "fight": 0,
+      "move": 0,
+      "endure": 0,
+      "sway": 0,
+      "sense": 0,
+      "channel": 0
+    },
+    "starting_stress_tracks": [
+      {"track_key": "body", "capacity": 4},
+      {"track_key": "composure", "capacity": 4},
+      {"track_key": "bonds", "capacity": 4},
+      {"track_key": "weird", "capacity": 4}
+    ],
+    "starting_kit": {
+      "slug": "workshop-kit",
+      "display_name": "Workshop Kit",
+      "description": "Wrenches, reagents, a portable burner, and an assortment of spare parts.",
+      "charges_max": 4,
+      "abilities": [
+        {
+          "slug": "field-repair",
+          "display_name": "Field Repair",
+          "description": "Jury-rig a broken object or item back to working order.",
+          "surfaces_as_verb": false,
+          "target_types": ["object", "item"],
+          "cost_type": "none",
+          "cost_amount": 0
+        }
+      ]
+    },
+    "tags": ["engineer", "inventor"],
+    "signature_adverbs": [
+      {"slug": "precisely", "target_types": ["object", "item"]},
+      {"slug": "experimentally", "target_types": ["object", "item", "room"]}
+    ],
+    "starting_abilities": ["field-repair", "overclock"],
+    "ability_pool": [
+      {
+        "slug": "overclock",
+        "display_name": "Overclock",
+        "description": "Push a device or object beyond its limits for one use.",
+        "surfaces_as_verb": true,
+        "target_types": ["object", "item"],
+        "cost_type": "active_stress",
+        "cost_amount": 1
+      }
+    ],
+    "beats": []
+  }
+]

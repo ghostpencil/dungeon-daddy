@@ -34,6 +34,7 @@ class ActorManifest(BaseModel):
     action_ratings: dict[str, int] = Field(default_factory=dict)
     stress_tracks: list[dict] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
+    playbook_slug: str | None = None
 
 
 class ClockManifest(BaseModel):

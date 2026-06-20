@@ -123,7 +123,8 @@ def test_history_compacted_when_over_budget(make_play_view):
 # Slice 5 — history cleared on level change
 # ---------------------------------------------------------------------------
 
-def test_history_cleared_on_level_change(make_play_view):
+def test_history_preserved_on_level_browse(make_play_view):
+    """Level browsing (stepper arrows) must not clear DM history — it is view-only."""
     from dungeon_daddy.llm.provider import LLMMessage
 
     level1 = _level(rooms=[], connections=[], level_id=1)
@@ -131,14 +132,16 @@ def test_history_cleared_on_level_change(make_play_view):
     dungeon = _dungeon([level1, level2])
     st = _state()
     view = make_play_view(dungeon=dungeon, state=st)
-    view._dm_history = [
+    view._viewed_level_idx = 0
+    history = [
         LLMMessage(role="user", content="Hello"),
         LLMMessage(role="assistant", content="Welcome."),
     ]
+    view._dm_history = list(history)
 
     view._on_level_change(+1)
 
-    assert view._dm_history == []
+    assert view._dm_history == history
 
 
 # ---------------------------------------------------------------------------

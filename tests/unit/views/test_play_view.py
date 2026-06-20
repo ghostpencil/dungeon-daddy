@@ -340,12 +340,10 @@ def test_memory_button_click_opens_overlay_on_floor_with_no_stored_memory(make_p
     level2 = _level(rooms=[], connections=[], level_id=2)
     st = _state()
     st.dungeon_id = "my_dungeon"
+    st.current_level_idx = 1  # party is on level 2 (engine moved them via MoveParty)
     view = make_play_view(dungeon=_dungeon([level1, level2]), state=st)
     view._repo.load_room_memory.return_value = ""
     view._edit_memory_rect = (100.0, 100.0, 100.0, 24.0)
-
-    view._on_level_change(+1)
-    view._repo.load_room_memory.reset_mock()
 
     # Click inside the button rect (x=150, y=112 is inside (100,100,100,24))
     view.on_mouse_press(150.0, 112.0, arcade.MOUSE_BUTTON_LEFT, 0)

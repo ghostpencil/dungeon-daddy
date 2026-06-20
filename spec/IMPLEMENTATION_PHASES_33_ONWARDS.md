@@ -1206,6 +1206,26 @@ Branch: `phase-48-dungeon-navigation`
 Room exits, party location, level connectors, and fog of war. 11 TDD slices:
 `RoomExit` model + migration `010_room_exits.sql`; seed publish (derive exits from dungeon connections + manifest overrides); exit-condition validator (item / object-state / clock / memory); `MoveParty(exit_id, how)` Player Command (validate + apply: location, one-way seal, visited rooms); post-move world reaction (`how?` → modifier flags); level connector transition (`current_level_idx` + `mark_level_items_inert`); `DiscoverExit` + passive hint; `UnlockExit` / `SealExit` / `BlockExit` proposal; room context bundle (`visible_exits`, `locked_exits`, `hidden_exit_hint`, `resonance_point`); provisional EXITS tab in Play Mode (exit-list panel + click-to-move + fog-of-war map); party-presence gate on `PickUpItem` / `ActivateObject` (`party_room_id` keyword param to `validate_command`). Plus `tools/backfill_room_exits.py` for pre-Phase-48 campaigns. 2799 tests passing.
 
+## Phase 49 — Starting Playbooks (COMPLETE)
+
+**Status: Complete (2026-06-19) — 2867 tests passing**
+Spec: `spec/PHASE_49_STARTING_PLAYBOOKS.md` (GitHub issue [#77](https://github.com/ghostpencil/dungeon-daddy/issues/77))
+Branch: `phase-49`
+
+Playbooks as bundled, read-only character-class data. Four classes ship: Fighter, Thief, Priest,
+Artificer. Each defines starting action ratings, stress track capacities (all 4), a class kit,
+signature adverbs, and a starting ability set — the kit ability plus the first pool ability;
+remaining pool entries are locked until Phase 52 milestones. New `actor_abilities` table
+(`011_actor_abilities.sql`) is the live, mutable ability set Phase 50 will read. `PlaybookLibrary`
+loads `data/playbooks.json`; `ActorState.playbook_slug` + `ActorManifest.playbook_slug` are
+additive and null-safe. Seeder applies playbook at publish: ratings / tracks / tags / kit Item /
+`actor_abilities` rows (`source="kit"` or `source="playbook_start"`). Playbook picker in the
+Campaign Seed editor (rigid auto-populate); Character Sheet renders PLAYBOOK / ADVERBS / ABILITIES
+sections.
+
+7 TDD slices (0–6): party-marker navigation fix; Pydantic schema; PlaybookLibrary + bundled JSON;
+DB migration + repo CRUD; seed wiring; character creation UI; Character Sheet panel. 57 new tests.
+
 ---
 
 # Planned Roadmap — Phases 49–53
@@ -1217,7 +1237,7 @@ A detailed `spec/PHASE_NN_*.md` is written when each phase actually starts.
 | Phase | Title | One-line scope |
 |---|---|---|
 | 48 | Dungeon Navigation | Room exits, party location, level connectors — **COMPLETE** |
-| 49 | Starting Playbooks | Class foundations: ratings, tracks, kit, **tags**, **signature adverbs**, starting abilities |
+| 49 | Starting Playbooks | Class foundations: ratings, tracks, kit, **tags**, **signature adverbs**, starting abilities — **COMPLETE** |
 | 50 | Hybrid Action Model | Structured **Verb · Noun · Adverb** action input; LLM narrates only |
 | 51 | Talk to the Dungeon | Intimacy-gated freeform channel at resonance points |
 | 52 | Milestone Advancement | Playbook beats, ranks to 5, ability unlocks |

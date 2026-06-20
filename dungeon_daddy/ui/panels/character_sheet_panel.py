@@ -1,7 +1,9 @@
 """Character sheet panel — displays actor state in Play Mode."""
 from __future__ import annotations
 
-from dungeon_daddy.rpg.models import ActorState, FalloutRecord
+import arcade
+
+from dungeon_daddy.rpg.models import ActorAbility, ActorState, FalloutRecord
 
 _ACTION_ORDER = [
     "fight", "move", "tinker", "study",
@@ -12,6 +14,10 @@ _PIP_H = 8
 _PIP_GAP = 3
 
 
+_PICKER_H = 22
+_PICKER_BTN_W = 22
+
+
 class CharacterSheetPanel:
     def __init__(self) -> None:
         self._actor: ActorState | None = None
@@ -20,10 +26,42 @@ class CharacterSheetPanel:
         self._kits: list[dict] = []
         self._dungeon_items: list[dict] = []
         self._equipped: list[dict] = []
+        self._playbook = None
+        self._abilities: list[ActorAbility] = []
         self._x = self._y = self._w = self._h = 0.0
+        self._party: list[ActorState] = []
+        self._party_idx: int = 0
+        self._prev_rect: tuple[float, float, float, float] = (0, 0, 0, 0)
+        self._next_rect: tuple[float, float, float, float] = (0, 0, 0, 0)
+
+    def set_party(self, actors: list[ActorState]) -> None:
+        self._party = list(actors)
+        self._party_idx = 0
 
     def set_actor(self, actor: ActorState | None) -> None:
         self._actor = actor
+        if actor is not None:
+            for i, a in enumerate(self._party):
+                if a.actor_id == actor.actor_id:
+                    self._party_idx = i
+                    break
+
+    def hit_picker(self, x: float, y: float) -> int:
+        """Return -1, 0, or +1 depending on which picker button was hit."""
+        px, py, pw, ph = self._prev_rect
+        if px <= x < px + pw and py <= y < py + ph:
+            return -1
+        nx, ny, nw, nh = self._next_rect
+        if nx <= x < nx + nw and ny <= y < ny + nh:
+            return 1
+        return 0
+
+    def cycle(self, delta: int) -> str | None:
+        """Advance party index by delta, return the new actor_id (or None if party empty)."""
+        if not self._party:
+            return None
+        self._party_idx = (self._party_idx + delta) % len(self._party)
+        return self._party[self._party_idx].actor_id
 
     def set_fallout(self, entries: list[FalloutRecord]) -> None:
         self._fallout = list(entries)
@@ -41,11 +79,16 @@ class CharacterSheetPanel:
         self._dungeon_items = list(dungeon_items)
         self._equipped = list(equipped)
 
+    def set_playbook(self, playbook) -> None:
+        self._playbook = playbook
+
+    def set_abilities(self, abilities: list[ActorAbility]) -> None:
+        self._abilities = list(abilities)
+
     def setup(self, x: float, y: float, w: float, h: float) -> None:
         self._x, self._y, self._w, self._h = x, y, w, h
 
     def draw(self) -> None:
-        import arcade
         from dungeon_daddy.ui.theme import (
             BG_1, BG_2, BG_3,
             EMBER, INK_1, INK_2, INK_3, INK_4,
@@ -65,13 +108,30 @@ class CharacterSheetPanel:
 
         cur_y = y + h - PAD_MD
 
-        # --- Actor name + type ---
+        # --- Character picker (< Name >) ---
+        picker_y_top = cur_y
+        picker_y_bot = picker_y_top - _PICKER_H
+        picker_cy = (picker_y_top + picker_y_bot) / 2
+
+        self._prev_rect = (x, picker_y_bot, _PICKER_BTN_W, _PICKER_H)
+        self._next_rect = (x + w - _PICKER_BTN_W, picker_y_bot, _PICKER_BTN_W, _PICKER_H)
+
+        if len(self._party) > 1:
+            arcade.draw_text("<", x + _PICKER_BTN_W / 2, picker_cy, INK_2,
+                             font_size=TEXT_SM, font_name=FONT_UI,
+                             anchor_x="center", anchor_y="center")
+            arcade.draw_text(">", x + w - _PICKER_BTN_W / 2, picker_cy, INK_2,
+                             font_size=TEXT_SM, font_name=FONT_UI,
+                             anchor_x="center", anchor_y="center")
+
         arcade.draw_text(
             self._actor.display_name,
-            x + PAD_MD, cur_y, INK_1,
-            font_size=TEXT_MD, font_name=FONT_UI, bold=True, anchor_y="top",
+            x + w / 2, picker_cy, INK_1,
+            font_size=TEXT_MD, font_name=FONT_UI, bold=True,
+            anchor_x="center", anchor_y="center",
         )
-        cur_y -= TEXT_MD + PAD_SM
+        cur_y = picker_y_bot - PAD_SM
+
         arcade.draw_text(
             f"[{self._actor.actor_type}]",
             x + PAD_MD, cur_y, INK_3,
@@ -231,3 +291,48 @@ class CharacterSheetPanel:
                     )
                     cur_y -= TEXT_SM + 2
                 cur_y -= PAD_SM
+
+        # --- Playbook ---
+        if self._playbook is not None:
+            cur_y -= PAD_SM
+            arcade.draw_text(
+                "PLAYBOOK", x + PAD_MD, cur_y, VIOLET,
+                font_size=TEXT_SM, font_name=FONT_UI, bold=True, anchor_y="top",
+            )
+            cur_y -= TEXT_SM + PAD_SM
+            arcade.draw_text(
+                self._playbook.display_name,
+                x + PAD_MD, cur_y, INK_2,
+                font_size=TEXT_SM, font_name=FONT_UI, anchor_y="top",
+            )
+            cur_y -= TEXT_SM + PAD_MD
+
+            if self._playbook.signature_adverbs:
+                arcade.draw_text(
+                    "ADVERBS", x + PAD_MD, cur_y, TEAL,
+                    font_size=TEXT_SM, font_name=FONT_UI, bold=True, anchor_y="top",
+                )
+                cur_y -= TEXT_SM + PAD_SM
+                for adverb in self._playbook.signature_adverbs:
+                    arcade.draw_text(
+                        adverb.slug,
+                        x + PAD_MD, cur_y, INK_3,
+                        font_size=TEXT_SM, font_name=FONT_UI, anchor_y="top",
+                    )
+                    cur_y -= TEXT_SM + 2
+
+        # --- Abilities ---
+        if self._abilities:
+            cur_y -= PAD_SM
+            arcade.draw_text(
+                "ABILITIES", x + PAD_MD, cur_y, TEAL,
+                font_size=TEXT_SM, font_name=FONT_UI, bold=True, anchor_y="top",
+            )
+            cur_y -= TEXT_SM + PAD_SM
+            for ability in self._abilities:
+                arcade.draw_text(
+                    ability.display_name,
+                    x + PAD_MD, cur_y, INK_2,
+                    font_size=TEXT_SM, font_name=FONT_UI, anchor_y="top",
+                )
+                cur_y -= TEXT_SM + 2

@@ -69,3 +69,58 @@ def test_draw_passes_visited_rooms_to_renderer() -> None:
         panel.draw()
 
     assert panel._layout_renderer.draw.call_args.kwargs["visited_rooms"] == ["r1", "r2"]
+
+
+# ---------------------------------------------------------------------------
+# Marker gating — visible only when viewed level == party level (Slice 0)
+# ---------------------------------------------------------------------------
+
+def test_draw_hides_marker_when_browsing_other_level() -> None:
+    """Party marker must be None when the map is showing a different level."""
+    panel = _make_panel()
+    panel._layout_renderer = MagicMock()
+    panel._art = MagicMock()
+    panel._level = _make_level()
+    panel._state = SessionState(dungeon_id="d1", current_level_idx=0, current_room_id="r1")
+    panel._viewed_level_idx = 1  # browsed to level 2; party still on level 1
+    panel._layout_result = MagicMock()
+
+    with patch("dungeon_daddy.ui.panels.map_panel.arcade"), \
+            patch("dungeon_daddy.ui.panels.map_panel.draw_kicker"), \
+            patch("dungeon_daddy.ui.panels.map_panel.draw_chip"):
+        panel.draw()
+
+    assert panel._layout_renderer.draw.call_args.kwargs["party_room_id"] is None
+
+
+def test_draw_shows_marker_when_viewing_party_level() -> None:
+    """Party marker must pass current_room_id when viewed level matches party level."""
+    panel = _make_panel()
+    panel._layout_renderer = MagicMock()
+    panel._art = MagicMock()
+    panel._level = _make_level()
+    panel._state = SessionState(dungeon_id="d1", current_level_idx=0, current_room_id="r1")
+    panel._viewed_level_idx = 0  # viewing the party's own level
+    panel._layout_result = MagicMock()
+
+    with patch("dungeon_daddy.ui.panels.map_panel.arcade"), \
+            patch("dungeon_daddy.ui.panels.map_panel.draw_kicker"), \
+            patch("dungeon_daddy.ui.panels.map_panel.draw_chip"):
+        panel.draw()
+
+    assert panel._layout_renderer.draw.call_args.kwargs["party_room_id"] == "r1"
+
+
+# ---------------------------------------------------------------------------
+# update_state — syncs viewed level to follow real party moves
+# ---------------------------------------------------------------------------
+
+def test_update_state_syncs_viewed_level_to_party() -> None:
+    """After a real MoveParty, viewed level must follow the party's new level."""
+    panel = _make_panel()
+    panel._viewed_level_idx = 1  # was browsing level 2
+    state = SessionState(dungeon_id="d1", current_level_idx=0)
+
+    panel.update_state(state, total_levels=2)
+
+    assert panel._viewed_level_idx == 0
