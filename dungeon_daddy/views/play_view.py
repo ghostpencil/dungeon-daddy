@@ -474,6 +474,7 @@ class PlayView(arcade.View):
                         actor_id = self._rpg_char.cycle(delta)
                         if actor_id:
                             self._refresh_right_panel_from_actors(actor_id)
+                            self._set_acting_actor(actor_id)
                 elif self._rpg_side._active == _TAB_MEM:
                     self._handle_mem_click(x, y)
                 return
@@ -1006,6 +1007,18 @@ class PlayView(arcade.View):
         if actor_id:
             return next((a for a in actors if a.actor_id == actor_id), actors[0] if actors else None)
         return actors[0] if actors else None
+
+    def _set_acting_actor(self, actor_id: str) -> None:
+        """Make ``actor_id`` the actor whose Cards/rolls resolve.
+
+        Drives the acting-actor selection from the CHAR-tab picker so the
+        Character Sheet, the chat actor mini-card, and the ACTION panel all
+        agree on whose turn it is (``_acting_actor`` reads
+        ``_action_state.actor_id``).
+        """
+        self._action_state.select_actor(actor_id)
+        self._refresh_chat_mini_card()
+        self._refresh_vna_panel()
 
     def _room_world_flags(self, room_id: str) -> set[str]:
         """World-context flags gating conditional adverbs (mirrors `_refresh_exits`)."""

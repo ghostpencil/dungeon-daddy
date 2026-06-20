@@ -91,6 +91,27 @@ class TestSetContextNouns:
 
 
 # ---------------------------------------------------------------------------
+# Acting-actor header — the panel reports whose action the Card builds
+# ---------------------------------------------------------------------------
+
+class TestActingActorName:
+    def test_set_context_captures_actor_display_name(self):
+        panel = _panel()
+        panel.set_context(
+            actor_abilities=[],
+            room_context=_room_context(),
+            actor=_actor(display_name="Borin"),
+            playbook_slug="fighter",
+            world_flags=[],
+        )
+        assert panel.acting_actor_name() == "Borin"
+
+    def test_acting_actor_name_none_before_context(self):
+        panel = _panel()
+        assert panel.acting_actor_name() is None
+
+
+# ---------------------------------------------------------------------------
 # Reactive adverbs — selecting a noun recomputes the adverb list by target_type
 # ---------------------------------------------------------------------------
 

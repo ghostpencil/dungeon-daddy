@@ -146,6 +146,21 @@ def test_submit_pickup_card_picks_up_item(tmp_path):
     assert picked["room_id"] is None
 
 
+def test_set_acting_actor_syncs_action_state_and_panel(tmp_path):
+    """Cycling the CHAR picker makes that PC the actor the ACTION tab acts as."""
+    view = _make_view(tmp_path)
+    borin = _actor(actor_id="pc-2", slug="borin", display_name="Borin")
+    view._rpg_action = MagicMock(_actors=[view._rpg_action._actors[0], borin])
+    view._action_state.set_actor_roster(["pc-1", "pc-2"])
+    view._rpg_char = MagicMock()
+
+    view._set_acting_actor("pc-2")
+
+    assert view._action_state.actor_id == "pc-2"
+    assert view._acting_actor().actor_id == "pc-2"
+    assert view._rpg_vna.acting_actor_name() == "Borin"
+
+
 def test_submit_activate_card_warns_not_wired(tmp_path):
     from dungeon_daddy.rpg.action_options import ActionCard
 

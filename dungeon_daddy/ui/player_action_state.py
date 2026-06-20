@@ -45,6 +45,10 @@ class PlayerActionState:
 
     def select_actor(self, actor_id: str | None) -> None:
         self.actor_id = actor_id
+        # Keep the roster cursor aligned so a subsequent next/prev steps from
+        # the chosen actor (e.g. when selection is driven from the CHAR picker).
+        if actor_id is not None and actor_id in self._actor_roster:
+            self._roster_index = self._actor_roster.index(actor_id)
 
     def select_action(self, action_key: str | None) -> None:
         if action_key is not None and action_key not in ACTION_KEYS:

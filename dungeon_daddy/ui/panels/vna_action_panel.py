@@ -30,6 +30,10 @@ from dungeon_daddy.rpg.action_options import (
 )
 from dungeon_daddy.rpg.models import ActorAbility
 
+# Vertical band reserved at the top of the panel for the acting-actor header,
+# above the Verb/Noun/Adverb rows (shared by setup_widget and draw).
+_HEADER_H = 22
+
 
 class VnaActionPanel:
     def __init__(self) -> None:
@@ -40,6 +44,7 @@ class VnaActionPanel:
         self._noun_id: str | None = None
         self._adverb: str | None = None
         self._playbook_slug: str | None = None
+        self._actor_name: str | None = None
         self._world_flags: list[str] = []
         self._library: object | None = None
         self._on_submit: Callable[[ActionCard], None] | None = None
@@ -69,6 +74,7 @@ class VnaActionPanel:
         """
         self._verbs = available_verbs(actor_abilities)
         self._nouns = available_nouns(room_context, actor)
+        self._actor_name = actor.get("display_name")
         self._playbook_slug = playbook_slug
         self._world_flags = list(world_flags)
         self._library = library
@@ -86,6 +92,10 @@ class VnaActionPanel:
 
     def select_adverb(self, adverb: str) -> None:
         self._adverb = adverb
+
+    def acting_actor_name(self) -> str | None:
+        """Display name of the actor whose action this Card builds."""
+        return self._actor_name
 
     def build_card(self) -> ActionCard | None:
         """Assemble an :class:`ActionCard` from the current selections.
@@ -200,7 +210,9 @@ class VnaActionPanel:
         if manager is None:
             return
         import arcade.gui
-        from dungeon_daddy.ui.theme import BG_2, FONT_UI, LINE, PAD_MD, TEAL
+        from dungeon_daddy.ui.theme import (
+            BG_2, BG_3, BG_HI, FONT_UI, INK_1, INK_4, LINE, LINE_HI, PAD_MD, TEAL,
+        )
 
         self._widget_params = (manager, x, y, w, h)
         self.teardown_widget(manager)
@@ -208,7 +220,7 @@ class VnaActionPanel:
         field_w = int(w - PAD_MD * 2)
         field_h = 30
         row_gap = 18 + field_h  # label row + dropdown
-        cur_y = y + h - PAD_MD - field_h
+        cur_y = y + h - PAD_MD - _HEADER_H - field_h  # leave room for actor header
 
         def _dropdown(options: list[str], default: str | None) -> object:
             nonlocal cur_y
@@ -255,6 +267,21 @@ class VnaActionPanel:
                     font_color=(*TEAL, 255), bg=(*BG_2, 255),
                     border=(*LINE, 255), border_width=1,
                 ),
+                "hover": arcade.gui.UIFlatButton.UIStyle(
+                    font_size=8, font_name=FONT_UI,
+                    font_color=(*INK_1, 255), bg=(*BG_3, 255),
+                    border=(*LINE_HI, 255), border_width=1,
+                ),
+                "press": arcade.gui.UIFlatButton.UIStyle(
+                    font_size=8, font_name=FONT_UI,
+                    font_color=(*TEAL, 255), bg=(*BG_HI, 255),
+                    border=(*TEAL, 255), border_width=1,
+                ),
+                "disabled": arcade.gui.UIFlatButton.UIStyle(
+                    font_size=8, font_name=FONT_UI,
+                    font_color=(*INK_4, 255), bg=(*BG_2, 255),
+                    border=(*LINE, 255), border_width=1,
+                ),
             },
         )
 
@@ -278,13 +305,19 @@ class VnaActionPanel:
     def draw(self, x: float, y: float, w: float, h: float) -> None:
         import arcade
         from dungeon_daddy.ui.theme import (
-            BG_1, FONT_UI, INK_4, PAD_MD, TEXT_SM,
+            BG_1, FONT_UI, INK_4, PAD_MD, TEAL, TEXT_SM,
         )
 
         arcade.draw_rect_filled(arcade.XYWH(x + w / 2, y + h / 2, w, h), BG_1)
+        # Acting-actor header — names whose action this Card builds.
+        header = f"ACTING AS: {self._actor_name}" if self._actor_name else "ACTING AS: —"
+        arcade.draw_text(
+            header, x + PAD_MD, y + h - PAD_MD,
+            TEAL, font_size=TEXT_SM, font_name=FONT_UI, anchor_y="top", bold=True,
+        )
         field_h = 30
         row_gap = 18 + field_h
-        cur_y = y + h - PAD_MD
+        cur_y = y + h - PAD_MD - _HEADER_H
         for label in ("Verb", "Noun", "Adverb"):
             arcade.draw_text(
                 label, x + PAD_MD, cur_y,
