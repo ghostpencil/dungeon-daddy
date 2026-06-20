@@ -2,9 +2,9 @@
 
 ## Phase
 
-Phase: **50 — Hybrid Action Model (BUILD — in progress)**
-Status: On branch **`phase-50`** (not pushed). Slices **1–7 + 5.1 of 8** complete;
-**Slice 8** (wire `VnaActionPanel` into PlayView, retire `how_chips`) next. Suite green (2941).
+Phase: **50 — Hybrid Action Model (BUILD — feature-complete, pending visual verify)**
+Status: On branch **`phase-50`** (not pushed). All **8 slices (+5.1)** landed in code;
+the **VNA panel's Arcade build is not yet visually verified** (see Outstanding). Suite green (2932).
 
 Spec: **`spec/PHASE_50_HYBRID_ACTION_MODEL.md`** (8-slice plan, no GitHub issue yet).
 Roadmap: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (Phase 50 rows). Prior phase spec:
@@ -19,6 +19,7 @@ Phase 50 commits (on top of pre-phase cleanup, all on `phase-50`):
 - `e9a339b` Slice 5.1 — noun `noun_id` now the full `object_id`/`item_id`
 - `971f8ca` Slice 6 — Card → action roll resolution (`resolve_card_roll`)
 - `40a72a3` Slice 7 — `VnaActionPanel` (VNA Card panel + dropdowns)
+- `f2d8fb1` Slice 8 — wire `VnaActionPanel` into PlayView + retire `how_chips`
 
 **Phase 48 locked decisions** (still relevant — Phase 50 reuses the `how?` contract):
 - `MoveParty(exit_id, how)` is a **Player Command** in `rpg/command.py` (not a proposal).
@@ -39,47 +40,41 @@ Full detail: `spec/PHASE_49_STARTING_PLAYBOOKS.md` + git `94c5fcb`.
 
 ## Outstanding / Next session
 
-**START HERE → Phase 50 Slice 8 — wire `VnaActionPanel` into PlayView + retire `how_chips`.**
-Swap the Slice 7 panel into the action surface and remove the provisional `how?` chip flow
-once the panel covers its cases (movement must keep working).
+**START HERE → Phase 50 visual verification (last remaining task).** All 8 slices are in
+code and the suite is green (2932), but the VNA panel's **Arcade widget build (3 `UIDropdown`s
++ SUBMIT) has not been seen running**. Launch `python -m dungeon_daddy`, open the RPG side
+panel → **ACTION** tab, and confirm the three dropdowns + SUBMIT render and that selecting a
+Noun re-populates the Adverb dropdown. Expect layout polish (`draw()` label rows vs. dropdown
+y-offsets are approximate; see `vna_action_panel.py:278-294`). Movement now flows through the
+VNA panel (`verb=move`, noun=exit) — confirm a move still works end-to-end.
 
-Concrete pointers for Slice 8 (gathered this session — verify before relying):
-- **Panel to wire:** `dungeon_daddy/ui/panels/vna_action_panel.py` (`VnaActionPanel`). It
-  exposes `set_context(*, actor_abilities, room_context, actor, playbook_slug, world_flags,
-  library=None)` (calls the Slice 1–3 providers, defaults each slot, computes adverbs for the
-  default noun), `select_*` / `select_*_by_label` / `*_labels()` / `selected_*_label()` (the
-  dropdown adapter — `UIDropdown` options are plain strings), `build_card()`, and `submit()`
-  (validates via `validate_card`; on success fires `set_submit_callback(card)`, else stores
-  `_last_error: CardError`). It already has `setup_widget(manager,x,y,w,h)` /
-  `teardown_widget(manager)` / `draw(x,y,w,h)` matching the `_RpgSidePanel` convention
-  (`play_view.py:185-213`), building 3 `UIDropdown`s + a SUBMIT button. **The Arcade widget
-  build is unverified visually** — exercise it via the ui-test harness / a manual run and
-  expect layout polish (the `draw()` label rows vs. dropdown y-offsets are approximate).
-- **Submit → resolution:** on the `set_submit_callback`, route the `ActionCard` through Slice
-  5 `resolve_card(...)` (mutation verbs → `PlayerCommand`) / Slice 6 `resolve_card_roll(...)`
-  (skill verbs → roll). `resolve_card` returns `None` for skill verbs, so try it first then
-  fall back to the roll path.
-- **What to retire:** the `how?` chip strip — `dungeon_daddy/ui/how_chips.py`
-  (`build_how_chips`), surfaced via `ExitListPanel.set_how_chips` and called from
-  `PlayView._refresh_exits` (`views/play_view.py:983`/`:1010`). The current action UI being
-  replaced: `dungeon_daddy/ui/panels/player_action_panel.py` (`PlayerActionPanel`, the
-  `_TAB_ACTION` tab in `_RpgSidePanel`, `play_view.py:357`/`:189`/`:209`).
-- **`set_context` inputs in PlayView:** `actor_abilities` from the live `actor_abilities`
-  table; `room_context` from `build_room_context(...)` (already built in `_refresh_exits`);
-  `actor` dict needs `actor_id`/`display_name`/`carried_items`; `playbook_slug` from the
-  actor; `world_flags` mirror the `_refresh_exits` chip gates (`can_sense`/`one_way`/
-  `ritual_connector`/`armed_trap`).
+Two **deliberate gaps** carried out of Slice 8 (decide in a follow-up, not bugs):
+- **`activate` verb is not wired** — it needs a trigger-selection step the panel does not
+  supply; `_on_vna_submit` posts a "not wired yet" system message instead of crashing
+  (`views/play_view.py`). Wiring it means surfacing the object's available transition trigger.
+- **Push-yourself / momentum-spend controls are gone from the action surface** — the VNA
+  panel rolls with `push_yourself=False`/`momentum_spend=0`. Those sliders lived in the old
+  `PlayerActionPanel` ACTION-tab UI the VNA panel replaced. (`PlayerActionPanel` is still the
+  headless holder for the chat action-card flow, which also hardcodes 0/False.)
 
-**Slice 7 done — `VnaActionPanel` (`40a72a3`).** New `dungeon_daddy/ui/panels/vna_action_panel.py`:
-the Play-mode Verb·Noun·Adverb Card panel. Pure-logic core is unit-tested without Arcade
-(`tests/unit/ui/panels/test_vna_action_panel.py`, 16 tests): `set_context` populates the
-Slice 1–3 provider option sets and defaults each slot; `select_noun` **recomputes the adverb
-pool** from the chosen noun's `target_type`; a label↔slug adapter feeds plain-string
-`UIDropdown`s; `submit()` builds + validates an `ActionCard` (`validate_card`) and either fires
-the submit callback or stores a `CardError` (out-of-bounds slot blocks dispatch — engine-bounded).
-The Arcade `setup_widget`/`teardown_widget`/`draw` build (3 `UIDropdown`s + SUBMIT, matching the
-`_RpgSidePanel` convention) ships in the same file but is **not yet visually verified** — Slice 8
-wires it into PlayView and polishes layout. Suite green (2941).
+**Slice 8 done — `f2d8fb1` (wire `VnaActionPanel` + retire `how_chips`).** Wiring lives in
+`views/play_view.py`:
+- `_refresh_vna_panel()` (+ `_acting_actor`/`_room_world_flags`) assembles `set_context`
+  inputs; the enriched room-noun block comes from new `build_room_noun_context(repo,
+  campaign_id, room_id)` (`memory/context_bundle.py`; `_fetch_current_room` delegates to it).
+- `_on_vna_submit(card)` routes via Slice 5 `resolve_card`: `move`→`_on_exit_move`;
+  `pick-up`/`equip`→`_apply_vna_command` (validate+apply); skill verbs→`_resolve_vna_roll`
+  (Slice 6 `resolve_card_roll` + the existing world-reaction/proposal/narration downstream).
+- ACTION tab now hosts `self._rpg_vna` (`_RpgSidePanel`); submit callback wired in `__init__`;
+  tab-click calls `_refresh_vna_panel()` **before** `set_active` builds the dropdowns.
+- `how_chips` retired: `ui/how_chips.py` + test deleted; `ExitListPanel` is now read-only
+  (chips/click-to-move/`set_move_callback` removed); `_refresh_exits` + the `_TAB_EXITS` click
+  handler cleaned. Tests: `tests/unit/views/test_play_view_vna.py` (6: context populate,
+  move/skill/pick-up submit routing, activate-warn).
+
+_Note: if the panel opens with ACTION as the active tab at startup (not the default CHAR tab),
+the dropdowns build before `_refresh_vna_panel` runs and show empty until re-clicked —
+`_RpgSidePanel.setup` cannot call back into PlayView. Low-priority; default tab is CHAR._
 
 **Slice 6 done (this session) — Card → action roll resolution.** Added
 `resolve_card_roll(card, *, campaign_id, actor, momentum_spend=0, push_yourself=False,
