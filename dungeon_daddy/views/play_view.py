@@ -38,9 +38,9 @@ from dungeon_daddy.ui.panels.fallout_panel import FalloutPanel
 from dungeon_daddy.ui.panels.map_panel import MapPanel
 from dungeon_daddy.ui.panels.memory_inspector_panel import MemoryInspectorPanel
 from dungeon_daddy.ui.panels.player_action_panel import PlayerActionPanel
+from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
 from dungeon_daddy.ui.panels.exit_list_panel import ExitListPanel
 from dungeon_daddy.ui.panels.scene_state_panel import SceneStatePanel
-from dungeon_daddy.ui.how_chips import build_how_chips
 from dungeon_daddy.ui.theme import (
     BG_0,
     BG_1,
@@ -156,7 +156,7 @@ class _RpgSidePanel:
         scene_panel: SceneStatePanel,
         fallout_panel: FalloutPanel,
         memory_panel: MemoryInspectorPanel,
-        action_panel: PlayerActionPanel,
+        action_panel: VnaActionPanel,
         exit_panel: ExitListPanel,
         debug_controls: DebugControls | None,
         manager: arcade.gui.UIManager | None = None,
@@ -355,18 +355,19 @@ class PlayView(arcade.View):
         self._rpg_fallout = FalloutPanel()
         self._rpg_memory = MemoryInspectorPanel()
         self._rpg_action = PlayerActionPanel()
+        self._rpg_vna = VnaActionPanel()
         self._exit_panel = ExitListPanel()
-        self._exit_panel.set_move_callback(self._on_exit_move)
         self._rpg_debug = DebugControls(rpg_service) if rpg_service is not None else None
         self._rpg_side = _RpgSidePanel(
             self._rpg_char, self._rpg_scene, self._rpg_fallout,
-            self._rpg_memory, self._rpg_action, self._exit_panel, self._rpg_debug,
+            self._rpg_memory, self._rpg_vna, self._exit_panel, self._rpg_debug,
             manager=self._manager,
         )
         self._rpg_open: bool = False
         self._rpg_toggle_rect: tuple[float, float, float, float] | None = None
         self._rpg_action.set_resolve_callback(self._on_resolve_action)
         self._rpg_action.set_action_select_callback(self._on_action_key_selected)
+        self._rpg_vna.set_submit_callback(self._on_vna_submit)
         self._rpg_campaign_id: str | None = None
         self._action_state = PlayerActionState()
         self._chat.set_actor_switch_callback(self._on_actor_switch)
@@ -457,6 +458,9 @@ class PlayView(arcade.View):
             if x >= rpg_x and y < content_h:
                 tab_idx = self._rpg_side.hit_tab(x, y)
                 if tab_idx is not None:
+                    # Populate VNA options before set_active builds its dropdowns.
+                    if tab_idx == _TAB_ACTION:
+                        self._refresh_vna_panel()
                     self._rpg_side.set_active(tab_idx)
                     if tab_idx == _TAB_MEM:
                         self._load_memory_entries()
@@ -472,8 +476,6 @@ class PlayView(arcade.View):
                             self._refresh_right_panel_from_actors(actor_id)
                 elif self._rpg_side._active == _TAB_MEM:
                     self._handle_mem_click(x, y)
-                elif self._rpg_side._active == _TAB_EXITS:
-                    self._exit_panel.handle_click(x, y)
                 return
         # Edit Memory button
         if (self._dungeon is not None and self._edit_memory_rect
@@ -980,7 +982,6 @@ class PlayView(arcade.View):
             self._exit_panel.set_from_context(
                 {"visible_exits": [], "locked_exits": [], "hidden_exit_hint": 0}
             )
-            self._exit_panel.set_how_chips(build_how_chips())
             return
 
         room_id = self._state.current_room_id
@@ -998,19 +999,134 @@ class PlayView(arcade.View):
         )
         self._exit_panel.set_from_context(bundle)
 
+    def _acting_actor(self):
+        """The actor a Card acts as: the selected one, else the first PC."""
         actors = getattr(self._rpg_action, "_actors", []) or []
-        max_sense = max((a.actions.get("sense", 0) for a in actors), default=0)
-        all_exits = bundle["visible_exits"] + bundle["locked_exits"]
-        one_way = any(e.get("status") == "one_way" for e in all_exits)
-        ritual = any(e.get("connector_type") == "ritual_gate" for e in bundle["visible_exits"])
-        armed_trap = any(
+        actor_id = getattr(self, "_action_state", None) and self._action_state.actor_id
+        if actor_id:
+            return next((a for a in actors if a.actor_id == actor_id), actors[0] if actors else None)
+        return actors[0] if actors else None
+
+    def _room_world_flags(self, room_id: str) -> set[str]:
+        """World-context flags gating conditional adverbs (mirrors `_refresh_exits`)."""
+        flags: set[str] = set()
+        actors = getattr(self._rpg_action, "_actors", []) or []
+        if max((a.actions.get("sense", 0) for a in actors), default=0) >= 1:
+            flags.add("can_sense")
+        exits = self._mem_repo.get_exits_by_room(self._rpg_campaign_id, room_id)
+        if any(e.get("status") == "one_way" for e in exits):
+            flags.add("one_way")
+        if any(e.get("connector_type") == "ritual_gate" for e in exits):
+            flags.add("ritual_connector")
+        if any(
             o["archetype"] == "trap" and o["current_state"] == "armed"
             for o in self._mem_repo.get_objects_by_room(self._rpg_campaign_id, room_id)
+        ):
+            flags.add("armed_trap")
+        return flags
+
+    def _refresh_vna_panel(self) -> None:
+        """Populate the VNA action panel from the current room + acting actor."""
+        from dungeon_daddy.memory.context_bundle import build_room_noun_context
+
+        if (self._mem_repo is None or self._rpg_campaign_id is None
+                or self._state is None or not self._state.current_room_id):
+            return
+        actor = self._acting_actor()
+        if actor is None:
+            return
+        room_id = self._state.current_room_id
+        room_context = build_room_noun_context(self._mem_repo, self._rpg_campaign_id, room_id)
+        self._rpg_vna.set_context(
+            actor_abilities=self._mem_repo.get_actor_abilities(actor.actor_id),
+            room_context=room_context,
+            actor={
+                "actor_id": actor.actor_id,
+                "display_name": actor.display_name,
+                "carried_items": [],
+            },
+            playbook_slug=actor.playbook_slug or "",
+            world_flags=self._room_world_flags(room_id),
         )
-        self._exit_panel.set_how_chips(build_how_chips(
-            max_sense=max_sense, one_way=one_way, ritual_connector=ritual,
-            armed_trap_clock=armed_trap,
-        ))
+
+    def _on_vna_submit(self, card) -> None:
+        """Route a validated ``ActionCard`` to the engine.
+
+        Mutation verbs (Slice 5 ``resolve_card``) become a ``PlayerCommand``:
+        ``move`` reuses the exit-move path, the rest apply via the command
+        pipeline. Skill verbs (``resolve_card`` returns ``None``) resolve as an
+        action roll (Slice 6 ``resolve_card_roll``).
+        """
+        from dungeon_daddy.rpg.action_resolution import resolve_card
+        from dungeon_daddy.rpg.command import MoveParty
+
+        actor = self._acting_actor()
+        if actor is None:
+            return
+        try:
+            command = resolve_card(card, actor_id=actor.actor_id)
+        except ValueError:
+            # ``activate`` needs a trigger the panel does not yet supply.
+            self._chat.add_message(
+                "system", "Activating objects from the action panel isn't wired yet."
+            )
+            return
+        if command is None:
+            self._resolve_vna_roll(card, actor)
+        elif isinstance(command, MoveParty):
+            self._on_exit_move(command.exit_id, command.how)
+        else:
+            self._apply_vna_command(command)
+
+    def _apply_vna_command(self, command) -> None:
+        """Validate + apply a non-move mutation command, then refresh."""
+        from dungeon_daddy.rpg.command_applier import apply_command
+        from dungeon_daddy.rpg.command_validator import validate_command
+
+        if self._mem_repo is None or self._rpg_campaign_id is None:
+            return
+        room_id = self._state.current_room_id if self._state else None
+        validation = validate_command(
+            command, self._mem_repo, self._rpg_campaign_id, party_room_id=room_id,
+        )
+        if not validation.accepted:
+            self._chat.add_message("system", f"⚠ Can't do that: {validation.rejection_reason}")
+            return
+        apply_command(command, validation, self._mem_repo, self._rpg_campaign_id)
+        self._refresh_vna_panel()
+
+    def _resolve_vna_roll(self, card, actor) -> None:
+        """Resolve a skill-verb Card as an action roll and narrate the outcome."""
+        from dungeon_daddy.rpg.action_resolution import resolve_card_roll
+
+        if self._rpg_service is None or self._state is None:
+            return
+        campaign_id = self._rpg_campaign_id or self._state.dungeon_id
+        card_roll = resolve_card_roll(
+            card,
+            campaign_id=campaign_id,
+            actor={"actor_id": actor.actor_id, "actions": actor.actions},
+        )
+        resolution = card_roll.resolution
+        reaction = self._apply_world_reaction(resolution)
+        self._run_proposal_pipeline(resolution, campaign_id)
+        self._chat.add_message(
+            "system",
+            format_mechanical_bubble(actor.display_name, card.verb, resolution, reaction),
+        )
+        if self._dungeon is not None and self._state.current_room_id:
+            level = self._dungeon.levels[self._state.current_level_idx]
+            room = {r.id: r for r in level.rooms}.get(self._state.current_room_id)
+            if room is not None:
+                msg = (
+                    f"{actor.display_name} [{card.verb.upper()}] {card.adverb}"
+                    f" — {resolution.outcome.upper()}"
+                )
+                self._compact_history()
+                self._dm_history.append(LLMMessage(role="user", content=msg))
+                self._chat.set_busy(True)
+                self._spawn_dm_thread(room, level)
+        self._refresh_right_panel_from_actors(actor.actor_id)
 
     def _on_exit_move(self, exit_id: str, how: str) -> None:
         """Apply an engine-validated party move, then narrate the result."""

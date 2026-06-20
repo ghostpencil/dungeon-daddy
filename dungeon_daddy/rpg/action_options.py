@@ -110,10 +110,10 @@ def validate_card(card: ActionCard, options: CardOptions) -> CardError | None:
     return None
 
 
-# Universal adverb surfacing (mirrors the Phase 48 ``ui/how_chips`` logic, which
-# Slice 8 retires). Base adverbs are always offered; the rest surface only when
-# the named world-context flag is present. Restricted at call time to keys the
-# engine's ``HOW_MODIFIER_FLAGS`` table can actually resolve.
+# Universal adverb surfacing (carries forward the Phase 48 ``ui/how_chips``
+# logic that Slice 8 retired). Base adverbs are always offered; the rest surface
+# only when the named world-context flag is present. Restricted at call time to
+# keys the engine's ``HOW_MODIFIER_FLAGS`` table can actually resolve.
 _BASE_ADVERBS: tuple[str, ...] = ("cautiously", "quickly", "boldly")
 _CONDITIONAL_ADVERBS: dict[str, str] = {
     "stealthily": "can_sense",
