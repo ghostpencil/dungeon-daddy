@@ -26,11 +26,27 @@ from dungeon_daddy.rpg.move_party import HOW_MODIFIER_FLAGS
 from dungeon_daddy.rpg.playbook import PlaybookLibrary, _UNIVERSAL_VERBS
 
 
+# Canonical verb slugs. ``move`` is one of the 9 universal skill verbs but is
+# also an engine mutation; the interaction verbs below are *not* skill verbs —
+# they map straight to a ``PlayerCommand`` (see ``rpg/action_resolution.py``).
+VERB_MOVE = "move"
+VERB_PICK_UP = "pick-up"
+VERB_EQUIP = "equip"
+VERB_ACTIVATE = "activate"
+
+# Interaction verbs surfaced in the Verb slot alongside the universal verbs.
+_INTERACTION_VERBS: dict[str, str] = {
+    VERB_PICK_UP: "Pick Up",
+    VERB_EQUIP: "Equip",
+    VERB_ACTIVATE: "Activate",
+}
+
+
 @dataclass(frozen=True)
 class VerbOption:
     verb: str
     label: str
-    kind: str  # "universal" | "class"
+    kind: str  # "universal" | "interaction" | "class"
 
 
 @dataclass(frozen=True)
@@ -120,6 +136,10 @@ def available_verbs(actor_abilities: Iterable[ActorAbility]) -> list[VerbOption]
         VerbOption(verb=verb, label=verb.capitalize(), kind="universal")
         for verb in sorted(_UNIVERSAL_VERBS)
     ]
+    options.extend(
+        VerbOption(verb=verb, label=label, kind="interaction")
+        for verb, label in _INTERACTION_VERBS.items()
+    )
     options.extend(
         VerbOption(verb=ability.ability_slug, label=ability.display_name, kind="class")
         for ability in actor_abilities

@@ -38,8 +38,15 @@ def _ability(slug, *, surfaces_as_verb, display_name=None):
 
 def test_available_verbs_includes_all_universal_verbs_with_no_abilities():
     verbs = available_verbs([])
-    assert {v.verb for v in verbs} == _UNIVERSAL
-    assert all(v.kind == "universal" for v in verbs)
+    universal = {v.verb for v in verbs if v.kind == "universal"}
+    assert universal == _UNIVERSAL
+
+
+def test_available_verbs_includes_interaction_verbs():
+    verbs = available_verbs([])
+    interaction = {v.verb: v for v in verbs if v.kind == "interaction"}
+    assert set(interaction) == {"pick-up", "equip", "activate"}
+    assert interaction["pick-up"].label == "Pick Up"
 
 
 def test_available_verbs_appends_class_verb_for_surfacing_ability():
