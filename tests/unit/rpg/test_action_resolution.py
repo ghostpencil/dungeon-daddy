@@ -1,5 +1,7 @@
+import pytest
+
 from dungeon_daddy.rpg.action_options import ActionCard
-from dungeon_daddy.rpg.action_resolution import resolve_card
+from dungeon_daddy.rpg.action_resolution import resolve_card, resolve_card_roll
 from dungeon_daddy.rpg.command import (
     ActivateObject,
     EquipItem,
@@ -45,3 +47,59 @@ def test_activate_card_without_trigger_raises():
 def test_non_mutation_verb_resolves_to_none():
     card = ActionCard(verb="fight", noun_id="actor:c1:ghoul", adverb="boldly")
     assert resolve_card(card, actor_id="actor:c1:mara") is None
+
+
+# --- Slice 6: Card -> action roll resolution -------------------------------
+
+ROLL_ACTOR = {"actor_id": "actor:c1:mara", "actions": {"fight": 2}}
+
+
+def test_roll_card_sizes_pool_from_actor_rating():
+    # rating 2 -> a 2-die pool; fixed dice make the outcome deterministic.
+    card = ActionCard(verb="fight", noun_id="actor:c1:ghoul", adverb="boldly")
+    roll = resolve_card_roll(
+        card, campaign_id="campaign:test", actor=ROLL_ACTOR, fixed=[6, 3]
+    )
+    assert roll.resolution.dice_rolled == [6, 3]
+    assert roll.resolution.outcome == "full"
+
+
+def test_roll_card_passes_adverb_side_effect_flags_through():
+    # "boldly" carries only world-side-effect flags (no dice delta).
+    card = ActionCard(verb="fight", noun_id="actor:c1:ghoul", adverb="boldly")
+    roll = resolve_card_roll(
+        card, campaign_id="campaign:test", actor=ROLL_ACTOR, fixed=[6, 1]
+    )
+    assert roll.side_effect_flags == {"occupants_aware", "advance_npc_reaction"}
+
+
+def test_roll_card_applies_adverb_dice_delta_to_pool(monkeypatch):
+    # No shipping adverb carries a dice delta yet; verify the dice:+N convention:
+    # a +1 flag grows the pool and is stripped from the side-effect flags.
+    from dungeon_daddy.rpg.move_party import HOW_MODIFIER_FLAGS
+
+    monkeypatch.setitem(HOW_MODIFIER_FLAGS, "boldly", {"dice:+1", "occupants_aware"})
+    card = ActionCard(verb="fight", noun_id="actor:c1:ghoul", adverb="boldly")
+    roll = resolve_card_roll(
+        card, campaign_id="campaign:test", actor=ROLL_ACTOR, fixed=[1, 1, 1]
+    )
+    assert roll.resolution.dice_rolled == [1, 1, 1]  # rating 2 + delta 1 = 3 dice
+    assert roll.side_effect_flags == {"occupants_aware"}
+
+
+def test_roll_card_adds_momentum_to_pool():
+    card = ActionCard(verb="fight", noun_id="actor:c1:ghoul", adverb="boldly")
+    roll = resolve_card_roll(
+        card,
+        campaign_id="campaign:test",
+        actor=ROLL_ACTOR,
+        momentum_spend=1,
+        fixed=[1, 1, 1],
+    )
+    assert roll.resolution.dice_rolled == [1, 1, 1]  # rating 2 + momentum 1 = 3 dice
+
+
+def test_roll_card_rejects_mutation_verb():
+    card = ActionCard(verb="move", noun_id="exit:c1:north", adverb="cautiously")
+    with pytest.raises(ValueError):
+        resolve_card_roll(card, campaign_id="campaign:test", actor=ROLL_ACTOR)

@@ -3,8 +3,8 @@
 ## Phase
 
 Phase: **50 — Hybrid Action Model (BUILD — in progress)**
-Status: On branch **`phase-50`** (not pushed). Slices **1–5 + 5.1 of 8** complete;
-**Slice 6** (Card → action roll) next. Suite green (2915).
+Status: On branch **`phase-50`** (not pushed). Slices **1–6 + 5.1 of 8** complete;
+**Slice 7** (UI VNA dropdown panel) next. Suite green (2921).
 
 Spec: **`spec/PHASE_50_HYBRID_ACTION_MODEL.md`** (8-slice plan, no GitHub issue yet).
 Roadmap: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (Phase 50 rows). Prior phase spec:
@@ -17,6 +17,7 @@ Phase 50 commits (on top of pre-phase cleanup, all on `phase-50`):
 - `9c3b65a` Slice 4 — `ActionCard` model + `validate_card`
 - `68d7060` Slice 5 — Card → `PlayerCommand` resolution (`rpg/action_resolution.py`)
 - `e9a339b` Slice 5.1 — noun `noun_id` now the full `object_id`/`item_id`
+- (pending) Slice 6 — Card → action roll resolution (`resolve_card_roll`)
 
 **Phase 48 locked decisions** (still relevant — Phase 50 reuses the `how?` contract):
 - `MoveParty(exit_id, how)` is a **Player Command** in `rpg/command.py` (not a proposal).
@@ -37,6 +38,28 @@ Full detail: `spec/PHASE_49_STARTING_PLAYBOOKS.md` + git `94c5fcb`.
 
 ## Outstanding / Next session
 
+**START HERE → Phase 50 Slice 7 — UI VNA dropdown panel.** Replace the provisional
+`how_chips` strip with a Verb·Noun·Adverb panel of **real dropdowns/comboboxes** (per
+auto-memory `project_phase50_vna_dropdowns`), driven by the Slice 1–3 providers; submit
+builds a Card → `validate_card` → Slice 5 (`resolve_card`) / Slice 6 (`resolve_card_roll`)
+resolution. *(ui-test harness)*. Then Slice 8 (wire into PlayView, retire `how_chips`).
+
+**Slice 6 done (this session) — Card → action roll resolution.** Added
+`resolve_card_roll(card, *, campaign_id, actor, momentum_spend=0, push_yourself=False,
+intent=None, fixed=None) -> CardRoll` to `rpg/action_resolution.py` (the dual of
+`resolve_card`): for a non-mutation verb it sizes the pool from the actor's rating
+(`actor["actions"][verb]`) + the adverb's `dice:±N` flag deltas, calls the existing roller
+**directly** (`rpg/actions.py::resolve_action`, per open question 2), and returns a
+`CardRoll(resolution, side_effect_flags)` — outcome tier on `resolution`, the adverb's
+non-dice `HOW_MODIFIER_FLAGS` as world-side-effects. Raises `ValueError` for a mutation verb
+(move/pick-up/equip/activate). **Design note:** no shipping adverb encodes a `dice:±N` flag
+yet (all current `HOW_MODIFIER_FLAGS` are world-side-effects), so the delta is 0 in
+production today; `_split_adverb_flags` implements the convention so Phase 52 / `BALANCE_NOTES`
+can add dice deltas with no rewiring. Unit tests (`tests/unit/rpg/test_action_resolution.py`:
+pool from rating, side-effect pass-through, `dice:±N` delta via monkeypatch, momentum,
+mutation-verb guard) + 1 e2e (`tests/integration/test_card_resolution_e2e.py`:
+`fight` Card through real providers → `validate_card` → roll). Suite green (2921).
+
 **Slice 5.1 done — noun id-scheme fix (slug → full id).** Closed the gap found while writing
 the Slice 5 integration test: `_fetch_current_room` (`memory/context_bundle.py`) now includes
 the full `object_id`/`item_id` on the `objects`/`loose_items` dicts, and `available_nouns`
@@ -50,15 +73,10 @@ available_nouns → validate_card → resolve_card → validate_command → appl
 an item is actually picked up / an object actually transitions. Downstream check: no
 production reader besides the noun provider touched those object/item dicts.
 
-**START HERE → Phase 50 Slice 6 — Card → action roll resolution.** For non-command verbs
-(`fight`/`study`/`sway`/…, where `resolve_card` returns `None`), build the dice pool (actor
-rating + adverb `dice:±N` flags + momentum), roll, return outcome tier + applied
-world-side-effect flags. Reuse the existing roll module — **confirm its entry point first**
-(open question 2: does Card resolution call the roller directly or emit a "roll request"?).
-*(unit + 1 integration)*. Then Slice 7 (UI VNA dropdown panel — per auto-memory
-`project_phase50_vna_dropdowns`), Slice 8 (wire into PlayView, retire `how_chips`).
+Open question 2 (roll entry point) is now **resolved**: Card resolution calls the roller
+(`resolve_action`) **directly** — see the Slice 6 note above.
 
-**Slice 5 done (this session) — `68d7060`:** new `rpg/action_resolution.py` with
+**Slice 5 done — `68d7060`:** new `rpg/action_resolution.py` with
 `resolve_card(card, *, actor_id, trigger=None) -> PlayerCommand | None`:
 `move`→`MoveParty(exit_id=noun_id, how=adverb)`, `pick-up`→`PickUpItem`, `equip`→`EquipItem`,
 `activate`→`ActivateObject` (raises if no `trigger`); other verbs → `None` (Slice 6 path).

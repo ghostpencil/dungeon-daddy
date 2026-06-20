@@ -23,7 +23,7 @@ from dungeon_daddy.rpg.action_options import (
     available_verbs,
     validate_card,
 )
-from dungeon_daddy.rpg.action_resolution import resolve_card
+from dungeon_daddy.rpg.action_resolution import resolve_card, resolve_card_roll
 from dungeon_daddy.rpg.command import ActivateObject, MoveParty, PickUpItem
 from dungeon_daddy.rpg.command_applier import apply_command
 from dungeon_daddy.rpg.command_validator import validate_command
@@ -182,3 +182,42 @@ def test_activate_card_flows_through_grammar_into_engine(repo: MemoryRepository)
 
     obj = repo.get_room_object("obj:c1:iron-chest")
     assert obj["current_state"] == "opened"
+
+
+def test_fight_card_flows_through_grammar_into_action_roll(repo: MemoryRepository) -> None:
+    """A non-mutation Card drives the real providers, then resolves as an action roll."""
+    repo.save_actor(
+        ACTOR["actor_id"], CAMPAIGN_ID, "pc", "mara", "Mara", "active", room_id=ROOM_A
+    )
+    repo.save_actor_action_rating(ACTOR["actor_id"], "fight", 2)
+    repo.save_actor(
+        "actor:c1:ghoul", CAMPAIGN_ID, "monster", "ghoul", "Ghoul", "active", room_id=ROOM_A
+    )
+
+    options = CardOptions(
+        verbs=available_verbs([]),
+        nouns=available_nouns(_room_context(repo), ACTOR),
+        adverbs=available_adverbs("fighter", target_type="monster", world_flags=set()),
+    )
+
+    card = ActionCard(verb="fight", noun_id="actor:c1:ghoul", adverb="boldly")
+    assert validate_card(card, options) is None
+    # The roll path: a non-mutation verb produces no PlayerCommand.
+    assert resolve_card(card, actor_id=ACTOR["actor_id"]) is None
+
+    actor = {
+        "actor_id": ACTOR["actor_id"],
+        "actions": {
+            r["action_key"]: r["rating"]
+            for r in repo.get_actor_action_ratings(ACTOR["actor_id"])
+        },
+    }
+    roll = resolve_card_roll(
+        card, campaign_id=CAMPAIGN_ID, actor=actor, fixed=[6, 2]
+    )
+
+    # rating 2 -> 2 dice; "boldly" carries only world-side-effect flags.
+    assert roll.resolution.dice_rolled == [6, 2]
+    assert roll.resolution.outcome == "full"
+    assert roll.resolution.actor_id == ACTOR["actor_id"]
+    assert roll.side_effect_flags == {"occupants_aware", "advance_npc_reaction"}
