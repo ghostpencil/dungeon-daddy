@@ -28,15 +28,11 @@ Prior phase spec: `spec/PHASE_49_STARTING_PLAYBOOKS.md` (GitHub issue **#77**, l
 
 ---
 
-## Phase 49 summary (2026-06-19)
+## Phase 49 decisions Phase 50 depends on
 
-All 7 slices complete — 57 new tests, 2867 total. Full detail in `spec/PHASE_49_STARTING_PLAYBOOKS.md` and git commit `94c5fcb`.
-
-Key decisions locked this phase:
-- Each playbook grants kit ability **+ first pool ability** at start; rest of pool locked until Phase 52.
+Full detail: `spec/PHASE_49_STARTING_PLAYBOOKS.md` + git `94c5fcb`.
 - Signature adverbs derived live from `playbook_slug` — not persisted per-actor.
 - `actor_abilities` table (migration `011`) is the live, mutable set Phase 50 reads.
-- The Crucible save manually re-seeded to add the pool abilities to its three playbook actors.
 
 ---
 
@@ -67,19 +63,6 @@ Still open (not blocking Phase 50):
    correct stale labels/status (that still needs the manual `--force` script). Could fold a
    label-refresh into load if it becomes a recurring pain.
 
-### Done this session (2026-06-20) — on `phase-50`, uncommitted-then-committed
-- **Backfill-on-load self-heal** (`fa54b20`): `dungeon_daddy/campaign/backfill.py`
-  `backfill_exits_if_empty(repo, dungeon_path)` derives exits from `dungeon.json` only when
-  `room_exits` is empty; wired into `window._attach_rpg_context`; never raises. 5 tests
-  (`tests/unit/campaign/test_backfill_exits.py` + 1 `test_window.py` wiring test).
-- **Stale Phase-49 test fix** (`9be98cd`): `test_play_view_bundle` 2 failures fixed — wire
-  `_rpg_char`/`_rpg_fallout` + `set_actors` side-effect so the real
-  `set_party` → `_refresh_right_panel_from_actors` path runs.
-- **Recklessly chip for armed traps** (`21256ef`): `_refresh_exits` sets `armed_trap_clock=` from
-  whether the current room holds a `RoomObject` with `archetype=="trap"` and
-  `current_state=="armed"` (engine flag `force_trap_trigger`). 2 tests in
-  `tests/unit/views/test_play_view_exits.py`.
-
 ---
 
 ## Product Direction
@@ -96,9 +79,7 @@ reactions. It must not directly mutate authoritative state.
 
 ## Known Failures
 
-None — full suite green (2026-06-20). The 2 stale Phase-49 `test_play_view_bundle` tests were
-fixed: they now wire `_rpg_char`/`_rpg_fallout` and a `set_actors` side-effect so the real
-`set_party` + `_refresh_right_panel_from_actors` path is exercised.
+None — full suite green (2026-06-20).
 
 ---
 
