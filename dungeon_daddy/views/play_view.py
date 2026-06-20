@@ -1003,8 +1003,13 @@ class PlayView(arcade.View):
         all_exits = bundle["visible_exits"] + bundle["locked_exits"]
         one_way = any(e.get("status") == "one_way" for e in all_exits)
         ritual = any(e.get("connector_type") == "ritual_gate" for e in bundle["visible_exits"])
+        armed_trap = any(
+            o["archetype"] == "trap" and o["current_state"] == "armed"
+            for o in self._mem_repo.get_objects_by_room(self._rpg_campaign_id, room_id)
+        )
         self._exit_panel.set_how_chips(build_how_chips(
             max_sense=max_sense, one_way=one_way, ritual_connector=ritual,
+            armed_trap_clock=armed_trap,
         ))
 
     def _on_exit_move(self, exit_id: str, how: str) -> None:

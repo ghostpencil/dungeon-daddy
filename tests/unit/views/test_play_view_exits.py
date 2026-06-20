@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 from dungeon_daddy.data.models import SessionState
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.rpg.models import RoomExit
+from dungeon_daddy.rpg.models import RoomExit, RoomObject
 from dungeon_daddy.ui.panels.exit_list_panel import ExitListPanel
 
 MIGRATIONS_DIR = (
@@ -76,6 +76,36 @@ def test_refresh_exits_lists_locked_exit_with_reason(tmp_path):
     view._refresh_exits()
 
     assert view._exit_panel._locked_exits[0]["missing_condition"] == "iron-key"
+
+
+def _save_trap(repo: MemoryRepository, state: str) -> None:
+    repo.save_room_object(RoomObject(
+        object_id="o-trap", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="dart-trap", display_name="Dart Trap", archetype="trap",
+        description="A pressure plate.", current_state=state,
+    ))
+
+
+def test_refresh_exits_surfaces_recklessly_chip_for_armed_trap(tmp_path):
+    view = _make_view(tmp_path)
+    _save_exit(view._mem_repo, status="open")
+    _save_trap(view._mem_repo, state="armed")
+
+    view._refresh_exits()
+
+    hows = [c.how for c in view._exit_panel._how_chips]
+    assert "recklessly" in hows
+
+
+def test_refresh_exits_no_recklessly_chip_when_trap_disarmed(tmp_path):
+    view = _make_view(tmp_path)
+    _save_exit(view._mem_repo, status="open")
+    _save_trap(view._mem_repo, state="disarmed")
+
+    view._refresh_exits()
+
+    hows = [c.how for c in view._exit_panel._how_chips]
+    assert "recklessly" not in hows
 
 
 # ---------------------------------------------------------------------------

@@ -34,11 +34,21 @@ Key decisions locked this phase:
 
 1. **Tomb of the Forgotten King** save needs exit backfill — close the app, then
    `python -m tools.backfill_room_exits "<save dir>" --force` (rewrites `room_exits` plus exit
-   labels/status). The Crucible is already backfilled.
-2. **Optional follow-up (own small slice):** backfill-on-load so pre-Phase-48 campaigns
-   self-heal without the script.
-3. **Minor:** `armed_trap_clock` chip surfacing (`recklessly` for trap rooms) left at default
-   `False` — throwaway-UI gap; engine flag mapping exists if needed.
+   labels/status). This `--force` *label re-write* is separate from the new on-load self-heal
+   (which only fires for **empty** exit tables — both current saves already have 36 exits).
+   The Crucible is already backfilled.
+2. ~~Backfill-on-load self-heal~~ **DONE (2026-06-19)** — `dungeon_daddy/campaign/backfill.py`
+   `backfill_exits_if_empty(repo, dungeon_path)` derives exits from `dungeon.json` only when
+   `room_exits` is empty; wired into `window._attach_rpg_context`. Never raises (load is never
+   blocked). 5 tests (`tests/unit/campaign/test_backfill_exits.py` + 1 window wiring test).
+3. ~~Stale Phase-49 `test_play_view_bundle` failures~~ **FIXED (2026-06-20)** — both tests now
+   wire `_rpg_char`/`_rpg_fallout` + a `set_actors` side-effect, exercising the real
+   `set_party` → `_refresh_right_panel_from_actors` path.
+4. ~~`armed_trap_clock` chip surfacing (`recklessly` for trap rooms)~~ **DONE (2026-06-20)** —
+   `_refresh_exits` now sets `armed_trap_clock=` from whether the current room holds a
+   `RoomObject` with `archetype=="trap"` and `current_state=="armed"` (the trap state machine's
+   armed state), surfacing the **Recklessly** chip (engine flag `force_trap_trigger`). 2 tests in
+   `tests/unit/views/test_play_view_exits.py`.
 4. **Next: Phase 50 — Hybrid Action Model.** Read `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`
    (Phase 50 section) and open `spec/PHASE_50_HYBRID_ACTION_MODEL.md` at phase start.
 
@@ -58,7 +68,9 @@ reactions. It must not directly mutate authoritative state.
 
 ## Known Failures
 
-None — full suite green (2867 tests as of 2026-06-19).
+None — full suite green (2026-06-20). The 2 stale Phase-49 `test_play_view_bundle` tests were
+fixed: they now wire `_rpg_char`/`_rpg_fallout` and a `set_actors` side-effect so the real
+`set_party` + `_refresh_right_panel_from_actors` path is exercised.
 
 ---
 
