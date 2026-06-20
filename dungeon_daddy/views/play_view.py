@@ -84,6 +84,7 @@ _RPG_TAB_H = 26
 _BTN_RPG_W = 88
 
 _RPG_TAB_LABELS = ["CHAR", "SCENE", "FALLOUT", "MEM", "ACTION", "EXITS", "DBG"]
+_TAB_CHAR = 0
 _TAB_MEM = 3
 _TAB_ACTION = 4
 _TAB_EXITS = 5
@@ -210,6 +211,10 @@ class _RpgSidePanel:
                 self._action.setup_widget(
                     self._manager, self._x, self._y, self._w, content_h,
                 )
+
+    @property
+    def active_tab(self) -> int:
+        return self._active
 
     def hit_tab(self, x: float, y: float) -> int | None:
         for i, (tx, ty, tw, th) in enumerate(self._tab_rects):
@@ -459,6 +464,12 @@ class PlayView(arcade.View):
                         self._build_context_bundle()
                     elif tab_idx == _TAB_EXITS:
                         self._refresh_exits()
+                elif self._rpg_side.active_tab == _TAB_CHAR:
+                    delta = self._rpg_char.hit_picker(x, y)
+                    if delta:
+                        actor_id = self._rpg_char.cycle(delta)
+                        if actor_id:
+                            self._refresh_right_panel_from_actors(actor_id)
                 elif self._rpg_side._active == _TAB_MEM:
                     self._handle_mem_click(x, y)
                 elif self._rpg_side._active == _TAB_EXITS:
@@ -679,9 +690,13 @@ class PlayView(arcade.View):
                 status=a["status"],
                 actions=ratings,
                 stress=stress,
+                playbook_slug=a.get("playbook_slug"),
             ))
         pc_actors = filter_player_actors(actor_states)
         self._rpg_action.set_actors(pc_actors)
+        self._rpg_char.set_party(pc_actors)
+        if pc_actors:
+            self._refresh_right_panel_from_actors(pc_actors[0].actor_id)
         pc_ids = [a.actor_id for a in pc_actors]
         if pc_ids and hasattr(self, "_action_state"):
             self._action_state.set_actor_roster(pc_ids)
@@ -775,6 +790,16 @@ class PlayView(arcade.View):
             return
         actor = next((a for a in actors if a.actor_id == actor_id), actors[0])
         self._rpg_char.set_actor(actor)
+        if actor.playbook_slug:
+            from dungeon_daddy.rpg.playbook import PlaybookLibrary
+            try:
+                self._rpg_char.set_playbook(PlaybookLibrary().get(actor.playbook_slug))
+            except KeyError:
+                self._rpg_char.set_playbook(None)
+        else:
+            self._rpg_char.set_playbook(None)
+        if self._mem_repo is not None:
+            self._rpg_char.set_abilities(self._mem_repo.get_actor_abilities(actor.actor_id))
         self._refresh_chat_mini_card()
         if self._mem_repo is not None and self._rpg_campaign_id:
             from dungeon_daddy.rpg.models import FalloutRecord

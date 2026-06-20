@@ -2,9 +2,9 @@
 
 ## Phase
 
-Phase: **49 — Starting Playbooks (IN PROGRESS — Slice 0 done)**
-Status: On branch `phase-49`. Test suite green — **2810 passing** (2026-06-19).
-Next: **Slice 1** — Playbook Pydantic schema (`rpg/playbook.py`). TDD per `spec/TESTING.md` + TDD skill.
+Phase: **49 — Starting Playbooks (COMPLETE — all 6 slices done)**
+Status: On branch `phase-49`. Test suite green — **2867 passing** (2026-06-19).
+Next: **Phase 50** — Action Model / verb-adverb picker. See `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`.
 
 Spec: `spec/PHASE_49_STARTING_PLAYBOOKS.md` (GitHub issue **#77**, label `phase-49`).
 Prior phase spec: `spec/PHASE_48_DUNGEON_NAVIGATION.md` (full 10-slice scope + folded-in Slice 11).
@@ -18,7 +18,32 @@ Prior phase spec: `spec/PHASE_48_DUNGEON_NAVIGATION.md` (full 10-slice scope + f
 
 ---
 
-## This session (2026-06-19, Phase 49 Slice 0)
+## This session (2026-06-19, Phase 49 Slices 0–6)
+
+**Slice 6 COMPLETE** — Character Sheet panel playbook section. `CharacterSheetPanel` gained `set_playbook(Playbook | None)` and `set_abilities(list[ActorAbility])` setters. `draw()` renders three new sections when an actor is loaded: **PLAYBOOK** (display name), **ADVERBS** (signature adverb slugs from the live playbook), **ABILITIES** (display name per `ActorAbility`). `import arcade` moved to module level (consistent with project pattern; enables mocker patching). 10 new tests (Cycles 43–50) in `tests/unit/ui/test_character_sheet_panel_playbook.py`.
+
+**Slice 5 COMPLETE** — Character creation UI. Playbook picker (`< / >` cycle buttons) added to `CampaignEditPanel._build_actor_form`. Picking a playbook pre-populates action ratings and stress track capacities in `_number_values` via `_apply_playbook_to_form`. `_collect_actor_inputs()` (new method, dispatched from `_collect_inputs()`) derives `playbook_slug` from the choice picker — `None` when sentinel "none" is selected. Actor with existing `playbook_slug` pre-selects the picker and pre-fills ratings/tracks at build time. 12 new tests (Cycles 31–42) in `tests/unit/ui/test_campaign_edit_panel_playbook.py`.
+
+**Slice 4 COMPLETE** — seed-publish wiring. `_seed_actor` applies playbook on create/force: writes `actors.playbook_slug` + `tags`, seeds action ratings + stress tracks (from playbook when manifest empty), seeds kit as `class_kit` Item via `_seed_item`, seeds `actor_abilities` rows (kit → `source="kit"`, pool in `starting_abilities` → `source="playbook_start"`). Idempotent + `--force` + dry-run. 9 new tests (Cycles 22–30) in `tests/unit/campaign/test_seeder_playbook.py`. Also: `ActorManifest.playbook_slug`, `ActorState.playbook_slug`, `repo.save_actor`/`get_actor` extended with `playbook_slug` + `tags`; migration 011 adds `actors.tags TEXT DEFAULT '[]'`.
+
+**Slice 3 COMPLETE** — `actor_abilities` DB table + repo CRUD. 8 new tests (Cycles 14–21).
+
+- **Migration `011_actor_abilities.sql`**: creates `actor_abilities` table (PK: `actor_id` + `ability_slug`; `target_types` stored as JSON); adds `actors.playbook_slug TEXT` column. Applies cleanly on fresh and existing DBs.
+- **`ActorAbility` Pydantic model** added to `rpg/models.py` (mirrors table columns; `target_types: list[str]` deserialised from JSON on read).
+- **Repo methods on `MemoryRepository`**: `save_actor_ability(ActorAbility)` (upsert), `get_actor_abilities(actor_id) -> list[ActorAbility]`, `delete_actor_ability(actor_id, slug)`. JSON roundtrip of `target_types` verified.
+- Tests in `tests/unit/memory/test_repository.py` class `TestActorAbilities`.
+
+**Slice 2 COMPLETE** — `PlaybookLibrary` + `data/playbooks.json`. 7 new tests (Cycles 9–13).
+
+- **`PlaybookLibrary`** added to `rpg/playbook.py`: `__init__` loads `dungeon_daddy/data/playbooks.json` via `importlib.resources`, validates each entry as `Playbook`; `list() -> list[Playbook]`; `get(slug) -> Playbook` (raises `KeyError` for unknowns).
+- **`data/playbooks.json`** — four bundled playbooks: Fighter (fight/endure ×2, move ×1; Combat Gear; recklessly/brutally/with-discipline), Thief (move/tinker ×2, sense ×1; Thieves' Tools; silently/deftly/unseen), Priest (channel/study ×2, focus ×1; Holy Kit; reverently/austerely), Artificer (tinker/focus ×2, study ×1; Workshop Kit; precisely/experimentally). Each has one kit ability as `starting_abilities` and one `ability_pool` entry.
+- Uses same `importlib.resources.files("dungeon_daddy.data")` pattern as `loop_patterns.json`.
+
+**Slice 1 COMPLETE** — Playbook Pydantic schema. New `dungeon_daddy/rpg/playbook.py` + 11 tests in `tests/unit/rpg/test_playbook.py`.
+
+- **Models:** `PlaybookStressTrack`, `SignatureAdverb`, `PlaybookAbility`, `PlaybookKit`, `Playbook` (all in `rpg/playbook.py`).
+- **Validation:** action keys ∈ 9 universal verbs; ratings 0–3; `track_key` ∈ `{body,composure,bonds,weird}`; `target_types` ∈ `{npc,object,item,room,self,monster}`; `starting_abilities` slugs resolve in kit ∪ pool; no duplicate slugs across kit + pool.
+- **Pure model tests only** — no I/O, no DB. 11 tests written red-first.
 
 **Slice 0 COMPLETE** — party marker survives level-stepper browsing. Committed `975a771` on `phase-49`.
 
@@ -46,13 +71,12 @@ marker uses position-marker icon tinted GOLD (PR #76); `game-icon-finder` skill 
 
 ## Outstanding / Next session
 
-1. **Slice 1 — Playbook Pydantic schema.** New `rpg/playbook.py` with `Playbook` + all nested
-   models. Pure model tests (no I/O); validation rules: verb keys ∈ 9 universal verbs, ratings
-   0–3, track keys ∈ `{body,composure,bonds,weird}`, `starting_abilities` slugs resolve within
-   kit+pool, adverb `target_types` from controlled set. Read `spec/TESTING.md` + invoke TDD skill.
-2. **Slice 2 — `PlaybookLibrary` + bundled JSON.** Loader + `data/playbooks.json` with the four
-   playbooks (Fighter, Thief, Priest, Artificer). Parse + validate tests.
-3. **Slices 3–6** — see `spec/PHASE_49_STARTING_PLAYBOOKS.md` slice plan.
+1. ~~**Slice 1 — Playbook Pydantic schema.**~~ **DONE** — `rpg/playbook.py`, 11 tests green.
+2. ~~**Slice 2 — `PlaybookLibrary` + bundled JSON.**~~ **DONE** — `data/playbooks.json`, `PlaybookLibrary`, 7 tests green.
+3. ~~**Slice 3 — `actor_abilities` schema + repo CRUD.**~~ **DONE** — migration `011`, `ActorAbility` model, 3 repo methods, 8 tests green.
+4. ~~**Slice 4 — Seed-publish wiring.**~~ **DONE** — 9 tests green.
+5. ~~**Slice 5 — Character creation UI**~~ **DONE** — playbook picker in actor form, 12 tests green.
+6. ~~**Slice 6 — Character Sheet panel**~~ **DONE** — playbook/adverbs/abilities sections, 10 tests green.
 4. **Tomb of the Forgotten King save needs the exit backfill** — close the app, then
    `python -m tools.backfill_room_exits "<save dir>" --force` (rewrites `room_exits`
    plus exit labels/status). The Crucible is already backfilled.
@@ -81,7 +105,7 @@ reactions. It must not directly mutate authoritative state.
 
 ## Known Failures
 
-None — full suite green (2803 tests as of 2026-06-19).
+None — full suite green (2867 tests as of 2026-06-19).
 
 ---
 
@@ -91,6 +115,7 @@ Phases 42 and earlier: `spec/HISTORY.md`. Recent completed phases:
 
 | Phase | Summary | Spec |
 |---|---|---|
+| 49 — Starting Playbooks | `Playbook` + nested models + `PlaybookLibrary`; `data/playbooks.json` (4 bundled playbooks); `actor_abilities` table + repo CRUD; seed-publish wiring (ratings/tracks/kit/tags/abilities); playbook picker in Seed editor; Character Sheet panel playbook/adverbs/abilities sections | `spec/PHASE_49_STARTING_PLAYBOOKS.md` |
 | 48 — Dungeon Navigation | `RoomExit` model + `room_exits` schema; `MoveParty` command; exit-condition validator; level transitions; `DiscoverExit`/`UnlockExit`/`SealExit`/`BlockExit`; room context bundle; Play-mode exit-list panel + fog-of-war map; party-presence gate on `PickUpItem`/`ActivateObject` | `spec/PHASE_48_DUNGEON_NAVIGATION.md` |
 | 47 — Room Contents | Items in rooms + interactive objects (state-machine archetypes); `ActivateObject`/`PickUpItem`/`DropItem` commands; `current_room` context block; Campaign Seed editor UI | `spec/PHASE_47_ROOM_CONTENTS.md` |
 | 46 — Inventory System | `Item`/`ItemFeature` models; class-kit/dungeon/gear commands; `compute_effective_ratings`; `mark_level_items_inert`; world-reaction item proposals; Character Sheet UI | issue #71 |

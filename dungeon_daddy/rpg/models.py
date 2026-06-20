@@ -74,6 +74,7 @@ class ActorState(BaseModel):
     stress: dict[str, StressTrack] = Field(default_factory=dict)
     abilities: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
+    playbook_slug: str | None = None
 
 
 class Ability(BaseModel):
@@ -247,6 +248,18 @@ class RoomObject(BaseModel):
         if not v.strip():
             raise ValueError("description must not be empty")
         return v
+
+
+class ActorAbility(BaseModel):
+    actor_id: str
+    ability_slug: str
+    display_name: str
+    description: str
+    source: str  # 'playbook_start' | 'kit' | 'advancement'
+    surfaces_as_verb: bool = False
+    target_types: list[str] = []
+    cost_type: str = "none"
+    cost_amount: int = 0
 
 
 class RoomExit(BaseModel):

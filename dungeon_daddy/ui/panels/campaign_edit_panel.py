@@ -9,6 +9,8 @@ from typing import Any
 import arcade
 import arcade.gui
 
+from dungeon_daddy.rpg.playbook import PlaybookLibrary
+
 from dungeon_daddy.ui.theme import (
     BG_1,
     BG_2,
@@ -89,6 +91,7 @@ _BTN_W = 80
 
 _ACTION_KEYS = ["fight", "move", "tinker", "study", "focus", "sway", "sense", "channel", "endure"]
 _STRESS_KEYS = ["body", "composure", "bonds", "weird"]
+_PLAYBOOK_NONE = "none"
 _REPUTATION_TIERS = ["hostile", "cold", "neutral", "warm", "allied"]
 # Archetype order matches the RoomObjectManifest.archetype Literal.
 _ARCHETYPES = ["container", "door", "mechanism", "structure", "trap", "lore_fixture", "resource"]
@@ -399,6 +402,8 @@ class CampaignEditPanel:
         self._add(cancel_btn)
 
     def _collect_inputs(self) -> dict:
+        if self.mode in ("actor", "new_actor"):
+            return self._collect_actor_inputs()
         if self.mode in ("faction", "new_faction"):
             return self._collect_faction_inputs()
         if self.mode in ("room_object", "new_room_object"):
@@ -407,6 +412,30 @@ class CampaignEditPanel:
         result.update(self._extra_data)
         result.update({k: str(v) for k, v in self._number_values.items()})
         return result
+
+    def _collect_actor_inputs(self) -> dict:
+        result = {k: v.text for k, v in self._inputs.items()}
+        result.update(self._extra_data)
+        result.update({k: str(v) for k, v in self._number_values.items()})
+        options = self._choice_options.get("playbook", [])
+        idx = self._choice_values.get("playbook", 0)
+        slug = options[idx] if 0 <= idx < len(options) else _PLAYBOOK_NONE
+        result["playbook_slug"] = None if slug == _PLAYBOOK_NONE else slug
+        return result
+
+    def _apply_playbook_to_form(self, slug: str | None) -> None:
+        """Pre-populate rating and stress number pickers from a playbook."""
+        if not slug or slug == _PLAYBOOK_NONE:
+            return
+        try:
+            pb = PlaybookLibrary().get(slug)
+        except KeyError:
+            return
+        for action_key, rating in pb.starting_action_ratings.items():
+            self._number_values[f"rating_{action_key}"] = rating
+        track_caps = {t.track_key: t.capacity for t in pb.starting_stress_tracks}
+        for stress_key in _STRESS_KEYS:
+            self._number_values[f"stress_{stress_key}"] = track_caps.get(stress_key, 0)
 
     def _collect_room_object_inputs(self) -> dict:
         result = {k: v.text for k, v in self._inputs.items()}
@@ -448,6 +477,7 @@ class CampaignEditPanel:
         # Preserve actor_type (no UI selector yet — roundtrip via _extra_data)
         self._extra_data["actor_type"] = getattr(actor, "actor_type", "pc")
 
+        initial_pb_slug: str | None = getattr(actor, "playbook_slug", None)
         action_ratings: dict = getattr(actor, "action_ratings", {}) or {}
         stress_caps: dict[str, int] = {}
         for track in getattr(actor, "stress_tracks", []):
@@ -510,6 +540,54 @@ class CampaignEditPanel:
             self._add(plus_btn)
             cursor += h + _ROW_GAP
 
+        # Build playbook picker options: sentinel + slugs from library
+        library = PlaybookLibrary()
+        playbooks = library.list()
+        pb_options = [_PLAYBOOK_NONE] + [pb.slug for pb in playbooks]
+        initial_pb_idx = (
+            pb_options.index(initial_pb_slug)
+            if initial_pb_slug and initial_pb_slug in pb_options
+            else 0
+        )
+
+        def _playbook_row(key: str, options: list[str], value_idx: int) -> None:
+            nonlocal cursor
+            h = _ROW_H
+            input_x = fx + _ROW_LABEL_W
+            input_w = fw - _ROW_LABEL_W
+            wy = self._widget_y(cursor, h)
+            cy = wy + h // 2
+
+            self._choice_values[key] = value_idx
+            self._choice_options[key] = options
+            vx = input_x + _BTN_W_PICKER + (input_w - 2 * _BTN_W_PICKER) / 2
+            self._choice_label_centers[key] = (vx, cy)
+
+            prev_btn = arcade.gui.UIFlatButton(
+                x=int(input_x), y=wy, width=_BTN_W_PICKER, height=h,
+                text="<", style=_btn_style("default"),
+            )
+            next_btn = arcade.gui.UIFlatButton(
+                x=int(input_x + input_w - _BTN_W_PICKER), y=wy, width=_BTN_W_PICKER, height=h,
+                text=">", style=_btn_style("default"),
+            )
+
+            @prev_btn.event
+            def on_click(event: arcade.gui.UIOnClickEvent, _k: str = key, _n: int = len(options)) -> None:
+                new_idx = (self._choice_values[_k] - 1) % _n
+                self._choice_values[_k] = new_idx
+                self._apply_playbook_to_form(options[new_idx])
+
+            @next_btn.event  # type: ignore[no-redef]
+            def on_click(event: arcade.gui.UIOnClickEvent, _k: str = key, _n: int = len(options)) -> None:  # noqa: F811
+                new_idx = (self._choice_values[_k] + 1) % _n
+                self._choice_values[_k] = new_idx
+                self._apply_playbook_to_form(options[new_idx])
+
+            self._add(prev_btn)
+            self._add(next_btn)
+            cursor += h + _ROW_GAP
+
         # Basic fields
         _lbl("NAME")
         _inp("display_name", getattr(actor, "display_name", ""))
@@ -518,7 +596,11 @@ class CampaignEditPanel:
         _lbl("CONCEPT")
         _inp("concept", getattr(actor, "concept", "") or "", h=80, multiline=True)
 
-        # Action ratings
+        # Playbook picker
+        _lbl("── PLAYBOOK ──", INK_2)
+        _playbook_row("playbook", pb_options, initial_pb_idx)
+
+        # Action ratings — pre-populated from playbook if one is set
         _lbl("── ACTION RATINGS ──", INK_2)
         for key in _ACTION_KEYS:
             _number_row(key, f"rating_{key}", action_ratings.get(key, 0))
@@ -527,6 +609,9 @@ class CampaignEditPanel:
         _lbl("── STRESS TRACKS ──", INK_2)
         for key in _STRESS_KEYS:
             _number_row(key, f"stress_{key}", stress_caps.get(key, 0))
+
+        # Pre-populate number values from playbook (overrides manifest defaults if slug set)
+        self._apply_playbook_to_form(initial_pb_slug)
 
         self._add_save_cancel(cursor + 8)
 

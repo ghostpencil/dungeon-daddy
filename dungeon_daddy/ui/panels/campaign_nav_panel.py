@@ -15,7 +15,6 @@ from dungeon_daddy.ui.theme import (
     LINE,
     PAD_MD,
     PAD_SM,
-    TEAL,
     TEXT_LG,
     TEXT_SM,
     draw_chip,
@@ -25,9 +24,6 @@ from dungeon_daddy.ui.theme import (
 HEADER_H: float = 38
 TITLE_AREA_H: float = 56   # campaign title area between kicker and first section row
 ROW_H: float = 32
-
-_BTN_H: float = 26.0
-_BTN_PAD: float = 8.0
 
 _SECTION_META: dict[str, tuple[str, str]] = {
     "player_side": ("✦", "PARTY"),
@@ -70,21 +66,6 @@ class CampaignNavPanel:
         return None
 
     # ------------------------------------------------------------------
-    # Button hit-tests
-    # ------------------------------------------------------------------
-
-    def _save_btn_cx_cy_w(self) -> tuple[float, float, float]:
-        cx = self._x + self._w / 2
-        cy = self._y + _BTN_PAD + _BTN_H / 2
-        w = self._w - 2 * _BTN_PAD
-        return cx, cy, w
-
-    def save_btn_at(self, x: float, y: float) -> bool:
-        cx, cy, bw = self._save_btn_cx_cy_w()
-        return (cx - bw / 2 <= x <= cx + bw / 2 and
-                cy - _BTN_H / 2 <= y <= cy + _BTN_H / 2)
-
-    # ------------------------------------------------------------------
     # Drawing
     # ------------------------------------------------------------------
 
@@ -93,7 +74,6 @@ class CampaignNavPanel:
         active_section: str | None,
         title: str | None,
         counts: dict[str, int],
-        is_dirty: bool,
     ) -> None:
         px, py, pw, ph = self._x, self._y, self._w, self._h
 
@@ -158,14 +138,3 @@ class CampaignNavPanel:
 
             # Row divider
             arcade.draw_line(px, row_bot, px + pw, row_bot, LINE, 1)
-
-        # Save button
-        save_cx, save_cy, save_w = self._save_btn_cx_cy_w()
-        save_color = TEAL if is_dirty else INK_4
-        arcade.draw_rect_filled(arcade.XYWH(save_cx, save_cy, save_w, _BTN_H), BG_2)
-        arcade.draw_rect_outline(arcade.XYWH(save_cx, save_cy, save_w, _BTN_H), save_color, 1)
-        arcade.draw_text(
-            "SAVE", save_cx, save_cy, save_color,
-            font_size=TEXT_SM, font_name=FONT_MONO,
-            anchor_x="center", anchor_y="center",
-        )

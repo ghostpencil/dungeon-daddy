@@ -111,27 +111,6 @@ def test_section_at_returns_none_below_last_section():
 
 
 # ---------------------------------------------------------------------------
-# CampaignNavPanel button hit-tests
-# ---------------------------------------------------------------------------
-#
-# Panel: x=0, y=0, w=220
-# _BTN_H=26, _BTN_PAD=8
-# Save button: cx=110, cy=8+13=21, w=204 → y ∈ [8, 34]
-# Load/New:    btn_w=(220-24)/2=98; cy=8+26+8+13=55 → y ∈ [42, 68]
-#   load_cx = 0+8+49=57  → x ∈ [8, 106]
-#   new_cx  = 0+8+98+8+49=163 → x ∈ [114, 212]
-
-def test_save_btn_at_centre_returns_true():
-    p = _nav_panel()
-    assert p.save_btn_at(110, 21) is True
-
-
-def test_save_btn_at_outside_returns_false():
-    p = _nav_panel()
-    assert p.save_btn_at(110, 50) is False
-
-
-# ---------------------------------------------------------------------------
 # CampaignListPanel.item_at
 # ---------------------------------------------------------------------------
 #

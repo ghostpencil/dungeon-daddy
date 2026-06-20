@@ -145,7 +145,6 @@ class CampaignView(arcade.View):
             self.active_section,
             self.manifest.title if self.manifest else None,
             self._section_counts(),
-            self.is_dirty,
         )
         breadcrumb = None
         if self.active_section == "rooms" and self._selected_room_id is not None:
@@ -176,10 +175,6 @@ class CampaignView(arcade.View):
             if section == "validation":
                 self.run_validation()
             return
-        if self._nav_panel.save_btn_at(x, y) and self.is_dirty:
-            self.save_seed()
-            return
-
         if (self.active_section == "rooms" and self._selected_room_id is not None
                 and self._list_panel.back_btn_at(x, y)):
             self.set_selected_room(None)
@@ -306,6 +301,10 @@ class CampaignView(arcade.View):
         if idx >= len(items):
             return
         item = items[idx]
+        label = getattr(item, "display_name", None) or getattr(item, "label", None) or str(item)
+        confirmed = self.window._ask_yes_no("Delete", f"Delete \"{label}\"?")
+        if not confirmed:
+            return
         if s in ("player_side", "monsters", "npcs", "factions"):
             self.remove_actor(item.slug)
         elif s == "clocks":
@@ -320,6 +319,7 @@ class CampaignView(arcade.View):
             # Only placed room objects are deletable; dungeon rooms are not.
             if self._selected_room_id is not None:
                 self.remove_room_object(item.slug)
+        self.save_seed()
         self._clear_selection()
 
     def _on_form_save(self, data: dict) -> None:
@@ -463,6 +463,7 @@ class CampaignView(arcade.View):
                     if data.get("archetype"):
                         existing.archetype = data["archetype"]
                     self.is_dirty = True
+        self.save_seed()
         self._clear_selection()
 
     def _clear_selection(self) -> None:

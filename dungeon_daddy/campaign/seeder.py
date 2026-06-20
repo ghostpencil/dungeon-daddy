@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, FactionManifest, ItemManifest, RoomObjectManifest, RoomExitSeed
 from dungeon_daddy.memory.repository import MemoryRepository
+from dungeon_daddy.rpg.models import ActorAbility
+from dungeon_daddy.rpg.playbook import Playbook, PlaybookLibrary
 
 if TYPE_CHECKING:
     from dungeon_daddy.data.models import Dungeon
@@ -101,26 +103,102 @@ def _seed_actor(
         result.skipped += 0 if existing is None else 1
         return
 
-    if existing is None:
-        repo.save_actor(actor_id, campaign_id, actor.actor_type, actor.slug, actor.display_name, actor.status)
-        for action_key, rating in actor.action_ratings.items():
+    playbook = PlaybookLibrary().get(actor.playbook_slug) if actor.playbook_slug else None
+    all_tags = list(dict.fromkeys(actor.tags + (playbook.tags if playbook else [])))
+
+    if existing is None or force:
+        repo.save_actor(actor_id, campaign_id, actor.actor_type, actor.slug, actor.display_name, actor.status, playbook_slug=actor.playbook_slug, tags=all_tags)
+        ratings = actor.action_ratings if actor.action_ratings else (
+            playbook.starting_action_ratings if playbook else {}
+        )
+        for action_key, rating in ratings.items():
             repo.save_actor_action_rating(actor_id, action_key, rating)
-        for track in actor.stress_tracks:
-            if isinstance(track, dict):
-                repo.save_actor_stress_track(
-                    actor_id,
-                    track.get("track_key", "body"),
-                    capacity=track.get("capacity", 6),
-                    filled=track.get("filled", 0),
-                )
-        result.created += 1
-    elif force:
-        repo.save_actor(actor_id, campaign_id, actor.actor_type, actor.slug, actor.display_name, actor.status)
-        for action_key, rating in actor.action_ratings.items():
-            repo.save_actor_action_rating(actor_id, action_key, rating)
-        result.updated += 1
+        if existing is None:
+            tracks_to_seed = actor.stress_tracks if actor.stress_tracks else (
+                [{"track_key": t.track_key, "capacity": t.capacity, "filled": 0}
+                 for t in playbook.starting_stress_tracks]
+                if playbook else []
+            )
+            for track in tracks_to_seed:
+                if isinstance(track, dict):
+                    repo.save_actor_stress_track(
+                        actor_id,
+                        track.get("track_key", "body"),
+                        capacity=track.get("capacity", 6),
+                        filled=track.get("filled", 0),
+                    )
+        if playbook:
+            kit_manifest = ItemManifest(
+                slug=playbook.starting_kit.slug,
+                display_name=playbook.starting_kit.display_name,
+                item_type="class_kit",
+                description=playbook.starting_kit.description,
+                owner_slug=actor.slug,
+                charges_max=playbook.starting_kit.charges_max,
+            )
+            _seed_item(kit_manifest, repo, campaign_id, campaign_slug, result, dry_run=dry_run, force=force)
+            _seed_actor_abilities(playbook, actor_id, repo, dry_run=dry_run, force=force)
+        if existing is None:
+            result.created += 1
+        else:
+            result.updated += 1
     else:
         result.skipped += 1
+
+
+def _seed_actor_abilities(
+    playbook: Playbook,
+    actor_id: str,
+    repo: MemoryRepository,
+    dry_run: bool,
+    force: bool,
+) -> None:
+    existing = {a.ability_slug for a in repo.get_actor_abilities(actor_id)}
+
+    kit_slugs = {a.slug for a in playbook.starting_kit.abilities}
+    all_kit = {a.slug: a for a in playbook.starting_kit.abilities}
+    pool_by_slug = {a.slug: a for a in playbook.ability_pool}
+
+    abilities_to_write: list[ActorAbility] = []
+    for slug, kit_ability in all_kit.items():
+        abilities_to_write.append(
+            ActorAbility(
+                actor_id=actor_id,
+                ability_slug=slug,
+                display_name=kit_ability.display_name,
+                description=kit_ability.description,
+                source="kit",
+                surfaces_as_verb=kit_ability.surfaces_as_verb,
+                target_types=kit_ability.target_types,
+                cost_type=kit_ability.cost_type,
+                cost_amount=kit_ability.cost_amount,
+            )
+        )
+
+    # Pool abilities explicitly listed in starting_abilities (not from kit)
+    for slug in playbook.starting_abilities:
+        if slug not in kit_slugs and slug in pool_by_slug:
+            pool_ability = pool_by_slug[slug]
+            abilities_to_write.append(
+                ActorAbility(
+                    actor_id=actor_id,
+                    ability_slug=slug,
+                    display_name=pool_ability.display_name,
+                    description=pool_ability.description,
+                    source="playbook_start",
+                    surfaces_as_verb=pool_ability.surfaces_as_verb,
+                    target_types=pool_ability.target_types,
+                    cost_type=pool_ability.cost_type,
+                    cost_amount=pool_ability.cost_amount,
+                )
+            )
+
+    if dry_run:
+        return
+
+    for ability in abilities_to_write:
+        if ability.ability_slug not in existing or force:
+            repo.save_actor_ability(ability)
 
 
 def _seed_clock(

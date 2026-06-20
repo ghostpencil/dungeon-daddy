@@ -17,8 +17,12 @@ from dungeon_daddy.views.campaign_view import CampaignView
 
 def _make_view() -> CampaignView:
     """Construct CampaignView without arcade initialisation."""
+    from unittest.mock import MagicMock
     view = CampaignView.__new__(CampaignView)
     view._init_state()
+    mock_window = MagicMock()
+    mock_window._ask_yes_no.return_value = True
+    view.window = mock_window
     return view
 
 

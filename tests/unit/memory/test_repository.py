@@ -197,3 +197,131 @@ class TestMemoryRepository:
         conn.close()
         repo.close()
         assert "dungeon_slug" in cols
+
+
+# ---------------------------------------------------------------------------
+# actor_abilities — Cycles 14–21
+# ---------------------------------------------------------------------------
+
+
+class TestActorAbilities:
+    def test_migration_011_creates_actor_abilities_table(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        tables = repo.list_tables()
+        repo.close()
+        assert "actor_abilities" in tables
+
+    def test_migration_011_adds_playbook_slug_to_actors(self, tmp_path: Path) -> None:
+        import duckdb
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.close()
+        conn = duckdb.connect(str(tmp_path / "test.duckdb"))
+        cols = [row[1] for row in conn.execute("PRAGMA table_info('actors')").fetchall()]
+        conn.close()
+        assert "playbook_slug" in cols
+
+    def test_get_actor_abilities_returns_empty_when_none(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        result = repo.get_actor_abilities("actor:x:nobody")
+        repo.close()
+        assert result == []
+
+    def test_save_and_get_actor_ability_roundtrip(self, tmp_path: Path) -> None:
+        from dungeon_daddy.rpg.models import ActorAbility
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        ability = ActorAbility(
+            actor_id="actor:campaign:hero",
+            ability_slug="combat-gear",
+            display_name="Combat Gear",
+            description="A kit of fighting tools.",
+            source="kit",
+        )
+        repo.save_actor_ability(ability)
+        result = repo.get_actor_abilities("actor:campaign:hero")
+        repo.close()
+        assert len(result) == 1
+        assert result[0].ability_slug == "combat-gear"
+        assert result[0].display_name == "Combat Gear"
+        assert result[0].source == "kit"
+
+    def test_actor_ability_target_types_roundtrip(self, tmp_path: Path) -> None:
+        from dungeon_daddy.rpg.models import ActorAbility
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        ability = ActorAbility(
+            actor_id="actor:campaign:hero",
+            ability_slug="strike",
+            display_name="Strike",
+            description="A melee attack.",
+            source="playbook_start",
+            surfaces_as_verb=True,
+            target_types=["npc", "monster"],
+        )
+        repo.save_actor_ability(ability)
+        result = repo.get_actor_abilities("actor:campaign:hero")
+        repo.close()
+        assert result[0].target_types == ["npc", "monster"]
+        assert result[0].surfaces_as_verb is True
+
+    def test_save_actor_ability_is_idempotent(self, tmp_path: Path) -> None:
+        from dungeon_daddy.rpg.models import ActorAbility
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.save_actor_ability(ActorAbility(
+            actor_id="actor:c:hero",
+            ability_slug="strike",
+            display_name="Strike",
+            description="First.",
+            source="kit",
+        ))
+        repo.save_actor_ability(ActorAbility(
+            actor_id="actor:c:hero",
+            ability_slug="strike",
+            display_name="Strike Updated",
+            description="Second.",
+            source="kit",
+        ))
+        result = repo.get_actor_abilities("actor:c:hero")
+        repo.close()
+        assert len(result) == 1
+        assert result[0].display_name == "Strike Updated"
+
+    def test_delete_actor_ability_removes_only_that_slug(self, tmp_path: Path) -> None:
+        from dungeon_daddy.rpg.models import ActorAbility
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        for slug, name in [("strike", "Strike"), ("dodge", "Dodge")]:
+            repo.save_actor_ability(ActorAbility(
+                actor_id="actor:c:hero",
+                ability_slug=slug,
+                display_name=name,
+                description="desc",
+                source="kit",
+            ))
+        repo.delete_actor_ability("actor:c:hero", "strike")
+        result = repo.get_actor_abilities("actor:c:hero")
+        repo.close()
+        assert len(result) == 1
+        assert result[0].ability_slug == "dodge"
+
+    def test_migration_011_applies_on_existing_db(self, tmp_path: Path) -> None:
+        import shutil
+        staged_dir = tmp_path / "migrations_staged"
+        staged_dir.mkdir()
+        for f in sorted(MIGRATIONS_DIR.glob("*.sql")):
+            if f.name >= "011":
+                break
+            shutil.copy(f, staged_dir / f.name)
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(staged_dir)
+        repo.close()
+        shutil.copy(MIGRATIONS_DIR / "011_actor_abilities.sql", staged_dir / "011_actor_abilities.sql")
+        repo2 = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo2.initialize_schema(staged_dir)
+        tables = repo2.list_tables()
+        repo2.close()
+        assert "actor_abilities" in tables
