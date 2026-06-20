@@ -3,7 +3,7 @@
 ## Phase
 
 Phase: **50 — Hybrid Action Model (BUILD — in progress)**
-Status: On branch **`phase-50`** (not pushed). Slices **1–4 of 8** complete. Suite green.
+Status: On branch **`phase-50`** (not pushed). Slices **1–5 of 8** complete. Suite green (2913).
 
 Spec: **`spec/PHASE_50_HYBRID_ACTION_MODEL.md`** (8-slice plan, no GitHub issue yet).
 Roadmap: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (Phase 50 rows). Prior phase spec:
@@ -13,7 +13,8 @@ Phase 50 commits (on top of pre-phase cleanup, all on `phase-50`):
 - `da3c2b6` Slice 1 — verb provider + spec
 - `48447a0` Slice 2 — noun provider + actor room-presence
 - `0f99981` Slice 3 — adverb provider
-- Slice 4 — `ActionCard` model + `validate_card` (this session, pending commit)
+- `9c3b65a` Slice 4 — `ActionCard` model + `validate_card`
+- `68d7060` Slice 5 — Card → `PlayerCommand` resolution (`rpg/action_resolution.py`)
 
 **Phase 48 locked decisions** (still relevant — Phase 50 reuses the `how?` contract):
 - `MoveParty(exit_id, how)` is a **Player Command** in `rpg/command.py` (not a proposal).
@@ -34,22 +35,32 @@ Full detail: `spec/PHASE_49_STARTING_PLAYBOOKS.md` + git `94c5fcb`.
 
 ## Outstanding / Next session
 
-**START HERE → Phase 50 Slice 5 — Card → PlayerCommand resolution.** Add `resolve_card(card,
-...)` mapping a Card whose verb is an engine mutation to the right `PlayerCommand`
-(`move`→`MoveParty(how=adverb)`, pick up→`PickUpItem`, activate→`ActivateObject`,
-equip→`EquipItem`, …), carrying the adverb through as `how`. *(unit + 1 integration)*.
-Open question to resolve at slice start: verb→command map location — new
-`rpg/action_resolution.py` vs. extending `command.py` (lean: new module). Then Slice 6 (Card
-→ action roll), Slice 7 (UI VNA dropdown panel — per auto-memory
+**START HERE → Phase 50 Slice 6 — Card → action roll resolution.** For non-command verbs
+(`fight`/`study`/`sway`/…, where `resolve_card` returns `None`), build the dice pool (actor
+rating + adverb `dice:±N` flags + momentum), roll, return outcome tier + applied
+world-side-effect flags. Reuse the existing roll module — **confirm its entry point first**
+(open question 2: does Card resolution call the roller directly or emit a "roll request"?).
+*(unit + 1 integration)*. Then Slice 7 (UI VNA dropdown panel — per auto-memory
 `project_phase50_vna_dropdowns`), Slice 8 (wire into PlayView, retire `how_chips`).
 
-**Slice 4 done (this session):** `ActionCard(verb, noun_id, adverb)` Pydantic model,
-`CardOptions(verbs, nouns, adverbs)` bundle, `CardError(field, reason)`, and
-`validate_card(card, options) -> CardError | None` — all in `rpg/action_options.py`. The
-validator rejects the first slot (verb→noun→adverb order) not in the offered sets,
-engine-bounded mirror of proposal validation. The three feeding providers are done (Slices
-1–3, same module). Full slice plan + locked contracts in
-**`spec/PHASE_50_HYBRID_ACTION_MODEL.md`**.
+**⚠ Carry-forward gap found in Slice 5 (fix before pick-up/equip/activate run live):** the
+`current_room` context block (`memory/context_bundle.py:177-196`) keys **objects and loose
+items by `slug`**, but `ActivateObject`/`PickUpItem`/`EquipItem` need the full
+`object_id`/`item_id`. So `available_nouns` surfaces slugs as `noun_id`, and `resolve_card`
+faithfully passes them through — meaning those three commands would receive a slug where the
+engine expects a full id. **`move` works end-to-end** (the noun_id *is* the `exit_id`; npcs/
+monsters already carry `actor_id`). Fix = have the noun provider surface full ids for
+objects/items (a Slice 2 id-scheme correction), then add object/item integration coverage.
+The Slice 5 commit message records this too.
+
+**Slice 5 done (this session) — `68d7060`:** new `rpg/action_resolution.py` with
+`resolve_card(card, *, actor_id, trigger=None) -> PlayerCommand | None`:
+`move`→`MoveParty(exit_id=noun_id, how=adverb)`, `pick-up`→`PickUpItem`, `equip`→`EquipItem`,
+`activate`→`ActivateObject` (raises if no `trigger`); other verbs → `None` (Slice 6 path).
+Verb-slug constants (`VERB_MOVE`/`VERB_PICK_UP`/`VERB_EQUIP`/`VERB_ACTIVATE`) live in
+`action_options.py` as the single source of truth; `available_verbs` now also surfaces the
+three interaction verbs (`kind="interaction"`) so those Cards are pickable. Integration test
+drives the full grammar→engine chain on the move path.
 
 **Slice 3 design note (carry forward):** `available_adverbs` is **self-contained in the
 engine** — it mirrors the `ui/how_chips` surfacing logic but depends only on
