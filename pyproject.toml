@@ -44,6 +44,11 @@ include = ["dungeon_daddy*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Evals make live, non-deterministic, paid LLM calls — they are a manual quality
+# gauge, not part of the deterministic suite. Exclude them by default so a full
+# `pytest` run stays green even when OPENAI_API_KEY is set. Run them explicitly
+# with `pytest -m eval` (a command-line -m overrides this default).
+addopts = "-m 'not eval'"
 markers = [
     "live_api: requires a real API key; skipped in CI unless key is set",
     "eval: AI output quality evals; require live API; run manually with pytest -m eval",
