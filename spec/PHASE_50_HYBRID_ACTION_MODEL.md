@@ -1,9 +1,19 @@
 # Phase 50 — Hybrid Action Model
 
-Status: **BUILD** (started 2026-06-20, branch `phase-50`).
+Status: **COMPLETE** (started 2026-06-20, finished 2026-06-23, branch `phase-50`).
 Depends on: 47 (room contents), 48 (navigation + `how?` contract), 49 (playbooks).
 Roadmap source: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (Phase 50 rows + "Key design
 resolutions" 2026-06-17).
+
+> **Done 2026-06-23.** All 8 slices (+5.1) shipped; the `VnaActionPanel` (Verb·Noun·Adverb
+> Card panel) is wired into PlayView, replacing the provisional `how_chips` strip. On-screen
+> visual verify passed: VNA dropdowns + verb→noun filtering, hybrid exit labels, Study
+> narration + inventory, lock glyph, and compass/exit-label orientation (final fix `796314a` —
+> exit directions now derive from the **rendered layout** coords + an 8-point y-up compass,
+> not raw `dungeon.json` grid). Suite green. Two **deliberate carry-outs** (not bugs, decide
+> in Phase 51): the `activate` verb isn't wired (needs trigger selection), and
+> push-yourself/momentum controls are absent from the VNA surface. See `spec/PROJECT_INDEX.md`
+> "Outstanding / Next session" for the full verify log.
 
 ---
 

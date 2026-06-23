@@ -1226,19 +1226,42 @@ sections.
 7 TDD slices (0–6): party-marker navigation fix; Pydantic schema; PlaybookLibrary + bundled JSON;
 DB migration + repo CRUD; seed wiring; character creation UI; Character Sheet panel. 57 new tests.
 
+## Phase 50 — Hybrid Action Model (COMPLETE)
+
+**Status: Complete (2026-06-23) — suite green**
+Spec: `spec/PHASE_50_HYBRID_ACTION_MODEL.md`
+Branch: `phase-50`
+
+Structured **Verb · Noun · Adverb** action input — a *Card* that is the input-dual of an
+`LLMReactionProposal`: the player declares an action through engine-offered choices, the
+engine resolves it, the LLM only narrates. 8 TDD slices (+5.1): verb provider
+(`available_verbs`), noun provider (`available_nouns` + actor room-presence, migration
+`012_actor_room.sql`), adverb provider (`available_adverbs`), `ActionCard` model +
+`validate_card`, Card → `PlayerCommand` resolution (`rpg/action_resolution.py::resolve_card`),
+Card → action-roll resolution (`resolve_card_roll`), the `VnaActionPanel` (real Verb/Noun/Adverb
+dropdowns), and wiring into PlayView (retiring the provisional `how_chips` strip). Verb→noun
+filtering, hybrid exit labels (compass direction → room name once visited), and Study-narration
++ inventory fixes landed during visual verify. Exit-label compass reads the **rendered layout**
+positions (8-point, y-up) so directions match the on-screen map (`796314a`).
+
+**Deliberate carry-outs to Phase 51** (decisions, not bugs): the `activate` verb is not wired
+(needs a trigger-selection step), and push-yourself/momentum controls are absent from the VNA
+surface (they lived in the retired `PlayerActionPanel` ACTION tab).
+
 ---
 
 # Planned Roadmap — Phases 49–53
 
 These phases are **defined on the GitHub Projects roadmap** (`ghostpencil/dungeon-daddy`,
-project #1) and are **not yet implemented**. Numbering and scope below mirror that board.
-A detailed `spec/PHASE_NN_*.md` is written when each phase actually starts.
+project #1). Phases 48–50 are **complete**; **51–53 are not yet implemented**. Numbering and
+scope below mirror that board. A detailed `spec/PHASE_NN_*.md` is written when each phase
+actually starts.
 
 | Phase | Title | One-line scope |
 |---|---|---|
 | 48 | Dungeon Navigation | Room exits, party location, level connectors — **COMPLETE** |
 | 49 | Starting Playbooks | Class foundations: ratings, tracks, kit, **tags**, **signature adverbs**, starting abilities — **COMPLETE** |
-| 50 | Hybrid Action Model | Structured **Verb · Noun · Adverb** action input; LLM narrates only |
+| 50 | Hybrid Action Model | Structured **Verb · Noun · Adverb** action input; LLM narrates only — **COMPLETE** |
 | 51 | Talk to the Dungeon | Intimacy-gated freeform channel at resonance points |
 | 52 | Milestone Advancement | Playbook beats, ranks to 5, ability unlocks |
 | 53 | Threat Behavior & Monster Reactions | Instinct-driven, engine-bounded monster reactions (no enemy turn); boss phases via clock thresholds |
