@@ -296,10 +296,19 @@ reactions. It must not directly mutate authoritative state.
 
 ## Known Failures
 
-None blocking — full suite green (2026-06-22, after the visual-verify fixes): 2963 passed.
-`tests/evals/test_generator_evals.py::test_generator_level_passes_validation` is **flaky**
-(non-deterministic LLM generator eval); it failed once in a full run and passed standalone on
-re-run. Not related to the verify-fix work.
+**None.** Full unit/integration suite green; the previously-flaky generator eval is resolved
+(2026-06-23, `26e95a3` on `main`):
+- **Root cause was structural** — evals were never excluded from the default run
+  (`testpaths=["tests"]`, no `addopts`), so a full `pytest` with `OPENAI_API_KEY` set (the
+  project requires it) ran the live, non-deterministic evals every time. Fixed with
+  `addopts = "-m 'not eval'"` in `pyproject.toml`; the deterministic suite no longer collects
+  evals. Run them deliberately with **`pytest -m eval`** (a command-line `-m` overrides the
+  default).
+- **The eval itself was also stricter than production** — it asserted *one-shot* validity, but
+  `design_view` regenerates-with-errors up to 3 retries. `test_generator_level_passes_validation`
+  now mirrors that retry budget, so a failure is a real regression, not a coin flip. Ran live
+  2026-06-23: 3/3 generator evals pass. (`tools/run_evals.py` compares pass **counts**, so this
+  is not a baseline regression.)
 
 ---
 
