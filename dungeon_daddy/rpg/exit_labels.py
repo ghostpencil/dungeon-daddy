@@ -5,11 +5,16 @@ undiscovered rooms: a discovered-but-unvisited exit shows a compass *direction*
 derived from the two rooms' grid centres; once the destination has been visited
 the label upgrades to the room name. Pure logic — no DB, no Arcade.
 
-Grid convention (matches ``data/dungeon.js``): ``+x`` is east, ``+y`` is south
-(map north is up).
+Coordinate convention: directions are derived from the **rendered layout**
+positions the player actually sees on the map (Arcade y-up screen space), not
+the raw ``dungeon.json`` grid — the layout pipeline re-grids rooms by their
+connections, so a raw "far east" room can render directly south of the hub.
+``+x`` is east, ``+y`` is north (screen up). Eight points so diagonal rooms
+read honestly (e.g. ``"southwest"``).
 """
 from __future__ import annotations
 
+import math
 from typing import Mapping, Collection
 
 # Prepended to an exit whose revealed status is a key-gated lock. A padlock glyph
@@ -26,20 +31,28 @@ def _center(room) -> tuple[float, float]:
     return (room.x + room.w / 2, room.y + room.h / 2)
 
 
-def compass_direction(from_room, to_room) -> str | None:
-    """Cardinal direction from one room to another by grid centre.
+# Eight compass points indexed by atan2 octant (0 = east, counter-clockwise),
+# with ``+y`` pointing north (the renderer's y-up screen space).
+_OCTANTS = (
+    "east", "northeast", "north", "northwest",
+    "west", "southwest", "south", "southeast",
+)
 
-    Returns the dominant axis (``"north"``/``"south"``/``"east"``/``"west"``),
-    or ``None`` when the two centres coincide.
+
+def compass_direction(from_room, to_room) -> str | None:
+    """Eight-point compass direction from one room to another by centre.
+
+    Returns one of the eight :data:`_OCTANTS` names, or ``None`` when the two
+    centres coincide. ``+y`` is north, so a destination drawn below the source
+    reads ``"south"``.
     """
     fx, fy = _center(from_room)
     tx, ty = _center(to_room)
     dx, dy = tx - fx, ty - fy
     if dx == 0 and dy == 0:
         return None
-    if abs(dx) >= abs(dy):
-        return "east" if dx > 0 else "west"
-    return "south" if dy > 0 else "north"
+    octant = round(math.degrees(math.atan2(dy, dx)) / 45.0) % 8
+    return _OCTANTS[octant]
 
 
 def exit_noun_label(

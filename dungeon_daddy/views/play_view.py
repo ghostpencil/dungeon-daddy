@@ -72,6 +72,21 @@ class DMResult:
     content: str
     error: str | None = None
 
+
+@dataclass(frozen=True)
+class _PositionedRoom:
+    """A room's rendered-layout geometry + name, for exit compass labels.
+
+    Exposes the same ``x``/``y``/``w``/``h``/``name`` surface a ``Room`` does so
+    :func:`dungeon_daddy.rpg.exit_labels.exit_noun_label` can consume it, but the
+    coordinates are the layout-pipeline positions the map actually draws.
+    """
+    x: float
+    y: float
+    w: float
+    h: float
+    name: str
+
 _log = logging.getLogger(__name__)
 
 _CELL_PX = 48
@@ -1108,13 +1123,35 @@ class PlayView(arcade.View):
         return {**room_context, "exits": prepared}
 
     def _current_level_rooms(self, room_id: str):
-        """``({room_id: Room}, current Room)`` for the active level, else ``({}, None)``."""
+        """``({room_id: positioned room}, current room)`` for the active level.
+
+        Positions come from the **rendered layout** (the same
+        ``run_layout_pipeline`` output the map draws), so exit compass
+        directions match what the player sees — the layout re-grids rooms by
+        their connections, which can move a raw "far east" room directly south
+        of the hub. Falls back to raw geometry if the layout can't be built,
+        and to ``({}, None)`` when no dungeon is loaded.
+        """
         if self._dungeon is None or self._state is None:
             return {}, None
         idx = self._state.current_level_idx
         if not (0 <= idx < len(self._dungeon.levels)):
             return {}, None
-        rooms = {r.id: r for r in self._dungeon.levels[idx].rooms}
+        from dungeon_daddy.map.dungeon_layout import run_layout_pipeline
+
+        level = self._dungeon.levels[idx]
+        names = {r.id: r.name for r in level.rooms}
+        try:
+            result = run_layout_pipeline(level)
+        except Exception:
+            rooms = {r.id: r for r in level.rooms}
+            return rooms, rooms.get(room_id)
+        rooms = {
+            rid: _PositionedRoom(
+                x=rect.x, y=rect.y, w=rect.w, h=rect.h, name=names.get(rid, ""),
+            )
+            for rid, rect in result.rooms.items()
+        }
         return rooms, rooms.get(room_id)
 
     def _on_vna_submit(self, card) -> None:

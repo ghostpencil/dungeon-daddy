@@ -136,6 +136,52 @@ def test_refresh_vna_panel_disambiguates_doors_by_direction(tmp_path):
     assert labels["e-south"] == "Door South"
 
 
+def _dungeon_with_connected_rooms(rooms, connections):
+    from dungeon_daddy.data.models import (
+        Connection, Dungeon, DungeonMeta, Level, Room,
+    )
+
+    room_models = [
+        Room(id=rid, num=i + 1, name=name, x=x, y=y, w=2, h=2, type="room", note="")
+        for i, (rid, name, x, y) in enumerate(rooms)
+    ]
+    conn_models = [Connection(from_room=a, to_room=b, type="hall") for a, b in connections]
+    level = Level(
+        id=0, name="L1", summary="", ecology="", loop="",
+        width=60, height=20, entries=[], rooms=room_models, connections=conn_models,
+    )
+    meta = DungeonMeta(title="T", theme="t", setting="s", party="p", quest="q")
+    return Dungeon(meta=meta, levels=[level])
+
+
+def test_refresh_vna_panel_directions_follow_rendered_layout_not_raw_coords(tmp_path):
+    # All three destinations sit due-east of the hub in raw dungeon coords, so
+    # raw geometry would label every door "Door East". The layout pipeline
+    # re-grids them around the hub by their connections, spreading them to
+    # distinct compass points — the panel must follow that rendered layout
+    # (the map the player sees), not the raw coordinates.
+    view = _make_view(tmp_path)
+    view._dungeon = _dungeon_with_connected_rooms(
+        [
+            ("r1", "Hub", 0, 0),
+            ("rE", "East One", 10, 0),
+            ("rE2", "East Two", 20, 0),
+            ("rE3", "East Three", 30, 0),
+        ],
+        [("r1", "rE"), ("r1", "rE2"), ("r1", "rE3")],
+    )
+    _save_exit(view._mem_repo, exit_id="d1", label="Door", to_room_id="rE", status="open")
+    _save_exit(view._mem_repo, exit_id="d2", label="Door", to_room_id="rE2", status="open")
+    _save_exit(view._mem_repo, exit_id="d3", label="Door", to_room_id="rE3", status="open")
+
+    view._refresh_vna_panel()
+
+    labels = {n.noun_id: n.label for n in view._rpg_vna._nouns}
+    door_labels = [labels["d1"], labels["d2"], labels["d3"]]
+    assert door_labels != ["Door East"] * 3  # raw coords would collide here
+    assert len(set(door_labels)) == 3  # layout disambiguates all three
+
+
 def test_refresh_vna_panel_visited_exit_shows_room_name(tmp_path):
     view = _make_view(tmp_path)
     view._dungeon = _dungeon_with_rooms([

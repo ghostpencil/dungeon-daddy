@@ -15,7 +15,8 @@ def _room(rid: str, name: str, x: int, y: int, w: int = 2, h: int = 2) -> Room:
 
 
 # ---------------------------------------------------------------------------
-# compass_direction — grid convention: +x = east, +y = south (north is up)
+# compass_direction — render-space convention: +x = east, +y = north (up).
+# Eight points, so diagonal destinations read honestly.
 # ---------------------------------------------------------------------------
 
 class TestCompassDirection:
@@ -25,15 +26,29 @@ class TestCompassDirection:
     def test_west(self):
         assert compass_direction(_room("a", "A", 10, 0), _room("b", "B", 0, 0)) == "west"
 
-    def test_north(self):
-        assert compass_direction(_room("a", "A", 0, 10), _room("b", "B", 0, 0)) == "north"
+    def test_north_is_higher_y(self):
+        # +y is up/north: a destination at greater y is north of the source.
+        assert compass_direction(_room("a", "A", 0, 0), _room("b", "B", 0, 10)) == "north"
 
-    def test_south(self):
-        assert compass_direction(_room("a", "A", 0, 0), _room("b", "B", 0, 10)) == "south"
+    def test_south_is_lower_y(self):
+        assert compass_direction(_room("a", "A", 0, 10), _room("b", "B", 0, 0)) == "south"
 
-    def test_dominant_axis_wins(self):
-        # Larger horizontal delta than vertical -> east, not south.
-        assert compass_direction(_room("a", "A", 0, 0), _room("b", "B", 10, 3)) == "east"
+    def test_northeast(self):
+        assert compass_direction(_room("a", "A", 0, 0), _room("b", "B", 10, 10)) == "northeast"
+
+    def test_northwest(self):
+        assert compass_direction(_room("a", "A", 0, 0), _room("b", "B", -10, 10)) == "northwest"
+
+    def test_southeast(self):
+        assert compass_direction(_room("a", "A", 0, 0), _room("b", "B", 10, -10)) == "southeast"
+
+    def test_southwest(self):
+        # Diagonally down-and-left (the locked Elevator door in the Crucible).
+        assert compass_direction(_room("a", "A", 0, 0), _room("b", "B", -10, -10)) == "southwest"
+
+    def test_dominant_axis_snaps_to_cardinal(self):
+        # A small vertical delta against a large horizontal one stays "east".
+        assert compass_direction(_room("a", "A", 0, 0), _room("b", "B", 10, 1)) == "east"
 
     def test_coincident_centers_returns_none(self):
         assert compass_direction(_room("a", "A", 0, 0), _room("b", "B", 0, 0)) is None
