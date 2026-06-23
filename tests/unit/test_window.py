@@ -273,6 +273,59 @@ def test_launch_save_game_attaches_rpg_context_from_saves_dir(tmp_path):
     assert call_kwargs.get("portraits_dir") == saves_dir / "my-save" / "assets" / "portraits"
 
 
+def test_launch_save_game_backfills_missing_exits_on_load(tmp_path):
+    """A pre-Phase-48 save (empty room_exits) self-heals when loaded."""
+    import json
+    from pathlib import Path
+
+    from dungeon_daddy.data.models import Connection, Level, Room
+    from dungeon_daddy.memory.repository import MemoryRepository
+
+    migrations = Path("dungeon_daddy/data/migrations")
+    saves_dir = tmp_path / "saves"
+    save_dir = saves_dir / "my-save"
+    save_dir.mkdir(parents=True)
+
+    # Seed a campaign DB with a campaign row but no room_exits (pre-Phase-48 state).
+    repo = MemoryRepository(save_dir / "campaign.duckdb")
+    repo.initialize_schema(migrations)
+    repo.save_campaign(campaign_id="campaign:my-save", slug="my-save", title="My Save")
+    repo.close()
+
+    # Write the dungeon.json the backfill derives exits from.
+    room_a = Room(id="room-a", num=1, name="room-a", x=0, y=0, w=1, h=1, type="room", note="")
+    room_b = Room(id="room-b", num=2, name="room-b", x=0, y=0, w=1, h=1, type="room", note="")
+    level = Level(
+        id=1, name="L1", summary="", ecology="", loop="", width=10, height=10, entries=[],
+        rooms=[room_a, room_b],
+        connections=[Connection.model_validate({"from": "room-a", "to": "room-b", "type": "door"})],
+    )
+    dungeon = _make_dungeon(save_name="my-save")
+    dungeon.levels = [level]
+    (save_dir / "dungeon.json").write_text(
+        json.dumps(dungeon.model_dump(mode="json")), encoding="utf-8"
+    )
+
+    win = _make_window(dungeon)
+    win._save_repo.load.return_value = dungeon
+    win._save_repo._dir = saves_dir
+    win.switch_mode = MagicMock()
+
+    win.launch_save_game("my-save")
+
+    # The load-time repo (passed to the mocked PlayView) keeps the DB open —
+    # close it so the verification repo can read (DuckDB is single-writer).
+    loaded_repo = win._play_view.set_rpg_context.call_args.args[0]
+    loaded_repo.close()
+
+    check = MemoryRepository(save_dir / "campaign.duckdb")
+    check.initialize_schema(migrations)
+    try:
+        assert len(check.get_exits_by_room("campaign:my-save", "room-a")) == 1
+    finally:
+        check.close()
+
+
 # ---------------------------------------------------------------------------
 # Library actions — Slice 6
 # ---------------------------------------------------------------------------

@@ -75,6 +75,7 @@ class ActorState(BaseModel):
     abilities: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     playbook_slug: str | None = None
+    room_id: str | None = None
 
 
 class Ability(BaseModel):

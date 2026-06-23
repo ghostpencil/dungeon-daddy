@@ -43,6 +43,13 @@ class TestSelectActor:
         s.select_actor(None)
         assert s.actor_id is None
 
+    def test_selecting_roster_actor_syncs_index_for_next(self):
+        s = _state()
+        s.set_actor_roster(["hero-1", "hero-2", "hero-3"])
+        s.select_actor("hero-2")          # jump straight to the middle actor
+        s.select_next_actor()             # next must advance from hero-2, not hero-1
+        assert s.actor_id == "hero-3"
+
 
 # ---------------------------------------------------------------------------
 # Slice 3 — select_action valid key

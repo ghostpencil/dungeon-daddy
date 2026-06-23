@@ -196,3 +196,26 @@ def test_build_prompt_no_bundle_returns_system_prompt():
     agent = DungeonMasterAgent(provider=_MockProvider())
     result = agent.build_prompt(context_bundle=None)
     assert result == DungeonMasterAgent.SYSTEM_PROMPT
+
+
+# ---------------------------------------------------------------------------
+# Room contents: the current_room block's objects (name + description) are
+# rendered so the DM can narrate what the party studies/interacts with.
+# ---------------------------------------------------------------------------
+
+def test_build_prompt_includes_room_object_description():
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    agent = DungeonMasterAgent(provider=_MockProvider())
+    bundle = _make_bundle(current_room={
+        "room_id": "r1",
+        "objects": [{
+            "object_id": "obj-board", "slug": "notice-board",
+            "display_name": "Warden's Notice Board", "archetype": "lore_fixture",
+            "current_state": "default",
+            "description": "A bounty for the missing lift-warden's key.",
+        }],
+        "loose_items": [], "npcs": [], "monsters": [], "exits": [],
+    })
+    result = agent.build_prompt(context_bundle=bundle)
+    assert "Warden's Notice Board" in result
+    assert "A bounty for the missing lift-warden's key." in result

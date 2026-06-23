@@ -90,6 +90,17 @@ class TestActorState:
         assert actor.actor_id == "pc_mara"
         assert actor.status == "active"
 
+    def test_room_id_defaults_to_none_and_accepts_value(self) -> None:
+        a = ActorState(
+            actor_id="x", campaign_id="c", actor_type="npc", slug="s", display_name="D"
+        )
+        assert a.room_id is None
+        b = ActorState(
+            actor_id="y", campaign_id="c", actor_type="monster", slug="s2",
+            display_name="D2", room_id="room:level-01:antechamber",
+        )
+        assert b.room_id == "room:level-01:antechamber"
+
     def test_all_actor_types_accepted(self) -> None:
         for t in ("pc", "npc", "monster", "dungeon"):
             a = ActorState(

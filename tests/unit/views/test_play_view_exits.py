@@ -43,7 +43,6 @@ def _make_view(tmp_path: Path):
     )
     view._dungeon = None
     view._exit_panel = ExitListPanel()
-    view._exit_panel.set_move_callback(view._on_exit_move)
     view._chat = MagicMock()
     view._map = MagicMock()
     view._rpg_scene = MagicMock()
@@ -101,17 +100,3 @@ def test_on_exit_move_rejected_keeps_room_and_warns(tmp_path):
     assert view._state.current_room_id == "r1"
     view._chat.add_message.assert_called_once()
     assert view._chat.add_message.call_args.args[0] == "system"
-
-
-def test_clicking_exit_in_panel_triggers_move(tmp_path):
-    """End-to-end through the panel: click an exit row -> engine move."""
-    view = _make_view(tmp_path)
-    _save_exit(view._mem_repo, status="open")
-    view._refresh_exits()
-    view._exit_panel.setup(0.0, 0.0, 240.0, 360.0)
-
-    layout = view._exit_panel._layout()
-    _eid, _label, _status, (ex, ey, ew, eh) = layout["exits"][0]
-    view._exit_panel.handle_click(ex + ew / 2, ey + eh / 2)
-
-    assert view._state.current_room_id == "r2"

@@ -157,7 +157,10 @@ def test_load_player_actors_calls_set_actors(tmp_path: Path):
     view._mem_repo.save_actor("a-pc", "camp-1", "pc", "hero", "Elara")
     view._mem_repo.save_actor("a-npc", "camp-1", "npc", "goblin", "Gob")
     action_panel = MagicMock()
+    action_panel.set_actors.side_effect = lambda a: setattr(action_panel, "_actors", list(a))
     view._rpg_action = action_panel
+    view._rpg_char = MagicMock()
+    view._rpg_fallout = MagicMock()
     view._load_player_actors()
     action_panel.set_actors.assert_called_once()
     actors = action_panel.set_actors.call_args[0][0]
@@ -187,7 +190,10 @@ def test_load_player_actors_excludes_faction_and_dungeon_presence(tmp_path: Path
     view._mem_repo.save_actor("a-faction",  "camp-1", "faction",          "cult",    "The Cult")
     view._mem_repo.save_actor("a-presence", "camp-1", "dungeon_presence", "spirit",  "The Spirit")
     action_panel = MagicMock()
+    action_panel.set_actors.side_effect = lambda a: setattr(action_panel, "_actors", list(a))
     view._rpg_action = action_panel
+    view._rpg_char = MagicMock()
+    view._rpg_fallout = MagicMock()
     view._load_player_actors()
     action_panel.set_actors.assert_called_once()
     actors = action_panel.set_actors.call_args[0][0]

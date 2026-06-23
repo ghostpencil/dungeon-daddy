@@ -3,7 +3,7 @@ from __future__ import annotations
 from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
 from dungeon_daddy.memory.models import ContextBundle
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.rpg.models import Item, RoomObject, ObjectTransition
+from dungeon_daddy.rpg.models import Item, RoomExit, RoomObject, ObjectTransition
 
 
 class TestContextBundleCurrentRoomField:
@@ -54,6 +54,7 @@ class TestContextBundleCurrentRoomBuilder:
 
         assert len(bundle.current_room["loose_items"]) == 1
         item = bundle.current_room["loose_items"][0]
+        assert item["item_id"] == "item:c1:gold-coin"
         assert item["slug"] == "gold-coin"
         assert item["display_name"] == "Gold Coin"
         assert item["description"] == "A shiny coin."
@@ -119,6 +120,7 @@ class TestContextBundleCurrentRoomBuilder:
 
         assert len(bundle.current_room["objects"]) == 1
         obj = bundle.current_room["objects"][0]
+        assert obj["object_id"] == "obj:c1:iron-chest"
         assert obj["slug"] == "iron-chest"
         assert obj["display_name"] == "Iron Chest"
         assert obj["archetype"] == "container"
@@ -141,4 +143,95 @@ class TestContextBundleCurrentRoomBuilder:
             "room_id": "room:level-01:antechamber",
             "objects": [],
             "loose_items": [],
+            "npcs": [],
+            "monsters": [],
+            "exits": [],
         }
+
+    def test_npc_in_room_appears_in_npcs(self, repo: MemoryRepository) -> None:
+        repo.save_actor(
+            "actor:c1:warden", "camp_001", "npc", "warden", "The Warden", "active",
+            room_id="room:level-01:antechamber",
+        )
+        bundle = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+            current_room_id="room:level-01:antechamber",
+        ).build(repo)
+        assert bundle.current_room["npcs"] == [
+            {
+                "actor_id": "actor:c1:warden",
+                "slug": "warden",
+                "display_name": "The Warden",
+                "status": "active",
+            }
+        ]
+        assert bundle.current_room["monsters"] == []
+
+    def test_monster_in_room_appears_in_monsters(self, repo: MemoryRepository) -> None:
+        repo.save_actor(
+            "actor:c1:ghoul", "camp_001", "monster", "ghoul", "Pale Ghoul", "active",
+            room_id="room:level-01:antechamber",
+        )
+        bundle = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+            current_room_id="room:level-01:antechamber",
+        ).build(repo)
+        assert bundle.current_room["monsters"] == [
+            {
+                "actor_id": "actor:c1:ghoul",
+                "slug": "ghoul",
+                "display_name": "Pale Ghoul",
+                "status": "active",
+            }
+        ]
+        assert bundle.current_room["npcs"] == []
+
+    def test_actor_in_other_room_excluded(self, repo: MemoryRepository) -> None:
+        repo.save_actor(
+            "actor:c1:elsewhere", "camp_001", "npc", "elsewhere", "Elsewhere", "active",
+            room_id="room:level-01:vault",
+        )
+        bundle = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+            current_room_id="room:level-01:antechamber",
+        ).build(repo)
+        assert bundle.current_room["npcs"] == []
+
+    def test_exit_from_room_appears_in_exits(self, repo: MemoryRepository) -> None:
+        repo.save_room_exit(RoomExit(
+            exit_id="exit:c1:north",
+            campaign_id="camp_001",
+            from_room_id="room:level-01:antechamber",
+            to_room_id="room:level-01:vault",
+            level_id="level-01",
+            label="North Door",
+            status="open",
+        ))
+        bundle = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+            current_room_id="room:level-01:antechamber",
+        ).build(repo)
+        assert bundle.current_room["exits"] == [
+            {
+                "exit_id": "exit:c1:north",
+                "label": "North Door",
+                "status": "open",
+                "to_room_id": "room:level-01:vault",
+            }
+        ]

@@ -163,31 +163,7 @@ class ContextBundleBuilder:
     def _fetch_current_room(self, repo: MemoryRepository) -> dict:
         if self._current_room_id is None:
             return {}
-        objects = repo.get_objects_by_room(self._campaign_id, self._current_room_id)
-        raw_items = repo.get_items_by_room(self._campaign_id, self._current_room_id)
-        return {
-            "room_id": self._current_room_id,
-            "objects": [
-                {
-                    "slug": o["slug"],
-                    "display_name": o["display_name"],
-                    "archetype": o["archetype"],
-                    "current_state": o["current_state"],
-                    "description": o["description"],
-                }
-                for o in objects
-            ],
-            "loose_items": [
-                {
-                    "slug": i["slug"],
-                    "display_name": i["display_name"],
-                    "description": i["description"],
-                    "status": i["status"],
-                }
-                for i in raw_items
-                if i["item_type"] == "dungeon_item"
-            ],
-        }
+        return build_room_noun_context(repo, self._campaign_id, self._current_room_id)
 
     def _fetch_scene_brief(self, repo: MemoryRepository) -> dict:
         if self._scene_id is None:
@@ -199,3 +175,65 @@ class ContextBundleBuilder:
         if row is None:
             return {}
         return {"scene_id": row[0], "location_slug": row[1], "status": row[2]}
+
+
+def _actor_noun(actor: dict) -> dict:
+    return {
+        "actor_id": actor["actor_id"],
+        "slug": actor["slug"],
+        "display_name": actor["display_name"],
+        "status": actor["status"],
+    }
+
+
+def build_room_noun_context(
+    repo: MemoryRepository, campaign_id: str, room_id: str
+) -> dict:
+    """The enriched ``current_room`` block: the concrete targets in a room.
+
+    Returns ``objects`` / ``loose_items`` / ``npcs`` / ``monsters`` / ``exits``
+    (plus ``room_id``) — the shape the Phase 50 noun provider
+    (:func:`dungeon_daddy.rpg.action_options.available_nouns`) reads. Shared by
+    the context bundle's ``current_room`` block and the Play-mode VNA panel.
+    """
+    objects = repo.get_objects_by_room(campaign_id, room_id)
+    raw_items = repo.get_items_by_room(campaign_id, room_id)
+    npcs = repo.get_actors_by_room(campaign_id, room_id, actor_types=["npc"])
+    monsters = repo.get_actors_by_room(campaign_id, room_id, actor_types=["monster"])
+    exits = repo.get_exits_by_room(campaign_id, room_id)
+    return {
+        "room_id": room_id,
+        "objects": [
+            {
+                "object_id": o["object_id"],
+                "slug": o["slug"],
+                "display_name": o["display_name"],
+                "archetype": o["archetype"],
+                "current_state": o["current_state"],
+                "description": o["description"],
+            }
+            for o in objects
+        ],
+        "loose_items": [
+            {
+                "item_id": i["item_id"],
+                "slug": i["slug"],
+                "display_name": i["display_name"],
+                "description": i["description"],
+                "status": i["status"],
+            }
+            for i in raw_items
+            if i["item_type"] == "dungeon_item"
+        ],
+        "npcs": [_actor_noun(a) for a in npcs],
+        "monsters": [_actor_noun(a) for a in monsters],
+        "exits": [
+            {
+                "exit_id": e["exit_id"],
+                "label": e["label"],
+                "status": e["status"],
+                "to_room_id": e["to_room_id"],
+            }
+            for e in exits
+        ],
+    }

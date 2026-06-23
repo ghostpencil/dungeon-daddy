@@ -1,0 +1,1 @@
+ALTER TABLE actors ADD COLUMN room_id TEXT
