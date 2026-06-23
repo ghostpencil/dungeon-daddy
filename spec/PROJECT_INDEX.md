@@ -2,12 +2,13 @@
 
 ## Phase
 
-Phase: **50 — Hybrid Action Model (BUILD — feature-complete, visual verify near done)**
+Phase: **50 — Hybrid Action Model (BUILD — feature-complete, visual verify DONE)**
 Status: On branch **`phase-50`** (not pushed). All **8 slices (+5.1)** landed in code. Visual
-verify **started 2026-06-22**; on-screen pass on **2026-06-23** confirmed the VNA dropdowns,
-verb→noun filtering, and hybrid exit labels render, and surfaced a third round of fixes (the
-**Study-narration + inventory** fixes below). Remaining: confirm the lock glyph + N/S orientation
-on screen (low priority — both one-line swaps). Suite green (full unit run 2026-06-23).
+verify **started 2026-06-22**, **completed 2026-06-23** — on-screen passes confirmed the VNA
+dropdowns, verb→noun filtering, hybrid exit labels, the **lock glyph** (🔒 renders fine), and
+the **N/S/compass orientation** (final fix `796314a`, below). Suite green (full unit run
+2026-06-23, 2067 in the rpg/views/map/ui slice). **Phase 50 is ready to close** → next is
+Phase 51 (Use-on grammar, design done — see below).
 
 Spec: **`spec/PHASE_50_HYBRID_ACTION_MODEL.md`** (8-slice plan, no GitHub issue yet).
 Roadmap: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (Phase 50 rows). Prior phase spec:
@@ -98,10 +99,24 @@ use-item→self/consume (`ConsumeItem` exists, no verb), and explicit consumptio
 
 ## Outstanding / Next session
 
-**START HERE → finish Phase 50 visual verification (on-screen pass).** All 8 slices + two
-verify-fix rounds are in code; the suite is green. The user verifies the GUI themselves
-(do **not** drive with computer-use). Launch `python -m dungeon_daddy`, open the RPG side
-panel → **ACTION** tab, and confirm on screen:
+**START HERE → Phase 50 visual verification is COMPLETE (2026-06-23). Next is Phase 51.**
+All 8 slices + verify-fix rounds are in code; suite green. The two previously-open items are
+now closed on screen:
+- **Lock glyph** — 🔒 renders correctly in the UI font; no swap needed.
+- **N/S / compass orientation** — fixed in **`796314a`**. Root cause was deeper than a sign
+  flip: `exit_labels` read **raw `dungeon.json` coords**, but the map is drawn by the
+  **layout pipeline**, which re-grids rooms by connections (e.g. Crucible Trap Room is raw-far-
+  east yet renders directly *south* of the Marketplace). Fix = (a) `compass_direction` is now
+  an **8-point** atan2 compass with **y-up** convention (`+y`=north; diagonals like the locked
+  Elevator read "Southwest"); (b) `play_view._current_level_rooms` feeds the compass the
+  **rendered layout positions** (`run_layout_pipeline`) via `_PositionedRoom`, not raw geometry
+  (falls back to raw if the pipeline can't build). Crucible R2 verified on screen: `Archway ->
+  Receiving Hall` / `🔒 Door Southwest` / `Hall East` (Cargo Bay) / `Hall South` (Trap Room).
+  Tests: `test_exit_labels` (y-up + 4 diagonals), `test_play_view_vna` (three raw-east rooms →
+  distinct layout directions).
+
+_Historical (now resolved) — the original on-screen checklist:_ Launch `python -m dungeon_daddy`,
+open the RPG side panel → **ACTION** tab, and confirm on screen:
 1. The three dropdowns + SUBMIT render; selecting a **Noun** re-populates the **Adverb**
    dropdown. (Layout polish may still be needed — `draw()` label rows vs. dropdown y-offsets
    are approximate; `vna_action_panel.py`.)
@@ -112,13 +127,11 @@ panel → **ACTION** tab, and confirm on screen:
    room's exits, not the old room's.
 4. **Exit labels** (verify-fix 1+2): same-type doors are disambiguated — `Door East` while
    unexplored, `Door -> <Room Name>` once visited; a locked door shows the **lock glyph**.
-   - ⚠ **OPEN — confirm the lock glyph renders.** `LOCK_PREFIX` is U+1F512 (🔒), an *emoji*
-     codepoint; Arcade/pyglet may render it as a box in the UI font (JetBrains Mono / Inter).
-     If it doesn't render, swap the `LOCK_PREFIX` constant in `rpg/exit_labels.py` to a
-     text marker (e.g. `" (locked)"` suffix) or a drawn icon beside the row. One-line change.
-   - ⚠ **OPEN — confirm N/S orientation.** `compass_direction` assumes grid `+y` = south
-     (north up). If North/South come out swapped in the Crucible, flip the two N/S branches
-     in `rpg/exit_labels.py`. (Disambiguation is correct either way; only the name is wrong.)
+   - ✅ **RESOLVED 2026-06-23 — lock glyph renders.** `LOCK_PREFIX` U+1F512 (🔒) displays
+     fine in the UI font on screen; no swap needed.
+   - ✅ **RESOLVED 2026-06-23 (`796314a`) — compass orientation.** `compass_direction` now
+     reads **rendered layout coords** (not raw grid) and is **8-point, y-up**. See the START
+     HERE block above for the full root cause + fix.
 
 **Study-narration + inventory fixes (2026-06-23, on `phase-50`).** Found during the on-screen
 verify pass: studying the Warden's Notice Board rolled `study` but the LLM invented lore instead
