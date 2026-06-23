@@ -41,6 +41,38 @@ _INTERACTION_VERBS: dict[str, str] = {
     VERB_ACTIVATE: "Activate",
 }
 
+# Noun ``source`` tags — finer than ``target_type`` (which can't tell an exit
+# from the synthetic room, or a loose item from a carried one). Used to filter
+# the Noun slot by the chosen Verb.
+SOURCE_OBJECT = "object"
+SOURCE_LOOSE_ITEM = "loose_item"
+SOURCE_CARRIED_ITEM = "carried_item"
+SOURCE_NPC = "npc"
+SOURCE_MONSTER = "monster"
+SOURCE_EXIT = "exit"
+SOURCE_SELF = "self"
+SOURCE_ROOM = "room"
+
+# Which noun sources each mutation verb may target. A verb absent from this map
+# (the skill verbs) is unrestricted — it may target any noun. ``move`` targets
+# only exits, ``pick-up`` loose items, ``equip`` carried items, ``activate``
+# interactive objects.
+_VERB_NOUN_SOURCES: dict[str, set[str]] = {
+    VERB_MOVE: {SOURCE_EXIT},
+    VERB_PICK_UP: {SOURCE_LOOSE_ITEM},
+    VERB_EQUIP: {SOURCE_CARRIED_ITEM},
+    VERB_ACTIVATE: {SOURCE_OBJECT},
+}
+
+
+def noun_sources_for_verb(verb: str) -> set[str] | None:
+    """The noun ``source`` tags ``verb`` may target, or ``None`` for unrestricted.
+
+    Mutation verbs map to one source each; skill verbs (not in the table) return
+    ``None`` and may target any noun.
+    """
+    return _VERB_NOUN_SOURCES.get(verb)
+
 
 @dataclass(frozen=True)
 class VerbOption:
@@ -55,6 +87,7 @@ class NounOption:
     label: str
     target_type: str  # one of _VALID_TARGET_TYPES (npc/object/item/room/self/monster)
     slug: str | None = None  # human-readable identity for display (objects/items only)
+    source: str = ""  # noun origin for verb filtering (see _NOUN_SOURCES)
 
 
 @dataclass(frozen=True)
@@ -215,6 +248,7 @@ def available_nouns(
                 label=obj["display_name"],
                 target_type="object",
                 slug=obj["slug"],
+                source=SOURCE_OBJECT,
             )
         )
     for item in room_context.get("loose_items", []):
@@ -224,6 +258,7 @@ def available_nouns(
                 label=item["display_name"],
                 target_type="item",
                 slug=item["slug"],
+                source=SOURCE_LOOSE_ITEM,
             )
         )
     for item in actor.get("carried_items", []):
@@ -233,26 +268,42 @@ def available_nouns(
                 label=item["display_name"],
                 target_type="item",
                 slug=item["slug"],
+                source=SOURCE_CARRIED_ITEM,
             )
         )
     for npc in room_context.get("npcs", []):
         options.append(
-            NounOption(noun_id=npc["actor_id"], label=npc["display_name"], target_type="npc")
+            NounOption(
+                noun_id=npc["actor_id"], label=npc["display_name"],
+                target_type="npc", source=SOURCE_NPC,
+            )
         )
     for monster in room_context.get("monsters", []):
         options.append(
             NounOption(
-                noun_id=monster["actor_id"], label=monster["display_name"], target_type="monster"
+                noun_id=monster["actor_id"], label=monster["display_name"],
+                target_type="monster", source=SOURCE_MONSTER,
             )
         )
     for ext in room_context.get("exits", []):
         options.append(
-            NounOption(noun_id=ext["exit_id"], label=ext["label"], target_type="room")
+            NounOption(
+                noun_id=ext["exit_id"], label=ext["label"],
+                target_type="room", source=SOURCE_EXIT,
+            )
         )
     options.append(
-        NounOption(noun_id=actor["actor_id"], label=actor["display_name"], target_type="self")
+        NounOption(
+            noun_id=actor["actor_id"], label=actor["display_name"],
+            target_type="self", source=SOURCE_SELF,
+        )
     )
     room_id = room_context.get("room_id")
     if room_id is not None:
-        options.append(NounOption(noun_id=room_id, label="This room", target_type="room"))
+        options.append(
+            NounOption(
+                noun_id=room_id, label="This room",
+                target_type="room", source=SOURCE_ROOM,
+            )
+        )
     return options

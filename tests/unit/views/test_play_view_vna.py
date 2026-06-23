@@ -89,6 +89,69 @@ def test_refresh_vna_panel_surfaces_exit_as_noun(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# _refresh_vna_panel — hidden exits excluded; same-type exits disambiguated
+# ---------------------------------------------------------------------------
+
+def _dungeon_with_rooms(rooms):
+    from dungeon_daddy.data.models import Dungeon, DungeonMeta, Level, Room
+
+    room_models = [
+        Room(id=rid, num=i + 1, name=name, x=x, y=y, w=2, h=2, type="room", note="")
+        for i, (rid, name, x, y) in enumerate(rooms)
+    ]
+    level = Level(
+        id=0, name="L1", summary="", ecology="", loop="",
+        width=20, height=20, entries=[], rooms=room_models, connections=[],
+    )
+    meta = DungeonMeta(title="T", theme="t", setting="s", party="p", quest="q")
+    return Dungeon(meta=meta, levels=[level])
+
+
+def test_refresh_vna_panel_excludes_hidden_exit(tmp_path):
+    view = _make_view(tmp_path)
+    _save_exit(view._mem_repo, exit_id="open-1", to_room_id="r2", status="open")
+    _save_exit(view._mem_repo, exit_id="secret-1", to_room_id="r3", status="hidden")
+
+    view._refresh_vna_panel()
+
+    noun_ids = {n.noun_id for n in view._rpg_vna._nouns}
+    assert "open-1" in noun_ids
+    assert "secret-1" not in noun_ids
+
+
+def test_refresh_vna_panel_disambiguates_doors_by_direction(tmp_path):
+    view = _make_view(tmp_path)
+    view._dungeon = _dungeon_with_rooms([
+        ("r1", "Forge Floor", 0, 0),
+        ("r2", "Gearworks", 10, 0),   # east of r1
+        ("r3", "Stair Landing", 0, 10),  # south of r1
+    ])
+    _save_exit(view._mem_repo, exit_id="e-east", label="Door", to_room_id="r2", status="open")
+    _save_exit(view._mem_repo, exit_id="e-south", label="Door", to_room_id="r3", status="open")
+
+    view._refresh_vna_panel()
+
+    labels = {n.noun_id: n.label for n in view._rpg_vna._nouns}
+    assert labels["e-east"] == "Door East"
+    assert labels["e-south"] == "Door South"
+
+
+def test_refresh_vna_panel_visited_exit_shows_room_name(tmp_path):
+    view = _make_view(tmp_path)
+    view._dungeon = _dungeon_with_rooms([
+        ("r1", "Forge Floor", 0, 0),
+        ("r2", "Gearworks", 10, 0),
+    ])
+    view._state.visited_rooms = ["r1", "r2"]
+    _save_exit(view._mem_repo, exit_id="e-east", label="Door", to_room_id="r2", status="open")
+
+    view._refresh_vna_panel()
+
+    labels = {n.noun_id: n.label for n in view._rpg_vna._nouns}
+    assert labels["e-east"] == "Door -> Gearworks"
+
+
+# ---------------------------------------------------------------------------
 # _on_vna_submit — routes a resolved Card to the engine
 # ---------------------------------------------------------------------------
 
@@ -108,6 +171,28 @@ def test_submit_move_card_moves_party(tmp_path):
 
     assert view._state.current_room_id == "r2"
     assert "r2" in view._state.visited_rooms
+
+
+def test_move_refreshes_vna_panel_to_new_room(tmp_path):
+    """After the party moves, the VNA noun list reflects the destination room."""
+    from dungeon_daddy.rpg.action_options import ActionCard
+
+    view = _make_view(tmp_path)
+    _save_exit(view._mem_repo, exit_id="e1", from_room_id="r1", to_room_id="r2", status="open")
+    _save_exit(view._mem_repo, exit_id="e2", from_room_id="r2", to_room_id="r3", status="open")
+    view._map = MagicMock()
+    view._rpg_scene = MagicMock()
+    view._spawn_dm_thread = MagicMock()
+    view._compact_history = MagicMock()
+    view._save_session = MagicMock()
+    view._dm_history = []
+
+    view._on_vna_submit(ActionCard(verb="move", noun_id="e1", adverb="cautiously"))
+
+    noun_ids = {n.noun_id for n in view._rpg_vna._nouns}
+    assert view._state.current_room_id == "r2"
+    assert "e2" in noun_ids   # destination room's exit is now surfaced
+    assert "e1" not in noun_ids  # the room we left is gone
 
 
 def test_submit_skill_card_posts_mechanical_bubble(tmp_path):
@@ -169,3 +254,83 @@ def test_submit_activate_card_warns_not_wired(tmp_path):
     view._on_vna_submit(ActionCard(verb="activate", noun_id="obj-1", adverb="cautiously"))
 
     assert view._chat.add_message.call_args.args[0] == "system"
+
+
+# ---------------------------------------------------------------------------
+# _refresh_vna_panel — the acting actor's carried items surface as nouns
+# (so the Equip verb has something to target)
+# ---------------------------------------------------------------------------
+
+def test_refresh_vna_panel_surfaces_carried_item_as_noun(tmp_path):
+    from dungeon_daddy.rpg.models import Item
+
+    view = _make_view(tmp_path)
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_item(Item(
+        item_id="itm-eq", campaign_id="camp-1", slug="iron-sword",
+        display_name="Iron Sword", item_type="equipped_gear",
+        description="A blade.", owner_actor_id="pc-1", status="active",
+    ))
+
+    view._refresh_vna_panel()
+
+    nouns = {n.noun_id: n for n in view._rpg_vna._nouns}
+    assert "itm-eq" in nouns
+    assert nouns["itm-eq"].source == "carried_item"
+
+
+# ---------------------------------------------------------------------------
+# _resolve_vna_roll — the skill-action message sent to the DM names the noun
+# (otherwise the LLM cannot narrate what was acted upon)
+# ---------------------------------------------------------------------------
+
+def test_skill_card_names_noun_in_dm_message(tmp_path):
+    from dungeon_daddy.rpg.action_options import ActionCard
+    from dungeon_daddy.rpg.models import RoomObject
+    from dungeon_daddy.rpg.service import RpgService
+
+    view = _make_view(tmp_path)
+    view._dungeon = _dungeon_with_rooms([("r1", "Forge Floor", 0, 0)])
+    view._rpg_service = RpgService()
+    view._dm_agent = None
+    view._rpg_debug = None
+    view._rpg_char = MagicMock()
+    view._rpg_fallout = MagicMock()
+    view._spawn_dm_thread = MagicMock()
+    view._compact_history = MagicMock()
+    view._dm_history = []
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-board", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="notice-board", display_name="Warden's Notice Board",
+        archetype="lore_fixture", description="Posted writ.", current_state="default",
+    ))
+    view._refresh_vna_panel()  # populate the panel's noun list
+
+    view._on_vna_submit(ActionCard(verb="study", noun_id="obj-board", adverb="cautiously"))
+
+    sent = " ".join(m.content for m in view._dm_history)
+    assert "Warden's Notice Board" in sent
+
+
+def test_build_context_bundle_includes_current_room_objects(tmp_path):
+    """The DM context bundle carries the current room's objects (with text)."""
+    from dungeon_daddy.rpg.models import RoomObject
+    from dungeon_daddy.rpg.service import RpgService
+
+    view = _make_view(tmp_path)
+    view._rpg_service = RpgService()
+    view._rpg_debug = None
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-board", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="notice-board", display_name="Warden's Notice Board",
+        archetype="lore_fixture", description="The lift-key stays at the watch-stall.",
+        current_state="default",
+    ))
+
+    bundle = view._build_context_bundle()
+
+    objects = bundle.current_room.get("objects", [])
+    names = [o["display_name"] for o in objects]
+    assert "Warden's Notice Board" in names
+    assert any("watch-stall" in o["description"] for o in objects)

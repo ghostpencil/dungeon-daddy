@@ -2,9 +2,12 @@
 
 ## Phase
 
-Phase: **50 — Hybrid Action Model (BUILD — feature-complete, pending visual verify)**
-Status: On branch **`phase-50`** (not pushed). All **8 slices (+5.1)** landed in code;
-the **VNA panel's Arcade build is not yet visually verified** (see Outstanding). Suite green (2932).
+Phase: **50 — Hybrid Action Model (BUILD — feature-complete, visual verify near done)**
+Status: On branch **`phase-50`** (not pushed). All **8 slices (+5.1)** landed in code. Visual
+verify **started 2026-06-22**; on-screen pass on **2026-06-23** confirmed the VNA dropdowns,
+verb→noun filtering, and hybrid exit labels render, and surfaced a third round of fixes (the
+**Study-narration + inventory** fixes below). Remaining: confirm the lock glyph + N/S orientation
+on screen (low priority — both one-line swaps). Suite green (full unit run 2026-06-23).
 
 Spec: **`spec/PHASE_50_HYBRID_ACTION_MODEL.md`** (8-slice plan, no GitHub issue yet).
 Roadmap: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (Phase 50 rows). Prior phase spec:
@@ -38,15 +41,129 @@ Full detail: `spec/PHASE_49_STARTING_PLAYBOOKS.md` + git `94c5fcb`.
 
 ---
 
+## Phase 51 (planned) — "Use Noun on Noun" transitive grammar
+
+Design pass done **2026-06-21** (memory: `project_phase51_use_on_grammar.md`). Extends the
+Phase 50 VNA panel to transitive actions: give an item, use an item on an object/creature,
+combine items. **Not started — gated behind Phase 50 visual verify (do not open until 50 closes).**
+
+**Key finding — most of this already works at the engine layer:**
+- **Key→door:** `RoomExit.requires_item_slug` + `exit_validator.py:14-20` already gate a
+  `MoveParty` on a **held (not consumed)** key. Only gap: set that field on the R2→R4 lift
+  exit — `tools/populate_crucible_level1.py` does **not** set it yet.
+- **Use-item→object (guaranteed, e.g. fuse→Great Lift):** `ObjectTransition.requires_item_slug`
+  + `command_validator.py:259-269` already gate `ActivateObject`. Gap: only the UI — `activate`
+  is the deliberate Slice 8 gap (needs trigger selection).
+- **Give:** `GiveItem(item_id, to_actor_id)` command already exists (`rpg/command.py:20`); needs
+  a validator + the UI second-noun.
+
+**Decision 1 — authority split = "roll for anything contested":** give / combine / key→door are
+deterministic Player Commands; use-on-object routes to an action roll *if it could fail*;
+use-on-creature / throw-at-monster are **always** an action roll (`resolve_card_roll` path) +
+LLM-narrated reaction. (Consistent with the core authority rule below.)
+
+**Decision 2 — contested signal = explicit flag on `ObjectTransition`:** add `contested: bool`
+(+ optional `action_verb` naming the rating to roll). No inferring from trigger strings; engine
+stays authoritative over success/fail.
+
+**Decision 3 — free `look`/`examine` verb (no roll), decided 2026-06-23.** Surfaced from Phase 50
+visual verify: studying the Warden's Notice Board forced a dice roll, which feels wrong for plain
+reading. Resolution: add a **`look` verb** that resolves *read-only* — a **third route** in
+`_on_vna_submit` alongside mutation-commands and skill-rolls (it is neither). It pulls the noun's
+**authoritative `description`** and hands it to the LLM as ground truth to narrate; **no dice, no
+state change**, works on any noun. `study` stays the **roll-based** verb that risks something but
+can reveal *hidden* info (a secret/ward). This is the **complement** of Decision 2's `contested`
+flag, not a replacement: `look` makes free info explicit/predictable; `contested` makes a normally
+free action risky on a specific object. Chosen over the alternative (a per-object "study-needs-no-
+roll" flag) because that left the same verb behaving two ways on hidden data — unpredictable to the
+player — and gave no general "just glance at it" affordance. **Authority note:** the readable text
+must be **seeded `description`** (it can gate puzzles, e.g. R1 journal → warden key), never
+LLM-invented; the LLM narrates *from* it. The plumbing this rides on now exists post-Phase-50:
+`build_room_noun_context` carries each object's `description`, and `dm_agent.build_prompt` renders a
+`# Room Contents` block (added in the Phase 50 verify-fix that also named the noun in skill-roll
+messages — see Phase 50 notes).
+
+**Slice sketch:** (1) grammar `Verb–Noun–[Target]–Adverb`, Target dropdown only for transitive
+verbs; (2) new `CombineItems` command + validators for Give/Combine; (3) `contested` flag on
+`ObjectTransition`; (4) wire `activate` (closes the Slice 8 gap); (5) set `requires_item_slug`
+on the R2→R4 lift exit so the Crucible demos the key/door + fuse/lift puzzle; (6) item-on-creature
++ consume/self ride the roll path; (7) `look` verb — free read-only route surfacing the noun's
+`description` (Decision 3). Spec file `spec/PHASE_51_*.md` **not yet written**.
+
+**Also missing from the original four cases** (fold into the spec): use-item→creature (vs give),
+use-item→self/consume (`ConsumeItem` exists, no verb), and explicit consumption semantics
+(keys held vs fuses/draughts consumed — `requires_item_slug` never consumes today).
+
+---
+
 ## Outstanding / Next session
 
-**START HERE → Phase 50 visual verification (last remaining task).** All 8 slices are in
-code and the suite is green (2932), but the VNA panel's **Arcade widget build (3 `UIDropdown`s
-+ SUBMIT) has not been seen running**. Launch `python -m dungeon_daddy`, open the RPG side
-panel → **ACTION** tab, and confirm the three dropdowns + SUBMIT render and that selecting a
-Noun re-populates the Adverb dropdown. Expect layout polish (`draw()` label rows vs. dropdown
-y-offsets are approximate; see `vna_action_panel.py:278-294`). Movement now flows through the
-VNA panel (`verb=move`, noun=exit) — confirm a move still works end-to-end.
+**START HERE → finish Phase 50 visual verification (on-screen pass).** All 8 slices + two
+verify-fix rounds are in code; the suite is green. The user verifies the GUI themselves
+(do **not** drive with computer-use). Launch `python -m dungeon_daddy`, open the RPG side
+panel → **ACTION** tab, and confirm on screen:
+1. The three dropdowns + SUBMIT render; selecting a **Noun** re-populates the **Adverb**
+   dropdown. (Layout polish may still be needed — `draw()` label rows vs. dropdown y-offsets
+   are approximate; `vna_action_panel.py`.)
+2. **Verb filters Noun** (verify-fix 1): with **Move** selected the Noun list shows **only
+   exits** (not objects/monsters/self/"This room"); `pick-up`→loose items, `equip`→carried,
+   `activate`→objects.
+3. **Move refreshes the panel** (verify-fix 2): after a move the Noun list shows the **new**
+   room's exits, not the old room's.
+4. **Exit labels** (verify-fix 1+2): same-type doors are disambiguated — `Door East` while
+   unexplored, `Door -> <Room Name>` once visited; a locked door shows the **lock glyph**.
+   - ⚠ **OPEN — confirm the lock glyph renders.** `LOCK_PREFIX` is U+1F512 (🔒), an *emoji*
+     codepoint; Arcade/pyglet may render it as a box in the UI font (JetBrains Mono / Inter).
+     If it doesn't render, swap the `LOCK_PREFIX` constant in `rpg/exit_labels.py` to a
+     text marker (e.g. `" (locked)"` suffix) or a drawn icon beside the row. One-line change.
+   - ⚠ **OPEN — confirm N/S orientation.** `compass_direction` assumes grid `+y` = south
+     (north up). If North/South come out swapped in the Crucible, flip the two N/S branches
+     in `rpg/exit_labels.py`. (Disambiguation is correct either way; only the name is wrong.)
+
+**Study-narration + inventory fixes (2026-06-23, on `phase-50`).** Found during the on-screen
+verify pass: studying the Warden's Notice Board rolled `study` but the LLM invented lore instead
+of relaying the board's seeded text. Three layers of the same root cause — the object's
+`description` never reached the DM — were fixed:
+- **Noun named in the skill-roll message.** `_resolve_vna_roll` (`play_view.py`) sent the DM
+  `"<actor> [STUDY] <adverb> — <outcome>"` with **no target**. Now resolves the noun's label via
+  new `VnaActionPanel.noun_label_for(noun_id)` → `"<actor> [STUDY] Warden's Notice Board (quickly)
+  — PARTIAL"`.
+- **`# Room Contents` rendered in the DM prompt.** `dm_agent.build_prompt` ignored the bundle's
+  `current_room`; it now lists each object's `display_name` + `description` so the DM narrates from
+  ground truth, not confabulation.
+- **Bundle actually populated.** The real bug: `_build_context_bundle` (`play_view.py`) built
+  `ContextBundleBuilder` **without `current_room_id`**, so `current_room` came back `{}` and the
+  block above never had data in live play. Now passes `self._state.current_room_id`.
+- **Carried items surface as nouns.** `_refresh_vna_panel` hardcoded `carried_items=[]`; now pulls
+  `get_items_by_actor(actor_id)`, so picked-up items appear in the **Equip** noun list.
+- **Crucible seed:** Notice Board `description` sharpened to a concrete key clue (Warden Brakkus →
+  "the lift-key stays at the watch-stall here in the market"); re-seeded 2026-06-23.
+- Tests: `test_play_view_vna.py` (carried-item noun, noun-in-DM-message, `_build_context_bundle`
+  populates `current_room`), `test_dm_agent_context_bundle.py` (room-object description rendered).
+- **Still LLM-narrated** — a `study` partial/miss may still soften the clue; deterministic
+  surfacing of read-text is the deferred **`look` verb** (Phase 51 Decision 3).
+
+**Visual-verify fixes (2026-06-22, on `phase-50`):**
+- **Verb→Noun filtering.** `NounOption` gained a `source` tag (exit/loose_item/carried_item/
+  object/npc/monster/self/room) and `action_options.noun_sources_for_verb()` maps each mutation
+  verb to its allowed sources (skill verbs → unrestricted). `VnaActionPanel` filters the Noun
+  dropdown to the verb's sources, defaults the Noun to the first visible option, and rebuilds the
+  Noun+Adverb dropdowns when the Verb changes (new `_visible_nouns`/`_reset_noun_for_verb`; verb
+  `on_change` now rebuilds the widget like the noun handler).
+- **Hybrid exit labels + hide undiscovered exits.** New pure module **`rpg/exit_labels.py`**:
+  `compass_direction(from_room, to_room)` (grid centres, `+x`=E/`+y`=S) and
+  `exit_noun_label(...)` → `Door <Direction>` unexplored, `Door -> <name>` once the destination
+  is in `visited_rooms`, with a `LOCK_PREFIX` (🔒) prefix for `locked`/`blocked` exits (`one_way`
+  excluded). Wired in `play_view._prepare_vna_exits` (called from `_refresh_vna_panel`), which
+  also **drops hidden/sealed exits** via the new shared `PLAYER_KNOWN_EXIT_STATUSES` frozenset in
+  `rpg/room_context.py` (= visible ∪ locked). Degrades gracefully when no dungeon is loaded
+  (`_current_level_rooms` returns `({}, None)` → plain base label).
+- **Refresh-after-move.** `_on_exit_move` now calls `_refresh_vna_panel()`; `_refresh_vna_panel`
+  rebuilds the live ACTION dropdowns via new `_RpgSidePanel.refresh_action_widget()` (no-op
+  unless ACTION is the active tab).
+- Tests: `test_action_options.py` (source field + `noun_sources_for_verb`), `test_vna_action_panel.py`
+  (`TestNounsFilteredByVerb`), new `test_exit_labels.py` (compass, hybrid label, lock marker),
+  `test_play_view_vna.py` (hidden-exit exclusion, direction/visited-name labels, move-refresh).
 
 Two **deliberate gaps** carried out of Slice 8 (decide in a follow-up, not bugs):
 - **`activate` verb is not wired** — it needs a trigger-selection step the panel does not
@@ -160,7 +277,10 @@ reactions. It must not directly mutate authoritative state.
 
 ## Known Failures
 
-None — full suite green (2026-06-20).
+None blocking — full suite green (2026-06-22, after the visual-verify fixes): 2963 passed.
+`tests/evals/test_generator_evals.py::test_generator_level_passes_validation` is **flaky**
+(non-deterministic LLM generator eval); it failed once in a full run and passed standalone on
+re-run. Not related to the verify-fix work.
 
 ---
 
@@ -192,5 +312,6 @@ Per-session implementation logs are in git history and the auto-memory (`project
 - Exit backfill (pre-Phase-48 campaigns): `python -m tools.backfill_room_exits ["<save dir>"] [--dry-run] [--force]`. Close the app first (DuckDB is single-writer). Saves live under `%LOCALAPPDATA%\DungeonDaddy\saves\<name>\`.
 - UI icons: `dungeon_daddy/assets/ui/icons/` (white/transparent PNG + SVG source); attribution in `CREDITS.json`. Fetch new ones with the `game-icon-finder` skill.
 - `protagonist` actor: `seed_data/campaigns/the-crucible/rpg_seed.json` (use `--seed-pack` + `--force` to reset). Generic `seed_campaign()` no longer creates a placeholder actor.
+- Crucible Level 1 content: `tools/populate_crucible_level1.py` (re-run 2026-06-23) — idempotent upserts of 11 objects, 7 loose items, 4 monsters, 1 NPC into the live save (`%LOCALAPPDATA%\DungeonDaddy\saves\The Crucible\campaign.duckdb`; close app first). Every object/item carries a `description`; Notice Board (R2) holds the sharpened Brakkus key clue. Puzzle chain R1 journal → R2 lift-warden-key → R3 lift-fuse → R4 Great Lift. The R2→R4 lift exit's `requires_item_slug` is **not** set, so the key/door gate is inert until Phase 51 sets it.
 - Example campaign manifest: `examples/campaign_manifests/bone-cathedral.json` (validates + seeds cleanly).
 - `proposal.applied` / `proposal.rejected` events: call sites must insert `result.rejection_events` into repo with the correct `campaign_id` after `validate_proposal()`.

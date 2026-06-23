@@ -212,6 +212,19 @@ class _RpgSidePanel:
                     self._manager, self._x, self._y, self._w, content_h,
                 )
 
+    def refresh_action_widget(self) -> None:
+        """Rebuild the ACTION dropdowns from the panel's current options.
+
+        Used after the panel's logic state changes while the tab is already
+        live (e.g. a party move repopulates the noun list) so the on-screen
+        dropdowns don't show the previous room's exits.
+        """
+        if self._active != _TAB_ACTION:
+            return
+        content_h = self._h - _RPG_TAB_H
+        self._action.teardown_widget(self._manager)
+        self._action.setup_widget(self._manager, self._x, self._y, self._w, content_h)
+
     @property
     def active_tab(self) -> int:
         return self._active
@@ -1050,17 +1063,59 @@ class PlayView(arcade.View):
             return
         room_id = self._state.current_room_id
         room_context = build_room_noun_context(self._mem_repo, self._rpg_campaign_id, room_id)
+        room_context = self._prepare_vna_exits(room_context, room_id)
         self._rpg_vna.set_context(
             actor_abilities=self._mem_repo.get_actor_abilities(actor.actor_id),
             room_context=room_context,
             actor={
                 "actor_id": actor.actor_id,
                 "display_name": actor.display_name,
-                "carried_items": [],
+                "carried_items": self._mem_repo.get_items_by_actor(actor.actor_id),
             },
             playbook_slug=actor.playbook_slug or "",
             world_flags=self._room_world_flags(room_id),
         )
+        # If the ACTION tab is live, rebuild its dropdowns so they reflect the
+        # newly-loaded options (e.g. after the party moves to a new room).
+        side = getattr(self, "_rpg_side", None)
+        if side is not None:
+            side.refresh_action_widget()
+
+    def _prepare_vna_exits(self, room_context: dict, room_id: str) -> dict:
+        """Player-facing exit nouns: drop unknown exits and disambiguate labels.
+
+        Hidden/sealed exits aren't surfaced as move targets. Same-type exits
+        ('Door' x2) are relabelled with a compass direction, upgrading to the
+        destination room name once that room has been visited (immersion-safe —
+        see :func:`dungeon_daddy.rpg.exit_labels.exit_noun_label`).
+        """
+        from dungeon_daddy.rpg.exit_labels import exit_noun_label
+        from dungeon_daddy.rpg.room_context import PLAYER_KNOWN_EXIT_STATUSES
+
+        rooms_by_id, from_room = self._current_level_rooms(room_id)
+        visited = set(self._state.visited_rooms) if self._state else set()
+        prepared = [
+            {
+                **ext,
+                "label": exit_noun_label(
+                    ext, from_room=from_room,
+                    rooms_by_id=rooms_by_id, visited_rooms=visited,
+                ),
+            }
+            for ext in room_context.get("exits", [])
+            if ext.get("status") in PLAYER_KNOWN_EXIT_STATUSES
+        ]
+        return {**room_context, "exits": prepared}
+
+    def _current_level_rooms(self, room_id: str):
+        """``({room_id: Room}, current Room)`` for the active level, else ``({}, None)``."""
+        if self._dungeon is None or self._state is None:
+            return {}, None
+        idx = self._state.current_level_idx
+        if not (0 <= idx < len(self._dungeon.levels)):
+            return {}, None
+        rooms = {r.id: r for r in self._dungeon.levels[idx].rooms}
+        return rooms, rooms.get(room_id)
 
     def _on_vna_submit(self, card) -> None:
         """Route a validated ``ActionCard`` to the engine.
@@ -1131,9 +1186,10 @@ class PlayView(arcade.View):
             level = self._dungeon.levels[self._state.current_level_idx]
             room = {r.id: r for r in level.rooms}.get(self._state.current_room_id)
             if room is not None:
+                noun_label = self._rpg_vna.noun_label_for(card.noun_id) or card.noun_id
                 msg = (
-                    f"{actor.display_name} [{card.verb.upper()}] {card.adverb}"
-                    f" — {resolution.outcome.upper()}"
+                    f"{actor.display_name} [{card.verb.upper()}] {noun_label}"
+                    f" ({card.adverb}) — {resolution.outcome.upper()}"
                 )
                 self._compact_history()
                 self._dm_history.append(LLMMessage(role="user", content=msg))
@@ -1172,6 +1228,7 @@ class PlayView(arcade.View):
                 self._rpg_scene.set_scene(room.name, str(level.id))
 
         self._refresh_exits()
+        self._refresh_vna_panel()
         self._save_session()
 
         if room is not None and level is not None:
@@ -1403,6 +1460,7 @@ class PlayView(arcade.View):
             mode="run_scene",
             focus_actor_ids=focus_ids,
             token_budget=2000,
+            current_room_id=self._state.current_room_id,
         )
         try:
             bundle = builder.build(self._mem_repo)

@@ -266,9 +266,60 @@ class TestDropdownLabels:
 
     def test_selected_labels_reflect_current_selection(self):
         panel = self._panel()
-        panel.select_verb_by_label("Move")
+        # 'Study' is a skill verb, so the Iron Key loose item stays targetable.
+        panel.select_verb_by_label("Study")
         panel.select_noun_by_label("Iron Key")
         panel.select_adverb_by_label("Cautiously")
-        assert panel.selected_verb_label() == "Move"
+        assert panel.selected_verb_label() == "Study"
         assert panel.selected_noun_label() == "Iron Key"
         assert panel.selected_adverb_label() == "Cautiously"
+
+
+# ---------------------------------------------------------------------------
+# Verb-filtered nouns — the Noun slot only offers what the Verb can target
+# ---------------------------------------------------------------------------
+
+class TestNounsFilteredByVerb:
+    def _panel(self):
+        panel = _panel()
+        panel.set_context(
+            actor_abilities=[],
+            room_context=_room_context(
+                loose_items=[
+                    {"item_id": "itm-9", "display_name": "Iron Key", "slug": "iron-key"}
+                ],
+                exits=[{"exit_id": "e-north", "label": "Door North"}],
+                monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}],
+            ),
+            actor=_actor(),
+            playbook_slug="fighter",
+            world_flags=[],
+        )
+        return panel
+
+    def test_move_offers_only_exits(self):
+        panel = self._panel()
+        panel.select_verb("move")
+        assert panel.noun_labels() == ["Door North"]
+
+    def test_pick_up_offers_only_loose_items(self):
+        panel = self._panel()
+        panel.select_verb("pick-up")
+        assert panel.noun_labels() == ["Iron Key"]
+
+    def test_skill_verb_offers_all_nouns(self):
+        panel = self._panel()
+        panel.select_verb("fight")
+        labels = panel.noun_labels()
+        assert "Gnoll" in labels and "Iron Key" in labels and "Door North" in labels
+
+    def test_select_verb_resets_noun_to_first_visible(self):
+        panel = self._panel()
+        panel.select_verb("move")
+        assert panel._noun_id == "e-north"
+
+    def test_verb_with_no_targets_clears_noun(self):
+        panel = self._panel()
+        panel.select_verb("equip")  # no carried items in context
+        assert panel.noun_labels() == []
+        assert panel._noun_id is None

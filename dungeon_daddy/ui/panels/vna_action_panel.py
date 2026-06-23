@@ -26,6 +26,7 @@ from dungeon_daddy.rpg.action_options import (
     available_adverbs,
     available_nouns,
     available_verbs,
+    noun_sources_for_verb,
     validate_card,
 )
 from dungeon_daddy.rpg.models import ActorAbility
@@ -79,11 +80,27 @@ class VnaActionPanel:
         self._world_flags = list(world_flags)
         self._library = library
         self._verb = self._verbs[0].verb if self._verbs else None
-        self._noun_id = self._nouns[0].noun_id if self._nouns else None
-        self._refresh_adverbs()
+        self._reset_noun_for_verb()
 
     def select_verb(self, verb: str) -> None:
+        """Select a verb and refilter the Noun slot to what that verb can target."""
         self._verb = verb
+        self._reset_noun_for_verb()
+
+    def _visible_nouns(self) -> list[NounOption]:
+        """The nouns the current verb may target (all of them for skill verbs)."""
+        if self._verb is None:
+            return list(self._nouns)
+        allowed = noun_sources_for_verb(self._verb)
+        if allowed is None:
+            return list(self._nouns)
+        return [n for n in self._nouns if n.source in allowed]
+
+    def _reset_noun_for_verb(self) -> None:
+        """Default the Noun (and its dependent Adverb list) to the verb's first option."""
+        visible = self._visible_nouns()
+        self._noun_id = visible[0].noun_id if visible else None
+        self._refresh_adverbs()
 
     def select_noun(self, noun_id: str) -> None:
         """Select a noun and recompute the adverb list for its ``target_type``."""
@@ -144,7 +161,7 @@ class VnaActionPanel:
         return [v.label for v in self._verbs]
 
     def noun_labels(self) -> list[str]:
-        return [n.label for n in self._nouns]
+        return [n.label for n in self._visible_nouns()]
 
     def adverb_labels(self) -> list[str]:
         return [a.label for a in self._adverbs]
@@ -156,7 +173,7 @@ class VnaActionPanel:
                 return
 
     def select_noun_by_label(self, label: str) -> None:
-        for n in self._nouns:
+        for n in self._visible_nouns():
             if n.label == label:
                 self.select_noun(n.noun_id)
                 return
@@ -171,10 +188,14 @@ class VnaActionPanel:
         return next((v.label for v in self._verbs if v.verb == self._verb), None)
 
     def selected_noun_label(self) -> str | None:
-        return next((n.label for n in self._nouns if n.noun_id == self._noun_id), None)
+        return next((n.label for n in self._visible_nouns() if n.noun_id == self._noun_id), None)
 
     def selected_adverb_label(self) -> str | None:
         return next((a.label for a in self._adverbs if a.adverb == self._adverb), None)
+
+    def noun_label_for(self, noun_id: str) -> str | None:
+        """Human-readable label for an offered noun id (for narration/messages)."""
+        return next((n.label for n in self._nouns if n.noun_id == noun_id), None)
 
     def _selected_noun(self) -> NounOption | None:
         return next((n for n in self._nouns if n.noun_id == self._noun_id), None)
@@ -242,6 +263,10 @@ class VnaActionPanel:
         def _on_verb(event) -> None:
             if event.new_value is not None:
                 self.select_verb_by_label(event.new_value)
+                # Noun options are verb-dependent — rebuild so the Noun and
+                # Adverb dropdowns reflect the new verb's targets.
+                if self._widget_params:
+                    self.setup_widget(*self._widget_params)
 
         @noun_dd.event("on_change")
         def _on_noun(event) -> None:

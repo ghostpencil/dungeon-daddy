@@ -76,7 +76,8 @@ def test_room_object_becomes_object_noun():
         {"object_id": "obj:c1:iron-chest", "slug": "iron-chest", "display_name": "Iron Chest"}
     ]})
     assert NounOption(
-        noun_id="obj:c1:iron-chest", slug="iron-chest", label="Iron Chest", target_type="object"
+        noun_id="obj:c1:iron-chest", slug="iron-chest", label="Iron Chest",
+        target_type="object", source="object",
     ) in nouns
 
 
@@ -85,7 +86,8 @@ def test_loose_item_becomes_item_noun():
         {"item_id": "item:c1:gold-coin", "slug": "gold-coin", "display_name": "Gold Coin"}
     ]})
     assert NounOption(
-        noun_id="item:c1:gold-coin", slug="gold-coin", label="Gold Coin", target_type="item"
+        noun_id="item:c1:gold-coin", slug="gold-coin", label="Gold Coin",
+        target_type="item", source="loose_item",
     ) in nouns
 
 
@@ -95,30 +97,40 @@ def test_carried_item_becomes_item_noun():
     ]}
     nouns = _nouns({}, actor)
     assert NounOption(
-        noun_id="item:c1:dagger", slug="dagger", label="Dagger", target_type="item"
+        noun_id="item:c1:dagger", slug="dagger", label="Dagger",
+        target_type="item", source="carried_item",
     ) in nouns
 
 
 def test_npc_becomes_npc_noun():
     nouns = _nouns({"npcs": [{"actor_id": "actor:c1:warden", "display_name": "The Warden"}]})
-    assert NounOption(noun_id="actor:c1:warden", label="The Warden", target_type="npc") in nouns
+    assert NounOption(
+        noun_id="actor:c1:warden", label="The Warden", target_type="npc", source="npc"
+    ) in nouns
 
 
 def test_monster_becomes_monster_noun():
     nouns = _nouns({"monsters": [{"actor_id": "actor:c1:ghoul", "display_name": "Pale Ghoul"}]})
-    assert NounOption(noun_id="actor:c1:ghoul", label="Pale Ghoul", target_type="monster") in nouns
+    assert NounOption(
+        noun_id="actor:c1:ghoul", label="Pale Ghoul", target_type="monster", source="monster"
+    ) in nouns
 
 
 def test_exit_becomes_room_noun():
     nouns = _nouns({"exits": [{"exit_id": "exit:c1:north", "label": "North Door"}]})
-    assert NounOption(noun_id="exit:c1:north", label="North Door", target_type="room") in nouns
+    assert NounOption(
+        noun_id="exit:c1:north", label="North Door", target_type="room", source="exit"
+    ) in nouns
 
 
 def test_synthetic_self_and_room_always_present():
     nouns = _nouns({"room_id": "room:level-01:antechamber"})
-    assert NounOption(noun_id="actor:c1:mara", label="Mara", target_type="self") in nouns
     assert NounOption(
-        noun_id="room:level-01:antechamber", label="This room", target_type="room"
+        noun_id="actor:c1:mara", label="Mara", target_type="self", source="self"
+    ) in nouns
+    assert NounOption(
+        noun_id="room:level-01:antechamber", label="This room",
+        target_type="room", source="room",
     ) in nouns
 
 
@@ -130,7 +142,38 @@ def test_self_present_even_without_room_context():
 
 def test_empty_context_yields_only_self():
     nouns = _nouns({})
-    assert nouns == [NounOption(noun_id="actor:c1:mara", label="Mara", target_type="self")]
+    assert nouns == [
+        NounOption(noun_id="actor:c1:mara", label="Mara", target_type="self", source="self")
+    ]
+
+
+# --------------------------------------------------------------------------
+# Verb -> noun-source filtering (Phase 50 visual-verify fix)
+# --------------------------------------------------------------------------
+
+def test_noun_sources_for_move_is_exits_only():
+    from dungeon_daddy.rpg.action_options import noun_sources_for_verb
+    assert noun_sources_for_verb("move") == {"exit"}
+
+
+def test_noun_sources_for_pick_up_is_loose_items():
+    from dungeon_daddy.rpg.action_options import noun_sources_for_verb
+    assert noun_sources_for_verb("pick-up") == {"loose_item"}
+
+
+def test_noun_sources_for_equip_is_carried_items():
+    from dungeon_daddy.rpg.action_options import noun_sources_for_verb
+    assert noun_sources_for_verb("equip") == {"carried_item"}
+
+
+def test_noun_sources_for_activate_is_objects():
+    from dungeon_daddy.rpg.action_options import noun_sources_for_verb
+    assert noun_sources_for_verb("activate") == {"object"}
+
+
+def test_noun_sources_for_skill_verb_is_unrestricted():
+    from dungeon_daddy.rpg.action_options import noun_sources_for_verb
+    assert noun_sources_for_verb("fight") is None
 
 
 # --------------------------------------------------------------------------

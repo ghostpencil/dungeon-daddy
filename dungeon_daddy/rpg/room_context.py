@@ -7,6 +7,11 @@ from dungeon_daddy.rpg.discover_exit import passive_hidden_exit_hint
 _VISIBLE_STATUSES = {"open", "discovered"}
 _LOCKED_STATUSES = {"locked", "blocked", "one_way"}
 
+# Exits the player already knows about (traversable or visibly locked) — i.e.
+# everything except undiscovered (``hidden``) and permanently ``sealed`` exits.
+# Shared with the Play-mode VNA noun list so hidden exits aren't move targets.
+PLAYER_KNOWN_EXIT_STATUSES = frozenset(_VISIBLE_STATUSES | _LOCKED_STATUSES)
+
 
 def build_room_context(
     room_id: str,

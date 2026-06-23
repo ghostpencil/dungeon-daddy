@@ -49,6 +49,13 @@ class DungeonMasterAgent:
                 lines.append("Open Clocks:")
                 for c in clocks:
                     lines.append(f"  - {c.get('label', c.get('name', ''))} ({c.get('filled', 0)}/{c.get('segments', 0)})")
+        objects = (context_bundle.current_room or {}).get("objects", [])
+        if objects:
+            lines.append("\n# Room Contents")
+            for o in objects:
+                desc = o.get("description", "")
+                lines.append(f"  - {o.get('display_name', '')}: {desc}" if desc
+                             else f"  - {o.get('display_name', '')}")
         return "\n".join(lines)
 
     def respond(
