@@ -11,7 +11,7 @@ resolutions" 2026-06-17).
 > narration + inventory, lock glyph, and compass/exit-label orientation (final fix `796314a` —
 > exit directions now derive from the **rendered layout** coords + an 8-point y-up compass,
 > not raw `dungeon.json` grid). Suite green. Two **deliberate carry-outs** (not bugs, decide
-> in Phase 51): the `activate` verb isn't wired (needs trigger selection), and
+> in Phase 50.5): the `activate` verb isn't wired (needs trigger selection), and
 > push-yourself/momentum controls are absent from the VNA surface. See `spec/PROJECT_INDEX.md`
 > "Outstanding / Next session" for the full verify log.
 

@@ -1244,9 +1244,11 @@ filtering, hybrid exit labels (compass direction → room name once visited), an
 + inventory fixes landed during visual verify. Exit-label compass reads the **rendered layout**
 positions (8-point, y-up) so directions match the on-screen map (`796314a`).
 
-**Deliberate carry-outs to Phase 51** (decisions, not bugs): the `activate` verb is not wired
+**Deliberate carry-outs to Phase 50.5** (decisions, not bugs): the `activate` verb is not wired
 (needs a trigger-selection step), and push-yourself/momentum controls are absent from the VNA
-surface (they lived in the retired `PlayerActionPanel` ACTION tab).
+surface (they lived in the retired `PlayerActionPanel` ACTION tab). Phase 50.5 = the "Use Noun
+on Noun" transitive-grammar add-on (a dynamic extension of Phase 50, not the roadmap's Phase 51
+"Talk to the Dungeon").
 
 ---
 

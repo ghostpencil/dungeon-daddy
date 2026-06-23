@@ -15,7 +15,9 @@ Load only the file that covers the phase you are working on.
 
 Phases 1–50 are complete. **Phases 51–53 are defined on the GitHub roadmap
 (planned, not yet implemented)** — see the "Planned Roadmap — Phases 49–53" section in
-`IMPLEMENTATION_PHASES_33_ONWARDS.md`. **Next up: Phase 51** (see `spec/PROJECT_INDEX.md` for
-its current framing — the "Use Noun on Noun" transitive grammar design pass).
+`IMPLEMENTATION_PHASES_33_ONWARDS.md`. **Next up: Phase 50.5** — the "Use Noun on Noun"
+transitive-grammar add-on (a dynamic extension of Phase 50, not on the roadmap and with no
+GitHub issue; design pass done — see `spec/PROJECT_INDEX.md`). The roadmap's **Phase 51 ("Talk
+to the Dungeon")** remains its own distinct future phase.
 
 See `IMPLEMENTATION_PHASES_33_ONWARDS.md` for the full spec.

@@ -8,7 +8,8 @@ verify **started 2026-06-22**, **completed 2026-06-23** — on-screen passes con
 dropdowns, verb→noun filtering, hybrid exit labels, the **lock glyph** (🔒 renders fine), and
 the **N/S/compass orientation** (final fix `796314a`, below). Suite green (full unit run
 2026-06-23, 2067 in the rpg/views/map/ui slice). **Phase 50 is ready to close** → next is
-Phase 51 (Use-on grammar, design done — see below).
+Phase 50.5 (Use-on grammar — a dynamic Phase 50 add-on, not the roadmap's Phase 51 "Talk to
+the Dungeon"; design done — see below).
 
 Spec: **`spec/PHASE_50_HYBRID_ACTION_MODEL.md`** (8-slice plan, no GitHub issue yet).
 Roadmap: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (Phase 50 rows). Prior phase spec:
@@ -42,11 +43,15 @@ Full detail: `spec/PHASE_49_STARTING_PLAYBOOKS.md` + git `94c5fcb`.
 
 ---
 
-## Phase 51 (planned) — "Use Noun on Noun" transitive grammar
+## Phase 50.5 (planned) — "Use Noun on Noun" transitive grammar
 
-Design pass done **2026-06-21** (memory: `project_phase51_use_on_grammar.md`). Extends the
+> A **dynamic add-on to Phase 50** (it grew out of Phase 50 visual verify), numbered 50.5 to
+> mark that it was **not** in the original roadmap and has **no GitHub issue**. Distinct from
+> the roadmap's **Phase 51 ("Talk to the Dungeon")**, which remains its own future phase.
+
+Design pass done **2026-06-21** (memory: `project_phase50_5_use_on_grammar.md`). Extends the
 Phase 50 VNA panel to transitive actions: give an item, use an item on an object/creature,
-combine items. **Not started — gated behind Phase 50 visual verify (do not open until 50 closes).**
+combine items. **Not started — Phase 50 now closed (2026-06-23), so this is unblocked.**
 
 **Key finding — most of this already works at the engine layer:**
 - **Key→door:** `RoomExit.requires_item_slug` + `exit_validator.py:14-20` already gate a
@@ -89,7 +94,7 @@ verbs; (2) new `CombineItems` command + validators for Give/Combine; (3) `contes
 `ObjectTransition`; (4) wire `activate` (closes the Slice 8 gap); (5) set `requires_item_slug`
 on the R2→R4 lift exit so the Crucible demos the key/door + fuse/lift puzzle; (6) item-on-creature
 + consume/self ride the roll path; (7) `look` verb — free read-only route surfacing the noun's
-`description` (Decision 3). Spec file `spec/PHASE_51_*.md` **not yet written**.
+`description` (Decision 3). Spec file `spec/PHASE_50_5_*.md` **not yet written**.
 
 **Also missing from the original four cases** (fold into the spec): use-item→creature (vs give),
 use-item→self/consume (`ConsumeItem` exists, no verb), and explicit consumption semantics
@@ -99,7 +104,8 @@ use-item→self/consume (`ConsumeItem` exists, no verb), and explicit consumptio
 
 ## Outstanding / Next session
 
-**START HERE → Phase 50 visual verification is COMPLETE (2026-06-23). Next is Phase 51.**
+**START HERE → Phase 50 is COMPLETE (2026-06-23). Next is Phase 50.5 (Use-on grammar) — or the
+roadmap's Phase 51 ("Talk to the Dungeon"), author's call.**
 All 8 slices + verify-fix rounds are in code; suite green. The two previously-open items are
 now closed on screen:
 - **Lock glyph** — 🔒 renders correctly in the UI font; no swap needed.
@@ -154,7 +160,7 @@ of relaying the board's seeded text. Three layers of the same root cause — the
 - Tests: `test_play_view_vna.py` (carried-item noun, noun-in-DM-message, `_build_context_bundle`
   populates `current_room`), `test_dm_agent_context_bundle.py` (room-object description rendered).
 - **Still LLM-narrated** — a `study` partial/miss may still soften the clue; deterministic
-  surfacing of read-text is the deferred **`look` verb** (Phase 51 Decision 3).
+  surfacing of read-text is the deferred **`look` verb** (Phase 50.5 Decision 3).
 
 **Visual-verify fixes (2026-06-22, on `phase-50`):**
 - **Verb→Noun filtering.** `NounOption` gained a `source` tag (exit/loose_item/carried_item/
@@ -325,6 +331,6 @@ Per-session implementation logs are in git history and the auto-memory (`project
 - Exit backfill (pre-Phase-48 campaigns): `python -m tools.backfill_room_exits ["<save dir>"] [--dry-run] [--force]`. Close the app first (DuckDB is single-writer). Saves live under `%LOCALAPPDATA%\DungeonDaddy\saves\<name>\`.
 - UI icons: `dungeon_daddy/assets/ui/icons/` (white/transparent PNG + SVG source); attribution in `CREDITS.json`. Fetch new ones with the `game-icon-finder` skill.
 - `protagonist` actor: `seed_data/campaigns/the-crucible/rpg_seed.json` (use `--seed-pack` + `--force` to reset). Generic `seed_campaign()` no longer creates a placeholder actor.
-- Crucible Level 1 content: `tools/populate_crucible_level1.py` (re-run 2026-06-23) — idempotent upserts of 11 objects, 7 loose items, 4 monsters, 1 NPC into the live save (`%LOCALAPPDATA%\DungeonDaddy\saves\The Crucible\campaign.duckdb`; close app first). Every object/item carries a `description`; Notice Board (R2) holds the sharpened Brakkus key clue. Puzzle chain R1 journal → R2 lift-warden-key → R3 lift-fuse → R4 Great Lift. The R2→R4 lift exit's `requires_item_slug` is **not** set, so the key/door gate is inert until Phase 51 sets it.
+- Crucible Level 1 content: `tools/populate_crucible_level1.py` (re-run 2026-06-23) — idempotent upserts of 11 objects, 7 loose items, 4 monsters, 1 NPC into the live save (`%LOCALAPPDATA%\DungeonDaddy\saves\The Crucible\campaign.duckdb`; close app first). Every object/item carries a `description`; Notice Board (R2) holds the sharpened Brakkus key clue. Puzzle chain R1 journal → R2 lift-warden-key → R3 lift-fuse → R4 Great Lift. The R2→R4 lift exit's `requires_item_slug` is **not** set, so the key/door gate is inert until Phase 50.5 sets it.
 - Example campaign manifest: `examples/campaign_manifests/bone-cathedral.json` (validates + seeds cleanly).
 - `proposal.applied` / `proposal.rejected` events: call sites must insert `result.rejection_events` into repo with the correct `campaign_id` after `validate_proposal()`.
