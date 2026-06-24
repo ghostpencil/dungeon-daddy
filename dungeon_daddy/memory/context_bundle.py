@@ -233,6 +233,7 @@ def build_room_noun_context(
                 "label": e["label"],
                 "status": e["status"],
                 "to_room_id": e["to_room_id"],
+                **({"requires_item_slug": e["requires_item_slug"]} if e.get("requires_item_slug") else {}),
             }
             for e in exits
         ],

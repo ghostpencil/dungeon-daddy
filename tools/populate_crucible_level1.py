@@ -17,7 +17,7 @@ import os
 from pathlib import Path
 
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.rpg.models import Item, ObjectTransition, RoomObject
+from dungeon_daddy.rpg.models import Item, ObjectTransition, RoomExit, RoomObject
 
 CAMPAIGN_ID = "campaign:the-crucible"
 LEVEL_ID = "level:1"
@@ -67,6 +67,44 @@ def _item(room, slug, name, desc) -> Item:
         item_type="dungeon_item", description=desc, room_id=room, level_id=LEVEL_ID,
         status="active",
     )
+
+
+def _lift_exits() -> list[RoomExit]:
+    return [
+        RoomExit(
+            exit_id="exit:the-crucible:R2:R4",
+            campaign_id=CAMPAIGN_ID,
+            from_room_id="R2",
+            to_room_id="R4",
+            level_id=LEVEL_ID,
+            label="Door",
+            status="open",
+            requires_item_slug="lift-warden-key",
+        ),
+        RoomExit(
+            exit_id="exit:the-crucible:R4:R2",
+            campaign_id=CAMPAIGN_ID,
+            from_room_id="R4",
+            to_room_id="R2",
+            level_id=LEVEL_ID,
+            label="Door",
+            status="open",
+        ),
+        RoomExit(
+            exit_id="exit:the-crucible:R4:L2",
+            campaign_id=CAMPAIGN_ID,
+            from_room_id="R4",
+            to_room_id="r01",
+            level_id=LEVEL_ID,
+            connector_type="vertical",
+            to_level_id="level:1",  # 0-based list index: levels[1] = Level 2 (Factory Floor)
+            label="Great Lift",
+            exit_type="vertical",
+            status="open",
+            requires_object_id="object:the-crucible:R4:great-lift",
+            requires_object_state="powered",
+        ),
+    ]
 
 
 def _objects() -> list[RoomObject]:
@@ -211,6 +249,10 @@ def main() -> None:
         items = _items()
         for it in items:
             repo.save_item(it)
+        # Exits — wire key/door gate on R2→R4 lift door
+        exits = _lift_exits()
+        for ex in exits:
+            repo.save_room_exit(ex)
         # NPC — a still-sane caretaker construct sheltering in the Cargo Bay.
         repo.save_actor(
             _aid("R3", "pinion-caretaker"), CAMPAIGN_ID, "npc", "pinion-caretaker",
@@ -239,6 +281,8 @@ def main() -> None:
         print("  monsters: R1 Scorpion Swarm, R2 Iron Scorpions, R4 Golem A-7, "
               "R5 Sweeper Drone")
         print("  npc:      R3 Pinion, the Caretaker Cog")
+        print("  exits:    R2->R4 requires lift-warden-key; R4->R2 open; "
+              "R4->Level2 Great Lift (connector=vertical, requires powered)")
         print("  KEY:      'Lift Warden's Iron Key' placed in R2 (Marketplace)")
     finally:
         repo.close()

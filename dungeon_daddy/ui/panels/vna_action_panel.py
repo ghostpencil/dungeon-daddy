@@ -26,7 +26,9 @@ from dungeon_daddy.rpg.action_options import (
     available_adverbs,
     available_nouns,
     available_verbs,
+    is_transitive,
     noun_sources_for_verb,
+    target_sources_for_verb,
     validate_card,
 )
 from dungeon_daddy.rpg.models import ActorAbility
@@ -41,9 +43,11 @@ class VnaActionPanel:
         self._verbs: list[VerbOption] = []
         self._nouns: list[NounOption] = []
         self._adverbs: list[AdverbOption] = []
+        self._targets: list[NounOption] = []
         self._verb: str | None = None
         self._noun_id: str | None = None
         self._adverb: str | None = None
+        self._target_id: str | None = None
         self._playbook_slug: str | None = None
         self._actor_name: str | None = None
         self._world_flags: list[str] = []
@@ -97,15 +101,20 @@ class VnaActionPanel:
         return [n for n in self._nouns if n.source in allowed]
 
     def _reset_noun_for_verb(self) -> None:
-        """Default the Noun (and its dependent Adverb list) to the verb's first option."""
+        """Default the Noun (and its dependent Adverb list and Target list)."""
         visible = self._visible_nouns()
         self._noun_id = visible[0].noun_id if visible else None
         self._refresh_adverbs()
+        self._refresh_targets()
 
     def select_noun(self, noun_id: str) -> None:
-        """Select a noun and recompute the adverb list for its ``target_type``."""
+        """Select a noun and recompute the adverb list and target list."""
         self._noun_id = noun_id
         self._refresh_adverbs()
+        self._refresh_targets()
+
+    def select_target(self, target_id: str) -> None:
+        self._target_id = target_id
 
     def select_adverb(self, adverb: str) -> None:
         self._adverb = adverb
@@ -121,7 +130,12 @@ class VnaActionPanel:
         """
         if self._verb is None or self._noun_id is None or self._adverb is None:
             return None
-        return ActionCard(verb=self._verb, noun_id=self._noun_id, adverb=self._adverb)
+        return ActionCard(
+            verb=self._verb,
+            noun_id=self._noun_id,
+            adverb=self._adverb,
+            target_id=self._target_id if is_transitive(self._verb) else None,
+        )
 
     # ------------------------------------------------------------------
     # Submit
@@ -150,7 +164,7 @@ class VnaActionPanel:
             self._on_submit(card)
 
     def _card_options(self) -> CardOptions:
-        return CardOptions(verbs=self._verbs, nouns=self._nouns, adverbs=self._adverbs)
+        return CardOptions(verbs=self._verbs, nouns=self._nouns, adverbs=self._adverbs, targets=self._targets)
 
     # ------------------------------------------------------------------
     # Dropdown adapter — UIDropdown options are plain strings, so map each
@@ -165,6 +179,9 @@ class VnaActionPanel:
 
     def adverb_labels(self) -> list[str]:
         return [a.label for a in self._adverbs]
+
+    def target_labels(self) -> list[str]:
+        return [n.label for n in self._targets]
 
     def select_verb_by_label(self, label: str) -> None:
         for v in self._verbs:
@@ -183,6 +200,15 @@ class VnaActionPanel:
             if a.label == label:
                 self.select_adverb(a.adverb)
                 return
+
+    def select_target_by_label(self, label: str) -> None:
+        for n in self._targets:
+            if n.label == label:
+                self.select_target(n.noun_id)
+                return
+
+    def selected_target_label(self) -> str | None:
+        return next((n.label for n in self._targets if n.noun_id == self._target_id), None)
 
     def selected_verb_label(self) -> str | None:
         return next((v.label for v in self._verbs if v.verb == self._verb), None)
@@ -213,6 +239,23 @@ class VnaActionPanel:
             library=self._library,
         )
         self._adverb = self._adverbs[0].adverb if self._adverbs else None
+
+    def _refresh_targets(self) -> None:
+        """Recompute the Target list for the current verb, excluding the selected noun."""
+        if self._verb is None:
+            self._targets = []
+            self._target_id = None
+            return
+        sources = target_sources_for_verb(self._verb)
+        if sources is None:
+            self._targets = []
+            self._target_id = None
+            return
+        self._targets = [
+            n for n in self._nouns
+            if n.source in sources and n.noun_id != self._noun_id
+        ]
+        self._target_id = self._targets[0].noun_id if self._targets else None
 
     # ------------------------------------------------------------------
     # Arcade widget build (display required; exercised via the ui-test harness)
@@ -257,6 +300,9 @@ class VnaActionPanel:
 
         verb_dd = _dropdown(self.verb_labels(), self.selected_verb_label())
         noun_dd = _dropdown(self.noun_labels(), self.selected_noun_label())
+        target_dd = None
+        if self._verb is not None and is_transitive(self._verb):
+            target_dd = _dropdown(self.target_labels(), self.selected_target_label())
         adverb_dd = _dropdown(self.adverb_labels(), self.selected_adverb_label())
 
         @verb_dd.event("on_change")
@@ -272,9 +318,15 @@ class VnaActionPanel:
         def _on_noun(event) -> None:
             if event.new_value is not None:
                 self.select_noun_by_label(event.new_value)
-                # Adverb options changed — rebuild so the dropdown reflects them.
+                # Adverb + Target options changed — rebuild so dropdowns reflect them.
                 if self._widget_params:
                     self.setup_widget(*self._widget_params)
+
+        if target_dd is not None:
+            @target_dd.event("on_change")
+            def _on_target(event) -> None:
+                if event.new_value is not None:
+                    self.select_target_by_label(event.new_value)
 
         @adverb_dd.event("on_change")
         def _on_adverb(event) -> None:
@@ -343,7 +395,11 @@ class VnaActionPanel:
         field_h = 30
         row_gap = 18 + field_h
         cur_y = y + h - PAD_MD - _HEADER_H
-        for label in ("Verb", "Noun", "Adverb"):
+        slot_labels = ["Verb", "Noun"]
+        if self._verb is not None and is_transitive(self._verb):
+            slot_labels.append("Target")
+        slot_labels.append("Adverb")
+        for label in slot_labels:
             arcade.draw_text(
                 label, x + PAD_MD, cur_y,
                 INK_4, font_size=TEXT_SM, font_name=FONT_UI, anchor_y="top",

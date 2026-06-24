@@ -3,52 +3,26 @@
 ## Phase
 
 Phase **50 — Hybrid Action Model: COMPLETE & merged to `main`** (2026-06-23).
-PR **#79** merged (`2d4ed79`); branch deleted; issue **#80** closed; roadmap board → Done.
-Visual-verified on screen (VNA dropdowns, verb→noun filtering, hybrid exit labels, lock glyph,
-compass orientation). Full suite green; evals excluded from the default run.
-
-**Next session → Phase 50.5 (Use Noun on Noun)** — spec written
-(`spec/PHASE_50_5_USE_ON_GRAMMAR.md`), implementation not started. See below.
+Phase **50.5 — Use Noun on Noun: COMPLETE** (2026-06-24). Branch: `phase-50.5`. PR pending.
+All 9 slices + post-playtest fixes + map level-refresh fix. Suite: 3037+ green.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
-`spec/IMPLEMENTATION_PHASES.md`). Phase 50 spec: `spec/PHASE_50_HYBRID_ACTION_MODEL.md`.
-
-**Contracts Phase 50.5 reuses (Phase 48, still locked):**
-- `MoveParty(exit_id, how)` is a **Player Command** in `rpg/command.py` (not a proposal).
-- **No `party_location` column** — session uses `current_room_id` / `visited_rooms` /
-  `current_level_idx` (`data/models.py:195-197`); the engine is their sole writer.
-- No LLM proposal may set those session fields or exit `status` (except approval-gated `BlockExit`).
-- `how?`/adverb = modifier flags (dice-pool deltas + world-side-effect flags; no position/effect axis).
-- **Phase 49 background:** signature adverbs derived live from `playbook_slug` (not persisted);
-  `actor_abilities` (migration `011`) is the live, mutable set the action providers read.
+`spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
 
 ---
 
-## START HERE next session — Phase 50.5 (planned): "Use Noun on Noun" transitive grammar
+## START HERE next session — open the Phase 50.5 PR, then Phase 51
 
-> A **dynamic add-on to Phase 50** (grew out of Phase 50 visual verify), numbered 50.5 to mark
-> that it was **not** in the original roadmap and has **no GitHub issue**. Distinct from the
-> roadmap's **Phase 51 ("Talk to the Dungeon")**, which remains its own future phase.
-> Full design memory: `project_phase50_5_use_on_grammar.md`. Spec **written**:
-> `spec/PHASE_50_5_USE_ON_GRAMMAR.md` (9-slice TDD plan). Implementation **not started.**
+Branch `phase-50.5` is ready. Open the PR against `main`. Key deliverables for the PR description:
+- Grammar: `Verb · Noun · [Target] · Adverb`; `TRANSITIVE_VERBS`; `validate_card` target rules
+- `contested` flag on `ObjectTransition` + migration `013`; `CombineItems` + migration `014`
+- `GiveItem` validator; `activate` wired (deterministic → `ActivateObject`, contested → roll)
+- `look` verb (read-only); Target dropdown in `VnaActionPanel`
+- Post-playtest: locked-exit target source, key-unlock persists, fuse consumed on lift power-up
+- Map level-refresh fix: level transitions call `map.load()` (repaints new level layout)
+- LLM narration hook after `ActivateObject`; Level 2 seed (`tools/populate_crucible_level2.py`)
 
-**Plan approved 2026-06-23. Spec + 9-slice TDD plan are authoritative in
-`spec/PHASE_50_5_USE_ON_GRAMMAR.md`** — read it, not this section, for the full design (thesis,
-the 3 locked decisions, the per-slice contracts, and the 4 open questions). Don't re-derive
-here. Grammar extends to `Verb · Noun · [Target] · Adverb`; most behavior already exists at the
-engine layer (key→door, use-item→object, `GiveItem`) so the phase is mostly UI wiring + a few
-commands/validators + one model flag. **Unblocked — Phase 50 is closed.**
-
-**▶ Next action (fresh context): Slice 1 — optional Target on the grammar.** Read
-`spec/TESTING.md`, invoke the TDD skill, then: add `target_id: str | None = None` to
-`ActionCard` (`rpg/action_options.py:100`); mark which verbs are transitive; extend
-`validate_card` to require a Target for transitive verbs and reject one for intransitive verbs.
-Pure model/validation — no UI, no DB. Then proceed down the slice plan in the spec.
-
-**Two Phase 50 carry-outs that 50.5 absorbs** (decisions, not bugs): `activate` verb not wired
-(Slice 5 adds trigger selection; today `_on_vna_submit` posts a "not wired yet" message); and
-push-yourself/momentum controls are absent from the VNA surface (**out of scope** here per the
-spec's non-goals unless a slice needs them).
+After merging: **Phase 51 — Talk to the Dungeon** (roadmap). Write `spec/PHASE_51_*.md` when starting.
 
 ---
 
@@ -79,6 +53,7 @@ Phases 42 and earlier: `spec/HISTORY.md`. Recent completed phases:
 
 | Phase | Summary | Spec |
 |---|---|---|
+| 50.5 — Use Noun on Noun | Grammar → `Verb · Noun · [Target] · Adverb`; `TRANSITIVE_VERBS`; `CombineItems` + migrations `013`/`014`; `GiveItem` validator; `activate` wired; `look` verb; Target dropdown; key-unlock persists; fuse consumed; map level-refresh fix | `spec/PHASE_50_5_USE_ON_GRAMMAR.md` |
 | 50 — Hybrid Action Model | Verb·Noun·Adverb action *Card* (input-dual of a proposal); `ActionCard` + `validate_card`; `resolve_card`/`resolve_card_roll` (`rpg/action_resolution.py`); `VnaActionPanel` wired into PlayView (retired `how_chips`); hybrid exit labels via 8-point layout-coord compass (`rpg/exit_labels.py`) | `spec/PHASE_50_HYBRID_ACTION_MODEL.md` (issue #80) |
 | 49 — Starting Playbooks | `Playbook` + nested models + `PlaybookLibrary`; `data/playbooks.json` (4 bundled playbooks, kit ability + first pool ability granted at start); `actor_abilities` table + repo CRUD; seed-publish wiring (ratings/tracks/kit/tags/abilities); playbook picker in Seed editor; Character Sheet panel playbook/adverbs/abilities sections | `spec/PHASE_49_STARTING_PLAYBOOKS.md` (issue #77) |
 | 48 — Dungeon Navigation | `RoomExit` model + `room_exits` schema; `MoveParty` command; exit-condition validator; level transitions; `DiscoverExit`/`UnlockExit`/`SealExit`/`BlockExit`; room context bundle; Play-mode exit-list panel + fog-of-war map; party-presence gate on `PickUpItem`/`ActivateObject` | `spec/PHASE_48_DUNGEON_NAVIGATION.md` |
@@ -101,6 +76,8 @@ Per-session implementation logs are in git history and the auto-memory (`project
 - Exit backfill (pre-Phase-48 campaigns): `python -m tools.backfill_room_exits ["<save dir>"] [--dry-run] [--force]`. Close the app first (DuckDB is single-writer). Saves live under `%LOCALAPPDATA%\DungeonDaddy\saves\<name>\`.
 - UI icons: `dungeon_daddy/assets/ui/icons/` (white/transparent PNG + SVG source); attribution in `CREDITS.json`. Fetch new ones with the `game-icon-finder` skill.
 - `protagonist` actor: `seed_data/campaigns/the-crucible/rpg_seed.json` (use `--seed-pack` + `--force` to reset). Generic `seed_campaign()` no longer creates a placeholder actor.
-- Crucible Level 1 content: `tools/populate_crucible_level1.py` (re-run 2026-06-23) — idempotent upserts of 11 objects, 7 loose items, 4 monsters, 1 NPC into the live save (`%LOCALAPPDATA%\DungeonDaddy\saves\The Crucible\campaign.duckdb`; close app first). Every object/item carries a `description`; Notice Board (R2) holds the sharpened Brakkus key clue. Puzzle chain R1 journal → R2 lift-warden-key → R3 lift-fuse → R4 Great Lift. The R2→R4 lift exit's `requires_item_slug` is **not** set, so the key/door gate is inert until Phase 50.5 sets it.
+- Crucible Level 1 content: `tools/populate_crucible_level1.py` (re-run 2026-06-24) — idempotent upserts of 11 objects, 7 loose items, 4 monsters, 1 NPC, and 3 exits into the live save (`%LOCALAPPDATA%\DungeonDaddy\saves\The Crucible\campaign.duckdb`; close app first). Puzzle chain: R1 journal → R2 lift-warden-key → R2→R4 door (key-gated, permanently unlocked on use) → R3 lift-fuse → R4 Great Lift (fuse-gated, consumed on power-up) → Level 2 r01.
+- Crucible Level 2 content: `tools/populate_crucible_level2.py` (run 2026-06-24) — Great Lift upper landing in r01 (`state=ready`) + open `r01→R4` vertical connector exit (return to Level 1). Re-run to reset.
+- Level-crossing exits: `to_level_id` encodes the **0-based list index** of the target level (not the 1-based level ID used for data scoping). `"level:0"` = Level 1 (index 0), `"level:1"` = Level 2 (index 1). `connector_type` must be set for `apply_move_party` to honour `to_level_id`.
 - Example campaign manifest: `examples/campaign_manifests/bone-cathedral.json` (validates + seeds cleanly).
 - `proposal.applied` / `proposal.rejected` events: call sites must insert `result.rejection_events` into repo with the correct `campaign_id` after `validate_proposal()`.

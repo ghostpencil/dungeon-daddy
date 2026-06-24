@@ -905,21 +905,24 @@ class MemoryRepository:
             INSERT INTO items (
                 item_id, campaign_id, slug, display_name, item_type,
                 description, owner_actor_id, level_id, status,
-                charges_current, charges_max, is_equipped, room_id
+                charges_current, charges_max, is_equipped, room_id,
+                combines_with_slug, combination_result_slug
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (item_id) DO UPDATE SET
-                slug            = excluded.slug,
-                display_name    = excluded.display_name,
-                item_type       = excluded.item_type,
-                description     = excluded.description,
-                owner_actor_id  = excluded.owner_actor_id,
-                level_id        = excluded.level_id,
-                status          = excluded.status,
-                charges_current = excluded.charges_current,
-                charges_max     = excluded.charges_max,
-                is_equipped     = excluded.is_equipped,
-                room_id         = excluded.room_id
+                slug                   = excluded.slug,
+                display_name           = excluded.display_name,
+                item_type              = excluded.item_type,
+                description            = excluded.description,
+                owner_actor_id         = excluded.owner_actor_id,
+                level_id               = excluded.level_id,
+                status                 = excluded.status,
+                charges_current        = excluded.charges_current,
+                charges_max            = excluded.charges_max,
+                is_equipped            = excluded.is_equipped,
+                room_id                = excluded.room_id,
+                combines_with_slug     = excluded.combines_with_slug,
+                combination_result_slug = excluded.combination_result_slug
             """,
             [
                 item.item_id,
@@ -935,6 +938,8 @@ class MemoryRepository:
                 item.charges_max,
                 item.is_equipped,
                 item.room_id,
+                item.combines_with_slug,
+                item.combination_result_slug,
             ],
         )
         self._conn.execute(
@@ -955,7 +960,8 @@ class MemoryRepository:
             """
             SELECT item_id, campaign_id, slug, display_name, item_type,
                    description, owner_actor_id, level_id, status,
-                   charges_current, charges_max, is_equipped, room_id
+                   charges_current, charges_max, is_equipped, room_id,
+                   combines_with_slug, combination_result_slug
             FROM items WHERE campaign_id = ?
             ORDER BY display_name
             """,
@@ -969,7 +975,8 @@ class MemoryRepository:
             """
             SELECT item_id, campaign_id, slug, display_name, item_type,
                    description, owner_actor_id, level_id, status,
-                   charges_current, charges_max, is_equipped, room_id
+                   charges_current, charges_max, is_equipped, room_id,
+                   combines_with_slug, combination_result_slug
             FROM items WHERE owner_actor_id = ?
             ORDER BY display_name
             """,
@@ -983,7 +990,8 @@ class MemoryRepository:
             """
             SELECT item_id, campaign_id, slug, display_name, item_type,
                    description, owner_actor_id, level_id, status,
-                   charges_current, charges_max, is_equipped, room_id
+                   charges_current, charges_max, is_equipped, room_id,
+                   combines_with_slug, combination_result_slug
             FROM items
             WHERE campaign_id = ? AND room_id = ? AND owner_actor_id IS NULL
             ORDER BY display_name
@@ -1027,6 +1035,8 @@ class MemoryRepository:
             "charges_max": r[10],
             "is_equipped": r[11],
             "room_id": r[12] if len(r) > 12 else None,
+            "combines_with_slug": r[13] if len(r) > 13 else None,
+            "combination_result_slug": r[14] if len(r) > 14 else None,
             "features": features,
         }
 
@@ -1113,9 +1123,10 @@ class MemoryRepository:
                 """
                 INSERT INTO object_transitions (
                     transition_id, object_id, from_state, to_state,
-                    trigger, requires_item_slug, spawns_item_slug, advances_clock_slug
+                    trigger, requires_item_slug, spawns_item_slug, advances_clock_slug,
+                    contested, action_verb
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     t.transition_id,
@@ -1126,6 +1137,8 @@ class MemoryRepository:
                     t.requires_item_slug,
                     t.spawns_item_slug,
                     t.advances_clock_slug,
+                    t.contested,
+                    t.action_verb,
                 ],
             )
 
@@ -1170,7 +1183,8 @@ class MemoryRepository:
         t_rows = self._conn.execute(
             """
             SELECT transition_id, object_id, from_state, to_state,
-                   trigger, requires_item_slug, spawns_item_slug, advances_clock_slug
+                   trigger, requires_item_slug, spawns_item_slug, advances_clock_slug,
+                   contested, action_verb
             FROM object_transitions WHERE object_id = ?
             ORDER BY transition_id
             """,
@@ -1186,6 +1200,8 @@ class MemoryRepository:
                 "requires_item_slug": tr[5],
                 "spawns_item_slug": tr[6],
                 "advances_clock_slug": tr[7],
+                "contested": tr[8],
+                "action_verb": tr[9],
             }
             for tr in t_rows
         ]
@@ -1290,6 +1306,13 @@ class MemoryRepository:
         self._conn.execute(
             "UPDATE room_exits SET status = ? WHERE exit_id = ?",
             [status, exit_id],
+        )
+
+    def update_exit_requires_item_slug(self, exit_id: str, slug: str | None) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            "UPDATE room_exits SET requires_item_slug = ? WHERE exit_id = ?",
+            [slug, exit_id],
         )
 
     def update_exit_label(self, exit_id: str, label: str, exit_type: str) -> None:

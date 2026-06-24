@@ -157,6 +157,38 @@ def test_block_exit_change_parses_in_proposal() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Phase 50.5: clear_exit_key_requirement clears requires_item_slug
+# ---------------------------------------------------------------------------
+
+def test_clear_exit_key_requirement_clears_slug(repo: MemoryRepository) -> None:
+    from dungeon_daddy.rpg.models import RoomExit
+    from dungeon_daddy.rpg.unlock_exit import clear_exit_key_requirement
+
+    ex = RoomExit(
+        exit_id=EXIT_ID, campaign_id=CAMPAIGN_ID,
+        from_room_id=ROOM_A, to_room_id="room:b", level_id="level:1",
+        label="Key Door", status="open",
+        requires_item_slug="lift-warden-key",
+    )
+    repo.save_room_exit(ex)
+
+    result = clear_exit_key_requirement(EXIT_ID, CAMPAIGN_ID, repo)
+
+    assert result.accepted is True
+    row = repo.get_exit_by_id(EXIT_ID)
+    assert row["requires_item_slug"] is None
+
+
+def test_clear_exit_key_requirement_unknown_exit(repo: MemoryRepository) -> None:
+    from dungeon_daddy.rpg.unlock_exit import clear_exit_key_requirement
+
+    result = clear_exit_key_requirement("exit:nonexistent", CAMPAIGN_ID, repo)
+
+    assert result.accepted is False
+    assert result.rejection_reason is not None
+
+
+# ---------------------------------------------------------------------------
 # Slice 8-8: validate_proposal rejects BlockExitChange with unknown exit_id
 # ---------------------------------------------------------------------------
 

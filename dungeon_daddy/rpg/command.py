@@ -57,6 +57,13 @@ class ActivateObject(BaseModel):
     trigger: str
 
 
+class CombineItems(BaseModel):
+    kind: Literal["combine_items"] = "combine_items"
+    item_a_id: str
+    item_b_id: str
+    actor_id: str
+
+
 class MoveParty(BaseModel):
     kind: Literal["move_party"] = "move_party"
     exit_id: str
@@ -64,6 +71,6 @@ class MoveParty(BaseModel):
 
 
 PlayerCommand = Annotated[
-    Union[ConsumeKitCharge, ConsumeItem, GiveItem, TakeItem, EquipItem, UnequipItem, PickUpItem, DropItem, ActivateObject, MoveParty],
+    Union[ConsumeKitCharge, ConsumeItem, GiveItem, TakeItem, EquipItem, UnequipItem, PickUpItem, DropItem, ActivateObject, CombineItems, MoveParty],
     Field(discriminator="kind"),
 ]

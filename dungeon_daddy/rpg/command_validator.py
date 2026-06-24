@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.rpg.command import ActivateObject, ConsumeItem, ConsumeKitCharge, DropItem, EquipItem, GiveItem, PickUpItem, PlayerCommand, TakeItem, UnequipItem
+from dungeon_daddy.rpg.command import ActivateObject, CombineItems, ConsumeItem, ConsumeKitCharge, DropItem, EquipItem, GiveItem, PickUpItem, PlayerCommand, TakeItem, UnequipItem
 
 _log = logging.getLogger(__name__)
 
@@ -88,6 +88,10 @@ def validate_command(
 
         if item is None:
             reason = f"Unknown item: {command.item_id}"
+        elif item["status"] != "active":
+            reason = f"Item is not active: {command.item_id}"
+        elif not item.get("owner_actor_id"):
+            reason = f"Item is not held: {command.item_id}"
         elif target is None:
             reason = f"Unknown target actor: {command.to_actor_id}"
         elif target.get("actor_type") != "pc":
@@ -218,6 +222,40 @@ def validate_command(
             reason = f"Unknown item: {command.item_id}"
         elif not item.get("owner_actor_id"):
             reason = f"Item has no owner: {command.item_id}"
+        else:
+            reason = None
+
+        if reason is not None:
+            _log.info("Command rejected [%s]: %s", command.kind, reason)
+            result.rejection_reason = reason
+            result.rejection_events.append(
+                DomainEvent(
+                    event_id=str(uuid.uuid4()),
+                    campaign_id=campaign_id,
+                    event_type="command.rejected",
+                    payload={"kind": command.kind, "reason": reason},
+                )
+            )
+        else:
+            result.accepted = True
+
+    elif isinstance(command, CombineItems):
+        items = repo.get_items(campaign_id)
+        item_a = next((i for i in items if i["item_id"] == command.item_a_id), None)
+        item_b = next((i for i in items if i["item_id"] == command.item_b_id), None)
+
+        if item_a is None:
+            reason = f"Unknown item: {command.item_a_id}"
+        elif item_a["status"] != "active":
+            reason = f"Item is not active: {command.item_a_id}"
+        elif item_a.get("owner_actor_id") != command.actor_id:
+            reason = f"Item is not held by actor: {command.item_a_id}"
+        elif item_b is None:
+            reason = f"Unknown item: {command.item_b_id}"
+        elif item_b["status"] != "active":
+            reason = f"Item is not active: {command.item_b_id}"
+        elif item_b.get("owner_actor_id") != command.actor_id:
+            reason = f"Item is not held by actor: {command.item_b_id}"
         else:
             reason = None
 

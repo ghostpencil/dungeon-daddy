@@ -1250,12 +1250,32 @@ surface (they lived in the retired `PlayerActionPanel` ACTION tab). Phase 50.5 =
 on Noun" transitive-grammar add-on (a dynamic extension of Phase 50, not the roadmap's Phase 51
 "Talk to the Dungeon").
 
+## Phase 50.5 — Use Noun on Noun (COMPLETE)
+
+**Status: Complete (2026-06-24) — 3037+ tests passing**
+Spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`
+Branch: `phase-50.5`
+
+Dynamic add-on to Phase 50 (not on the roadmap, no GitHub issue). Extended the action grammar
+to `Verb · Noun · [Target] · Adverb` for transitive verbs (`give`, `use`, `combine`).
+
+9 TDD slices: `ActionCard.target_id` + `TRANSITIVE_VERBS` + `validate_card` target rules;
+`contested: bool` + `action_verb: str | None` on `ObjectTransition` + migration `013`;
+`GiveItem` validator; `CombineItems` command + validator + applier + migration `014`; `activate`
+verb wired (deterministic → `ActivateObject`, contested → `resolve_card_roll`); Crucible
+key/door + fuse/lift puzzle seeded end-to-end; `use`-on-creature/self + `ConsumeItem` routing;
+`look` verb (read-only, no roll); Target dropdown in `VnaActionPanel`.
+
+Post-playtest fixes: locked exits as `use` targets; key-unlock persists to DB; fuse consumed
+on `ActivateObject`; map level-refresh fix (`map.load()` on level transition, not `update_state`).
+LLM narration hook after deterministic `ActivateObject`. Level 2 seed (`tools/populate_crucible_level2.py`).
+
 ---
 
 # Planned Roadmap — Phases 49–53
 
 These phases are **defined on the GitHub Projects roadmap** (`ghostpencil/dungeon-daddy`,
-project #1). Phases 48–50 are **complete**; **51–53 are not yet implemented**. Numbering and
+project #1). Phases 48–50.5 are **complete**; **51–53 are not yet implemented**. Numbering and
 scope below mirror that board. A detailed `spec/PHASE_NN_*.md` is written when each phase
 actually starts.
 

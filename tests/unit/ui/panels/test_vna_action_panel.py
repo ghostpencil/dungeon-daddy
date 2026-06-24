@@ -323,3 +323,162 @@ class TestNounsFilteredByVerb:
         panel.select_verb("equip")  # no carried items in context
         assert panel.noun_labels() == []
         assert panel._noun_id is None
+
+
+# ---------------------------------------------------------------------------
+# Slice 9 — Target slot for transitive verbs (give / use / combine)
+# ---------------------------------------------------------------------------
+
+def _transitive_panel():
+    """Panel with an NPC, object, monster, two carried items, party PC, and a locked exit."""
+    panel = _panel()
+    panel.set_context(
+        actor_abilities=[],
+        room_context=_room_context(
+            npcs=[{"actor_id": "npc-guard", "display_name": "Guard"}],
+            objects=[{"object_id": "obj-chest", "display_name": "Chest",
+                      "slug": "chest", "description": "A heavy chest."}],
+            monsters=[{"actor_id": "mon-ghoul", "display_name": "Ghoul"}],
+            party=[{"actor_id": "pc-2", "display_name": "Borin"}],
+            exits=[
+                {"exit_id": "exit-gate", "label": "Iron Gate", "status": "locked"},
+                {"exit_id": "exit-north", "label": "North Arch", "status": "open"},
+            ],
+        ),
+        actor=_actor(
+            actor_id="pc-1",
+            display_name="Elara",
+            carried_items=[
+                {"item_id": "itm-key", "display_name": "Brass Key", "slug": "brass-key"},
+                {"item_id": "itm-vial", "display_name": "Healing Vial", "slug": "healing-vial"},
+            ],
+        ),
+        playbook_slug="fighter",
+        world_flags=[],
+    )
+    return panel
+
+
+class TestTargetSlot:
+    def test_intransitive_verb_has_empty_targets(self):
+        panel = _transitive_panel()
+        panel.select_verb("fight")
+        assert panel._targets == []
+
+    def test_give_verb_restricts_noun_to_carried_items(self):
+        panel = _transitive_panel()
+        panel.select_verb("give")
+        noun_ids = {n.noun_id for n in panel._visible_nouns()}
+        assert "itm-key" in noun_ids
+        assert "npc-guard" not in noun_ids  # NPC is a target, not a noun
+
+    def test_give_verb_surfaces_npcs_as_targets(self):
+        panel = _transitive_panel()
+        panel.select_verb("give")
+        target_ids = {n.noun_id for n in panel._targets}
+        assert "npc-guard" in target_ids
+
+    def test_give_verb_surfaces_party_pcs_as_targets(self):
+        panel = _transitive_panel()
+        panel.select_verb("give")
+        target_ids = {n.noun_id for n in panel._targets}
+        assert "pc-2" in target_ids
+
+    def test_give_verb_excludes_acting_actor_from_targets(self):
+        panel = _transitive_panel()
+        panel.select_verb("give")
+        target_ids = {n.noun_id for n in panel._targets}
+        assert "pc-1" not in target_ids  # acting actor is SOURCE_SELF, not a give target
+
+    def test_combine_verb_targets_exclude_selected_noun(self):
+        panel = _transitive_panel()
+        panel.select_verb("combine")
+        panel.select_noun("itm-key")
+        target_ids = {n.noun_id for n in panel._targets}
+        assert "itm-vial" in target_ids
+        assert "itm-key" not in target_ids  # can't combine with itself
+
+    def test_use_verb_surfaces_object_and_monster_as_targets(self):
+        panel = _transitive_panel()
+        panel.select_verb("use")
+        panel.select_noun("itm-vial")
+        target_ids = {n.noun_id for n in panel._targets}
+        assert "obj-chest" in target_ids
+        assert "mon-ghoul" in target_ids
+
+    def test_use_verb_surfaces_self_as_target(self):
+        panel = _transitive_panel()
+        panel.select_verb("use")
+        panel.select_noun("itm-vial")
+        target_ids = {n.noun_id for n in panel._targets}
+        assert "pc-1" in target_ids  # self is a valid "use on self" target
+
+    def test_use_verb_surfaces_party_members_as_targets(self):
+        panel = _transitive_panel()
+        panel.select_verb("use")
+        panel.select_noun("itm-vial")
+        target_ids = {n.noun_id for n in panel._targets}
+        assert "pc-2" in target_ids  # other party PCs are valid use targets
+
+    def test_build_card_includes_target_id_for_transitive_verb(self):
+        from dungeon_daddy.rpg.action_options import ActionCard
+
+        panel = _transitive_panel()
+        panel.select_verb("give")
+        panel.select_noun("itm-key")
+        panel.select_target("npc-guard")
+        panel.select_adverb("cautiously")
+        card = panel.build_card()
+        assert isinstance(card, ActionCard)
+        assert card.target_id == "npc-guard"
+
+    def test_submit_transitive_verb_fires_callback_with_target(self):
+        panel = _transitive_panel()
+        panel.select_verb("use")
+        panel.select_noun("itm-vial")
+        panel.select_target("pc-1")
+        panel.select_adverb("cautiously")
+        seen = []
+        panel.set_submit_callback(lambda card: seen.append(card))
+        panel.submit()
+        assert len(seen) == 1
+        assert seen[0].target_id == "pc-1"
+
+    def test_submit_transitive_verb_no_target_stores_error(self):
+        from dungeon_daddy.rpg.action_options import CardError
+
+        panel = _transitive_panel()
+        panel.select_verb("give")
+        panel.select_noun("itm-key")
+        # _target_id is None (no target selected)
+        panel._target_id = None
+        panel.select_adverb("cautiously")
+        seen = []
+        panel.set_submit_callback(lambda card: seen.append(card))
+        panel.submit()
+        assert seen == []
+        assert isinstance(panel._last_error, CardError)
+        assert panel._last_error.field == "target"
+
+    def test_target_labels_and_select_by_label(self):
+        panel = _transitive_panel()
+        panel.select_verb("give")
+        panel.select_noun("itm-key")
+        labels = panel.target_labels()
+        assert "Guard" in labels
+        panel.select_target_by_label("Guard")
+        assert panel._target_id == "npc-guard"
+
+    def test_use_verb_surfaces_locked_exit_as_target(self):
+        panel = _transitive_panel()
+        panel.select_verb("use")
+        panel.select_noun("itm-key")
+        target_ids = {n.noun_id for n in panel._targets}
+        assert "exit-gate" in target_ids  # locked exit appears as Use target
+
+    def test_use_verb_excludes_open_exit_from_targets(self):
+        panel = _transitive_panel()
+        panel.select_verb("use")
+        panel.select_noun("itm-key")
+        target_ids = {n.noun_id for n in panel._targets}
+        assert "exit-north" not in target_ids  # open exit without key requirement is NOT a use target

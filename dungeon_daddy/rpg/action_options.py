@@ -33,13 +33,29 @@ VERB_MOVE = "move"
 VERB_PICK_UP = "pick-up"
 VERB_EQUIP = "equip"
 VERB_ACTIVATE = "activate"
+VERB_GIVE = "give"
+VERB_USE = "use"
+VERB_COMBINE = "combine"
+VERB_LOOK = "look"
 
 # Interaction verbs surfaced in the Verb slot alongside the universal verbs.
 _INTERACTION_VERBS: dict[str, str] = {
     VERB_PICK_UP: "Pick Up",
     VERB_EQUIP: "Equip",
     VERB_ACTIVATE: "Activate",
+    VERB_LOOK: "Look",
+    VERB_GIVE: "Give",
+    VERB_USE: "Use",
+    VERB_COMBINE: "Combine",
 }
+
+# Verbs that require a second noun (Target). Absent from this set = intransitive.
+TRANSITIVE_VERBS: frozenset[str] = frozenset({VERB_GIVE, VERB_USE, VERB_COMBINE})
+
+
+def is_transitive(verb: str) -> bool:
+    """True when ``verb`` requires a Target noun."""
+    return verb in TRANSITIVE_VERBS
 
 # Noun ``source`` tags — finer than ``target_type`` (which can't tell an exit
 # from the synthetic room, or a loose item from a carried one). Used to filter
@@ -50,18 +66,32 @@ SOURCE_CARRIED_ITEM = "carried_item"
 SOURCE_NPC = "npc"
 SOURCE_MONSTER = "monster"
 SOURCE_EXIT = "exit"
+SOURCE_LOCKED_EXIT = "locked_exit"
 SOURCE_SELF = "self"
 SOURCE_ROOM = "room"
+SOURCE_PARTY = "party"
 
-# Which noun sources each mutation verb may target. A verb absent from this map
-# (the skill verbs) is unrestricted — it may target any noun. ``move`` targets
-# only exits, ``pick-up`` loose items, ``equip`` carried items, ``activate``
-# interactive objects.
+# Exit statuses that block movement and should appear as Use targets.
+_LOCKED_EXIT_STATUSES: frozenset[str] = frozenset({"locked", "blocked", "one_way"})
+
+# Which noun sources each verb may target for the primary noun slot. Absent
+# verbs (skill verbs) are unrestricted. Transitive verbs (give/use/combine)
+# use a carried item as the primary noun; the Target slot holds the recipient.
 _VERB_NOUN_SOURCES: dict[str, set[str]] = {
-    VERB_MOVE: {SOURCE_EXIT},
+    VERB_MOVE: {SOURCE_EXIT, SOURCE_LOCKED_EXIT},
     VERB_PICK_UP: {SOURCE_LOOSE_ITEM},
     VERB_EQUIP: {SOURCE_CARRIED_ITEM},
     VERB_ACTIVATE: {SOURCE_OBJECT},
+    VERB_GIVE: {SOURCE_CARRIED_ITEM},
+    VERB_USE: {SOURCE_CARRIED_ITEM},
+    VERB_COMBINE: {SOURCE_CARRIED_ITEM},
+}
+
+# Which noun sources are valid as the Target (second noun) for each transitive verb.
+_VERB_TARGET_SOURCES: dict[str, set[str]] = {
+    VERB_GIVE: {SOURCE_NPC, SOURCE_PARTY},
+    VERB_COMBINE: {SOURCE_CARRIED_ITEM},
+    VERB_USE: {SOURCE_OBJECT, SOURCE_MONSTER, SOURCE_NPC, SOURCE_SELF, SOURCE_PARTY, SOURCE_LOCKED_EXIT},
 }
 
 
@@ -72,6 +102,11 @@ def noun_sources_for_verb(verb: str) -> set[str] | None:
     ``None`` and may target any noun.
     """
     return _VERB_NOUN_SOURCES.get(verb)
+
+
+def target_sources_for_verb(verb: str) -> set[str] | None:
+    """Source filter for the Target slot, or ``None`` if verb is intransitive."""
+    return _VERB_TARGET_SOURCES.get(verb)
 
 
 @dataclass(frozen=True)
@@ -98,16 +133,18 @@ class AdverbOption:
 
 
 class ActionCard(BaseModel):
-    """The player's structured action declaration: a Verb · Noun · Adverb grammar.
+    """The player's structured action declaration: a Verb · Noun · [Target] · Adverb grammar.
 
     The input-dual of an ``LLMReactionProposal`` — the player declares an action
     through bounded, engine-offered choices that :func:`validate_card` checks
     against the sets the providers offered for the current room/actor.
+    ``target_id`` is present only for transitive verbs (give, use, combine).
     """
 
     verb: str
     noun_id: str
     adverb: str
+    target_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -117,6 +154,7 @@ class CardOptions:
     verbs: list[VerbOption] = field(default_factory=list)
     nouns: list[NounOption] = field(default_factory=list)
     adverbs: list[AdverbOption] = field(default_factory=list)
+    targets: list[NounOption] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -140,6 +178,13 @@ def validate_card(card: ActionCard, options: CardOptions) -> CardError | None:
         return CardError(field="noun", reason=f"Noun not offered: {card.noun_id}")
     if card.adverb not in {a.adverb for a in options.adverbs}:
         return CardError(field="adverb", reason=f"Adverb not offered: {card.adverb}")
+    if is_transitive(card.verb):
+        if card.target_id is None:
+            return CardError(field="target", reason=f"Transitive verb requires a Target: {card.verb}")
+        if card.target_id not in {n.noun_id for n in options.targets}:
+            return CardError(field="target", reason=f"Target not offered: {card.target_id}")
+    elif card.target_id is not None:
+        return CardError(field="target", reason=f"Intransitive verb may not have a Target: {card.verb}")
     return None
 
 
@@ -278,6 +323,15 @@ def available_nouns(
                 target_type="npc", source=SOURCE_NPC,
             )
         )
+    acting_id = actor.get("actor_id")
+    for pc in room_context.get("party", []):
+        if pc["actor_id"] != acting_id:
+            options.append(
+                NounOption(
+                    noun_id=pc["actor_id"], label=pc["display_name"],
+                    target_type="npc", source=SOURCE_PARTY,
+                )
+            )
     for monster in room_context.get("monsters", []):
         options.append(
             NounOption(
@@ -286,10 +340,15 @@ def available_nouns(
             )
         )
     for ext in room_context.get("exits", []):
+        is_locked = (
+            ext.get("status") in _LOCKED_EXIT_STATUSES
+            or bool(ext.get("requires_item_slug"))
+        )
         options.append(
             NounOption(
                 noun_id=ext["exit_id"], label=ext["label"],
-                target_type="room", source=SOURCE_EXIT,
+                target_type="room",
+                source=SOURCE_LOCKED_EXIT if is_locked else SOURCE_EXIT,
             )
         )
     options.append(

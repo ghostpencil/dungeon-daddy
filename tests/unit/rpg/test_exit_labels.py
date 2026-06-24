@@ -137,3 +137,13 @@ class TestLockedExitMarker:
             from_room=_FROM, rooms_by_id=_ROOMS, visited_rooms={"r2"},
         )
         assert LOCK_PREFIX not in label
+
+    def test_open_exit_with_requires_item_slug_is_prefixed_with_lock_glyph(self):
+        """The Crucible's lift door is status='open' + requires_item_slug — must show lock icon."""
+        from dungeon_daddy.rpg.exit_labels import LOCK_PREFIX
+
+        label = exit_noun_label(
+            _exit(status="open", requires_item_slug="lift-warden-key"),
+            from_room=_FROM, rooms_by_id=_ROOMS, visited_rooms={"r2"},
+        )
+        assert label.startswith(LOCK_PREFIX)

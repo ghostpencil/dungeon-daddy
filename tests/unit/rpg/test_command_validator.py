@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dungeon_daddy.rpg.command import ActivateObject, ConsumeItem, ConsumeKitCharge, DropItem, EquipItem, GiveItem, PickUpItem, TakeItem, UnequipItem
+from dungeon_daddy.rpg.command import ActivateObject, CombineItems, ConsumeItem, ConsumeKitCharge, DropItem, EquipItem, GiveItem, PickUpItem, TakeItem, UnequipItem
 from dungeon_daddy.rpg.command_validator import validate_command
 from dungeon_daddy.rpg.models import Item, ObjectTransition, RoomObject
 
@@ -131,6 +131,29 @@ class TestGiveItemValidation:
         result = validate_command(GiveItem(item_id=ITEM_ID, to_actor_id=ACTOR_B), repo, CAMPAIGN)
         assert not result.accepted
         assert "not a player character" in (result.rejection_reason or "")
+
+    def test_rejects_inactive_item(self, repo) -> None:
+        repo.save_item(_dungeon_item(status="consumed"))
+        _save_pc(repo)
+        result = validate_command(GiveItem(item_id=ITEM_ID, to_actor_id=ACTOR_B), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "not active" in (result.rejection_reason or "")
+
+    def test_rejects_unheld_item(self, repo) -> None:
+        loose = Item(
+            item_id=ITEM_ID,
+            campaign_id=CAMPAIGN,
+            slug="potion",
+            display_name="Healing Potion",
+            item_type="dungeon_item",
+            description="Restores vitality.",
+            owner_actor_id=None,
+        )
+        repo.save_item(loose)
+        _save_pc(repo)
+        result = validate_command(GiveItem(item_id=ITEM_ID, to_actor_id=ACTOR_B), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "not held" in (result.rejection_reason or "")
 
     def test_rejects_when_target_at_dungeon_item_cap(self, repo) -> None:
         repo.save_item(_dungeon_item())
@@ -536,5 +559,70 @@ class TestDropItemValidation:
     def test_accepts_owned_item(self, repo) -> None:
         repo.save_item(_loose_item(owner=ACTOR_A, room_id=None))
         result = validate_command(DropItem(item_id=LOOSE_ITEM_ID, room_id=ROOM_ID_A), repo, CAMPAIGN)
+        assert result.accepted
+        assert result.rejection_events == []
+
+
+ITEM_A_ID = "item:test:herb"
+ITEM_B_ID = "item:test:vial"
+
+
+def _held_item(item_id: str, owner: str | None = ACTOR_A, status: str = "active") -> Item:
+    return Item(
+        item_id=item_id,
+        campaign_id=CAMPAIGN,
+        slug=item_id.split(":")[-1],
+        display_name=item_id.split(":")[-1].title(),
+        item_type="dungeon_item",
+        description="A dungeon item.",
+        owner_actor_id=owner,
+        status=status,  # type: ignore[arg-type]
+    )
+
+
+class TestCombineItemsValidation:
+    def test_rejects_unknown_item_a(self, repo) -> None:
+        result = validate_command(CombineItems(item_a_id=ITEM_A_ID, item_b_id=ITEM_B_ID, actor_id=ACTOR_A), repo, CAMPAIGN)
+        assert not result.accepted
+        assert result.rejection_events[0].event_type == "command.rejected"
+
+    def test_rejects_item_a_not_active(self, repo) -> None:
+        repo.save_item(_held_item(ITEM_A_ID, status="consumed"))
+        repo.save_item(_held_item(ITEM_B_ID))
+        result = validate_command(CombineItems(item_a_id=ITEM_A_ID, item_b_id=ITEM_B_ID, actor_id=ACTOR_A), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "not active" in (result.rejection_reason or "")
+
+    def test_rejects_item_a_not_held_by_actor(self, repo) -> None:
+        repo.save_item(_held_item(ITEM_A_ID, owner=ACTOR_B))
+        repo.save_item(_held_item(ITEM_B_ID))
+        result = validate_command(CombineItems(item_a_id=ITEM_A_ID, item_b_id=ITEM_B_ID, actor_id=ACTOR_A), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "not held by actor" in (result.rejection_reason or "")
+
+    def test_rejects_unknown_item_b(self, repo) -> None:
+        repo.save_item(_held_item(ITEM_A_ID))
+        result = validate_command(CombineItems(item_a_id=ITEM_A_ID, item_b_id=ITEM_B_ID, actor_id=ACTOR_A), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "Unknown item" in (result.rejection_reason or "")
+
+    def test_rejects_item_b_not_active(self, repo) -> None:
+        repo.save_item(_held_item(ITEM_A_ID))
+        repo.save_item(_held_item(ITEM_B_ID, status="consumed"))
+        result = validate_command(CombineItems(item_a_id=ITEM_A_ID, item_b_id=ITEM_B_ID, actor_id=ACTOR_A), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "not active" in (result.rejection_reason or "")
+
+    def test_rejects_item_b_not_held_by_actor(self, repo) -> None:
+        repo.save_item(_held_item(ITEM_A_ID))
+        repo.save_item(_held_item(ITEM_B_ID, owner=ACTOR_B))
+        result = validate_command(CombineItems(item_a_id=ITEM_A_ID, item_b_id=ITEM_B_ID, actor_id=ACTOR_A), repo, CAMPAIGN)
+        assert not result.accepted
+        assert "not held by actor" in (result.rejection_reason or "")
+
+    def test_accepts_both_held_and_active(self, repo) -> None:
+        repo.save_item(_held_item(ITEM_A_ID))
+        repo.save_item(_held_item(ITEM_B_ID))
+        result = validate_command(CombineItems(item_a_id=ITEM_A_ID, item_b_id=ITEM_B_ID, actor_id=ACTOR_A), repo, CAMPAIGN)
         assert result.accepted
         assert result.rejection_events == []

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.rpg.command import ActivateObject, ConsumeItem, ConsumeKitCharge, DropItem, EquipItem, GiveItem, PickUpItem, PlayerCommand, TakeItem, UnequipItem
+from dungeon_daddy.rpg.command import ActivateObject, CombineItems, ConsumeItem, ConsumeKitCharge, DropItem, EquipItem, GiveItem, PickUpItem, PlayerCommand, TakeItem, UnequipItem
 from dungeon_daddy.rpg.command_validator import CommandValidationResult
 from dungeon_daddy.rpg.models import ClockState
 from dungeon_daddy.rpg.service import RpgService
@@ -130,6 +130,57 @@ def apply_command(
             )
         )
 
+    elif isinstance(command, CombineItems):
+        items = repo.get_items(campaign_id)
+        item_a = next((i for i in items if i["item_id"] == command.item_a_id), None)
+        item_b = next((i for i in items if i["item_id"] == command.item_b_id), None)
+        if item_a is None or item_b is None:
+            return result
+
+        repo.update_item_status(command.item_a_id, "consumed")
+        repo.update_item_status(command.item_b_id, "consumed")
+        result.events.append(
+            DomainEvent(
+                event_id=str(uuid.uuid4()),
+                campaign_id=campaign_id,
+                event_type="items.combined",
+                payload={
+                    "item_a_id": command.item_a_id,
+                    "item_b_id": command.item_b_id,
+                    "actor_id": command.actor_id,
+                },
+            )
+        )
+
+        result_slug = item_a.get("combination_result_slug")
+        if result_slug:
+            target = next(
+                (
+                    i for i in items
+                    if i["slug"] == result_slug
+                    and i.get("owner_actor_id") is None
+                    and i.get("room_id") is None
+                ),
+                None,
+            )
+            if target is not None:
+                repo.update_item_owner(target["item_id"], command.actor_id)
+                repo.update_item_status(target["item_id"], "active")
+                result.events.append(
+                    DomainEvent(
+                        event_id=str(uuid.uuid4()),
+                        campaign_id=campaign_id,
+                        event_type="item.spawned",
+                        payload={
+                            "item_id": target["item_id"],
+                            "slug": result_slug,
+                            "actor_id": command.actor_id,
+                        },
+                    )
+                )
+            else:
+                _log.info("Combine spawn no-op: no unplaced inert item with slug '%s'", result_slug)
+
     elif isinstance(command, ActivateObject):
         obj = repo.get_room_object(command.object_id)
         if obj is None:
@@ -184,6 +235,24 @@ def apply_command(
                 )
             else:
                 _log.info("Spawn no-op: no unplaced inert item with slug '%s'", spawns_slug)
+
+        required_slug = transition.get("requires_item_slug")
+        if required_slug:
+            actor_items = repo.get_items_by_actor(command.actor_id)
+            held = next(
+                (i for i in actor_items if i["slug"] == required_slug and i["status"] == "active"),
+                None,
+            )
+            if held is not None:
+                repo.update_item_status(held["item_id"], "consumed")
+                result.events.append(
+                    DomainEvent(
+                        event_id=str(uuid.uuid4()),
+                        campaign_id=campaign_id,
+                        event_type="item.consumed",
+                        payload={"item_id": held["item_id"], "reason": "activated"},
+                    )
+                )
 
         advances_slug = transition.get("advances_clock_slug")
         if advances_slug:
