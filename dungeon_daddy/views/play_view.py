@@ -38,6 +38,7 @@ from dungeon_daddy.ui.panels.fallout_panel import FalloutPanel
 from dungeon_daddy.ui.panels.map_panel import MapPanel
 from dungeon_daddy.ui.panels.memory_inspector_panel import MemoryInspectorPanel
 from dungeon_daddy.ui.panels.player_action_panel import PlayerActionPanel
+from dungeon_daddy.ui.panels.action_builder import InChatActionBuilder
 from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
 from dungeon_daddy.ui.panels.exit_list_panel import ExitListPanel
 from dungeon_daddy.ui.panels.scene_state_panel import SceneStatePanel
@@ -396,6 +397,11 @@ class PlayView(arcade.View):
         self._rpg_action.set_resolve_callback(self._on_resolve_action)
         self._rpg_action.set_action_select_callback(self._on_action_key_selected)
         self._rpg_vna.set_submit_callback(self._on_vna_submit)
+        # In-chat Action Builder (Phase 50.6) — relocates the V·N·A surface into
+        # the left chat column. Wraps the same VnaActionPanel logic core, so
+        # _refresh_vna_panel feeds it and submit() routes through _on_vna_submit.
+        self._chat_action_builder = InChatActionBuilder(self._rpg_vna)
+        self._chat.set_action_builder(self._chat_action_builder)
         self._rpg_campaign_id: str | None = None
         self._action_state = PlayerActionState()
         self._chat.set_actor_switch_callback(self._on_actor_switch)

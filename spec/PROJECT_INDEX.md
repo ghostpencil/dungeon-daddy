@@ -4,7 +4,8 @@
 
 Phase **50 — Hybrid Action Model: COMPLETE & merged to `main`** (2026-06-23).
 Phase **50.5 — Use Noun on Noun: COMPLETE & merged to `main`** (PR #81, 2026-06-24).
-Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–3 done on branch `phase-50.6` (2026-06-24).
+Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–3 committed; Slice 4 implemented
+(uncommitted) on branch `phase-50.6` (2026-06-24).
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -12,7 +13,10 @@ Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
 
 ---
 
-## START HERE next session — Phase 50.6, Slice 4
+## START HERE next session — Phase 50.6, Slice 5
+
+**First: commit Slice 4** (implemented but uncommitted — see Slice 4 entry below for the diff).
+Then continue with Slice 5.
 
 Spec is `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md` (read it; design decisions are locked in §3).
 Phase 50.6 is a **BUILD add-on** (dynamic, like 50.5 — not on the 51–53 roadmap, no issue).
@@ -24,6 +28,12 @@ Arcade widget layer is rebuilt, plus 3 new pure helpers. 11-slice TDD plan in sp
 
 **Work is on branch `phase-50.6`** (off `main`; not yet pushed/PR'd). Use the TDD skill
 (read `spec/TESTING.md` first).
+
+**Slot-widget decision (locked, 2026-06-24):** the in-chat builder's V/N/T/A slots are
+**custom-drawn chips that open a popup list on click** — NOT a cycle picker, NOT native
+`arcade.gui.UIDropdown` (re-affirms Phase 50 feedback; see auto-memory
+`project_phase50_vna_dropdowns`). The right-panel ACTION tab is **kept alongside** the new
+in-chat builder until Slice 9 retires it.
 
 - **Slice 1 — DONE** (commit `e6b6a6e`): `verbs_for_noun` pure helper (inverse of
   `noun_sources_for_verb`) in `rpg/action_options.py` + 4 unit tests. Full rpg unit suite green.
@@ -40,14 +50,30 @@ Arcade widget layer is rebuilt, plus 3 new pure helpers. 11-slice TDD plan in sp
   (teal/ember/gold/default); objects get hazard glyph `⚠` when disturbed/armed; creatures
   prefer `disposition` over actor `status`; key-gated open exits read "locked"; items gold;
   synthetic self/room (+ ally party) dropped; empty sections omitted. Full rpg unit suite green.
-- **Slice 4 — NEXT (first widget slice):** Builder widget relocation (spec §4.1–4.3) — render
-  the wrapped command sentence + slots in `chat_panel.py` (below the actor mini-card, replacing
-  the old always-on Ask input). Reuse `VnaActionPanel`'s logic core verbatim; only the Arcade
-  widget layer changes. Verify slot population/selection + valid-card submit via the **ui-test
-  harness** (read `spec/UI_TESTING.md` + `spec/TESTING.md`; pure-logic slices are done, the rest
-  are widget slices). The 3 pure helpers (`verbs_for_noun`, `action_preview`, `room_things`)
-  are ready to wire in slices 5–8.
-- Then slices 5–11 (suggested-verbs row, preview render, overlay, overlay→builder link, retire
+- **Slice 4 — DONE (uncommitted; first widget slice):** Builder widget relocation (spec §4.1–4.3).
+  New `dungeon_daddy/ui/panels/action_builder.py` → `InChatActionBuilder`, which **reuses
+  `VnaActionPanel`'s Arcade-free logic core verbatim** (`*_labels()`/`select_*_by_label()`/
+  `submit()`) and adds only a presentational layer: wrapped command sentence ("`<Actor>` will
+  [VERB] the [NOUN] [ADVERB]"; transitive verbs grow a Target slot with connector "on the"/"to"),
+  **custom-drawn slot chips that open a popup list on click** (popup-row click selects + closes;
+  outside-click dismisses; action button calls `submit()`). 10 unit tests
+  (`tests/unit/ui/panels/test_action_builder.py`): slots order, transitive target slot, popup
+  open/select/dismiss, button-submits-valid-card, and a `draw()`-records-hit-rects test (mocks
+  the draw primitives → guards draw/hit-test agreement headlessly). Wired in:
+  `chat_panel.py` draws the builder band below the actor mini-card in play mode (band adds
+  ~156px; `_builder_extra_h`/`set_action_builder`; routes `on_mouse_press`; popup drawn **last**
+  so it overlays the card/messages), and `play_view.py` builds `InChatActionBuilder(self._rpg_vna)`
+  so `_refresh_vna_panel()` feeds it and `submit()` routes through `_on_vna_submit`. ACTION tab
+  kept alongside. Full UI+views unit suite green (935). **Caveats:** `ROLL` button label is a
+  placeholder (Slice 6 makes it adaptive ROLL/DO/MOVE/LOOK via `action_preview`); band height not
+  yet responsive/collapsible (Slice 11). **Not done:** ui-test-harness visual check — user
+  verifies the GUI manually (`python -m dungeon_daddy` → Play mode, room loaded).
+- **Slice 5 — NEXT:** Suggested-verbs row (spec §4.4) — quick-select chips below the sentence,
+  **filtered by the selected noun** via the ready `verbs_for_noun` helper; clicking a chip sets
+  the Verb slot (same as the verb popup); inapplicable verbs render disabled (`INK_4`), capped at
+  ~5 by relevance. Add to `InChatActionBuilder` (chips + hit-testing) reusing the rect-list
+  pattern; unit-test chip selection + disabled state.
+- Then slices 6–11 (preview render + adaptive button, overlay, overlay→builder link, retire
   ACTION tab, SAY/ASK swap stub, polish + smoke test).
 
 After 50.6: **Phase 51 — Talk to the Dungeon** (roadmap; 50.6 carves the SAY/ASK input seam).

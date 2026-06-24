@@ -1,0 +1,265 @@
+"""In-chat Action Builder (Phase 50.6 Slice 4).
+
+Relocates the Verb·Noun·Adverb action surface out of the right RPG side panel
+and into the left chat column, directly below the actor mini-card. It **reuses
+:class:`VnaActionPanel`'s Arcade-free logic core verbatim** — every option list,
+selection, and the ``submit`` path come from the panel — and adds only a
+presentational layer: a wrapped command sentence whose slots are custom-drawn
+chips that open a popup selection list on click (per Phase 50 feedback the slots
+must support fast selection from a large vocabulary, not a cycle picker).
+
+This module stays unit-testable: drawing is mocked in tests and exercised for
+real via the ui-test harness. The slot/popup hit-testing follows the same
+rect-list pattern as :mod:`chat_panel`.
+"""
+from __future__ import annotations
+
+from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
+
+# Slot kinds, in the order they appear in the command sentence. ``target`` is
+# present only for transitive verbs (Phase 50.5 ``Verb · Noun · [Target] · Adverb``).
+_KIND_VERB = "verb"
+_KIND_NOUN = "noun"
+_KIND_TARGET = "target"
+_KIND_ADVERB = "adverb"
+
+# Connector word drawn before the Target slot, per transitive verb family
+# (Phase 50.5 grammar): "use X on the Y", "give X to Y".
+_TARGET_CONNECTORS = {"use": "on the", "give": "to"}
+_DEFAULT_TARGET_CONNECTOR = "with"
+
+
+class InChatActionBuilder:
+    def __init__(self, panel: VnaActionPanel) -> None:
+        self._panel = panel
+        # The slot currently showing its popup list, or ``None`` when closed.
+        self._open_slot: str | None = None
+        # Hit rects populated by draw(): slots, the open popup's rows, the button.
+        self._slot_rects: list[tuple[float, float, float, float, str]] = []
+        self._popup_row_rects: list[tuple[float, float, float, float, str]] = []
+        self._button_rect: tuple[float, float, float, float] | None = None
+
+    # ------------------------------------------------------------------
+    # Command sentence model (drawn + hit-tested)
+    # ------------------------------------------------------------------
+
+    def slots(self) -> list[tuple[str, str | None]]:
+        """Ordered ``(kind, label)`` slots reflecting the panel's selection.
+
+        The Target slot is included only when the chosen verb is transitive and
+        offers at least one target.
+        """
+        result: list[tuple[str, str | None]] = [
+            (_KIND_VERB, self._panel.selected_verb_label()),
+            (_KIND_NOUN, self._panel.selected_noun_label()),
+        ]
+        if self._panel.target_labels():
+            result.append((_KIND_TARGET, self._panel.selected_target_label()))
+        result.append((_KIND_ADVERB, self._panel.selected_adverb_label()))
+        return result
+
+    # ------------------------------------------------------------------
+    # Interaction — slot chips open a popup list (custom combobox)
+    # ------------------------------------------------------------------
+
+    def popup_labels(self) -> list[str]:
+        """Selectable labels for the currently-open slot (empty when closed)."""
+        return self._labels_for(self._open_slot)
+
+    def _labels_for(self, kind: str | None) -> list[str]:
+        if kind == _KIND_VERB:
+            return self._panel.verb_labels()
+        if kind == _KIND_NOUN:
+            return self._panel.noun_labels()
+        if kind == _KIND_TARGET:
+            return self._panel.target_labels()
+        if kind == _KIND_ADVERB:
+            return self._panel.adverb_labels()
+        return []
+
+    def _select(self, kind: str, label: str) -> None:
+        if kind == _KIND_VERB:
+            self._panel.select_verb_by_label(label)
+        elif kind == _KIND_NOUN:
+            self._panel.select_noun_by_label(label)
+        elif kind == _KIND_TARGET:
+            self._panel.select_target_by_label(label)
+        elif kind == _KIND_ADVERB:
+            self._panel.select_adverb_by_label(label)
+
+    def on_mouse_press(self, x: float, y: float) -> bool:
+        """Route a click. Returns ``True`` when the builder consumed it.
+
+        An open popup takes priority (it is drawn on top): a click on one of its
+        rows selects that option and closes the popup.
+        """
+        if self._open_slot is not None:
+            for left, bottom, w, h, label in self._popup_row_rects:
+                if left <= x < left + w and bottom <= y < bottom + h:
+                    self._select(self._open_slot, label)
+                    self._open_slot = None
+                    return True
+            # A click anywhere else while a popup is open dismisses it.
+            self._open_slot = None
+            return True
+        for left, bottom, w, h, kind in self._slot_rects:
+            if left <= x < left + w and bottom <= y < bottom + h:
+                self._open_slot = kind
+                return True
+        if self._button_rect is not None:
+            left, bottom, w, h = self._button_rect
+            if left <= x < left + w and bottom <= y < bottom + h:
+                self._panel.submit()
+                return True
+        return False
+
+    def button_label(self) -> str:
+        """Label for the action button.
+
+        Adaptive ``ROLL`` vs ``DO``/``MOVE``/``LOOK`` styling is wired to the
+        deterministic preview in Slice 6; for now the contested default holds.
+        """
+        return "ROLL"
+
+    def _target_connector(self) -> str:
+        verb_label = (self._panel.selected_verb_label() or "").lower()
+        return _TARGET_CONNECTORS.get(verb_label, _DEFAULT_TARGET_CONNECTOR)
+
+    # ------------------------------------------------------------------
+    # Arcade draw layer (display required; exercised via the ui-test harness)
+    # ------------------------------------------------------------------
+
+    # Rough per-character advance for width estimation (FONT_MONO @ TEXT_SM).
+    _CHAR_W = 7.0
+    _LINE_H = 26.0
+    _CHIP_H = 20.0
+    _ROW_H = 18.0  # popup row height
+
+    def draw(self, x: float, y: float, w: float, h: float) -> None:
+        """Render the wrapped command sentence + slot chips + action button.
+
+        Records hit rects (``_slot_rects``/``_button_rect``/``_popup_row_rects``)
+        consumed by :meth:`on_mouse_press`. The open popup is drawn last so it
+        overlays the sentence.
+        """
+        import arcade
+        from dungeon_daddy.ui.theme import (
+            BG_1, BG_2, BG_3, FONT_MONO, FONT_UI, INK_2, INK_3,
+            LINE, LINE_HI, PAD_MD, PAD_SM, RADIUS_SM, TEAL, TEXT_SM,
+            VIOLET, draw_kicker, draw_rounded_rect,
+        )
+
+        self._slot_rects = []
+        self._popup_row_rects = []
+        self._button_rect = None
+
+        # Panel background + kicker
+        arcade.draw_rect_filled(arcade.XYWH(x + w / 2, y + h / 2, w, h), BG_2)
+        arcade.draw_line(x, y + h, x + w, y + h, LINE, 1)
+        draw_kicker("COMMAND SENTENCE", x + PAD_MD + 6, y + h - 12)
+
+        left = x + PAD_MD
+        right = x + w - PAD_MD
+        cur_x = left
+        cur_y = y + h - 34  # baseline of the first sentence row (chip centre)
+
+        _SLOT_TINT = {
+            _KIND_VERB: VIOLET,
+            _KIND_NOUN: TEAL,
+            _KIND_TARGET: TEAL,
+            _KIND_ADVERB: INK_3,
+        }
+
+        def _text_w(s: str) -> float:
+            return len(s) * self._CHAR_W
+
+        def _wrap(needed: float) -> None:
+            nonlocal cur_x, cur_y
+            if cur_x + needed > right:
+                cur_x = left
+                cur_y -= self._LINE_H
+
+        def _draw_text_token(s: str, color) -> None:
+            nonlocal cur_x
+            tw = _text_w(s)
+            _wrap(tw)
+            arcade.draw_text(
+                s, cur_x, cur_y, color,
+                font_size=TEXT_SM, font_name=FONT_UI, anchor_y="center",
+            )
+            cur_x += tw + 6
+
+        def _draw_slot(kind: str, label: str | None) -> None:
+            nonlocal cur_x
+            text = (label or "—")
+            if kind == _KIND_VERB:
+                text = text.upper()
+            chip_w = _text_w(text) + PAD_SM * 2 + 14  # +14 for the ▾ affordance
+            _wrap(chip_w)
+            tint = _SLOT_TINT.get(kind, INK_3)
+            draw_rounded_rect(
+                cur_x + chip_w / 2, cur_y, chip_w, self._CHIP_H, RADIUS_SM,
+                BG_3, border_color=tint, border_width=1,
+            )
+            arcade.draw_text(
+                f"{text} ▾", cur_x + chip_w / 2, cur_y, tint,
+                font_size=TEXT_SM, font_name=FONT_MONO,
+                anchor_x="center", anchor_y="center",
+            )
+            self._slot_rects.append(
+                (cur_x, cur_y - self._CHIP_H / 2, chip_w, self._CHIP_H, kind)
+            )
+            cur_x += chip_w + 6
+
+        # Build the sentence: "<Actor> will [VERB] the [NOUN] (conn [TARGET]) [ADVERB]"
+        actor = self._panel.acting_actor_name() or "—"
+        _draw_text_token(f"{actor} will", INK_2)
+        slots = self.slots()
+        for i, (kind, label) in enumerate(slots):
+            if kind == _KIND_NOUN:
+                _draw_text_token("the", INK_3)
+            elif kind == _KIND_TARGET:
+                _draw_text_token(self._target_connector(), INK_3)
+            _draw_slot(kind, label)
+
+        # Action button — bottom-right of the band
+        btn_w, btn_h = 64.0, 24.0
+        btn_x = right - btn_w
+        btn_y = y + PAD_SM
+        draw_rounded_rect(
+            btn_x + btn_w / 2, btn_y + btn_h / 2, btn_w, btn_h, RADIUS_SM,
+            BG_1, border_color=TEAL, border_width=1,
+        )
+        arcade.draw_text(
+            self.button_label(), btn_x + btn_w / 2, btn_y + btn_h / 2, TEAL,
+            font_size=TEXT_SM, font_name=FONT_MONO,
+            anchor_x="center", anchor_y="center", bold=True,
+        )
+        self._button_rect = (btn_x, btn_y, btn_w, btn_h)
+
+        # Open popup — drawn last, stacked upward from its slot so it never
+        # spills off the bottom of the column.
+        if self._open_slot is not None:
+            anchor = next(
+                (r for r in self._slot_rects if r[4] == self._open_slot), None
+            )
+            if anchor is not None:
+                ax, abot, aw, _ah, _kind = anchor
+                labels = self.popup_labels()
+                pop_w = max(aw, 120.0)
+                row_h = self._ROW_H
+                base = abot + self._CHIP_H + 2  # just above the slot chip
+                for i, label in enumerate(labels):
+                    row_bot = base + i * row_h
+                    row_cy = row_bot + row_h / 2
+                    draw_rounded_rect(
+                        ax + pop_w / 2, row_cy, pop_w, row_h, RADIUS_SM,
+                        BG_1, border_color=LINE_HI, border_width=1,
+                    )
+                    arcade.draw_text(
+                        label, ax + PAD_SM, row_cy, INK_2,
+                        font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="center",
+                    )
+                    self._popup_row_rects.append(
+                        (ax, row_bot, pop_w, row_h, label)
+                    )

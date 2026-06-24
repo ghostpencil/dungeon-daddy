@@ -51,6 +51,9 @@ _CHIP_CY_OFF = 86    # distance from panel bottom to chip row centre (design mod
 _PLAY_INPUT_AREA_H = 176  # play mode: char card (96) + gap (6) + input (70) + top pad (4)
 _CHAR_CARD_H = 96         # character card height
 _CHAR_CARD_Y_BOT = 76     # card bottom offset from panel bottom (_INPUT_Y_OFF + INPUT_H + 6)
+_BUILDER_H = 150          # in-chat Action Builder band height (Phase 50.6)
+_BUILDER_BAND_GAP = 6     # gap above/below the builder band
+_BUILDER_Y_BOT = 76       # builder band bottom offset (above the input row)
 _PORTRAIT_W = 96          # width of portrait section including divider
 _LABEL_H = 20  # height reserved at top of each bubble for the role label
 _SCROLL_SPEED = 30  # pixels per mouse wheel click
@@ -115,6 +118,7 @@ class ChatPanel:
         self._actor_switch_callback: Callable[[str], None] | None = None
         self._mini_card_prev_rect: tuple[float, float, float, float] | None = None
         self._mini_card_next_rect: tuple[float, float, float, float] | None = None
+        self._action_builder = None  # InChatActionBuilder (play mode, Phase 50.6)
         self._action_cards: dict[int, _ActionCardData] = {}
         self._active_card_index: int | None = None
         self._active_card_button_rects: list[tuple[str, tuple[float, float, float, float]]] = []
@@ -299,6 +303,10 @@ class ChatPanel:
     def set_actor_switch_callback(self, fn: Callable[[str], None]) -> None:
         self._actor_switch_callback = fn
 
+    def set_action_builder(self, builder) -> None:
+        """Attach the in-chat Action Builder (play mode). ``None`` detaches it."""
+        self._action_builder = builder
+
     def add_action_card(
         self,
         actor_name: str,
@@ -343,6 +351,10 @@ class ChatPanel:
     def on_mouse_press(self, x: float, y: float) -> bool:
         if self._busy:
             return False
+        # In-chat Action Builder takes priority in play mode (its open popup is
+        # drawn on top and may overlap the mini-card / message area).
+        if self._action_builder is not None and self._action_builder.on_mouse_press(x, y):
+            return True
         if self._mini_card_prev_rect is not None:
             left, bot, right, top = self._mini_card_prev_rect
             if left <= x <= right and bot <= y <= top:
@@ -390,8 +402,17 @@ class ChatPanel:
         self._hovered_card_button = None
 
     @property
+    def _builder_extra_h(self) -> float:
+        """Extra vertical space the Action Builder band adds in play mode."""
+        if self._mode == "play" and self._action_builder is not None:
+            return _BUILDER_H + _BUILDER_BAND_GAP
+        return 0.0
+
+    @property
     def _input_area_h(self) -> float:
-        return _PLAY_INPUT_AREA_H if self._mode == "play" else INPUT_AREA_H
+        if self._mode == "play":
+            return _PLAY_INPUT_AREA_H + self._builder_extra_h
+        return INPUT_AREA_H
 
     def on_mouse_scroll(self, x: float, y: float, scroll_y: float) -> None:
         """Handle mouse wheel scroll over the message area."""
@@ -505,13 +526,19 @@ class ChatPanel:
         if self._mode == "play" and self._actor_mini_card is not None:
             self._draw_character_card(x, y, w)
 
+        # In-chat Action Builder band (play mode) — between the input row and
+        # the actor mini-card. Drawn last so its open popup overlays the card
+        # and message area above it.
+        if self._mode == "play" and self._action_builder is not None:
+            self._action_builder.draw(x, y + _BUILDER_Y_BOT, w, _BUILDER_H)
+
     def _draw_character_card(self, x: float, y: float, w: float) -> None:
         """Render the character card above the input field (play mode only)."""
         card = self._actor_mini_card
         if card is None:
             return
 
-        card_bot = y + _CHAR_CARD_Y_BOT
+        card_bot = y + _CHAR_CARD_Y_BOT + self._builder_extra_h
         card_top = card_bot + _CHAR_CARD_H
 
         # Card background + top border
