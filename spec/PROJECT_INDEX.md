@@ -4,7 +4,7 @@
 
 Phase **50 — Hybrid Action Model: COMPLETE & merged to `main`** (2026-06-23).
 Phase **50.5 — Use Noun on Noun: COMPLETE & merged to `main`** (PR #81, 2026-06-24).
-Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–2 done on branch `phase-50.6` (2026-06-24).
+Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–3 done on branch `phase-50.6` (2026-06-24).
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -12,7 +12,7 @@ Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
 
 ---
 
-## START HERE next session — Phase 50.6, Slice 3
+## START HERE next session — Phase 50.6, Slice 4
 
 Spec is `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md` (read it; design decisions are locked in §3).
 Phase 50.6 is a **BUILD add-on** (dynamic, like 50.5 — not on the 51–53 roadmap, no issue).
@@ -33,10 +33,22 @@ Arcade widget layer is rebuilt, plus 3 new pure helpers. 11-slice TDD plan in sp
   use-on-self deterministic), templated `risk` from live room threats, `memory_tags`. **§11
   resolved:** Memory line uses **canonical** `MEMORY_SYSTEM_SPEC` type names (event/fallout/
   location/dungeon_state/relationship), not the mockup's flavor words. Full rpg unit suite green.
-- **Slice 3 — NEXT:** `room_things(room_context, actor) -> RoomThings` view-model (spec §5.2):
-  group `available_nouns` into EXITS/OBJECTS/CREATURES/ITEMS with status chips
-  `(noun_id, label, glyph, status, status_color)`; ordering + empty-section handling. Pure.
-- Then widget slices 4–11.
+- **Slice 3 — DONE** (commit `eb4a475`): `room_things` view-model + `RoomThings`/
+  `ThingsSection`/`RoomThing` dataclasses (spec §5.2) in `rpg/action_options.py` + 13 unit
+  tests. Groups `available_nouns` into ordered EXITS/OBJECTS/CREATURES/ITEMS; rows carry
+  `(noun_id, label, glyph, status, status_color)`. status_color → existing `draw_chip` tokens
+  (teal/ember/gold/default); objects get hazard glyph `⚠` when disturbed/armed; creatures
+  prefer `disposition` over actor `status`; key-gated open exits read "locked"; items gold;
+  synthetic self/room (+ ally party) dropped; empty sections omitted. Full rpg unit suite green.
+- **Slice 4 — NEXT (first widget slice):** Builder widget relocation (spec §4.1–4.3) — render
+  the wrapped command sentence + slots in `chat_panel.py` (below the actor mini-card, replacing
+  the old always-on Ask input). Reuse `VnaActionPanel`'s logic core verbatim; only the Arcade
+  widget layer changes. Verify slot population/selection + valid-card submit via the **ui-test
+  harness** (read `spec/UI_TESTING.md` + `spec/TESTING.md`; pure-logic slices are done, the rest
+  are widget slices). The 3 pure helpers (`verbs_for_noun`, `action_preview`, `room_things`)
+  are ready to wire in slices 5–8.
+- Then slices 5–11 (suggested-verbs row, preview render, overlay, overlay→builder link, retire
+  ACTION tab, SAY/ASK swap stub, polish + smoke test).
 
 After 50.6: **Phase 51 — Talk to the Dungeon** (roadmap; 50.6 carves the SAY/ASK input seam).
 Write `spec/PHASE_51_*.md` when starting.
