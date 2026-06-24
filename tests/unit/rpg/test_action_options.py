@@ -8,6 +8,7 @@ from dungeon_daddy.rpg.action_options import (
     available_adverbs,
     available_nouns,
     available_verbs,
+    is_transitive,
     validate_card,
 )
 from dungeon_daddy.rpg.models import ActorAbility
@@ -45,8 +46,12 @@ def test_available_verbs_includes_all_universal_verbs_with_no_abilities():
 def test_available_verbs_includes_interaction_verbs():
     verbs = available_verbs([])
     interaction = {v.verb: v for v in verbs if v.kind == "interaction"}
-    assert set(interaction) == {"pick-up", "equip", "activate"}
+    assert set(interaction) == {"pick-up", "equip", "activate", "look", "give", "use", "combine"}
     assert interaction["pick-up"].label == "Pick Up"
+    assert interaction["look"].label == "Look"
+    assert interaction["give"].label == "Give"
+    assert interaction["use"].label == "Use"
+    assert interaction["combine"].label == "Combine"
 
 
 def test_available_verbs_appends_class_verb_for_surfacing_ability():
@@ -151,9 +156,9 @@ def test_empty_context_yields_only_self():
 # Verb -> noun-source filtering (Phase 50 visual-verify fix)
 # --------------------------------------------------------------------------
 
-def test_noun_sources_for_move_is_exits_only():
+def test_noun_sources_for_move_includes_locked_exits():
     from dungeon_daddy.rpg.action_options import noun_sources_for_verb
-    assert noun_sources_for_verb("move") == {"exit"}
+    assert noun_sources_for_verb("move") == {"exit", "locked_exit"}
 
 
 def test_noun_sources_for_pick_up_is_loose_items():
@@ -174,6 +179,64 @@ def test_noun_sources_for_activate_is_objects():
 def test_noun_sources_for_skill_verb_is_unrestricted():
     from dungeon_daddy.rpg.action_options import noun_sources_for_verb
     assert noun_sources_for_verb("fight") is None
+
+
+def test_noun_sources_for_transitive_verbs_is_carried_item():
+    from dungeon_daddy.rpg.action_options import noun_sources_for_verb
+    assert noun_sources_for_verb("give") == {"carried_item"}
+    assert noun_sources_for_verb("use") == {"carried_item"}
+    assert noun_sources_for_verb("combine") == {"carried_item"}
+
+
+def test_target_sources_for_give_includes_npcs_and_party():
+    from dungeon_daddy.rpg.action_options import target_sources_for_verb
+    assert target_sources_for_verb("give") == {"npc", "party"}
+
+
+def test_target_sources_for_use_includes_objects_monsters_self_party_and_locked_exits():
+    from dungeon_daddy.rpg.action_options import target_sources_for_verb
+    sources = target_sources_for_verb("use")
+    assert {"object", "monster", "npc", "self", "party", "locked_exit"}.issubset(sources)
+
+
+def test_locked_status_exit_gets_locked_exit_source():
+    nouns = _nouns({"exits": [
+        {"exit_id": "exit:c1:heavy-door", "label": "Heavy Door", "status": "locked"}
+    ]})
+    n = next((n for n in nouns if n.noun_id == "exit:c1:heavy-door"), None)
+    assert n is not None and n.source == "locked_exit"
+
+
+def test_open_exit_with_requires_item_slug_gets_locked_exit_source():
+    nouns = _nouns({"exits": [
+        {
+            "exit_id": "exit:c1:lift",
+            "label": "Lift",
+            "status": "open",
+            "requires_item_slug": "lift-warden-key",
+        }
+    ]})
+    n = next((n for n in nouns if n.noun_id == "exit:c1:lift"), None)
+    assert n is not None and n.source == "locked_exit"
+
+
+def test_open_exit_without_key_requirement_keeps_exit_source():
+    nouns = _nouns({"exits": [
+        {"exit_id": "exit:c1:north", "label": "North Door", "status": "open"}
+    ]})
+    n = next((n for n in nouns if n.noun_id == "exit:c1:north"), None)
+    assert n is not None and n.source == "exit"
+
+
+def test_target_sources_for_combine_is_carried_item():
+    from dungeon_daddy.rpg.action_options import target_sources_for_verb
+    assert target_sources_for_verb("combine") == {"carried_item"}
+
+
+def test_target_sources_for_intransitive_verb_is_none():
+    from dungeon_daddy.rpg.action_options import target_sources_for_verb
+    assert target_sources_for_verb("fight") is None
+    assert target_sources_for_verb("move") is None
 
 
 # --------------------------------------------------------------------------
@@ -258,6 +321,11 @@ def test_action_card_constructs_with_verb_noun_adverb():
     assert (card.verb, card.noun_id, card.adverb) == ("fight", "actor:c1:ghoul", "boldly")
 
 
+def test_action_card_target_id_defaults_to_none():
+    card = ActionCard(verb="fight", noun_id="actor:c1:ghoul", adverb="boldly")
+    assert card.target_id is None
+
+
 def test_validate_card_accepts_card_within_offered_sets():
     card = ActionCard(verb="fight", noun_id="actor:c1:ghoul", adverb="boldly")
     assert validate_card(card, _OPTIONS) is None
@@ -279,3 +347,58 @@ def test_validate_card_rejects_adverb_not_offered():
     card = ActionCard(verb="fight", noun_id="actor:c1:ghoul", adverb="sneakily")
     err = validate_card(card, _OPTIONS)
     assert isinstance(err, CardError) and err.field == "adverb"
+
+
+# --------------------------------------------------------------------------
+# Slice 1 — Transitive verbs + target_id grammar
+# --------------------------------------------------------------------------
+
+
+def test_is_transitive_true_for_give_use_combine():
+    assert is_transitive("give")
+    assert is_transitive("use")
+    assert is_transitive("combine")
+
+
+def test_is_transitive_false_for_intransitive_verbs():
+    for verb in ("fight", "move", "pick-up", "equip", "activate", "study", "look"):
+        assert not is_transitive(verb), f"Expected intransitive: {verb}"
+
+_OPTIONS_WITH_GIVE = CardOptions(
+    verbs=[
+        VerbOption(verb="fight", label="Fight", kind="universal"),
+        VerbOption(verb="give", label="Give", kind="interaction"),
+    ],
+    nouns=[
+        NounOption(noun_id="item:c1:key", label="Iron Key", target_type="item"),
+    ],
+    adverbs=[
+        AdverbOption(adverb="boldly", label="Boldly", kind="universal"),
+    ],
+    targets=[
+        NounOption(noun_id="actor:c1:warden", label="The Warden", target_type="npc"),
+    ],
+)
+
+
+def test_validate_card_rejects_transitive_verb_without_target():
+    card = ActionCard(verb="give", noun_id="item:c1:key", adverb="boldly", target_id=None)
+    err = validate_card(card, _OPTIONS_WITH_GIVE)
+    assert isinstance(err, CardError) and err.field == "target"
+
+
+def test_validate_card_rejects_intransitive_verb_with_target():
+    card = ActionCard(verb="fight", noun_id="actor:c1:ghoul", adverb="boldly", target_id="actor:c1:warden")
+    err = validate_card(card, _OPTIONS)
+    assert isinstance(err, CardError) and err.field == "target"
+
+
+def test_validate_card_accepts_transitive_verb_with_valid_target():
+    card = ActionCard(verb="give", noun_id="item:c1:key", adverb="boldly", target_id="actor:c1:warden")
+    assert validate_card(card, _OPTIONS_WITH_GIVE) is None
+
+
+def test_validate_card_rejects_transitive_verb_with_target_not_in_offered_set():
+    card = ActionCard(verb="give", noun_id="item:c1:key", adverb="boldly", target_id="actor:c1:nobody")
+    err = validate_card(card, _OPTIONS_WITH_GIVE)
+    assert isinstance(err, CardError) and err.field == "target"

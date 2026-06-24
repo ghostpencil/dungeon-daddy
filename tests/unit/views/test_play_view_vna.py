@@ -293,6 +293,7 @@ def test_set_acting_actor_syncs_action_state_and_panel(tmp_path):
 
 
 def test_submit_activate_card_warns_not_wired(tmp_path):
+    # Object not in repo → error system message (object-not-found path)
     from dungeon_daddy.rpg.action_options import ActionCard
 
     view = _make_view(tmp_path)
@@ -300,6 +301,224 @@ def test_submit_activate_card_warns_not_wired(tmp_path):
     view._on_vna_submit(ActionCard(verb="activate", noun_id="obj-1", adverb="cautiously"))
 
     assert view._chat.add_message.call_args.args[0] == "system"
+
+
+def test_submit_activate_card_applies_deterministic_transition(tmp_path):
+    from dungeon_daddy.rpg.action_options import ActionCard
+    from dungeon_daddy.rpg.models import ObjectTransition, RoomObject
+
+    view = _make_view(tmp_path)
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-lever", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="lever", display_name="Iron Lever", archetype="mechanism",
+        description="A heavy lever.", current_state="idle",
+        transitions=[
+            ObjectTransition(
+                transition_id="tr-1", object_id="obj-lever",
+                from_state="idle", to_state="pulled",
+                trigger="pull", contested=False,
+            )
+        ],
+    ))
+
+    view._on_vna_submit(ActionCard(verb="activate", noun_id="obj-lever", adverb="cautiously"))
+
+    updated = view._mem_repo.get_room_object("obj-lever")
+    assert updated["current_state"] == "pulled"
+    msg = view._chat.add_message.call_args.args[1]
+    assert "Iron Lever" in msg
+    assert "pulled" in msg
+
+
+def test_submit_activate_deterministic_spawns_dm_narration(tmp_path):
+    # Successful deterministic activation injects transition context into DM history
+    from dungeon_daddy.rpg.action_options import ActionCard
+    from dungeon_daddy.rpg.models import ObjectTransition, RoomObject
+
+    view = _make_view(tmp_path)
+    view._dungeon = _dungeon_with_rooms([("r1", "Forge Floor", 0, 0)])
+    view._spawn_dm_thread = MagicMock()
+    view._compact_history = MagicMock()
+    view._dm_history = []
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-lever", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="lever", display_name="Iron Lever", archetype="mechanism",
+        description="A heavy lever.", current_state="idle",
+        transitions=[ObjectTransition(
+            transition_id="tr-1", object_id="obj-lever",
+            from_state="idle", to_state="pulled", trigger="pull", contested=False,
+        )],
+    ))
+
+    view._on_vna_submit(ActionCard(verb="activate", noun_id="obj-lever", adverb="cautiously"))
+
+    assert view._spawn_dm_thread.called
+    sent = " ".join(m.content for m in view._dm_history)
+    assert "Iron Lever" in sent
+    assert "pulled" in sent
+
+
+def test_submit_activate_card_posts_roll_bubble_for_contested_transition(tmp_path):
+    from dungeon_daddy.rpg.action_options import ActionCard
+    from dungeon_daddy.rpg.models import ObjectTransition, RoomObject
+    from dungeon_daddy.rpg.service import RpgService
+
+    view = _make_view(tmp_path)
+    view._rpg_service = RpgService()
+    view._dm_agent = None
+    view._rpg_debug = None
+    view._rpg_char = MagicMock()
+    view._rpg_fallout = MagicMock()
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-trap", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="trap", display_name="Pressure Trap", archetype="mechanism",
+        description="A dangerous trap.", current_state="armed",
+        transitions=[
+            ObjectTransition(
+                transition_id="tr-2", object_id="obj-trap",
+                from_state="armed", to_state="triggered",
+                trigger="disarm", contested=True, action_verb="fight",
+            )
+        ],
+    ))
+
+    view._on_vna_submit(ActionCard(verb="activate", noun_id="obj-trap", adverb="cautiously"))
+
+    assert view._chat.add_message.called
+    msg = view._chat.add_message.call_args.args[1]
+    assert "rolls" in msg  # mechanical roll bubble, not "not wired" message
+    # Roll path → object state unchanged
+    updated = view._mem_repo.get_room_object("obj-trap")
+    assert updated["current_state"] == "armed"
+
+
+def test_submit_activate_card_posts_error_when_no_valid_transition(tmp_path):
+    from dungeon_daddy.rpg.action_options import ActionCard
+    from dungeon_daddy.rpg.models import RoomObject
+
+    view = _make_view(tmp_path)
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-stuck", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="stuck-door", display_name="Stuck Door", archetype="structure",
+        description="A stuck door.", current_state="stuck",
+        # no transitions from "stuck" state
+    ))
+
+    view._on_vna_submit(ActionCard(verb="activate", noun_id="obj-stuck", adverb="cautiously"))
+
+    assert view._chat.add_message.called
+    msg = view._chat.add_message.call_args.args[1]
+    assert "⚠" in msg
+
+
+def test_submit_activate_with_required_item_missing_posts_error(tmp_path):
+    # transition.requires_item_slug set but actor holds nothing → error, state unchanged
+    from dungeon_daddy.rpg.action_options import ActionCard
+    from dungeon_daddy.rpg.models import ObjectTransition, RoomObject
+
+    view = _make_view(tmp_path)
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-lift", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="great-lift", display_name="Great Lift", archetype="mechanism",
+        description="A massive lift.", current_state="idle",
+        transitions=[
+            ObjectTransition(
+                transition_id="tr-lift", object_id="obj-lift",
+                from_state="idle", to_state="powered",
+                trigger="power", contested=False,
+                requires_item_slug="lift-fuse",
+            )
+        ],
+    ))
+
+    view._on_vna_submit(ActionCard(verb="activate", noun_id="obj-lift", adverb="cautiously"))
+
+    msg = view._chat.add_message.call_args.args[1]
+    assert "⚠" in msg
+    assert "lift-fuse" in msg
+    updated = view._mem_repo.get_room_object("obj-lift")
+    assert updated["current_state"] == "idle"
+
+
+def test_submit_activate_with_required_item_held_transitions_and_consumes(tmp_path):
+    # transition.requires_item_slug set and actor holds it → state changes + item consumed
+    from dungeon_daddy.rpg.action_options import ActionCard
+    from dungeon_daddy.rpg.models import Item, ObjectTransition, RoomObject
+
+    view = _make_view(tmp_path)
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_item(Item(
+        item_id="itm-fuse", campaign_id="camp-1", slug="lift-fuse",
+        display_name="Lift Fuse", item_type="dungeon_item",
+        description="A fuse.", owner_actor_id="pc-1", status="active",
+    ))
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-lift", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="great-lift", display_name="Great Lift", archetype="mechanism",
+        description="A massive lift.", current_state="idle",
+        transitions=[
+            ObjectTransition(
+                transition_id="tr-lift", object_id="obj-lift",
+                from_state="idle", to_state="powered",
+                trigger="power", contested=False,
+                requires_item_slug="lift-fuse",
+            )
+        ],
+    ))
+
+    view._on_vna_submit(ActionCard(verb="activate", noun_id="obj-lift", adverb="cautiously"))
+
+    updated = view._mem_repo.get_room_object("obj-lift")
+    assert updated["current_state"] == "powered"
+    items = view._mem_repo.get_items_by_actor("pc-1")
+    fuse = next((i for i in items if i["item_id"] == "itm-fuse"), None)
+    assert fuse is not None
+    assert fuse["status"] == "consumed"
+
+
+def test_submit_use_on_object_routes_as_activate(tmp_path):
+    # use [fuse] on [lift] with target SOURCE_OBJECT → same activation path as activate [lift]
+    from dungeon_daddy.rpg.action_options import ActionCard, NounOption, SOURCE_OBJECT
+    from dungeon_daddy.rpg.models import Item, ObjectTransition, RoomObject
+
+    view = _make_view(tmp_path)
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_item(Item(
+        item_id="itm-fuse", campaign_id="camp-1", slug="lift-fuse",
+        display_name="Lift Fuse", item_type="dungeon_item",
+        description="A fuse.", owner_actor_id="pc-1", status="active",
+    ))
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-lift", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="great-lift", display_name="Great Lift", archetype="mechanism",
+        description="A massive lift.", current_state="idle",
+        transitions=[
+            ObjectTransition(
+                transition_id="tr-lift", object_id="obj-lift",
+                from_state="idle", to_state="powered",
+                trigger="power", contested=False,
+                requires_item_slug="lift-fuse",
+            )
+        ],
+    ))
+    # plant an object noun so _on_vna_submit can identify the target source
+    view._rpg_vna._nouns = [
+        NounOption(noun_id="itm-fuse", label="Lift Fuse", target_type="item", slug="lift-fuse", source="carried_item"),
+        NounOption(noun_id="obj-lift", label="Great Lift", target_type="object", slug="great-lift", source=SOURCE_OBJECT),
+    ]
+
+    view._on_vna_submit(ActionCard(
+        verb="use", noun_id="itm-fuse", adverb="cautiously", target_id="obj-lift",
+    ))
+
+    updated = view._mem_repo.get_room_object("obj-lift")
+    assert updated["current_state"] == "powered"
+    fuse = next(i for i in view._mem_repo.get_items("camp-1") if i["item_id"] == "itm-fuse")
+    assert fuse["status"] == "consumed"
 
 
 # ---------------------------------------------------------------------------
@@ -356,6 +575,210 @@ def test_skill_card_names_noun_in_dm_message(tmp_path):
 
     sent = " ".join(m.content for m in view._dm_history)
     assert "Warden's Notice Board" in sent
+
+
+# ---------------------------------------------------------------------------
+# Slice 8 — look verb: read-only description fetch, no roll, no state change
+# ---------------------------------------------------------------------------
+
+def test_look_verb_surfaces_in_available_verbs(tmp_path):
+    from dungeon_daddy.rpg.action_options import available_verbs
+
+    verbs = {v.verb for v in available_verbs([])}
+    assert "look" in verbs
+
+
+def test_submit_look_card_posts_object_description(tmp_path):
+    from dungeon_daddy.rpg.action_options import ActionCard
+    from dungeon_daddy.rpg.models import RoomObject
+
+    view = _make_view(tmp_path)
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-notice", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="notice-board", display_name="Notice Board",
+        archetype="lore_fixture", description="A board with wanted posters.",
+        current_state="default",
+    ))
+
+    view._on_vna_submit(ActionCard(verb="look", noun_id="obj-notice", adverb="cautiously"))
+
+    assert view._chat.add_message.called
+    msg = view._chat.add_message.call_args.args[1]
+    assert "wanted posters" in msg
+
+
+def test_submit_look_card_posts_item_description(tmp_path):
+    from dungeon_daddy.rpg.action_options import ActionCard
+    from dungeon_daddy.rpg.models import Item
+
+    view = _make_view(tmp_path)
+    view._mem_repo.save_item(Item(
+        item_id="itm-scroll", campaign_id="camp-1", slug="ancient-scroll",
+        display_name="Ancient Scroll", item_type="dungeon_item",
+        description="Faded runes warn of the lift's price.",
+        room_id="r1", status="active",
+    ))
+
+    view._on_vna_submit(ActionCard(verb="look", noun_id="itm-scroll", adverb="cautiously"))
+
+    msg = view._chat.add_message.call_args.args[1]
+    assert "lift's price" in msg
+
+
+def test_submit_look_card_no_state_change(tmp_path):
+    """look verb must not alter repo state."""
+    from dungeon_daddy.rpg.action_options import ActionCard
+    from dungeon_daddy.rpg.models import RoomObject
+
+    view = _make_view(tmp_path)
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-jar", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="clay-jar", display_name="Clay Jar",
+        archetype="container", description="A sealed clay jar.",
+        current_state="sealed",
+    ))
+
+    view._on_vna_submit(ActionCard(verb="look", noun_id="obj-jar", adverb="cautiously"))
+
+    obj = view._mem_repo.get_room_object("obj-jar")
+    assert obj["current_state"] == "sealed"
+
+
+def test_give_target_includes_other_party_members(tmp_path):
+    """Other party PCs (from _rpg_action._actors) appear as give targets."""
+    from dungeon_daddy.rpg.action_options import ActionCard
+    from dungeon_daddy.rpg.models import Item
+
+    borin = _actor(actor_id="pc-2", slug="borin", display_name="Borin")
+    view = _make_view(tmp_path)
+    # Two-member party: default actor (pc-1) + Borin (pc-2)
+    view._rpg_action = MagicMock(_actors=[view._rpg_action._actors[0], borin])
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_item(Item(
+        item_id="itm-1", campaign_id="camp-1", slug="ration",
+        display_name="Iron Ration", item_type="dungeon_item",
+        description="A day's food.", owner_actor_id="pc-1", status="active",
+    ))
+
+    view._refresh_vna_panel()
+    view._rpg_vna.select_verb("give")
+
+    target_ids = {n.noun_id for n in view._rpg_vna._targets}
+    assert "pc-2" in target_ids
+    assert "pc-1" not in target_ids  # acting actor excluded from own give targets
+
+
+def test_use_item_on_locked_exit_routes_to_exit_move(tmp_path):
+    """Using a carried item on a locked exit calls _on_exit_move with the exit id."""
+    from dungeon_daddy.rpg.models import Item
+
+    view = _make_view(tmp_path)
+    _save_exit(view._mem_repo, exit_id="e1", status="locked")
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_item(Item(
+        item_id="itm-key", campaign_id="camp-1", slug="warden-key",
+        display_name="Warden Key", item_type="dungeon_item",
+        description="Opens the iron gate.", owner_actor_id="pc-1", status="active",
+    ))
+
+    view._refresh_vna_panel()
+    view._rpg_vna.select_verb("use")
+    view._rpg_vna.select_noun("itm-key")
+    view._rpg_vna.select_target("e1")
+    view._rpg_vna.select_adverb("cautiously")
+    card = view._rpg_vna.build_card()
+
+    view._on_exit_move = MagicMock()
+    view._on_vna_submit(card)
+
+    view._on_exit_move.assert_called_once_with("e1", "cautiously", item_slug="warden-key")
+
+
+def test_use_item_on_exit_passes_item_slug_to_exit_move_when_no_key_match(tmp_path):
+    """Item slug is forwarded to _on_exit_move when it doesn't match exit's key requirement."""
+    from dungeon_daddy.rpg.models import Item
+
+    view = _make_view(tmp_path)
+    # Exit requires a different key — so item slug does NOT match; party still moves
+    _save_exit(view._mem_repo, exit_id="e1", status="open",
+               requires_item_slug="other-key")
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_item(Item(
+        item_id="itm-key", campaign_id="camp-1", slug="rusty-key",
+        display_name="Rusty Key", item_type="dungeon_item",
+        description="Some key.", owner_actor_id="pc-1", status="active",
+    ))
+
+    view._refresh_vna_panel()
+    view._rpg_vna.select_verb("use")
+    view._rpg_vna.select_noun("itm-key")
+    view._rpg_vna.select_target("e1")
+    view._rpg_vna.select_adverb("cautiously")
+    card = view._rpg_vna.build_card()
+
+    view._on_exit_move = MagicMock()
+    view._on_vna_submit(card)
+
+    call_kwargs = view._on_exit_move.call_args
+    assert call_kwargs.kwargs.get("item_slug") == "rusty-key"
+
+
+def test_use_matching_key_on_exit_clears_requires_item_slug(tmp_path):
+    """When item slug matches exit's requires_item_slug: DB cleared, party stays, message posted."""
+    from dungeon_daddy.rpg.models import Item
+
+    view = _make_view(tmp_path)
+    _save_exit(view._mem_repo, exit_id="e1", status="open",
+               requires_item_slug="lift-warden-key")
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_item(Item(
+        item_id="itm-key", campaign_id="camp-1", slug="lift-warden-key",
+        display_name="Lift Warden's Iron Key", item_type="dungeon_item",
+        description="Opens the lift.", owner_actor_id="pc-1", status="active",
+    ))
+
+    view._refresh_vna_panel()
+    view._rpg_vna.select_verb("use")
+    view._rpg_vna.select_noun("itm-key")
+    view._rpg_vna.select_target("e1")
+    view._rpg_vna.select_adverb("cautiously")
+    card = view._rpg_vna.build_card()
+
+    view._on_exit_move = MagicMock()
+    view._on_vna_submit(card)
+
+    row = view._mem_repo.get_exit_by_id("e1")
+    assert row["requires_item_slug"] is None
+    view._on_exit_move.assert_not_called()
+    view._chat.add_message.assert_any_call("system", "North Door: unlocked.")  # lock glyph stripped
+
+
+def test_use_non_matching_item_on_exit_does_not_clear_requires_item_slug(tmp_path):
+    """When item slug does not match exit's requires_item_slug, the slug is preserved."""
+    from dungeon_daddy.rpg.models import Item
+
+    view = _make_view(tmp_path)
+    _save_exit(view._mem_repo, exit_id="e1", status="open",
+               requires_item_slug="lift-warden-key")
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_item(Item(
+        item_id="itm-key", campaign_id="camp-1", slug="rusty-key",
+        display_name="Rusty Key", item_type="dungeon_item",
+        description="Some other key.", owner_actor_id="pc-1", status="active",
+    ))
+
+    view._refresh_vna_panel()
+    view._rpg_vna.select_verb("use")
+    view._rpg_vna.select_noun("itm-key")
+    view._rpg_vna.select_target("e1")
+    view._rpg_vna.select_adverb("cautiously")
+    card = view._rpg_vna.build_card()
+
+    view._on_exit_move = MagicMock()
+    view._on_vna_submit(card)
+
+    row = view._mem_repo.get_exit_by_id("e1")
+    assert row["requires_item_slug"] == "lift-warden-key"
 
 
 def test_build_context_bundle_includes_current_room_objects(tmp_path):

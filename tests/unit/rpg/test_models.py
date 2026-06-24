@@ -575,6 +575,30 @@ class TestObjectTransition:
         assert t.spawns_item_slug == "gold-coin"
         assert t.advances_clock_slug == "ritual-clock"
 
+    def test_contested_defaults_to_false_and_action_verb_defaults_to_none(self) -> None:
+        t = ObjectTransition(
+            transition_id="tr:3",
+            object_id="obj:c:chest",
+            from_state="sealed",
+            to_state="opened",
+            trigger="open",
+        )
+        assert t.contested is False
+        assert t.action_verb is None
+
+    def test_contested_flag_and_action_verb_stored(self) -> None:
+        t = ObjectTransition(
+            transition_id="tr:4",
+            object_id="obj:c:mechanism",
+            from_state="idle",
+            to_state="triggered",
+            trigger="operate",
+            contested=True,
+            action_verb="scrap",
+        )
+        assert t.contested is True
+        assert t.action_verb == "scrap"
+
 
 class TestRoomExit:
     def test_constructs_with_required_fields_and_defaults(self) -> None:

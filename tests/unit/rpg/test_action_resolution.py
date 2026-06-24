@@ -103,3 +103,53 @@ def test_roll_card_rejects_mutation_verb():
     card = ActionCard(verb="move", noun_id="exit:c1:north", adverb="cautiously")
     with pytest.raises(ValueError):
         resolve_card_roll(card, campaign_id="campaign:test", actor=ROLL_ACTOR)
+
+
+# --- Slice 7: use/give/combine routing in resolve_card ----------------------
+
+ACTOR_ID = "actor:c1:mara"
+MONSTER_ID = "actor:c1:ghoul"
+ITEM_ID = "item:c1:vial"
+ITEM_B_ID = "item:c1:shard"
+
+
+def test_use_card_on_self_resolves_to_consume_item():
+    from dungeon_daddy.rpg.command import ConsumeItem
+
+    card = ActionCard(verb="use", noun_id=ITEM_ID, adverb="cautiously", target_id=ACTOR_ID)
+    cmd = resolve_card(card, actor_id=ACTOR_ID)
+    assert cmd == ConsumeItem(item_id=ITEM_ID, reason="used")
+
+
+def test_use_card_on_creature_resolves_to_none_for_roll():
+    card = ActionCard(verb="use", noun_id=ITEM_ID, adverb="boldly", target_id=MONSTER_ID)
+    cmd = resolve_card(card, actor_id=ACTOR_ID)
+    assert cmd is None
+
+
+def test_give_card_resolves_to_give_item():
+    from dungeon_daddy.rpg.command import GiveItem
+
+    card = ActionCard(verb="give", noun_id=ITEM_ID, adverb="cautiously", target_id=MONSTER_ID)
+    cmd = resolve_card(card, actor_id=ACTOR_ID)
+    assert cmd == GiveItem(item_id=ITEM_ID, to_actor_id=MONSTER_ID)
+
+
+def test_combine_card_resolves_to_combine_items():
+    from dungeon_daddy.rpg.command import CombineItems
+
+    card = ActionCard(verb="combine", noun_id=ITEM_ID, adverb="cautiously", target_id=ITEM_B_ID)
+    cmd = resolve_card(card, actor_id=ACTOR_ID)
+    assert cmd == CombineItems(item_a_id=ITEM_ID, item_b_id=ITEM_B_ID, actor_id=ACTOR_ID)
+
+
+def test_give_card_rejects_in_roll_path():
+    card = ActionCard(verb="give", noun_id=ITEM_ID, adverb="cautiously", target_id=MONSTER_ID)
+    with pytest.raises(ValueError):
+        resolve_card_roll(card, campaign_id="campaign:test", actor=ROLL_ACTOR)
+
+
+def test_combine_card_rejects_in_roll_path():
+    card = ActionCard(verb="combine", noun_id=ITEM_ID, adverb="cautiously", target_id=ITEM_B_ID)
+    with pytest.raises(ValueError):
+        resolve_card_roll(card, campaign_id="campaign:test", actor=ROLL_ACTOR)

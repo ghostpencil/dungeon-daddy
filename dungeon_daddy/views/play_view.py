@@ -1001,6 +1001,17 @@ class PlayView(arcade.View):
         self._rpg_scene.set_scene(room.name, str(level.id))
         self._refresh_exits()
 
+    def _clear_dungeon_connection_lock(self, from_room: str, to_room: str) -> None:
+        """Clear lock styling on the dungeon model connection so the map re-renders it open."""
+        if self._dungeon is None or self._state is None:
+            return
+        level = self._dungeon.levels[self._state.current_level_idx]
+        for conn in level.connections:
+            if conn.from_room == from_room and conn.to_room == to_room:
+                conn.connection_style = None
+                conn.layout_connection_role = None
+                break
+
     def _refresh_exits(self) -> None:
         """Rebuild the exit-list panel from the room-context bundle."""
         from dungeon_daddy.rpg.room_context import build_room_context
@@ -1079,6 +1090,17 @@ class PlayView(arcade.View):
         room_id = self._state.current_room_id
         room_context = build_room_noun_context(self._mem_repo, self._rpg_campaign_id, room_id)
         room_context = self._prepare_vna_exits(room_context, room_id)
+        # Party PCs move as a group — their location is in session state, not
+        # per-actor room_id, so we inject them here from the loaded actor roster.
+        all_actors = getattr(self._rpg_action, "_actors", []) or []
+        room_context = {
+            **room_context,
+            "party": [
+                {"actor_id": a.actor_id, "display_name": a.display_name}
+                for a in all_actors
+                if a.actor_id != actor.actor_id
+            ],
+        }
         self._rpg_vna.set_context(
             actor_abilities=self._mem_repo.get_actor_abilities(actor.actor_id),
             room_context=room_context,
@@ -1157,25 +1179,67 @@ class PlayView(arcade.View):
     def _on_vna_submit(self, card) -> None:
         """Route a validated ``ActionCard`` to the engine.
 
-        Mutation verbs (Slice 5 ``resolve_card``) become a ``PlayerCommand``:
-        ``move`` reuses the exit-move path, the rest apply via the command
-        pipeline. Skill verbs (``resolve_card`` returns ``None``) resolve as an
-        action roll (Slice 6 ``resolve_card_roll``).
+        Three branches: (1) ``look`` — read-only description fetch, no dice,
+        no state change; (2) mutation verbs via ``resolve_card`` (``activate``
+        pre-routes through trigger selection); (3) skill verbs — action roll.
         """
+        from dungeon_daddy.rpg.action_options import (
+            VERB_ACTIVATE, VERB_LOOK, VERB_USE,
+            SOURCE_EXIT, SOURCE_LOCKED_EXIT, SOURCE_OBJECT,
+        )
         from dungeon_daddy.rpg.action_resolution import resolve_card
         from dungeon_daddy.rpg.command import MoveParty
 
         actor = self._acting_actor()
         if actor is None:
             return
-        try:
-            command = resolve_card(card, actor_id=actor.actor_id)
-        except ValueError:
-            # ``activate`` needs a trigger the panel does not yet supply.
-            self._chat.add_message(
-                "system", "Activating objects from the action panel isn't wired yet."
-            )
+
+        if card.verb == VERB_LOOK:
+            self._on_look_submit(card)
             return
+
+        if card.verb == VERB_ACTIVATE:
+            self._on_activate_submit(card, actor)
+            return
+
+        if card.verb == VERB_USE and card.target_id is not None:
+            target_noun = next(
+                (n for n in self._rpg_vna._nouns if n.noun_id == card.target_id),
+                None,
+            )
+            if target_noun and target_noun.source in {SOURCE_EXIT, SOURCE_LOCKED_EXIT}:
+                item_noun = next(
+                    (n for n in self._rpg_vna._nouns if n.noun_id == card.noun_id),
+                    None,
+                )
+                item_slug = item_noun.slug if item_noun else None
+                if item_slug and self._mem_repo is not None:
+                    from dungeon_daddy.rpg.unlock_exit import clear_exit_key_requirement
+                    exit_row = self._mem_repo.get_exit_by_id(card.target_id)
+                    if exit_row and exit_row.get("requires_item_slug") == item_slug:
+                        clear_exit_key_requirement(
+                            card.target_id, self._rpg_campaign_id or "", self._mem_repo
+                        )
+                        self._clear_dungeon_connection_lock(
+                            exit_row["from_room_id"], exit_row["to_room_id"]
+                        )
+                        from dungeon_daddy.rpg.exit_labels import LOCK_PREFIX
+                        exit_label = target_noun.label.removeprefix(LOCK_PREFIX)
+                        self._chat.add_message("system", f"{exit_label}: unlocked.")
+                        self._refresh_exits()
+                        self._refresh_vna_panel()
+                        return
+                self._on_exit_move(card.target_id, card.adverb, item_slug=item_slug)
+                return
+            if target_noun and target_noun.source == SOURCE_OBJECT:
+                from dungeon_daddy.rpg.action_options import ActionCard
+                activate_card = ActionCard(
+                    verb=VERB_ACTIVATE, noun_id=card.target_id, adverb=card.adverb,
+                )
+                self._on_activate_submit(activate_card, actor)
+                return
+
+        command = resolve_card(card, actor_id=actor.actor_id)
         if command is None:
             self._resolve_vna_roll(card, actor)
         elif isinstance(command, MoveParty):
@@ -1183,22 +1247,123 @@ class PlayView(arcade.View):
         else:
             self._apply_vna_command(command)
 
-    def _apply_vna_command(self, command) -> None:
-        """Validate + apply a non-move mutation command, then refresh."""
+    def _on_look_submit(self, card) -> None:
+        """Read-only branch: fetch the noun's authoritative description and post it.
+
+        No dice rolled, no state changed. The description is ground truth —
+        it can gate puzzles (e.g. journal → key clue) and must never be
+        LLM-invented. The chat bubble makes it visible; the DM agent sees it
+        in history for narration context on subsequent turns.
+        """
+        description = self._look_up_noun_description(card.noun_id)
+        noun_label = card.noun_id
+        for noun in (getattr(self, "_rpg_vna", None) and self._rpg_vna._nouns or []):
+            if noun.noun_id == card.noun_id:
+                noun_label = noun.label
+                break
+        if description:
+            self._chat.add_message("system", f"{noun_label}: {description}")
+        else:
+            self._chat.add_message("system", f"⚠ Nothing to read about {noun_label}.")
+
+    def _look_up_noun_description(self, noun_id: str) -> str | None:
+        """Return the authoritative description for ``noun_id``, or ``None``."""
+        if self._mem_repo is None:
+            return None
+        obj = self._mem_repo.get_room_object(noun_id)
+        if obj is not None:
+            return obj.get("description") or None
+        campaign_id = self._rpg_campaign_id
+        if campaign_id is not None:
+            items = self._mem_repo.get_items(campaign_id)
+            item = next((i for i in items if i["item_id"] == noun_id), None)
+            if item is not None:
+                return item.get("description") or None
+        actor = self._mem_repo.get_actor(noun_id)
+        if actor is not None:
+            return actor.get("description") or actor.get("display_name") or None
+        return None
+
+    def _on_activate_submit(self, card, actor) -> None:
+        """Handle ``activate`` verb: pick trigger from the object, then route.
+
+        Looks up the object's current transitions, selects the first one
+        matching the current state, and routes deterministic transitions to the
+        command pipeline and contested transitions to the action-roll path.
+        """
+        from dungeon_daddy.rpg.action_options import ActionCard
+        from dungeon_daddy.rpg.action_resolution import resolve_card
+
+        if self._mem_repo is None or self._rpg_campaign_id is None:
+            return
+
+        obj = self._mem_repo.get_room_object(card.noun_id)
+        if obj is None:
+            self._chat.add_message("system", f"⚠ Object not found: {card.noun_id}")
+            return
+
+        transition = next(
+            (t for t in obj.get("transitions", [])
+             if t.get("from_state") == obj.get("current_state")),
+            None,
+        )
+        if transition is None:
+            self._chat.add_message("system", f"⚠ Nothing to do with this object right now.")
+            return
+
+        if transition.get("contested"):
+            roll_verb = transition.get("action_verb") or "fight"
+            roll_card = ActionCard(verb=roll_verb, noun_id=card.noun_id, adverb=card.adverb)
+            self._resolve_vna_roll(roll_card, actor)
+        else:
+            command = resolve_card(card, actor_id=actor.actor_id, trigger=transition["trigger"])
+            if self._apply_vna_command(command):
+                noun_label = obj.get("display_name") or card.noun_id
+                from_state = obj.get("current_state", "")
+                to_state = transition.get("to_state", "activated")
+                self._chat.add_message("system", f"{noun_label}: {to_state}.")
+                self._narrate_object_transition(actor, noun_label, from_state, to_state, transition)
+
+    def _narrate_object_transition(self, actor, noun_label: str, from_state: str, to_state: str, transition: dict) -> None:
+        """Inject the deterministic transition result into DM history and request narration."""
+        if self._dungeon is None or self._state is None:
+            return
+        level = self._dungeon.levels[self._state.current_level_idx]
+        room = {r.id: r for r in level.rooms}.get(self._state.current_room_id or "")
+        if room is None:
+            return
+        from dungeon_daddy.llm.agents.dm_agent import LLMMessage
+        self._compact_history()
+        self._dm_history.append(LLMMessage(
+            role="user",
+            content=(
+                f"{actor.display_name} {transition.get('trigger', 'activates')} the {noun_label}. "
+                f"[{noun_label}: {from_state} → {to_state}]"
+            ),
+        ))
+        self._chat.set_busy(True)
+        self._spawn_dm_thread(room, level)
+
+    def _apply_vna_command(self, command) -> bool:
+        """Validate + apply a non-move mutation command, then refresh.
+
+        Returns True if the command was accepted and applied, False if rejected.
+        """
         from dungeon_daddy.rpg.command_applier import apply_command
         from dungeon_daddy.rpg.command_validator import validate_command
 
         if self._mem_repo is None or self._rpg_campaign_id is None:
-            return
+            return False
         room_id = self._state.current_room_id if self._state else None
         validation = validate_command(
             command, self._mem_repo, self._rpg_campaign_id, party_room_id=room_id,
         )
         if not validation.accepted:
             self._chat.add_message("system", f"⚠ Can't do that: {validation.rejection_reason}")
-            return
+            return False
         apply_command(command, validation, self._mem_repo, self._rpg_campaign_id)
         self._refresh_vna_panel()
+        return True
 
     def _resolve_vna_roll(self, card, actor) -> None:
         """Resolve a skill-verb Card as an action roll and narrate the outcome."""
@@ -1234,7 +1399,7 @@ class PlayView(arcade.View):
                 self._spawn_dm_thread(room, level)
         self._refresh_right_panel_from_actors(actor.actor_id)
 
-    def _on_exit_move(self, exit_id: str, how: str) -> None:
+    def _on_exit_move(self, exit_id: str, how: str, *, item_slug: str | None = None) -> None:
         """Apply an engine-validated party move, then narrate the result."""
         from dungeon_daddy.rpg.command import MoveParty
         from dungeon_daddy.rpg.move_party import apply_move_party
@@ -1245,18 +1410,24 @@ class PlayView(arcade.View):
         new_session, result = apply_move_party(
             MoveParty(exit_id=exit_id, how=how),
             self._mem_repo, self._rpg_campaign_id, self._state,
+            extra_inventory_slugs=[item_slug] if item_slug else None,
         )
         if not result.accepted:
             self._chat.add_message("system", f"⚠ Can't move: {result.rejection_reason}")
             return
 
+        old_level_idx = self._state.current_level_idx
         self._state = new_session
         room = None
         level = None
         if self._dungeon is not None:
             level = self._dungeon.levels[self._state.current_level_idx]
             room = {r.id: r for r in level.rooms}.get(self._state.current_room_id)
-            self._map.update_state(self._state, len(self._dungeon.levels))
+            if self._state.current_level_idx != old_level_idx:
+                self._viewed_level_idx = self._state.current_level_idx
+                self._map.load(level, self._state, len(self._dungeon.levels))
+            else:
+                self._map.update_state(self._state, len(self._dungeon.levels))
             if room is not None:
                 # Move the selection cursor with the party so the selected frame
                 # and detail/info overlay follow — same treatment as a click.

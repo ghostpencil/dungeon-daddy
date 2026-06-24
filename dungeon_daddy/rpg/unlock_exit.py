@@ -41,6 +41,27 @@ def unlock_exit(
     return ExitActionResult(accepted=True, events=[event])
 
 
+def clear_exit_key_requirement(
+    exit_id: str,
+    campaign_id: str,
+    repo: MemoryRepository,
+) -> ExitActionResult:
+    row = repo.get_exit_by_id(exit_id)
+    if row is None:
+        return ExitActionResult(accepted=False, rejection_reason=f"Unknown exit: {exit_id}")
+
+    repo.update_exit_requires_item_slug(exit_id, None)
+
+    event = DomainEvent(
+        event_id=str(uuid.uuid4()),
+        campaign_id=campaign_id,
+        event_type="exit.key_requirement_cleared",
+        payload={"exit_id": exit_id},
+    )
+
+    return ExitActionResult(accepted=True, events=[event])
+
+
 def seal_exit(
     exit_id: str,
     campaign_id: str,

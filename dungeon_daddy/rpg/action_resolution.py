@@ -19,14 +19,21 @@ from typing import Mapping
 
 from dungeon_daddy.rpg.action_options import (
     VERB_ACTIVATE,
+    VERB_COMBINE,
     VERB_EQUIP,
+    VERB_GIVE,
+    VERB_LOOK,
     VERB_MOVE,
     VERB_PICK_UP,
+    VERB_USE,
 )
 from dungeon_daddy.rpg.actions import resolve_action
 from dungeon_daddy.rpg.command import (
     ActivateObject,
+    CombineItems,
+    ConsumeItem,
     EquipItem,
+    GiveItem,
     MoveParty,
     PickUpItem,
     PlayerCommand,
@@ -59,6 +66,14 @@ def resolve_card(
         return ActivateObject(
             object_id=card.noun_id, actor_id=actor_id, trigger=trigger
         )
+    if card.verb == VERB_GIVE:
+        return GiveItem(item_id=card.noun_id, to_actor_id=card.target_id)
+    if card.verb == VERB_COMBINE:
+        return CombineItems(item_a_id=card.noun_id, item_b_id=card.target_id, actor_id=actor_id)
+    if card.verb == VERB_USE:
+        if card.target_id == actor_id:
+            return ConsumeItem(item_id=card.noun_id, reason="used")
+        return None  # use-on-creature → roll path
     return None
 
 
@@ -93,7 +108,7 @@ def resolve_card_roll(
     remaining adverb flags are returned as world-side-effects. Raises
     ``ValueError`` for a mutation verb — those go through :func:`resolve_card`.
     """
-    if card.verb in (VERB_MOVE, VERB_PICK_UP, VERB_EQUIP, VERB_ACTIVATE):
+    if card.verb in (VERB_MOVE, VERB_PICK_UP, VERB_EQUIP, VERB_ACTIVATE, VERB_GIVE, VERB_COMBINE, VERB_LOOK):
         raise ValueError(f"mutation verb is not an action roll: {card.verb}")
 
     rating = actor.get("actions", {}).get(card.verb, 0)

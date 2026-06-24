@@ -37,6 +37,8 @@ def apply_move_party(
     repo: MemoryRepository,
     campaign_id: str,
     session: SessionState,
+    *,
+    extra_inventory_slugs: list[str] | None = None,
 ) -> tuple[SessionState, MoveResult]:
     exit_row = repo.get_exit_by_id(command.exit_id)
 
@@ -60,6 +62,9 @@ def apply_move_party(
                 for item in repo.get_items_by_actor(actor["actor_id"]):
                     if item["status"] == "active" and item.get("slug"):
                         inventory_slugs.append(item["slug"])
+
+        if extra_inventory_slugs:
+            inventory_slugs.extend(extra_inventory_slugs)
 
         room_objects = repo.get_objects_by_room(campaign_id, session.current_room_id or "")
         clocks = repo.get_clocks(campaign_id)

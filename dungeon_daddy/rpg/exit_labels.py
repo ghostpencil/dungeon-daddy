@@ -79,6 +79,6 @@ def exit_noun_label(
     else:
         direction = compass_direction(from_room, dest)
         label = f"{base} {direction.title()}" if direction else base
-    if exit_row.get("status") in _LOCKED_LABEL_STATUSES:
+    if exit_row.get("status") in _LOCKED_LABEL_STATUSES or exit_row.get("requires_item_slug"):
         label = f"{LOCK_PREFIX}{label}"
     return label

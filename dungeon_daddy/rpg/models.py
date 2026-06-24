@@ -193,6 +193,8 @@ class Item(BaseModel):
     charges_current: int | None = None
     charges_max: int | None = None
     is_equipped: bool = False
+    combines_with_slug: str | None = None
+    combination_result_slug: str | None = None
     features: list[ItemFeature] = Field(default_factory=list)
 
     @field_validator("description")
@@ -229,6 +231,8 @@ class ObjectTransition(BaseModel):
     requires_item_slug: str | None = None
     spawns_item_slug: str | None = None
     advances_clock_slug: str | None = None
+    contested: bool = False
+    action_verb: str | None = None
 
 
 class RoomObject(BaseModel):
