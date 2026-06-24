@@ -3,26 +3,38 @@
 ## Phase
 
 Phase **50 — Hybrid Action Model: COMPLETE & merged to `main`** (2026-06-23).
-Phase **50.5 — Use Noun on Noun: COMPLETE** (2026-06-24). Branch: `phase-50.5`. PR pending.
-All 9 slices + post-playtest fixes + map level-refresh fix. Suite: 3037+ green.
+Phase **50.5 — Use Noun on Noun: COMPLETE & merged to `main`** (PR #81, 2026-06-24).
+Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slice 1 done on branch `phase-50.6` (2026-06-24).
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
+Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
 
 ---
 
-## START HERE next session — open the Phase 50.5 PR, then Phase 51
+## START HERE next session — Phase 50.6, Slice 2
 
-Branch `phase-50.5` is ready. Open the PR against `main`. Key deliverables for the PR description:
-- Grammar: `Verb · Noun · [Target] · Adverb`; `TRANSITIVE_VERBS`; `validate_card` target rules
-- `contested` flag on `ObjectTransition` + migration `013`; `CombineItems` + migration `014`
-- `GiveItem` validator; `activate` wired (deterministic → `ActivateObject`, contested → roll)
-- `look` verb (read-only); Target dropdown in `VnaActionPanel`
-- Post-playtest: locked-exit target source, key-unlock persists, fuse consumed on lift power-up
-- Map level-refresh fix: level transitions call `map.load()` (repaints new level layout)
-- LLM narration hook after `ActivateObject`; Level 2 seed (`tools/populate_crucible_level2.py`)
+Spec is `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md` (read it; design decisions are locked in §3).
+Phase 50.6 is a **BUILD add-on** (dynamic, like 50.5 — not on the 51–53 roadmap, no issue).
+Goal: close the action loop in the left chat column — move the Action Builder out of the right
+RPG panel into the chat, and turn the map room overlay into a clickable "Things Here" noun picker.
 
-After merging: **Phase 51 — Talk to the Dungeon** (roadmap). Write `spec/PHASE_51_*.md` when starting.
+Mostly a relocation + re-skin: `VnaActionPanel`'s pure-logic core is reused verbatim; only the
+Arcade widget layer is rebuilt, plus 3 new pure helpers. 11-slice TDD plan in spec §9.
+
+**Work is on branch `phase-50.6`** (off `main`; not yet pushed/PR'd). Use the TDD skill
+(read `spec/TESTING.md` first).
+
+- **Slice 1 — DONE** (commit `e6b6a6e`): `verbs_for_noun` pure helper (inverse of
+  `noun_sources_for_verb`) in `rpg/action_options.py` + 4 unit tests. Full rpg unit suite green.
+- **Slice 2 — NEXT:** `action_preview` pure helper (spec §4.5): `likely_roll`/`requires_roll`,
+  templated `risk` from room threats, `memory_tags`; deterministic-action case shows
+  `No roll — automatic`. **Open question (§11):** confirm exact memory **type names** against
+  `MEMORY_SYSTEM_SPEC.md` before writing the Memory line.
+- Then Slice 3 (`room_things` view-model), then widget slices 4–11.
+
+After 50.6: **Phase 51 — Talk to the Dungeon** (roadmap; 50.6 carves the SAY/ASK input seam).
+Write `spec/PHASE_51_*.md` when starting.
 
 ---
 
