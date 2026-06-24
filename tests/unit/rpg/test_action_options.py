@@ -4,12 +4,16 @@ from dungeon_daddy.rpg.action_options import (
     CardError,
     CardOptions,
     NounOption,
+    RoomThing,
+    RoomThings,
+    ThingsSection,
     VerbOption,
     available_adverbs,
     available_nouns,
     available_verbs,
     action_preview,
     is_transitive,
+    room_things,
     validate_card,
     verbs_for_noun,
 )
@@ -520,3 +524,124 @@ def test_action_preview_risk_names_disturbed_object_hazard():
     preview = action_preview(_preview_card("study"), room, _PREVIEW_ACTOR)
     assert preview.risk is not None
     assert "Scorpion Nest" in preview.risk
+
+
+# --------------------------------------------------------------------------
+# Phase 50.6 Slice 3 — room_things ("Things Here" view-model)
+# --------------------------------------------------------------------------
+
+_THINGS_ACTOR = {"actor_id": "actor:c1:talvas", "display_name": "Talvas"}
+
+_THINGS_ROOM = {
+    "room_id": "room:level-01:hall",
+    "objects": [
+        {"object_id": "obj:c1:symbols", "slug": "wall-symbols",
+         "display_name": "Wall Symbols", "current_state": "unexamined"},
+        {"object_id": "obj:c1:nest", "slug": "scorpion-nest",
+         "display_name": "Scorpion Nest", "current_state": "disturbed"},
+    ],
+    "loose_items": [
+        {"item_id": "item:c1:fuse", "slug": "brass-fuse",
+         "display_name": "Brass Fuse", "status": "in_room"},
+    ],
+    "monsters": [
+        {"actor_id": "actor:c1:scorps", "slug": "scorpions",
+         "display_name": "Scorpions", "status": "active"},
+    ],
+    "exits": [
+        {"exit_id": "exit:c1:arch", "label": "Marketplace Arch", "status": "open"},
+        {"exit_id": "exit:c1:shaft", "label": "Elevator Shaft Door", "status": "locked"},
+    ],
+}
+
+
+def _section(things: RoomThings, title: str) -> ThingsSection:
+    return next(s for s in things.sections if s.title == title)
+
+
+def _row(things: RoomThings, title: str, noun_id: str) -> RoomThing:
+    return next(t for t in _section(things, title).things if t.noun_id == noun_id)
+
+
+def test_room_things_groups_into_four_ordered_sections():
+    things = room_things(_THINGS_ROOM, _THINGS_ACTOR)
+    assert [s.title for s in things.sections] == ["EXITS", "OBJECTS", "CREATURES", "ITEMS"]
+
+
+def test_room_things_exposes_room_id():
+    things = room_things(_THINGS_ROOM, _THINGS_ACTOR)
+    assert things.room_id == "room:level-01:hall"
+
+
+def test_room_things_omits_empty_sections():
+    # An empty room yields only the synthetic self noun, which has no section.
+    things = room_things({}, _THINGS_ACTOR)
+    assert things.sections == []
+    assert things.room_id is None
+
+
+def test_room_things_drops_synthetic_self_and_room_nouns():
+    things = room_things({"room_id": "room:level-01:hall"}, _THINGS_ACTOR)
+    all_ids = [t.noun_id for s in things.sections for t in s.things]
+    assert _THINGS_ACTOR["actor_id"] not in all_ids
+    assert "room:level-01:hall" not in all_ids
+
+
+def test_room_things_open_exit_is_teal():
+    row = _row(room_things(_THINGS_ROOM, _THINGS_ACTOR), "EXITS", "exit:c1:arch")
+    assert (row.label, row.glyph, row.status, row.status_color) == (
+        "Marketplace Arch", "→", "open", "teal",
+    )
+
+
+def test_room_things_locked_exit_is_ember():
+    row = _row(room_things(_THINGS_ROOM, _THINGS_ACTOR), "EXITS", "exit:c1:shaft")
+    assert row.status == "locked"
+    assert row.status_color == "ember"
+
+
+def test_room_things_key_gated_open_exit_reads_locked():
+    room = {"exits": [
+        {"exit_id": "exit:c1:lift", "label": "Lift", "status": "open",
+         "requires_item_slug": "lift-warden-key"},
+    ]}
+    row = _row(room_things(room, _THINGS_ACTOR), "EXITS", "exit:c1:lift")
+    assert row.status == "locked"
+    assert row.status_color == "ember"
+
+
+def test_room_things_unexamined_object_is_neutral_with_star_glyph():
+    row = _row(room_things(_THINGS_ROOM, _THINGS_ACTOR), "OBJECTS", "obj:c1:symbols")
+    assert (row.glyph, row.status, row.status_color) == ("✦", "unexamined", "default")
+
+
+def test_room_things_disturbed_object_is_ember_with_hazard_glyph():
+    row = _row(room_things(_THINGS_ROOM, _THINGS_ACTOR), "OBJECTS", "obj:c1:nest")
+    assert (row.glyph, row.status, row.status_color) == ("⚠", "disturbed", "ember")
+
+
+def test_room_things_active_creature_is_ember():
+    row = _row(room_things(_THINGS_ROOM, _THINGS_ACTOR), "CREATURES", "actor:c1:scorps")
+    assert (row.glyph, row.status, row.status_color) == ("●", "active", "ember")
+
+
+def test_room_things_creature_prefers_disposition_over_status():
+    room = {"npcs": [
+        {"actor_id": "actor:c1:warden", "slug": "warden",
+         "display_name": "The Warden", "status": "active", "disposition": "willing"},
+    ]}
+    row = _row(room_things(room, _THINGS_ACTOR), "CREATURES", "actor:c1:warden")
+    assert (row.status, row.status_color) == ("willing", "teal")
+
+
+def test_room_things_loose_item_is_gold():
+    row = _row(room_things(_THINGS_ROOM, _THINGS_ACTOR), "ITEMS", "item:c1:fuse")
+    assert (row.glyph, row.status, row.status_color) == ("◆", "in room", "gold")
+
+
+def test_room_things_carried_item_is_gold_and_marked_carried():
+    actor = {**_THINGS_ACTOR, "carried_items": [
+        {"item_id": "item:c1:key", "slug": "iron-key", "display_name": "Iron Key"},
+    ]}
+    row = _row(room_things({}, actor), "ITEMS", "item:c1:key")
+    assert (row.status, row.status_color) == ("carried", "gold")

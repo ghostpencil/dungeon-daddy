@@ -225,6 +225,153 @@ def _templated_risk(room_context: Mapping) -> str | None:
     return "; ".join(threats) if threats else None
 
 
+# --------------------------------------------------------------------------
+# "Things Here" overlay view-model (spec §5.2) — pure, no Arcade, no LLM.
+# --------------------------------------------------------------------------
+
+SECTION_EXITS = "EXITS"
+SECTION_OBJECTS = "OBJECTS"
+SECTION_CREATURES = "CREATURES"
+SECTION_ITEMS = "ITEMS"
+
+# Fixed display order; empty sections are omitted by :func:`room_things`.
+_SECTION_ORDER: tuple[str, ...] = (
+    SECTION_EXITS, SECTION_OBJECTS, SECTION_CREATURES, SECTION_ITEMS,
+)
+
+# Which overlay section each noun ``source`` falls into. Synthetic ``self`` and
+# ``room`` (and ally ``party``) sources are intentionally absent — they belong to
+# no "Things Here" section and are dropped.
+_SOURCE_SECTION: dict[str, str] = {
+    SOURCE_EXIT: SECTION_EXITS,
+    SOURCE_LOCKED_EXIT: SECTION_EXITS,
+    SOURCE_OBJECT: SECTION_OBJECTS,
+    SOURCE_MONSTER: SECTION_CREATURES,
+    SOURCE_NPC: SECTION_CREATURES,
+    SOURCE_LOOSE_ITEM: SECTION_ITEMS,
+    SOURCE_CARRIED_ITEM: SECTION_ITEMS,
+}
+
+# Row glyphs (spec §5.1). Objects show a hazard glyph when their state is alarming.
+GLYPH_EXIT = "→"
+GLYPH_OBJECT = "✦"
+GLYPH_OBJECT_HAZARD = "⚠"
+GLYPH_CREATURE = "●"
+GLYPH_ITEM = "◆"
+
+# Status string → ``draw_chip`` colour token (spec §8). Anything unlisted is neutral.
+_TEAL_STATES: frozenset[str] = frozenset({"open", "discovered", "ready", "willing"})
+_EMBER_STATES: frozenset[str] = frozenset(
+    {"locked", "blocked", "sealed", "one_way", "disturbed", "armed", "hostile", "active"}
+)
+
+
+def _state_color(status: str) -> str:
+    if status in _EMBER_STATES:
+        return "ember"
+    if status in _TEAL_STATES:
+        return "teal"
+    return "default"
+
+
+@dataclass(frozen=True)
+class RoomThing:
+    """One clickable row in the overlay: ``noun_id`` feeds the builder's noun slot."""
+
+    noun_id: str
+    label: str
+    glyph: str
+    status: str
+    status_color: str  # "teal" | "ember" | "gold" | "default"
+
+
+@dataclass(frozen=True)
+class ThingsSection:
+    title: str  # one of SECTION_*
+    things: list[RoomThing] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class RoomThings:
+    """Ordered, non-empty overlay sections for the current room (spec §5.2)."""
+
+    room_id: str | None = None
+    sections: list[ThingsSection] = field(default_factory=list)
+
+
+def room_things(room_context: Mapping, actor: Mapping) -> RoomThings:
+    """Group the room's :func:`available_nouns` into the overlay's EXITS / OBJECTS /
+    CREATURES / ITEMS sections with per-row status chips (spec §5.2).
+
+    Pure and unit-testable. Reuses ``available_nouns`` so the row ``noun_id``\\ s
+    are exactly the ids the builder's ``select_noun`` expects, then joins each
+    noun to its live status from ``room_context`` to derive the chip text/colour
+    and glyph. Synthetic ``self``/``room`` (and ally ``party``) nouns map to no
+    section and are dropped; sections with no rows are omitted.
+    """
+    objects_by_id = {o["object_id"]: o for o in room_context.get("objects", [])}
+    exits_by_id = {e["exit_id"]: e for e in room_context.get("exits", [])}
+    creatures_by_id = {
+        c["actor_id"]: c
+        for c in (*room_context.get("monsters", []), *room_context.get("npcs", []))
+    }
+    loose_by_id = {i["item_id"]: i for i in room_context.get("loose_items", [])}
+
+    buckets: dict[str, list[RoomThing]] = {title: [] for title in _SECTION_ORDER}
+    for noun in available_nouns(room_context, actor):
+        section = _SOURCE_SECTION.get(noun.source)
+        if section is None:
+            continue
+        buckets[section].append(
+            _room_thing(noun, objects_by_id, exits_by_id, creatures_by_id, loose_by_id)
+        )
+
+    sections = [
+        ThingsSection(title=title, things=buckets[title])
+        for title in _SECTION_ORDER
+        if buckets[title]
+    ]
+    return RoomThings(room_id=room_context.get("room_id"), sections=sections)
+
+
+def _room_thing(
+    noun: "NounOption",
+    objects_by_id: Mapping,
+    exits_by_id: Mapping,
+    creatures_by_id: Mapping,
+    loose_by_id: Mapping,
+) -> RoomThing:
+    src = noun.source
+    if src in (SOURCE_EXIT, SOURCE_LOCKED_EXIT):
+        status = _exit_status(exits_by_id.get(noun.noun_id, {}))
+        return RoomThing(noun.noun_id, noun.label, GLYPH_EXIT, status, _state_color(status))
+    if src == SOURCE_OBJECT:
+        status = objects_by_id.get(noun.noun_id, {}).get("current_state", "")
+        color = _state_color(status)
+        glyph = GLYPH_OBJECT_HAZARD if color == "ember" else GLYPH_OBJECT
+        return RoomThing(noun.noun_id, noun.label, glyph, status, color)
+    if src in (SOURCE_MONSTER, SOURCE_NPC):
+        creature = creatures_by_id.get(noun.noun_id, {})
+        status = creature.get("disposition") or creature.get("status", "")
+        return RoomThing(noun.noun_id, noun.label, GLYPH_CREATURE, status, _state_color(status))
+    # SOURCE_LOOSE_ITEM / SOURCE_CARRIED_ITEM — loot, always gold.
+    if src == SOURCE_CARRIED_ITEM:
+        status = "carried"
+    else:
+        status = (loose_by_id.get(noun.noun_id, {}).get("status") or "on floor").replace("_", " ")
+    return RoomThing(noun.noun_id, noun.label, GLYPH_ITEM, status, "gold")
+
+
+def _exit_status(exit_row: Mapping) -> str:
+    """Display status for an exit row: explicit blocked states, else key-gated → ``locked``."""
+    status = exit_row.get("status", "open")
+    if status in _LOCKED_EXIT_STATUSES:
+        return status
+    if exit_row.get("requires_item_slug"):
+        return "locked"
+    return status
+
+
 @dataclass(frozen=True)
 class VerbOption:
     verb: str
