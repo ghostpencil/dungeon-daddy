@@ -109,6 +109,26 @@ def target_sources_for_verb(verb: str) -> set[str] | None:
     return _VERB_TARGET_SOURCES.get(verb)
 
 
+def verbs_for_noun(
+    noun: "NounOption", all_verbs: Iterable["VerbOption"]
+) -> list["VerbOption"]:
+    """The verbs from ``all_verbs`` that may target ``noun`` — inverse of
+    :func:`noun_sources_for_verb`.
+
+    A verb applies when it is unrestricted (skill verbs, for which
+    ``noun_sources_for_verb`` returns ``None``) or when ``noun.source`` is among
+    the sources the verb accepts for its primary Noun slot. Input order is
+    preserved. Used to populate the suggested-verbs chip row for the selected
+    noun; verbs *not* returned are rendered disabled by the widget layer.
+    """
+    applicable: list[VerbOption] = []
+    for verb in all_verbs:
+        sources = noun_sources_for_verb(verb.verb)
+        if sources is None or noun.source in sources:
+            applicable.append(verb)
+    return applicable
+
+
 @dataclass(frozen=True)
 class VerbOption:
     verb: str

@@ -10,6 +10,7 @@ from dungeon_daddy.rpg.action_options import (
     available_verbs,
     is_transitive,
     validate_card,
+    verbs_for_noun,
 )
 from dungeon_daddy.rpg.models import ActorAbility
 
@@ -402,3 +403,44 @@ def test_validate_card_rejects_transitive_verb_with_target_not_in_offered_set():
     card = ActionCard(verb="give", noun_id="item:c1:key", adverb="boldly", target_id="actor:c1:nobody")
     err = validate_card(card, _OPTIONS_WITH_GIVE)
     assert isinstance(err, CardError) and err.field == "target"
+
+
+# --------------------------------------------------------------------------
+# Phase 50.6 Slice 1 — verbs_for_noun (inverse of noun_sources_for_verb)
+# --------------------------------------------------------------------------
+
+_FIGHT = VerbOption(verb="fight", label="Fight", kind="universal")
+_MOVE = VerbOption(verb="move", label="Move", kind="universal")
+_PICK_UP = VerbOption(verb="pick-up", label="Pick Up", kind="interaction")
+_ACTIVATE = VerbOption(verb="activate", label="Activate", kind="interaction")
+
+_ALL_VERBS = [_FIGHT, _MOVE, _PICK_UP, _ACTIVATE]
+
+
+def _noun(source):
+    return NounOption(noun_id="n", label="N", target_type="object", source=source)
+
+
+def test_verbs_for_noun_includes_unrestricted_skill_verb_for_any_source():
+    # fight is a skill verb (noun_sources_for_verb -> None): applies to anything.
+    for source in ("object", "loose_item", "exit", "self", "room"):
+        applicable = verbs_for_noun(_noun(source), _ALL_VERBS)
+        assert _FIGHT in applicable
+
+
+def test_verbs_for_noun_includes_restricted_verb_only_for_matching_source():
+    # activate -> {object}: applies to an object noun, not a loose item.
+    assert _ACTIVATE in verbs_for_noun(_noun("object"), _ALL_VERBS)
+    assert _ACTIVATE not in verbs_for_noun(_noun("loose_item"), _ALL_VERBS)
+
+
+def test_verbs_for_noun_excludes_move_for_non_exit_source():
+    # the greyed `·move·` chip: move -> {exit, locked_exit}, not an object.
+    assert _MOVE not in verbs_for_noun(_noun("object"), _ALL_VERBS)
+    assert _MOVE in verbs_for_noun(_noun("exit"), _ALL_VERBS)
+    assert _MOVE in verbs_for_noun(_noun("locked_exit"), _ALL_VERBS)
+
+
+def test_verbs_for_noun_preserves_input_order_and_returns_subset():
+    result = verbs_for_noun(_noun("object"), _ALL_VERBS)
+    assert result == [_FIGHT, _ACTIVATE]  # move/pick-up dropped, order kept
