@@ -129,6 +129,102 @@ def verbs_for_noun(
     return applicable
 
 
+# Deterministic (no-roll) verbs: these resolve straight to a ``PlayerCommand``
+# (or pure observation) rather than an action roll. ``use`` is conditional —
+# use-on-self is a deterministic Consume, use-on-creature is a roll — so it is
+# handled separately in :func:`action_preview`, not listed here.
+_DETERMINISTIC_VERBS: frozenset[str] = frozenset(
+    {VERB_MOVE, VERB_PICK_UP, VERB_EQUIP, VERB_ACTIVATE, VERB_GIVE, VERB_COMBINE, VERB_LOOK}
+)
+
+# Canonical memory types a deterministic verb could create, per the
+# creation-trigger rules in MEMORY_SYSTEM_SPEC.md (move → a new room/`location`;
+# activate/use/combine → `dungeon_state`; give → forms/damages a bond
+# (`relationship`); look → a discovered clue (`event`)). Inventory shuffles
+# (pick-up/equip) trigger no memory. Contested rolls use ``_CONTESTED_MEMORY_TAGS``.
+_DETERMINISTIC_MEMORY_TAGS: dict[str, list[str]] = {
+    VERB_MOVE: ["location"],
+    VERB_ACTIVATE: ["dungeon_state"],
+    VERB_USE: ["dungeon_state"],
+    VERB_COMBINE: ["dungeon_state"],
+    VERB_GIVE: ["relationship"],
+    VERB_LOOK: ["event"],
+    VERB_PICK_UP: [],
+    VERB_EQUIP: [],
+}
+
+# Any action roll resolves a major action (`event`) and risks fallout on a
+# failed/partial outcome (`fallout`).
+_CONTESTED_MEMORY_TAGS: list[str] = ["event", "fallout"]
+
+# Actor status that means a creature is a live threat (see Actor.status).
+_LIVE_ACTOR_STATUS = "active"
+
+
+@dataclass(frozen=True)
+class ActionPreview:
+    """A deterministic, engine-derived preview of an action Card (no LLM call).
+
+    ``likely_roll`` is the action rating the verb resolves against (the verb
+    name for skill verbs), or ``None`` for a deterministic action that shows
+    "No roll — automatic". ``requires_roll`` drives the adaptive button
+    (``ROLL`` vs ``DO``/``MOVE``/``LOOK``). ``risk`` is a templated line built
+    from threats *present in the room* (``None`` when the room is calm).
+    ``memory_tags`` are the canonical memory types this action could create.
+    """
+
+    likely_roll: str | None
+    requires_roll: bool
+    risk: str | None
+    memory_tags: list[str] = field(default_factory=list)
+
+
+def action_preview(
+    card: "ActionCard", room_context: Mapping, actor: Mapping
+) -> ActionPreview:
+    """Build the deterministic Preview box for an action Card (spec §4.5).
+
+    Pure and unit-testable — it reads only already-loaded state and **never**
+    calls the LLM. ``requires_roll`` is true for skill/class verbs and for
+    use-on-a-creature (use-on-self is a deterministic Consume). ``risk`` names
+    the live threats in ``room_context`` (active creatures, disturbed objects).
+    """
+    verb = card.verb
+    if verb == VERB_USE:
+        requires_roll = card.target_id != actor.get("actor_id")
+    else:
+        requires_roll = verb not in _DETERMINISTIC_VERBS
+
+    likely_roll = verb if requires_roll else None
+    if requires_roll:
+        memory_tags = list(_CONTESTED_MEMORY_TAGS)
+    else:
+        memory_tags = list(_DETERMINISTIC_MEMORY_TAGS.get(verb, []))
+
+    return ActionPreview(
+        likely_roll=likely_roll,
+        requires_roll=requires_roll,
+        risk=_templated_risk(room_context),
+        memory_tags=memory_tags,
+    )
+
+
+def _templated_risk(room_context: Mapping) -> str | None:
+    """Template a risk line from threats present in the room, or ``None``.
+
+    Active creatures may stir; disturbed objects are named hazards. Forgiving of
+    absent keys, matching :func:`available_nouns`.
+    """
+    threats: list[str] = []
+    for monster in room_context.get("monsters", []):
+        if monster.get("status", _LIVE_ACTOR_STATUS) == _LIVE_ACTOR_STATUS:
+            threats.append(f"{monster['display_name']} may stir")
+    for obj in room_context.get("objects", []):
+        if obj.get("current_state") == "disturbed":
+            threats.append(f"{obj['display_name']} is disturbed")
+    return "; ".join(threats) if threats else None
+
+
 @dataclass(frozen=True)
 class VerbOption:
     verb: str

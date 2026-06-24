@@ -8,6 +8,7 @@ from dungeon_daddy.rpg.action_options import (
     available_adverbs,
     available_nouns,
     available_verbs,
+    action_preview,
     is_transitive,
     validate_card,
     verbs_for_noun,
@@ -444,3 +445,78 @@ def test_verbs_for_noun_excludes_move_for_non_exit_source():
 def test_verbs_for_noun_preserves_input_order_and_returns_subset():
     result = verbs_for_noun(_noun("object"), _ALL_VERBS)
     assert result == [_FIGHT, _ACTIVATE]  # move/pick-up dropped, order kept
+
+
+# --------------------------------------------------------------------------
+# Phase 50.6 Slice 2 — action_preview (deterministic preview; never calls LLM)
+# --------------------------------------------------------------------------
+
+_PREVIEW_ACTOR = {"actor_id": "pc-1", "display_name": "Talvas"}
+
+
+def _preview_card(verb, *, noun_id="n", adverb="cautiously", target_id=None):
+    return ActionCard(verb=verb, noun_id=noun_id, adverb=adverb, target_id=target_id)
+
+
+def test_action_preview_contested_verb_requires_roll_and_names_rating():
+    # A skill verb resolves against the rating named by the verb itself.
+    preview = action_preview(_preview_card("study"), {}, _PREVIEW_ACTOR)
+    assert preview.requires_roll is True
+    assert preview.likely_roll == "study"
+
+
+def test_action_preview_contested_verb_could_create_event_and_fallout_memory():
+    preview = action_preview(_preview_card("fight"), {}, _PREVIEW_ACTOR)
+    assert "event" in preview.memory_tags
+    assert "fallout" in preview.memory_tags
+
+
+def test_action_preview_move_is_deterministic_with_no_roll():
+    preview = action_preview(_preview_card("move"), {}, _PREVIEW_ACTOR)
+    assert preview.requires_roll is False
+    assert preview.likely_roll is None
+
+
+def test_action_preview_move_could_create_location_memory():
+    preview = action_preview(_preview_card("move"), {}, _PREVIEW_ACTOR)
+    assert preview.memory_tags == ["location"]
+
+
+def test_action_preview_activate_is_deterministic_dungeon_state_memory():
+    preview = action_preview(_preview_card("activate"), {}, _PREVIEW_ACTOR)
+    assert preview.requires_roll is False
+    assert preview.memory_tags == ["dungeon_state"]
+
+
+def test_action_preview_use_on_self_is_deterministic_consume():
+    # use targeting the actor itself = ConsumeItem (no roll).
+    card = _preview_card("use", target_id="pc-1")
+    preview = action_preview(card, {}, _PREVIEW_ACTOR)
+    assert preview.requires_roll is False
+    assert preview.likely_roll is None
+
+
+def test_action_preview_use_on_creature_requires_roll():
+    card = _preview_card("use", target_id="monster-9")
+    preview = action_preview(card, {}, _PREVIEW_ACTOR)
+    assert preview.requires_roll is True
+
+
+def test_action_preview_risk_names_present_active_creature():
+    room = {"monsters": [{"actor_id": "m1", "display_name": "Scorpions", "status": "active"}]}
+    preview = action_preview(_preview_card("study"), room, _PREVIEW_ACTOR)
+    assert preview.risk is not None
+    assert "Scorpions" in preview.risk
+
+
+def test_action_preview_risk_hidden_when_only_dead_creature_present():
+    room = {"monsters": [{"actor_id": "m1", "display_name": "Scorpions", "status": "dead"}]}
+    preview = action_preview(_preview_card("study"), room, _PREVIEW_ACTOR)
+    assert preview.risk is None
+
+
+def test_action_preview_risk_names_disturbed_object_hazard():
+    room = {"objects": [{"object_id": "o1", "display_name": "Scorpion Nest", "current_state": "disturbed"}]}
+    preview = action_preview(_preview_card("study"), room, _PREVIEW_ACTOR)
+    assert preview.risk is not None
+    assert "Scorpion Nest" in preview.risk
