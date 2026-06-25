@@ -280,6 +280,22 @@ def test_default_noun_connector_is_the():
 
 
 # ---------------------------------------------------------------------------
+# Empty-slot placeholder (CP-3) — an unset slot reads "needs a choice"
+# ---------------------------------------------------------------------------
+
+def test_slot_is_unset_true_for_bare_panel():
+    # A panel with no context offers nothing, so the verb slot is unselected.
+    builder = InChatActionBuilder(VnaActionPanel())
+    assert builder.slot_is_unset("verb") is True
+
+
+def test_slot_is_unset_false_after_selection():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    builder._panel.select_verb("study")
+    assert builder.slot_is_unset("verb") is False
+
+
+# ---------------------------------------------------------------------------
 # Clause-aware wrap (CP-1) — a connector never separates from its slot
 # ---------------------------------------------------------------------------
 

@@ -34,6 +34,15 @@ _DEFAULT_TARGET_CONNECTOR = "with"
 _NOUN_CONNECTORS = {"look": "at the"}
 _DEFAULT_NOUN_CONNECTOR = "the"
 
+# Placeholder text drawn (dim, INK_4) in a slot that has no current selection, so
+# an empty slot reads as a fill-in-the-blank prompt rather than a value (CP-3).
+_SLOT_PLACEHOLDERS = {
+    _KIND_VERB: "verb",
+    _KIND_NOUN: "noun",
+    _KIND_TARGET: "target",
+    _KIND_ADVERB: "how",
+}
+
 
 class InChatActionBuilder:
     def __init__(self, panel: VnaActionPanel) -> None:
@@ -67,6 +76,22 @@ class InChatActionBuilder:
             result.append((_KIND_TARGET, self._panel.selected_target_label()))
         result.append((_KIND_ADVERB, self._panel.selected_adverb_label()))
         return result
+
+    def slot_is_unset(self, kind: str) -> bool:
+        """True when ``kind`` has no current selection.
+
+        An unset slot is drawn as a dim ``INK_4`` placeholder (its role word) so
+        it reads as "needs a choice" rather than as a value (CP-3).
+        """
+        if kind == _KIND_VERB:
+            return self._panel.selected_verb_label() is None
+        if kind == _KIND_NOUN:
+            return self._panel.selected_noun_label() is None
+        if kind == _KIND_TARGET:
+            return self._panel.selected_target_label() is None
+        if kind == _KIND_ADVERB:
+            return self._panel.selected_adverb_label() is None
+        return False
 
     # ------------------------------------------------------------------
     # Interaction — slot chips open a popup list (custom combobox)
@@ -279,11 +304,16 @@ class InChatActionBuilder:
         top_y = y + h - 16  # baseline (chip centre) of the first sentence row
         gap = 6.0
 
+        # Per-slot tint encodes slot role (spec §8: verb VIOLET, noun/target TEAL,
+        # adverb INK_2). All slots share identical chip chrome (BG_3 fill, 1px
+        # border, ▾ caret) so they read as the same kind of editable control; the
+        # tint is the only differentiator. The adverb uses INK_2 (not the dimmer
+        # INK_3) so it does not read as static text next to the INK_3 connectors.
         _SLOT_TINT = {
             _KIND_VERB: VIOLET,
             _KIND_NOUN: TEAL,
             _KIND_TARGET: TEAL,
-            _KIND_ADVERB: INK_3,
+            _KIND_ADVERB: INK_2,
         }
 
         def _text_w(s: str) -> float:
@@ -304,11 +334,14 @@ class InChatActionBuilder:
             elif kind == _KIND_TARGET:
                 conn = self._target_connector()
                 units.append(("text", (conn, INK_3), _text_w(conn), False))
-            text = label or "—"
-            if kind == _KIND_VERB:
-                text = text.upper()
+            if label is None:
+                # Empty slot → dim placeholder prompt instead of a value (CP-3).
+                text = _SLOT_PLACEHOLDERS.get(kind, "…")
+                tint = INK_4
+            else:
+                text = label.upper() if kind == _KIND_VERB else label
+                tint = _SLOT_TINT.get(kind, INK_3)
             chip_w = _text_w(text) + PAD_SM * 2 + 14  # +14 for the ▾ affordance
-            tint = _SLOT_TINT.get(kind, INK_3)
             glued = kind in (_KIND_NOUN, _KIND_TARGET)
             units.append(("slot", (kind, text, tint, chip_w), chip_w, glued))
 
