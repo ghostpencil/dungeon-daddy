@@ -91,9 +91,6 @@ class _PositionedRoom:
 _log = logging.getLogger(__name__)
 
 _CELL_PX = 48
-# Max verbs mirrored in the "Things Here" overlay footer for the selected noun
-# (Phase 50.6 §5.3). Keeps the footer to a single short line.
-_OVERLAY_SUGGESTED_CAP = 4
 _OVERLAY_TAB_H = 0   # tab bar is now an in-canvas overlay, not a reserved strip
 _BTN_EDIT_W = 100
 _BTN_EDIT_H = 24
@@ -1154,11 +1151,11 @@ class PlayView(arcade.View):
         """Push the current room contents + builder selection to the map overlay.
 
         Rebuilds the :class:`RoomThings` view-model from the retained room
-        context (cheap; no set_context) and mirrors the builder's selected noun —
-        its row gets a TEAL ring and the footer lists that noun's suggested verbs
-        (Phase 50.6 §5.3). Safe to call before the first refresh.
+        context (cheap; no set_context) and marks the builder's selected noun so
+        its row shows the larger TEAL marker (Phase 50.6 §5.3). Safe to call
+        before the first refresh.
         """
-        from dungeon_daddy.rpg.action_options import room_things, verbs_for_noun
+        from dungeon_daddy.rpg.action_options import room_things
 
         map_panel = getattr(self, "_map", None)
         room_context = getattr(self, "_last_room_context", None)
@@ -1167,36 +1164,33 @@ class PlayView(arcade.View):
         actor_dict = getattr(self, "_last_actor_dict", {})
         selected = self._rpg_vna.selected_noun_option()
         selected_noun_id = selected.noun_id if selected is not None else None
-        suggested_verbs: list[str] | None = None
-        if selected is not None:
-            applicable = verbs_for_noun(selected, self._rpg_vna.verb_options())
-            suggested_verbs = [
-                v.label.upper() for v in applicable[:_OVERLAY_SUGGESTED_CAP]
-            ]
         map_panel.set_things_here(
             room_things(room_context, actor_dict),
             selected_noun_id=selected_noun_id,
-            suggested_verbs=suggested_verbs,
         )
 
     def _on_overlay_noun_click(self, noun_id: str) -> None:
         """Overlay "Things Here" row click → act on the clicked noun (§5.3).
 
-        An **open exit** is walked through immediately (select ``move`` + the exit
-        and submit) — the most common overlay action, so it needs no verb pick.
-        Any other noun (incl. a *locked* exit, which can't be walked) just fills
-        the builder's noun slot and re-pushes the overlay so the clicked row shows
-        its selection cue + suggested-verb footer. Selecting does **not** rebuild
-        the panel context — the room is unchanged, and a full refresh would reset
-        the selection back to the default noun.
+        The two most common overlay actions are done in one click, no verb pick:
+        an **open exit** is walked through (``move``) and a **loose item** is
+        picked up (``pick_up``) by the acting character. Any other noun (incl. a
+        *locked* exit, which can't be walked) just fills the builder's noun slot
+        and re-pushes the overlay so the clicked row shows its selection cue.
+        Selecting does **not** rebuild the panel context — the room is unchanged,
+        and a full refresh would reset the selection back to the default noun.
         """
-        from dungeon_daddy.rpg.action_options import SOURCE_EXIT, VERB_MOVE
+        from dungeon_daddy.rpg.action_options import (
+            SOURCE_EXIT, SOURCE_LOOSE_ITEM, VERB_MOVE, VERB_PICK_UP,
+        )
 
+        _AUTO_VERB = {SOURCE_EXIT: VERB_MOVE, SOURCE_LOOSE_ITEM: VERB_PICK_UP}
         clicked = next(
             (n for n in self._rpg_vna._nouns if n.noun_id == noun_id), None
         )
-        if clicked is not None and clicked.source == SOURCE_EXIT:
-            self._rpg_vna.select_verb(VERB_MOVE)
+        auto_verb = _AUTO_VERB.get(clicked.source) if clicked is not None else None
+        if auto_verb is not None:
+            self._rpg_vna.select_verb(auto_verb)
             self._rpg_vna.select_noun(noun_id)
             self._rpg_vna.submit()
             return

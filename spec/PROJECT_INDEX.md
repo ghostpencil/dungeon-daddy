@@ -20,9 +20,11 @@ Continue with Slice 9 ("Retire ACTION tab" — remove the right-panel ACTION tab
 in-chat builder is the single source of truth; re-wire the submit callback to the in-chat builder;
 keep CHAR/Scene/Fallout/Memory/Debug tabs; suite stays green, spec §7 + §9). Slices 1–8 are
 committed; Slices 1–7 + the Command-Sentence Polish track (CP-1…CP-7) are user-verified. **Slice 8
-still needs a GUI manual-verify** (`python -m dungeon_daddy` → Play mode: click a "Things Here" row
-→ the row gets a TEAL ring, the in-chat builder's noun slot fills, and the overlay footer lists
-that noun's suggested verbs + the contract line).
+still needs a final GUI manual-verify** (`python -m dungeon_daddy` → Play mode, after three UX
+rounds): header reads `R4: THINGS HERE` (no separate room row, no footer); the selected row shows a
+larger bold TEAL `▸`; clicking an **open exit** auto-moves and a **loose item** auto-picks-up;
+clicking any other noun (incl. a locked exit) fills the in-chat builder's noun slot; loop-pattern
+chips appear only in test-drive, not a real play session.
 
 Spec is `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md` (read it; design decisions are locked in §3).
 Phase 50.6 is a **BUILD add-on** (dynamic, like 50.5 — not on the 51–53 roadmap, no issue).
@@ -207,6 +209,18 @@ in-chat builder until Slice 9 retires it.
   `load_dungeon_session`** (real play). 7 new tests (1 view-model marker, 1 renderer marker-size,
   2 play_view auto-move, 3 MapPanel loop-gating; 3 prior overlay tests retargeted to locked exits).
   Full map+ui+views suites green (1634).
+- **Slice 8 UX round 3 — DONE** (user-requested; 3 items). (1) **Footer removed** — the
+  Selected/Suggested/"Clicking a noun…" footer is gone; `format_things_here` no longer emits
+  `"footer"` lines, and the `suggested_verbs` plumbing was removed end-to-end (param dropped from
+  `format_things_here`/`LayoutRenderer.draw`/`MapPanel.set_things_here`; `play_view` no longer
+  computes `verbs_for_noun` for the overlay or keeps `_OVERLAY_SUGGESTED_CAP`). `verbs_for_noun`
+  stays in `rpg/action_options.py` for the later verb-dropdown ordering. (2) **Click a loose item =
+  auto-pickup** — `_on_overlay_noun_click` generalised to an `{SOURCE_EXIT: move, SOURCE_LOOSE_ITEM:
+  pick-up}` map; clicking a floor item picks it up with the acting actor. (3) **Room code folded into
+  the header** — `"R4: THINGS HERE"` instead of a separate `R4` row (saves a vertical line). Net
+  tests: −3 footer/suggested (renderer + 2 view-model), +2 view-model (no-footer, header-folds-id),
+  +1 play_view loose-item pickup; the "feeds-selected" test trimmed to selection-only. Full
+  map+ui+views suites green (1633).
 - Then slices 9–11 (retire ACTION tab, SAY/ASK swap stub, polish + smoke test). **Slice 9:** remove
   the right-panel ACTION tab, re-wire submit to the in-chat builder, suite stays green (spec §7).
 

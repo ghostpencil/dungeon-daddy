@@ -211,26 +211,23 @@ def test_selected_row_uses_a_distinct_marker_from_unselected():
     assert _SEL_MARKER != _UNSEL_MARKER
 
 
-def test_footer_shows_selected_label_and_suggested_verbs():
-    lines = format_things_here(
-        _things(sections=[_exits_section()]),
-        selected_noun_id="e1",
-        suggested_verbs=["MOVE", "LOOK"],
-    )
-    footer_text = " ".join(ln.text for ln in lines if ln.kind == "footer")
-    assert "Marketplace Arch" in footer_text
-    assert "MOVE" in footer_text
-    assert "LOOK" in footer_text
-
-
-def test_footer_states_the_contract_when_a_noun_is_selected():
+def test_no_footer_lines_rendered():
+    # The Selected/Suggested/contract footer was removed (user request).
     lines = format_things_here(
         _things(sections=[_exits_section()]), selected_noun_id="e1"
     )
-    footer_text = " ".join(ln.text for ln in lines if ln.kind == "footer").lower()
-    assert "builder" in footer_text
-
-
-def test_no_footer_without_selection():
-    lines = format_things_here(_things(sections=[_exits_section()]))
     assert not any(ln.kind == "footer" for ln in lines)
+    all_text = " ".join(ln.text for ln in lines)
+    assert "Selected:" not in all_text
+    assert "Suggested:" not in all_text
+    assert "feeds the action builder" not in all_text
+
+
+def test_room_id_folded_into_header():
+    # Room code lives in the header to save a vertical row ("R1: THINGS HERE").
+    lines = format_things_here(_things(room_id="R1", sections=[_exits_section()]))
+    header = next(ln for ln in lines if ln.kind == "header")
+    assert "R1" in header.text
+    assert "THINGS HERE" in header.text.upper()
+    # no standalone room-id value row anymore
+    assert not any(ln.kind == "value" and ln.text.strip() == "R1" for ln in lines)

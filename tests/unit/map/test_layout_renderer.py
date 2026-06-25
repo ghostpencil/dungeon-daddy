@@ -441,23 +441,6 @@ def test_play_mode_selected_row_text_is_teal() -> None:
     assert tuple(color)[:3] == tuple(TEAL)[:3]
 
 
-def test_play_mode_footer_shows_suggested_verbs() -> None:
-    result, view_state = _play_setup()
-    renderer = LayoutRenderer()
-
-    with patch("dungeon_daddy.map.layout_renderer.draw_chip"), \
-            patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
-        renderer.draw(
-            result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
-            mode="play", room_things=_room_things(),
-            selected_noun_id="e1", suggested_verbs=["MOVE", "LOOK"],
-        )
-        all_text = " ".join(str(c) for c in mock_arcade.draw_text.call_args_list)
-
-    assert "MOVE" in all_text
-    assert "Marketplace Arch" in all_text
-
-
 # ---------------------------------------------------------------------------
 # Cycle 12 — secret connection uses lower alpha than normal
 # ---------------------------------------------------------------------------

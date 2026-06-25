@@ -160,7 +160,6 @@ class LayoutRenderer:
         mode: str = "graph",
         room_things: RoomThings | None = None,
         selected_noun_id: str | None = None,
-        suggested_verbs: list[str] | None = None,
     ) -> None:
         cfg = presentation_config or GraphPresentationConfig()
         # Reset each draw; only the play-mode branch repopulates it.
@@ -195,9 +194,7 @@ class LayoutRenderer:
                     # Play mode: the player-facing "Things Here" overlay replaces
                     # the graph authoring readout. Placement still anchors to the
                     # selected (== current) room, so positioning is unchanged.
-                    lines = format_things_here(
-                        room_things, selected_noun_id, suggested_verbs
-                    )
+                    lines = format_things_here(room_things, selected_noun_id)
                 else:
                     panel_data = build_room_detail(sel, level, result) if sel else None
                     lines = format_detail_panel(panel_data)

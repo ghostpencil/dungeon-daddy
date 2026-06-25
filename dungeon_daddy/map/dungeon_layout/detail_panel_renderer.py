@@ -20,7 +20,7 @@ _UNSEL_MARKER = "·"
 @dataclass
 class PanelLine:
     text: str
-    kind: str  # "header", "section", "value", "empty", "thing", "footer"
+    kind: str  # "header", "section", "value", "empty", "thing"
     # "thing" rows (Things Here overlay) carry a trailing status chip:
     status: str | None = None
     status_color: str | None = None  # "teal" | "ember" | "gold" | "default"
@@ -83,35 +83,29 @@ def format_detail_panel(
 def format_things_here(
     things: RoomThings,
     selected_noun_id: str | None = None,
-    suggested_verbs: list[str] | None = None,
 ) -> list[PanelLine]:
     """Render the play-mode "Things Here" overlay content (Phase 50.6 §5.1, §5.3).
 
-    Pure: turns the :class:`RoomThings` view-model into drawable panel lines —
-    a header, the room id, then each section title followed by its clickable
-    rows. Each ``"thing"`` row carries its ``status``/``status_color`` (for the
-    trailing status chip) plus its ``noun_id`` and a ``selected`` flag — the row
-    matching ``selected_noun_id`` is flagged so the renderer can draw a TEAL
-    selection ring (Slice 8). When a noun is selected, a footer mirrors the
-    suggested verbs for it (``suggested_verbs``) and states the contract that
-    clicking a noun feeds the action builder. Replaces the technical
-    graph-metadata readout (``format_detail_panel``) when the map is in play mode.
+    Pure: turns the :class:`RoomThings` view-model into drawable panel lines — a
+    header that folds the room id in to save a row (``"R4: THINGS HERE"``), then
+    each section title followed by its clickable rows. Each ``"thing"`` row carries
+    its ``status``/``status_color`` (for the trailing status chip) plus its
+    ``noun_id``, a ``selected`` flag (the row matching ``selected_noun_id``), and a
+    leading marker glyph the renderer draws as the selected/deselected icon.
+    Replaces the technical graph-metadata readout (``format_detail_panel``) when
+    the map is in play mode.
     """
-    lines: list[PanelLine] = [PanelLine("THINGS HERE", "header")]
-    if things.room_id:
-        lines.append(PanelLine(things.room_id, "value"))
+    header = f"{things.room_id}: THINGS HERE" if things.room_id else "THINGS HERE"
+    lines: list[PanelLine] = [PanelLine(header, "header")]
 
     if not things.sections:
         lines.append(PanelLine("Nothing of note here.", "value"))
         return lines
 
-    selected_label: str | None = None
     for section in things.sections:
         lines.append(PanelLine(section.title, "section"))
         for thing in section.things:
             is_selected = thing.noun_id == selected_noun_id
-            if is_selected:
-                selected_label = thing.label
             lines.append(PanelLine(
                 f"{thing.glyph} {thing.label}",
                 "thing",
@@ -122,9 +116,4 @@ def format_things_here(
                 marker=_SEL_MARKER if is_selected else _UNSEL_MARKER,
             ))
 
-    if selected_label is not None:
-        lines.append(PanelLine(f"Selected: {selected_label}", "footer"))
-        if suggested_verbs:
-            lines.append(PanelLine("Suggested: " + ", ".join(suggested_verbs), "footer"))
-        lines.append(PanelLine("Clicking a noun feeds the action builder.", "footer"))
     return lines

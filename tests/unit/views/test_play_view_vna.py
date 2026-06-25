@@ -170,7 +170,7 @@ def test_overlay_click_on_locked_exit_selects_not_moves(tmp_path):
     assert view._rpg_vna._noun_id == "e1"        # selected instead
 
 
-def test_click_feeds_selected_noun_and_suggested_verbs_to_overlay(tmp_path):
+def test_click_feeds_selected_noun_to_overlay(tmp_path):
     # Use a locked exit so the click takes the select path (open exits auto-move).
     view = _make_view(tmp_path)
     view._map = MagicMock()
@@ -182,8 +182,27 @@ def test_click_feeds_selected_noun_and_suggested_verbs_to_overlay(tmp_path):
 
     kwargs = view._map.set_things_here.call_args.kwargs
     assert kwargs["selected_noun_id"] == "e1"
-    assert isinstance(kwargs["suggested_verbs"], list)
-    assert kwargs["suggested_verbs"]  # the selected exit has applicable verbs
+
+
+def test_overlay_click_on_loose_item_auto_picks_up(tmp_path):
+    """Clicking a loose floor item picks it up with the acting character."""
+    from dungeon_daddy.rpg.models import Item
+
+    view = _make_view(tmp_path)
+    view._map = MagicMock()
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_item(Item(
+        item_id="itm-1", campaign_id="camp-1", slug="gold-coin",
+        display_name="Gold Coin", item_type="dungeon_item",
+        description="A coin.", room_id="r1", status="active",
+    ))
+    view._refresh_vna_panel()
+
+    view._on_overlay_noun_click("itm-1")
+
+    picked = next(i for i in view._mem_repo.get_items("camp-1") if i["item_id"] == "itm-1")
+    assert picked["owner_actor_id"] == "pc-1"
+    assert picked["room_id"] is None
 
 
 def test_set_rpg_context_populates_action_builder_on_load(tmp_path):

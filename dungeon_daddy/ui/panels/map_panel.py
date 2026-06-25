@@ -159,7 +159,6 @@ class MapPanel:
         self._selected_room_id = None
         self._things_here: RoomThings | None = None  # play-mode overlay content
         self._things_selected_noun_id: str | None = None
-        self._things_suggested_verbs: list[str] | None = None
         self._art = None  # MapArtAssets, lazy-loaded on first draw
 
         from dungeon_daddy.ui.widgets.level_stepper import LevelStepper
@@ -250,19 +249,16 @@ class MapPanel:
         self,
         things: RoomThings | None,
         selected_noun_id: str | None = None,
-        suggested_verbs: list[str] | None = None,
     ) -> None:
         """Feed the play-mode "Things Here" overlay content (Phase 50.6 §5).
 
         When set, the map's detail panel renders the player-facing room contents
         (Exits/Objects/Creatures/Items) instead of the graph authoring readout.
-        ``selected_noun_id`` highlights one row with a TEAL ring and drives the
-        footer; ``suggested_verbs`` are mirrored in that footer (spec §5.3). Pass
+        ``selected_noun_id`` marks one row as selected (larger TEAL marker). Pass
         ``None`` for *things* to revert to graph mode (e.g. design view).
         """
         self._things_here = things
         self._things_selected_noun_id = selected_noun_id
-        self._things_suggested_verbs = suggested_verbs
 
     def set_loops_visible(self, visible: bool) -> None:
         """Show/hide the loop-pattern chips (authoring/test-drive only).
@@ -497,7 +493,6 @@ class MapPanel:
                         mode="play" if (self._things_here is not None and on_current_level) else "graph",
                         room_things=self._things_here if on_current_level else None,
                         selected_noun_id=self._things_selected_noun_id if on_current_level else None,
-                        suggested_verbs=self._things_suggested_verbs if on_current_level else None,
                     )
                 else:
                     self._renderer.draw(self._level, self._state, origin_x, origin_y, self._zoom_level)

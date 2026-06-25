@@ -551,7 +551,7 @@ def test_set_loops_visible_rebuilds_on_loaded_level() -> None:
     assert "lp1" in p._loop_strip_rects
 
 
-def test_draw_forwards_selection_and_suggested_verbs() -> None:
+def test_draw_forwards_selection() -> None:
     from dungeon_daddy.rpg.action_options import RoomThing, RoomThings, ThingsSection
     p = _panel()
     p.load(_level(["a", "b"], [_conn("a", "b")]), _state())
@@ -559,9 +559,8 @@ def test_draw_forwards_selection_and_suggested_verbs() -> None:
         room_id="a",
         sections=[ThingsSection("EXITS", [RoomThing("b", "Hall", "→", "open", "teal")])],
     )
-    p.set_things_here(things, selected_noun_id="b", suggested_verbs=["MOVE"])
+    p.set_things_here(things, selected_noun_id="b")
 
     draw = _draw_with_mock_renderer(p)
     _, kwargs = draw.call_args
     assert kwargs["selected_noun_id"] == "b"
-    assert kwargs["suggested_verbs"] == ["MOVE"]
