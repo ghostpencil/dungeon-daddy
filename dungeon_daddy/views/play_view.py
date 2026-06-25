@@ -99,12 +99,11 @@ _RPG_PANEL_W = 300
 _RPG_TAB_H = 26
 _BTN_RPG_W = 88
 
-_RPG_TAB_LABELS = ["CHAR", "SCENE", "FALLOUT", "MEM", "ACTION", "EXITS", "DBG"]
+_RPG_TAB_LABELS = ["CHAR", "SCENE", "FALLOUT", "MEM", "EXITS", "DBG"]
 _TAB_CHAR = 0
 _TAB_MEM = 3
-_TAB_ACTION = 4
-_TAB_EXITS = 5
-_TAB_DBG = 6
+_TAB_EXITS = 4
+_TAB_DBG = 5
 _DBG_LINE_MAX = 36
 
 
@@ -172,7 +171,6 @@ class _RpgSidePanel:
         scene_panel: SceneStatePanel,
         fallout_panel: FalloutPanel,
         memory_panel: MemoryInspectorPanel,
-        action_panel: VnaActionPanel,
         exit_panel: ExitListPanel,
         debug_controls: DebugControls | None,
         manager: arcade.gui.UIManager | None = None,
@@ -181,7 +179,6 @@ class _RpgSidePanel:
         self._scene = scene_panel
         self._fallout = fallout_panel
         self._memory = memory_panel
-        self._action = action_panel
         self._exit = exit_panel
         self._debug = debug_controls
         self._manager = manager
@@ -202,44 +199,21 @@ class _RpgSidePanel:
             panel.setup(x, y, w, content_h)
         if self._active == _TAB_MEM:
             self._memory.setup_widget(self._manager, x, y, w, content_h)
-        if self._active == _TAB_ACTION:
-            self._action.setup_widget(self._manager, x, y, w, content_h)
 
     def teardown(self) -> None:
         """Remove any active UI widgets (call before hiding the panel)."""
         self._memory.teardown_widget(self._manager)
-        self._action.teardown_widget(self._manager)
 
     def set_active(self, index: int) -> None:
         if 0 <= index < len(_RPG_TAB_LABELS):
             if self._active == _TAB_MEM:
                 self._memory.teardown_widget(self._manager)
-            if self._active == _TAB_ACTION:
-                self._action.teardown_widget(self._manager)
             self._active = index
             if self._active == _TAB_MEM:
                 content_h = self._h - _RPG_TAB_H
                 self._memory.setup_widget(
                     self._manager, self._x, self._y, self._w, content_h,
                 )
-            if self._active == _TAB_ACTION:
-                content_h = self._h - _RPG_TAB_H
-                self._action.setup_widget(
-                    self._manager, self._x, self._y, self._w, content_h,
-                )
-
-    def refresh_action_widget(self) -> None:
-        """Rebuild the ACTION dropdowns from the panel's current options.
-
-        Used after the panel's logic state changes while the tab is already
-        live (e.g. a party move repopulates the noun list) so the on-screen
-        dropdowns don't show the previous room's exits.
-        """
-        if self._active != _TAB_ACTION:
-            return
-        content_h = self._h - _RPG_TAB_H
-        self._action.teardown_widget(self._manager)
-        self._action.setup_widget(self._manager, self._x, self._y, self._w, content_h)
 
     @property
     def active_tab(self) -> int:
@@ -264,10 +238,6 @@ class _RpgSidePanel:
             self._fallout.draw()
         elif self._active == _TAB_MEM:
             self._memory.draw()
-        elif self._active == _TAB_ACTION:
-            self._action.draw(
-                self._x, self._y, self._w, self._h - _RPG_TAB_H
-            )
         elif self._active == _TAB_EXITS:
             self._exit.draw()
         else:
@@ -390,7 +360,7 @@ class PlayView(arcade.View):
         self._rpg_debug = DebugControls(rpg_service) if rpg_service is not None else None
         self._rpg_side = _RpgSidePanel(
             self._rpg_char, self._rpg_scene, self._rpg_fallout,
-            self._rpg_memory, self._rpg_vna, self._exit_panel, self._rpg_debug,
+            self._rpg_memory, self._exit_panel, self._rpg_debug,
             manager=self._manager,
         )
         self._rpg_open: bool = False
@@ -493,9 +463,6 @@ class PlayView(arcade.View):
             if x >= rpg_x and y < content_h:
                 tab_idx = self._rpg_side.hit_tab(x, y)
                 if tab_idx is not None:
-                    # Populate VNA options before set_active builds its dropdowns.
-                    if tab_idx == _TAB_ACTION:
-                        self._refresh_vna_panel()
                     self._rpg_side.set_active(tab_idx)
                     if tab_idx == _TAB_MEM:
                         self._load_memory_entries()
@@ -695,7 +662,7 @@ class PlayView(arcade.View):
         # set_rpg_context runs *after* load_dungeon_session (where _focus_party_room
         # fires while _mem_repo is still None), so this is the first point where the
         # room, actors, and repo are all available. Populate the in-chat Action
-        # Builder now so it is usable on load — not only after the ACTION tab opens.
+        # Builder now so it is usable on load.
         self._refresh_vna_panel()
 
     def _sync_debug_level_id(self) -> None:
@@ -1139,13 +1106,10 @@ class PlayView(arcade.View):
         self._last_room_context = room_context
         self._last_actor_dict = actor_dict
         # Feed the map's "Things Here" overlay from the same room context, so it
-        # auto-tracks the current room (Phase 50.6 §5).
+        # auto-tracks the current room (Phase 50.6 §5). The in-chat Action
+        # Builder reads _rpg_vna's options live each draw, so no widget rebuild
+        # is needed here.
         self._push_things_here_overlay()
-        # If the ACTION tab is live, rebuild its dropdowns so they reflect the
-        # newly-loaded options (e.g. after the party moves to a new room).
-        side = getattr(self, "_rpg_side", None)
-        if side is not None:
-            side.refresh_action_widget()
 
     def _push_things_here_overlay(self) -> None:
         """Push the current room contents + builder selection to the map overlay.
@@ -1196,9 +1160,6 @@ class PlayView(arcade.View):
             return
         self._rpg_vna.select_noun(noun_id)
         self._push_things_here_overlay()
-        side = getattr(self, "_rpg_side", None)
-        if side is not None:
-            side.refresh_action_widget()
 
     def _prepare_vna_exits(self, room_context: dict, room_id: str) -> dict:
         """Player-facing exit nouns: drop unknown exits and disambiguate labels.

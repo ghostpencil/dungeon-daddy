@@ -6,7 +6,8 @@ Phase **50 — Hybrid Action Model: COMPLETE & merged to `main`** (2026-06-23).
 Phase **50.5 — Use Noun on Noun: COMPLETE & merged to `main`** (PR #81, 2026-06-24).
 Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–8 committed and **user-verified**
 (+ manual-verify fixes + Command-Sentence Polish CP-1…CP-7; Slice 8 incl. three UX rounds, all
-user-verified) on branch `phase-50.6` (latest 2026-06-25). Slice 9 is next.
+user-verified); **Slice 9 (retire ACTION tab) DONE** (suite green 2938, not yet GUI-verified) on
+branch `phase-50.6` (latest 2026-06-25). Slice 10 is next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -14,18 +15,26 @@ Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
 
 ---
 
-## START HERE next session — Phase 50.6, Slice 9
+## START HERE next session — Phase 50.6, Slice 10
 
-Continue with Slice 9 ("Retire ACTION tab" — remove the right-panel ACTION tab now that the
-in-chat builder is the single source of truth; re-wire the submit callback to the in-chat builder;
-keep CHAR/Scene/Fallout/Memory/Debug tabs; suite stays green, spec §7 + §9). **Slices 1–8 are
-committed and user-verified**, including the three Slice 8 UX rounds (GUI-confirmed 2026-06-25):
-`R4: THINGS HERE` folded header (no footer), larger bold TEAL `▸` selection marker, click-an-
-open-exit-to-move / click-a-loose-item-to-pickup, and loop-pattern chips only in test-drive.
+Continue with **Slice 10 — SAY/ASK swap (stub)** (spec §6 + §9.10). The bottom-of-column input
+defaults to the in-chat Action Builder; swap it to a free-text **SAY/ASK** box only on a dialogue
+flag (a "Speak to the Dungeon" event, or `talk`/`sway`-family verb on a *willing* NPC/monster),
+and swap back when dialogue ends. **Scope = the swap mechanism + a stubbed/no-op SAY box that can
+be shown/hidden + the "is this target speakable?" gate surfaced in the builder** (e.g. `talk` only
+enabled on willing targets). **Out of scope (Phase 51):** actual conversation flow, NPC memory,
+routing — mark the SAY handler as a Phase 51 extension point. Note: the free-text Ask box is
+*currently always visible*; Slice 10 makes it contextual.
 
-**Possible follow-up to weigh during/after Slice 9 (user, 2026-06-25):** now that clicking an open
-exit auto-moves, consider whether to drop the `move` verb from the in-chat command sentence — TBD,
-revisit once it's been played a bit.
+**Slice 9 is DONE** (suite green 2938) but **not yet GUI-verified** — the only visible change is the
+right RPG panel now showing **6 tabs (CHAR/SCENE/FALLOUT/MEM/EXITS/DBG)** instead of 7 (ACTION
+gone); the in-chat builder is unchanged (already user-verified through Slice 8). Worth a quick look
+on next launch.
+
+**Possible follow-ups to weigh (user, 2026-06-25):** (a) now that clicking an open exit auto-moves,
+consider dropping the `move` verb from the in-chat command sentence — TBD, revisit once played.
+(b) The **EXITS tab** is now redundant with the "Things Here" overlay — optional retire (spec §7
+notes it as a follow-up, deliberately *not* part of Slice 9).
 
 Spec is `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md` (read it; design decisions are locked in §3).
 Phase 50.6 is a **BUILD add-on** (dynamic, like 50.5 — not on the 51–53 roadmap, no issue).
@@ -41,8 +50,8 @@ Arcade widget layer is rebuilt, plus 3 new pure helpers. 11-slice TDD plan in sp
 **Slot-widget decision (locked, 2026-06-24):** the in-chat builder's V/N/T/A slots are
 **custom-drawn chips that open a popup list on click** — NOT a cycle picker, NOT native
 `arcade.gui.UIDropdown` (re-affirms Phase 50 feedback; see auto-memory
-`project_phase50_vna_dropdowns`). The right-panel ACTION tab is **kept alongside** the new
-in-chat builder until Slice 9 retires it.
+`project_phase50_vna_dropdowns`). The right-panel ACTION tab was kept alongside the new
+in-chat builder until **Slice 9 retired it** (in-chat builder is now the sole action surface).
 
 - **Slice 1 — DONE** (commit `e6b6a6e`): `verbs_for_noun` pure helper (inverse of
   `noun_sources_for_verb`) in `rpg/action_options.py` + 4 unit tests. Full rpg unit suite green.
@@ -234,8 +243,27 @@ in-chat builder until Slice 9 retires it.
   (kira→fighter, mira→artificer, talvas→thief; `protagonist` is blank by design). Reseed-a-save
   invocation gotchas captured in **Notes** (`--campaigns-dir` for the saves dir; `PYTHONPATH=.` for
   the populate scripts). Full unit suite green (2940).
-- Then slices 9–11 (retire ACTION tab, SAY/ASK swap stub, polish + smoke test). **Slice 9:** remove
-  the right-panel ACTION tab, re-wire submit to the in-chat builder, suite stays green (spec §7).
+- **Slice 9 — DONE** (retire ACTION tab, spec §7 + §9.9; suite green 2938, **not yet GUI-verified**).
+  The right-panel **ACTION tab is removed** — the in-chat builder is now the single action surface.
+  In `play_view.py`: dropped `"ACTION"` from `_RPG_TAB_LABELS` (now 6 tabs:
+  CHAR/SCENE/FALLOUT/MEM/EXITS/DBG), removed `_TAB_ACTION`, reindexed `_TAB_EXITS`/`_TAB_DBG` to
+  4/5; stripped the `action_panel` from `_RpgSidePanel` (ctor param + `setup`/`teardown`/
+  `set_active`/`draw` branches + the `refresh_action_widget` method); removed the `_TAB_ACTION`
+  branch in `on_mouse_press` and both `side.refresh_action_widget()` calls (the in-chat builder
+  reads `_rpg_vna`'s options **live each draw**, so no widget rebuild is needed). `_rpg_vna` + its
+  `set_submit_callback(_on_vna_submit)` + the `InChatActionBuilder` wiring are **unchanged** —
+  submit already routed through the in-chat builder since Slice 4, so "re-wire submit" was a no-op.
+  Tests (`test_play_view_bundle.py`): inverted the tab-registration test
+  (`test_action_tab_retired_from_rpg_tab_labels` + `test_remaining_rpg_tabs_kept`), **deleted the
+  obsolete `TestRpgSidePanelActionLifecycle` class**, dropped the `action` arg from `_make_rpg_side`.
+  **Note:** `tools/smoke_test_phase33.py` still references an ACTION tab but is a stale Phase-33
+  manual tool (already out of date — hardcoded a 6-tab layout) and isn't in the suite; left as-is,
+  the Phase 50.6 smoke test is Slice 11. The legacy `_rpg_action` (`PlayerActionPanel`, Phase 33
+  resolve flow) is untouched — it was never a tab.
+- Then slices 10–11 (SAY/ASK swap stub, polish + smoke test). **Slice 10:** input surface swaps
+  builder↔SAY box on a dialogue flag; `talk` verb gated to willing targets (conversation logic
+  deferred to Phase 51). **Slice 11:** polish (incl. dynamic builder-band height + collapsible
+  short-window fallback) + smoke test.
 
   **Known not-yet-done (expected, not bugs):** the free-text **Ask box is still always visible** —
   the contextual SAY/ASK swap is **Slice 10**; the builder band is **not yet responsive/
