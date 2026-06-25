@@ -255,7 +255,10 @@ class VnaActionPanel:
 
     def _refresh_adverbs(self) -> None:
         noun = self._selected_noun()
-        if noun is None or self._playbook_slug is None:
+        # An empty slug means the actor has no assigned playbook yet — treat it
+        # like None (offer no adverbs) rather than letting available_adverbs raise
+        # KeyError on a "" lookup.
+        if noun is None or not self._playbook_slug:
             self._adverbs = []
             self._adverb = None
             return

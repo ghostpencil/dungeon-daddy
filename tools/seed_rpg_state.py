@@ -422,7 +422,16 @@ def seed_campaign_with_pack(
                 repo.save_actor_stress_track(actor_id, track_key, capacity=6, filled=0)
             result.created += 1
         elif force:
-            repo.save_actor(actor_id, campaign_id, actor.actor_type, actor.slug, actor.display_name)
+            # The pack does not own playbook_slug / room_id / status (set by the
+            # publish pipeline and movement). Preserve them across a force reseed
+            # so re-applying the pack doesn't blank a PC's playbook (which the
+            # action UI needs) or relocate actors.
+            repo.save_actor(
+                actor_id, campaign_id, actor.actor_type, actor.slug, actor.display_name,
+                status=existing.get("status", "active"),
+                playbook_slug=existing.get("playbook_slug"),
+                room_id=existing.get("room_id"),
+            )
             for action_key, rating in actor.actions.items():
                 repo.save_actor_action_rating(actor_id, action_key, rating)
             for track_key in actor.stress_tracks:

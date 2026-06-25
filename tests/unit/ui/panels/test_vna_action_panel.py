@@ -27,6 +27,22 @@ def _actor(**kw) -> dict:
     return a
 
 
+def test_set_context_with_empty_playbook_does_not_crash():
+    # An actor with no assigned playbook (playbook_slug == "") must not raise —
+    # available_adverbs would KeyError on an empty/unknown slug. The panel simply
+    # offers no adverbs until a playbook is assigned.
+    panel = _panel()
+    panel.set_context(
+        actor_abilities=[],
+        room_context=_room_context(exits=[{"exit_id": "e1", "label": "Door",
+                                            "status": "open", "to_room_id": "r2"}]),
+        actor=_actor(),
+        playbook_slug="",
+        world_flags=[],
+    )
+    assert panel.adverb_labels() == []
+
+
 # ---------------------------------------------------------------------------
 # Tracer bullet — set_context populates verbs and defaults the verb selection
 # ---------------------------------------------------------------------------
