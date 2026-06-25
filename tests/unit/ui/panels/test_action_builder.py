@@ -280,6 +280,39 @@ def test_default_noun_connector_is_the():
 
 
 # ---------------------------------------------------------------------------
+# Clause-aware wrap (CP-1) — a connector never separates from its slot
+# ---------------------------------------------------------------------------
+
+def test_wrap_packs_groups_greedily_when_room():
+    # Plenty of width → everything stays on the first line.
+    lines = InChatActionBuilder._wrap_units(
+        [40.0, 30.0], avail=1000.0, gap=6.0, glued=[False, False]
+    )
+    assert lines == [0, 0]
+
+
+def test_wrap_non_glued_unit_starts_new_line_on_overflow():
+    # Two wide non-glued units that cannot share a line wrap normally.
+    lines = InChatActionBuilder._wrap_units(
+        [100.0, 100.0], avail=120.0, gap=6.0, glued=[False, False]
+    )
+    assert lines == [0, 1]
+
+
+def test_wrap_keeps_glued_connector_with_its_slot():
+    # Units: "<actor> will" | VERB | "the" | NOUN | ADVERB, NOUN glued to "the".
+    # avail fits "...will VERB the" but not the NOUN chip → the connector and its
+    # noun wrap to the next line *together* (no orphaned "the").
+    widths = [40.0, 30.0, 20.0, 100.0, 40.0]
+    glued = [False, False, False, True, False]
+    lines = InChatActionBuilder._wrap_units(
+        widths, avail=110.0, gap=6.0, glued=glued
+    )
+    assert lines[2] == lines[3]          # connector and noun share a line
+    assert lines[3] == lines[1] + 1      # they moved down together
+
+
+# ---------------------------------------------------------------------------
 # draw() records hit rects consistent with slots() / the action button
 # ---------------------------------------------------------------------------
 

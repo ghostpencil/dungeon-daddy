@@ -198,6 +198,40 @@ class InChatActionBuilder:
             lines.append("Memory: " + ", ".join(preview.memory_tags))
         return lines
 
+    @staticmethod
+    def _wrap_units(
+        widths: list[float],
+        avail: float,
+        gap: float,
+        glued: list[bool],
+    ) -> list[int]:
+        """Greedy line assignment for the command sentence (CP-1).
+
+        ``glued[i] is True`` keeps unit ``i`` on the same line as unit ``i-1`` —
+        used to bind a noun/target connector to the slot it precedes so a wrap
+        never orphans the connector. Units are grouped by their glue chains and
+        each *group* is placed greedily; a group that would overflow ``avail``
+        starts a new line as a unit. Returns the 0-based line index per unit.
+        """
+        groups: list[list[int]] = []
+        for i in range(len(widths)):
+            if i > 0 and glued[i]:
+                groups[-1].append(i)
+            else:
+                groups.append([i])
+        lines = [0] * len(widths)
+        line = 0
+        cur_x = 0.0
+        for group in groups:
+            group_w = sum(widths[i] for i in group) + gap * (len(group) - 1)
+            if cur_x > 0 and cur_x + group_w > avail:
+                line += 1
+                cur_x = 0.0
+            for i in group:
+                lines[i] = line
+            cur_x += group_w + gap
+        return lines
+
     def _target_connector(self) -> str:
         verb_label = (self._panel.selected_verb_label() or "").lower()
         return _TARGET_CONNECTORS.get(verb_label, _DEFAULT_TARGET_CONNECTOR)
@@ -242,8 +276,8 @@ class InChatActionBuilder:
 
         left = x + PAD_MD
         right = x + w - PAD_MD
-        cur_x = left
-        cur_y = y + h - 16  # baseline of the first sentence row (chip centre)
+        top_y = y + h - 16  # baseline (chip centre) of the first sentence row
+        gap = 6.0
 
         _SLOT_TINT = {
             _KIND_VERB: VIOLET,
@@ -255,54 +289,61 @@ class InChatActionBuilder:
         def _text_w(s: str) -> float:
             return len(s) * self._CHAR_W
 
-        def _wrap(needed: float) -> None:
-            nonlocal cur_x, cur_y
-            if cur_x + needed > right:
-                cur_x = left
-                cur_y -= self._LINE_H
-
-        def _draw_text_token(s: str, color) -> None:
-            nonlocal cur_x
-            tw = _text_w(s)
-            _wrap(tw)
-            arcade.draw_text(
-                s, cur_x, cur_y, color,
-                font_size=TEXT_SM, font_name=FONT_UI, anchor_y="center",
-            )
-            cur_x += tw + 6
-
-        def _draw_slot(kind: str, label: str | None) -> None:
-            nonlocal cur_x
-            text = (label or "—")
+        # Build the command sentence as ordered draw units so wrapping can be
+        # clause-aware: "<Actor> will [VERB] the [NOUN] (conn [TARGET]) [ADVERB]".
+        # Each unit is (utype, payload, width, glued); a noun/target slot is glued
+        # to the connector that precedes it so a wrap never orphans the connector.
+        units: list[tuple[str, object, float, bool]] = []
+        actor = self._panel.acting_actor_name() or "—"
+        will = f"{actor} will"
+        units.append(("text", (will, INK_2), _text_w(will), False))
+        for kind, label in self.slots():
+            if kind == _KIND_NOUN:
+                conn = self._noun_connector()
+                units.append(("text", (conn, INK_3), _text_w(conn), False))
+            elif kind == _KIND_TARGET:
+                conn = self._target_connector()
+                units.append(("text", (conn, INK_3), _text_w(conn), False))
+            text = label or "—"
             if kind == _KIND_VERB:
                 text = text.upper()
             chip_w = _text_w(text) + PAD_SM * 2 + 14  # +14 for the ▾ affordance
-            _wrap(chip_w)
             tint = _SLOT_TINT.get(kind, INK_3)
-            draw_rounded_rect(
-                cur_x + chip_w / 2, cur_y, chip_w, self._CHIP_H, RADIUS_SM,
-                BG_3, border_color=tint, border_width=1,
-            )
-            arcade.draw_text(
-                f"{text} ▾", cur_x + chip_w / 2, cur_y, tint,
-                font_size=TEXT_SM, font_name=FONT_MONO,
-                anchor_x="center", anchor_y="center",
-            )
-            self._slot_rects.append(
-                (cur_x, cur_y - self._CHIP_H / 2, chip_w, self._CHIP_H, kind)
-            )
-            cur_x += chip_w + 6
+            glued = kind in (_KIND_NOUN, _KIND_TARGET)
+            units.append(("slot", (kind, text, tint, chip_w), chip_w, glued))
 
-        # Build the sentence: "<Actor> will [VERB] the [NOUN] (conn [TARGET]) [ADVERB]"
-        actor = self._panel.acting_actor_name() or "—"
-        _draw_text_token(f"{actor} will", INK_2)
-        slots = self.slots()
-        for i, (kind, label) in enumerate(slots):
-            if kind == _KIND_NOUN:
-                _draw_text_token(self._noun_connector(), INK_3)
-            elif kind == _KIND_TARGET:
-                _draw_text_token(self._target_connector(), INK_3)
-            _draw_slot(kind, label)
+        lines = self._wrap_units(
+            [u[2] for u in units], right - left, gap, [u[3] for u in units]
+        )
+
+        cur_line = 0
+        cur_x = left
+        for (utype, payload, width, _glued), line in zip(units, lines):
+            if line != cur_line:
+                cur_line = line
+                cur_x = left
+            cy = top_y - line * self._LINE_H
+            if utype == "text":
+                s, color = payload  # type: ignore[misc]
+                arcade.draw_text(
+                    s, cur_x, cy, color,
+                    font_size=TEXT_SM, font_name=FONT_UI, anchor_y="center",
+                )
+            else:
+                kind, text, tint, chip_w = payload  # type: ignore[misc]
+                draw_rounded_rect(
+                    cur_x + chip_w / 2, cy, chip_w, self._CHIP_H, RADIUS_SM,
+                    BG_3, border_color=tint, border_width=1,
+                )
+                arcade.draw_text(
+                    f"{text} ▾", cur_x + chip_w / 2, cy, tint,
+                    font_size=TEXT_SM, font_name=FONT_MONO,
+                    anchor_x="center", anchor_y="center",
+                )
+                self._slot_rects.append(
+                    (cur_x, cy - self._CHIP_H / 2, chip_w, self._CHIP_H, kind)
+                )
+            cur_x += width + gap
 
         # Action button — bottom-right of the band. Styling is adaptive: a
         # contested ROLL gets TEAL emphasis; a deterministic DO/MOVE/LOOK reads
