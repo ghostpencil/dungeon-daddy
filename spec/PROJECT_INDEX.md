@@ -130,6 +130,10 @@ in-chat builder until Slice 9 retires it.
   2. **CP-7 remove PREVIEW kicker** — the `draw_kicker` accent bar poked above the inset; dropped
      it and re-padded so the preview lines sit centred with symmetric top/bottom padding.
   Net −5 tests. Full UI+views unit suite green (953).
+  **Band height (decided 2026-06-25):** keep `_BUILDER_H` fixed at **180** — the freed suggested-
+  row space is intentional headroom for the top-anchored command sentence (~3 wrapped lines clear
+  the preview, covering transitive `V·N·T·A`). **Dynamic band height** (size to actual sentence
+  line count, kill the airy-when-short gap) is now a **Slice 11 requirement** (spec §9).
 - Then slices 7–11 (overlay, overlay→builder link, retire ACTION tab, SAY/ASK swap stub, polish +
   smoke test). **Slice 7:** replace the technical `_draw_detail_panel` content with the ready
   `room_things` view-model + a renderer; auto-track the current room; render the EXITS/OBJECTS/

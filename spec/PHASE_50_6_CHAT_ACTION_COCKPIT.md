@@ -299,7 +299,18 @@ Logic-first, then widgets via the ui-test harness. Each slice is one behavior.
 10. **SAY/ASK swap (stub)** — input surface swaps builder↔SAY box on a dialogue flag; `talk`
     verb gated to willing targets. (Conversation logic deferred to Phase 51.)
 11. **Polish + smoke test** — `tools/smoke_test_phase*.py` (Strategy A/B per TESTING.md); manual
-    visual verify by the user.
+    visual verify by the user. **Includes dynamic builder-band height** (see below) and the
+    short-window collapsible fallback (§4.1).
+
+> **Slice 11 requirement — dynamic band height.** `_BUILDER_H` is currently a fixed **180px**
+> (chosen 2026-06-25 after CP-6 freed the suggested-row space). At 180 the top-anchored command
+> sentence has room for ~3 wrapped lines before its lowest chip collides with the bottom-anchored
+> preview inset — which covers the realistic worst case (transitive `V·N·T·A` with long labels).
+> The cost is an airy gap when the sentence is short. Slice 11 should make the band **size to the
+> actual sentence line count** so the sentence↔preview gap stays constant: the builder must
+> *measure* its wrapped sentence height (the CP-1 `_wrap_units` line assignment already yields the
+> line count) and expose it so `chat_panel`'s layout (`_builder_extra_h`/`_BUILDER_H`) consults it
+> instead of a constant. This removes both the empty-gap-when-short and collision-when-long cases.
 
 ## 10. Non-goals
 
