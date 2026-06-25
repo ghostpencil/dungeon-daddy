@@ -4,8 +4,9 @@
 
 Phase **50 — Hybrid Action Model: COMPLETE & merged to `main`** (2026-06-23).
 Phase **50.5 — Use Noun on Noun: COMPLETE & merged to `main`** (PR #81, 2026-06-24).
-Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–6 committed (+ manual-verify
-fixes + Command-Sentence Polish CP-1…CP-5) on branch `phase-50.6` (2026-06-24). Slice 7 is next.
+Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–6 committed (+ manual-verify fixes
++ Command-Sentence Polish CP-1…CP-7, all user-verified) on branch `phase-50.6` (latest 2026-06-25).
+Slice 7 is next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -16,7 +17,8 @@ Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
 ## START HERE next session — Phase 50.6, Slice 7
 
 Continue with Slice 7 ("Things Here" overlay — replace detail content; auto-track current
-room; render sections). Slices 1–6 are committed.
+room; render sections). Slices 1–6 + the Command-Sentence Polish track (CP-1…CP-7) are committed
+and user-verified; the builder band is settled (see the CP-6/CP-7 + band-height log below).
 
 Spec is `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md` (read it; design decisions are locked in §3).
 Phase 50.6 is a **BUILD add-on** (dynamic, like 50.5 — not on the 51–53 roadmap, no issue).
