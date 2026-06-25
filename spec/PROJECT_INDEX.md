@@ -49,7 +49,7 @@ in-chat builder until Slice 9 retires it.
   (teal/ember/gold/default); objects get hazard glyph `⚠` when disturbed/armed; creatures
   prefer `disposition` over actor `status`; key-gated open exits read "locked"; items gold;
   synthetic self/room (+ ally party) dropped; empty sections omitted. Full rpg unit suite green.
-- **Slice 4 — DONE (uncommitted; first widget slice):** Builder widget relocation (spec §4.1–4.3).
+- **Slice 4 — DONE** (commit `43456f2`; first widget slice): Builder widget relocation (spec §4.1–4.3).
   New `dungeon_daddy/ui/panels/action_builder.py` → `InChatActionBuilder`, which **reuses
   `VnaActionPanel`'s Arcade-free logic core verbatim** (`*_labels()`/`select_*_by_label()`/
   `submit()`) and adds only a presentational layer: wrapped command sentence ("`<Actor>` will
@@ -67,7 +67,7 @@ in-chat builder until Slice 9 retires it.
   placeholder (Slice 6 makes it adaptive ROLL/DO/MOVE/LOOK via `action_preview`); band height not
   yet responsive/collapsible (Slice 11). **Not done:** ui-test-harness visual check — user
   verifies the GUI manually (`python -m dungeon_daddy` → Play mode, room loaded).
-- **Slice 5 — DONE (commit pending this session):** Suggested-verbs row (spec §4.4) in
+- **Slice 5 — DONE** (commit `96f2db0`): Suggested-verbs row (spec §4.4) in
   `InChatActionBuilder`. `suggested_verbs() -> list[(label, enabled)]` ranks verbs **applicable
   to the selected noun** (`verbs_for_noun`) first/enabled, the rest tagged disabled; `draw()`
   applies the ~5 cap (VIOLET chips; greyed `INK_4` when disabled) and records `_suggested_rects`;
