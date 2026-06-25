@@ -5,7 +5,7 @@
 Phase **50 — Hybrid Action Model: COMPLETE & merged to `main`** (2026-06-23).
 Phase **50.5 — Use Noun on Noun: COMPLETE & merged to `main`** (PR #81, 2026-06-24).
 Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–6 committed (+ manual-verify
-fixes) on branch `phase-50.6` (2026-06-24). Slice 7 is next.
+fixes + Command-Sentence Polish CP-1…CP-5) on branch `phase-50.6` (2026-06-24). Slice 7 is next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -102,6 +102,24 @@ in-chat builder until Slice 9 retires it.
      at the top. Band height `_BUILDER_H` settled at **180** (was bumped 150→200 in Slice 6, then
      trimmed). A decorative frame to highlight the builder region is a later polish.
   4 new unit tests. Full UI+views unit suite green (952).
+- **Command-Sentence Polish (CP-1…CP-5) — DONE** (commits `3a5851f`, `5a0e82d`, `4dd12ad`; user
+  verified the GUI). A design-review pass on the in-chat builder's command sentence (Surface 1
+  refinement; pulls Slice 11 polish forward, respects locked spec §8 color scheme — keeps per-slot
+  tints rather than removing color coding). All in `InChatActionBuilder` draw layer + pure helpers:
+  1. **CP-1 clause-aware wrap** — pure `_wrap_units` (keep-with-previous grouping) glues a
+     noun/target connector to its slot so a wrap never orphans "the"/"on the"/"to"; `draw()`
+     rewired from per-token wrap to a two-pass unit layout. 3 unit tests.
+  2. **CP-2 adverb contrast** — adverb slot tint `INK_3`→`INK_2` (spec §8 alignment; was shipped
+     dim). All slots share identical chrome (BG_3 fill, 1px border, ▾ caret) so the tint is the
+     only role differentiator and the adverb reads as editable, not static. Visual.
+  3. **CP-3 empty-slot placeholder** — an unset slot draws its dim `INK_4` role word
+     ("verb"/"noun"/"target"/"how") instead of "—". New `slot_is_unset(kind)` predicate + 2 tests.
+  4. **CP-4 suggested active-fill** — the suggested chip matching the current verb draws filled
+     (vs outlined), distinguishing the quick-pick row from the verb slot (spec §8 "selected =
+     filled"). New `_suggested_is_active(label)` + 1 test.
+  5. **CP-5 connector calm** — actor name kept `INK_2` (content), "will" dropped to `INK_3` to
+     match the other glue words; all function words now one quiet weight. Visual.
+  6 new unit tests total. Full UI+views unit suite green (958).
 - Then slices 7–11 (overlay, overlay→builder link, retire ACTION tab, SAY/ASK swap stub, polish +
   smoke test). **Slice 7:** replace the technical `_draw_detail_panel` content with the ready
   `room_things` view-model + a renderer; auto-track the current room; render the EXITS/OBJECTS/
