@@ -182,6 +182,15 @@ def test_click_enabled_suggested_chip_sets_verb():
     assert builder._panel.selected_verb_label() == "Fight"
 
 
+def test_suggested_chip_active_when_label_matches_selected_verb():
+    # The suggested chip for the currently-selected verb is "active" → drawn
+    # filled (CP-4), distinguishing the quick-pick row from the verb slot.
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    builder._panel.select_verb("study")  # label "Study"
+    assert builder._suggested_is_active("Study") is True
+    assert builder._suggested_is_active("Fight") is False
+
+
 def test_click_disabled_suggested_chip_is_noop():
     builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
     builder._panel.select_noun("mon-1")

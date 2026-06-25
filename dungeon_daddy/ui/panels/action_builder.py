@@ -141,6 +141,16 @@ class InChatActionBuilder:
             + [(v.label, False) for v in disabled]
         )
 
+    def _suggested_is_active(self, label: str) -> bool:
+        """True when a suggested chip matches the current verb selection.
+
+        The active chip is drawn *filled* (vs the outlined slots and other
+        suggestions) to show which verb is current and to distinguish the
+        quick-pick row from the verb dropdown slot (CP-4, spec §8 "selected =
+        filled").
+        """
+        return label == self._panel.selected_verb_label()
+
     def _select(self, kind: str, label: str) -> None:
         if kind == _KIND_VERB:
             self._panel.select_verb_by_label(label)
@@ -325,8 +335,11 @@ class InChatActionBuilder:
         # to the connector that precedes it so a wrap never orphans the connector.
         units: list[tuple[str, object, float, bool]] = []
         actor = self._panel.acting_actor_name() or "—"
-        will = f"{actor} will"
-        units.append(("text", (will, INK_2), _text_w(will), False))
+        # The actor name is content (INK_2); "will" is a glue word and shares the
+        # quiet INK_3 weight of the other connectors so the sentence reads evenly
+        # (CP-5). "will" is glued to the name so it never wraps away from it.
+        units.append(("text", (actor, INK_2), _text_w(actor), False))
+        units.append(("text", ("will", INK_3), _text_w("will"), True))
         for kind, label in self.slots():
             if kind == _KIND_NOUN:
                 conn = self._noun_connector()
@@ -435,12 +448,17 @@ class InChatActionBuilder:
             if sug_x + chip_w > right:
                 break
             tint = VIOLET if enabled else INK_4
+            # Active = the chip for the current verb → filled (spec §8); other
+            # chips stay outlined so the row reads distinct from the verb slot.
+            active = enabled and self._suggested_is_active(s_label)
+            fill = tint if active else BG_3
+            text_color = BG_1 if active else tint
             draw_rounded_rect(
                 sug_x + chip_w / 2, sug_y, chip_w, self._CHIP_H, RADIUS_SM,
-                BG_3, border_color=tint, border_width=1,
+                fill, border_color=tint, border_width=1,
             )
             arcade.draw_text(
-                text, sug_x + chip_w / 2, sug_y, tint,
+                text, sug_x + chip_w / 2, sug_y, text_color,
                 font_size=TEXT_SM, font_name=FONT_MONO,
                 anchor_x="center", anchor_y="center",
             )
