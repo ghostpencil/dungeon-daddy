@@ -29,6 +29,11 @@ _KIND_ADVERB = "adverb"
 _TARGET_CONNECTORS = {"use": "on the", "give": "to"}
 _DEFAULT_TARGET_CONNECTOR = "with"
 
+# Connector word drawn before the Noun slot. Most verbs read "<verb> the <noun>";
+# a few read better with a preposition (e.g. "look at the symbols").
+_NOUN_CONNECTORS = {"look": "at the"}
+_DEFAULT_NOUN_CONNECTOR = "the"
+
 
 class InChatActionBuilder:
     def __init__(self, panel: VnaActionPanel) -> None:
@@ -197,6 +202,10 @@ class InChatActionBuilder:
         verb_label = (self._panel.selected_verb_label() or "").lower()
         return _TARGET_CONNECTORS.get(verb_label, _DEFAULT_TARGET_CONNECTOR)
 
+    def _noun_connector(self) -> str:
+        verb_label = (self._panel.selected_verb_label() or "").lower()
+        return _NOUN_CONNECTORS.get(verb_label, _DEFAULT_NOUN_CONNECTOR)
+
     # ------------------------------------------------------------------
     # Arcade draw layer (display required; exercised via the ui-test harness)
     # ------------------------------------------------------------------
@@ -290,7 +299,7 @@ class InChatActionBuilder:
         slots = self.slots()
         for i, (kind, label) in enumerate(slots):
             if kind == _KIND_NOUN:
-                _draw_text_token("the", INK_3)
+                _draw_text_token(self._noun_connector(), INK_3)
             elif kind == _KIND_TARGET:
                 _draw_text_token(self._target_connector(), INK_3)
             _draw_slot(kind, label)

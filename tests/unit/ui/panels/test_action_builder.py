@@ -264,6 +264,22 @@ def test_preview_lines_empty_without_a_card():
 
 
 # ---------------------------------------------------------------------------
+# Noun connector — "Look at the …" reads better than "Look the …"
+# ---------------------------------------------------------------------------
+
+def test_look_verb_uses_at_the_noun_connector():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    builder._panel.select_verb("look")
+    assert builder._noun_connector() == "at the"
+
+
+def test_default_noun_connector_is_the():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    builder._panel.select_verb("study")
+    assert builder._noun_connector() == "the"
+
+
+# ---------------------------------------------------------------------------
 # draw() records hit rects consistent with slots() / the action button
 # ---------------------------------------------------------------------------
 

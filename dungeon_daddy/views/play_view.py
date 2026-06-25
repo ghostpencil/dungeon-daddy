@@ -687,6 +687,11 @@ class PlayView(arcade.View):
         self._rpg_campaign_id = campaign_id
         self._portraits_dir = portraits_dir
         self._load_player_actors()
+        # set_rpg_context runs *after* load_dungeon_session (where _focus_party_room
+        # fires while _mem_repo is still None), so this is the first point where the
+        # room, actors, and repo are all available. Populate the in-chat Action
+        # Builder now so it is usable on load — not only after the ACTION tab opens.
+        self._refresh_vna_panel()
 
     def _sync_debug_level_id(self) -> None:
         if self._rpg_debug is None or self._state is None:

@@ -88,6 +88,23 @@ def test_refresh_vna_panel_surfaces_exit_as_noun(tmp_path):
     assert "e1" in noun_ids
 
 
+def test_set_rpg_context_populates_action_builder_on_load(tmp_path):
+    # On load the in-chat builder must be ready without first opening the
+    # right-panel ACTION tab: set_rpg_context is the chokepoint where mem_repo,
+    # actors, and the current room are all finally available, so it refreshes
+    # the VNA panel. (_load_player_actors is exercised by its own tests; stub it
+    # here to isolate the on-load refresh.)
+    view = _make_view(tmp_path)
+    _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="open")
+    view._load_player_actors = lambda: None
+    assert view._rpg_vna._verbs == []  # empty before context attaches
+
+    view.set_rpg_context(view._mem_repo, "camp-1")
+
+    assert view._rpg_vna._verbs  # builder now has its verb options
+    assert "e1" in {n.noun_id for n in view._rpg_vna._nouns}
+
+
 # ---------------------------------------------------------------------------
 # _refresh_vna_panel — hidden exits excluded; same-type exits disambiguated
 # ---------------------------------------------------------------------------
