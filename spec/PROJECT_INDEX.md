@@ -4,8 +4,8 @@
 
 Phase **50 — Hybrid Action Model: COMPLETE & merged to `main`** (2026-06-23).
 Phase **50.5 — Use Noun on Noun: COMPLETE & merged to `main`** (PR #81, 2026-06-24).
-Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–6 committed on branch
-`phase-50.6` (2026-06-24).
+Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–6 committed (+ manual-verify
+fixes) on branch `phase-50.6` (2026-06-24). Slice 7 is next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -86,13 +86,30 @@ in-chat builder until Slice 9 retires it.
   automatic"; a `Risk:` line only when a live room threat is present, drawn EMBER; a `Memory:`
   line of canonical tags) and an **adaptive `button_label()`** — `ROLL` when contested/no-card,
   else `MOVE`/`LOOK` for those verbs / `DO`. `draw()` renders a BG_1 PREVIEW inset above an
-  adaptive button (TEAL emphasis for ROLL; calmer BG_3/LINE/INK_2 for DO/MOVE/LOOK); band height
-  `_BUILDER_H` bumped 150→200 to fit. 8 new unit tests (button label per verb-class + 4
-  preview-line cases incl. empty-without-card). Full UI+views unit suite green (947).
+  adaptive button (TEAL emphasis for ROLL; calmer BG_3/LINE/INK_2 for DO/MOVE/LOOK). 8 new unit
+  tests (button label per verb-class + 4 preview-line cases incl. empty-without-card).
+- **Slice 6 manual-verify fixes — DONE** (commits `7c47b60`, `ba739e2`; user verified the GUI):
+  1. **Builder empty on load** → `set_rpg_context` now calls `_refresh_vna_panel()` as its last
+     step (it runs after `load_dungeon_session`, whose `_focus_party_room` fires while `_mem_repo`
+     is still `None`, so it is the first point room+actors+repo are all ready). Previously the
+     builder showed `— will [—] the [—]` until the right-panel ACTION tab was opened.
+  2. **Actor switch didn't update the sentence** → `_on_actor_switch` (the chat mini-card `< >`
+     picker) now also calls `_refresh_vna_panel()`, mirroring the CHAR-tab `_set_acting_actor`
+     path (skipped while awaiting confirmation).
+  3. **"Look the …" grammar** → builder gained a verb-specific `_noun_connector()`; LOOK reads
+     "<Actor> will Look **at the** <noun>" (default stays "the").
+  4. **"COMMAND SENTENCE" kicker removed** (read too technical, cost a row); sentence now starts
+     at the top. Band height `_BUILDER_H` settled at **180** (was bumped 150→200 in Slice 6, then
+     trimmed). A decorative frame to highlight the builder region is a later polish.
+  4 new unit tests. Full UI+views unit suite green (952).
 - Then slices 7–11 (overlay, overlay→builder link, retire ACTION tab, SAY/ASK swap stub, polish +
   smoke test). **Slice 7:** replace the technical `_draw_detail_panel` content with the ready
   `room_things` view-model + a renderer; auto-track the current room; render the EXITS/OBJECTS/
   CREATURES/ITEMS sections with status chips.
+
+  **Known not-yet-done (expected, not bugs):** the free-text **Ask box is still always visible** —
+  the contextual SAY/ASK swap is **Slice 10**; the builder band is **not yet responsive/
+  collapsible** on short windows (Slice 11).
 
 After 50.6: **Phase 51 — Talk to the Dungeon** (roadmap; 50.6 carves the SAY/ASK input seam).
 Write `spec/PHASE_51_*.md` when starting.
