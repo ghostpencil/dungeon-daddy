@@ -7,7 +7,7 @@ Phase **50.5 — Use Noun on Noun: COMPLETE & merged to `main`** (PR #81, 2026-0
 Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–8 committed and **user-verified**
 (+ manual-verify fixes + Command-Sentence Polish CP-1…CP-7; Slice 8 incl. three UX rounds, all
 user-verified); **Slice 9 (retire ACTION tab) DONE & GUI-verified; EXITS/Move tab also retired** on
-branch `phase-50.6` (latest 2026-06-25). Slice 10 is next.
+branch `phase-50.6` (latest 2026-06-26). Slice 10 is next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
