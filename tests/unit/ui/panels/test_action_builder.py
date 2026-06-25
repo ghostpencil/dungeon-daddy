@@ -153,6 +153,46 @@ def test_click_action_button_submits_valid_card():
 
 
 # ---------------------------------------------------------------------------
+# Suggested-verbs row (Slice 5) — quick-pick chips filtered by the selected noun
+# ---------------------------------------------------------------------------
+
+def test_suggested_verbs_tag_applicable_enabled_inapplicable_disabled():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    builder._panel.select_noun("mon-1")  # a creature noun (source "monster")
+    tags = dict(builder.suggested_verbs())
+    # "move" only targets exits → disabled for a creature.
+    assert tags["Move"] is False
+    # A skill verb is unrestricted → enabled.
+    assert tags["Study"] is True
+
+
+def test_suggested_verbs_rank_applicable_before_disabled():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    builder._panel.select_noun("mon-1")
+    flags = [enabled for _label, enabled in builder.suggested_verbs()]
+    # Applicable (enabled) verbs are ranked ahead of the disabled remainder.
+    assert flags == sorted(flags, reverse=True)
+
+
+def test_click_enabled_suggested_chip_sets_verb():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    builder._suggested_rects = [(0.0, 0.0, 60.0, 20.0, "Fight", True)]
+    result = builder.on_mouse_press(30.0, 10.0)
+    assert result is True
+    assert builder._panel.selected_verb_label() == "Fight"
+
+
+def test_click_disabled_suggested_chip_is_noop():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    builder._panel.select_noun("mon-1")
+    before = builder._panel.selected_verb_label()
+    builder._suggested_rects = [(0.0, 0.0, 60.0, 20.0, "Move", False)]
+    result = builder.on_mouse_press(30.0, 10.0)
+    assert result is True
+    assert builder._panel.selected_verb_label() == before
+
+
+# ---------------------------------------------------------------------------
 # draw() records hit rects consistent with slots() / the action button
 # ---------------------------------------------------------------------------
 
@@ -166,3 +206,8 @@ def test_draw_records_slot_and_button_rects(monkeypatch):
         builder.draw(0.0, 0.0, 440.0, 200.0)
     assert [r[4] for r in builder._slot_rects] == ["verb", "noun", "adverb"]
     assert builder._button_rect is not None
+    # Suggested-verbs chips recorded, capped, and labelled from the verb pool.
+    assert builder._suggested_rects
+    assert len(builder._suggested_rects) <= InChatActionBuilder._SUGGESTED_CAP
+    verb_labels = set(builder._panel.verb_labels())
+    assert all(r[4] in verb_labels for r in builder._suggested_rects)

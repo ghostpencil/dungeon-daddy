@@ -4,8 +4,8 @@
 
 Phase **50 — Hybrid Action Model: COMPLETE & merged to `main`** (2026-06-23).
 Phase **50.5 — Use Noun on Noun: COMPLETE & merged to `main`** (PR #81, 2026-06-24).
-Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–3 committed; Slice 4 implemented
-(uncommitted) on branch `phase-50.6` (2026-06-24).
+Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–5 committed on branch
+`phase-50.6` (2026-06-24).
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -13,10 +13,9 @@ Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
 
 ---
 
-## START HERE next session — Phase 50.6, Slice 5
+## START HERE next session — Phase 50.6, Slice 6
 
-**First: commit Slice 4** (implemented but uncommitted — see Slice 4 entry below for the diff).
-Then continue with Slice 5.
+Continue with Slice 6 (preview render + adaptive button). Slices 1–5 are committed.
 
 Spec is `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md` (read it; design decisions are locked in §3).
 Phase 50.6 is a **BUILD add-on** (dynamic, like 50.5 — not on the 51–53 roadmap, no issue).
@@ -68,13 +67,22 @@ in-chat builder until Slice 9 retires it.
   placeholder (Slice 6 makes it adaptive ROLL/DO/MOVE/LOOK via `action_preview`); band height not
   yet responsive/collapsible (Slice 11). **Not done:** ui-test-harness visual check — user
   verifies the GUI manually (`python -m dungeon_daddy` → Play mode, room loaded).
-- **Slice 5 — NEXT:** Suggested-verbs row (spec §4.4) — quick-select chips below the sentence,
-  **filtered by the selected noun** via the ready `verbs_for_noun` helper; clicking a chip sets
-  the Verb slot (same as the verb popup); inapplicable verbs render disabled (`INK_4`), capped at
-  ~5 by relevance. Add to `InChatActionBuilder` (chips + hit-testing) reusing the rect-list
-  pattern; unit-test chip selection + disabled state.
+- **Slice 5 — DONE (commit pending this session):** Suggested-verbs row (spec §4.4) in
+  `InChatActionBuilder`. `suggested_verbs() -> list[(label, enabled)]` ranks verbs **applicable
+  to the selected noun** (`verbs_for_noun`) first/enabled, the rest tagged disabled; `draw()`
+  applies the ~5 cap (VIOLET chips; greyed `INK_4` when disabled) and records `_suggested_rects`;
+  `on_mouse_press` routes an **enabled** chip → `select_verb_by_label` (a disabled chip consumes
+  the click but is a no-op). Two new presentational read-accessors on `VnaActionPanel`
+  (`verb_options()`, `selected_noun_option()`). 5 new unit tests (chip tagging, applicable-ranked-
+  first, enabled-click-sets-verb, disabled-click-noop, draw-records-capped-rects). **Design note:**
+  the pool always has 8+ always-applicable universal verbs, so `suggested_verbs()` returns the
+  **full** ranked list (disabled tags stay testable) and the cap lives in `draw()` — in the live
+  app the drawn ~5 are normally all enabled. Full UI+views+rpg unit suite green (1525).
 - Then slices 6–11 (preview render + adaptive button, overlay, overlay→builder link, retire
-  ACTION tab, SAY/ASK swap stub, polish + smoke test).
+  ACTION tab, SAY/ASK swap stub, polish + smoke test). **Slice 6:** wire the ready `action_preview`
+  helper into a PREVIEW inset (likely-roll / templated risk / memory tags) + make the action
+  button adaptive (`ROLL` vs `DO`/`MOVE`/`LOOK` from `requires_roll`); `button_label()` is still
+  the `"ROLL"` placeholder.
 
 After 50.6: **Phase 51 — Talk to the Dungeon** (roadmap; 50.6 carves the SAY/ASK input seam).
 Write `spec/PHASE_51_*.md` when starting.

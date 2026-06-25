@@ -14,6 +14,7 @@ rect-list pattern as :mod:`chat_panel`.
 """
 from __future__ import annotations
 
+from dungeon_daddy.rpg.action_options import verbs_for_noun
 from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
 
 # Slot kinds, in the order they appear in the command sentence. ``target`` is
@@ -34,10 +35,14 @@ class InChatActionBuilder:
         self._panel = panel
         # The slot currently showing its popup list, or ``None`` when closed.
         self._open_slot: str | None = None
-        # Hit rects populated by draw(): slots, the open popup's rows, the button.
+        # Hit rects populated by draw(): slots, the open popup's rows, the button,
+        # and the suggested-verb chips (carry a label + enabled flag).
         self._slot_rects: list[tuple[float, float, float, float, str]] = []
         self._popup_row_rects: list[tuple[float, float, float, float, str]] = []
         self._button_rect: tuple[float, float, float, float] | None = None
+        self._suggested_rects: list[
+            tuple[float, float, float, float, str, bool]
+        ] = []
 
     # ------------------------------------------------------------------
     # Command sentence model (drawn + hit-tested)
@@ -77,6 +82,35 @@ class InChatActionBuilder:
             return self._panel.adverb_labels()
         return []
 
+    # ------------------------------------------------------------------
+    # Suggested-verbs row — quick-pick chips filtered by the selected noun
+    # ------------------------------------------------------------------
+
+    # Max suggested chips drawn (the ~5 "by relevance" cap is applied in draw();
+    # the model below returns the full ranked list so disabled tags stay testable).
+    _SUGGESTED_CAP = 5
+
+    def suggested_verbs(self) -> list[tuple[str, bool]]:
+        """Relevance-ranked ``(label, enabled)`` verb chips for the selected noun.
+
+        Verbs that may target the current noun (:func:`verbs_for_noun`) are
+        enabled and ranked first; the remaining offered verbs are tagged disabled
+        so the widget can grey them as hints. Clicking an enabled chip sets the
+        Verb slot (same effect as the verb popup); ``draw`` shows the first
+        :attr:`_SUGGESTED_CAP`.
+        """
+        verbs = self._panel.verb_options()
+        noun = self._panel.selected_noun_option()
+        if noun is None:
+            return [(v.label, True) for v in verbs]
+        applicable = verbs_for_noun(noun, verbs)
+        enabled = {v.verb for v in applicable}
+        disabled = [v for v in verbs if v.verb not in enabled]
+        return (
+            [(v.label, True) for v in applicable]
+            + [(v.label, False) for v in disabled]
+        )
+
     def _select(self, kind: str, label: str) -> None:
         if kind == _KIND_VERB:
             self._panel.select_verb_by_label(label)
@@ -102,6 +136,13 @@ class InChatActionBuilder:
             # A click anywhere else while a popup is open dismisses it.
             self._open_slot = None
             return True
+        for left, bottom, w, h, label, enabled in self._suggested_rects:
+            if left <= x < left + w and bottom <= y < bottom + h:
+                # Enabled chip sets the Verb slot; a disabled chip is a no-op
+                # but still consumes the click (it sits inside the band).
+                if enabled:
+                    self._panel.select_verb_by_label(label)
+                return True
         for left, bottom, w, h, kind in self._slot_rects:
             if left <= x < left + w and bottom <= y < bottom + h:
                 self._open_slot = kind
@@ -144,7 +185,7 @@ class InChatActionBuilder:
         """
         import arcade
         from dungeon_daddy.ui.theme import (
-            BG_1, BG_2, BG_3, FONT_MONO, FONT_UI, INK_2, INK_3,
+            BG_1, BG_2, BG_3, FONT_MONO, FONT_UI, INK_2, INK_3, INK_4,
             LINE, LINE_HI, PAD_MD, PAD_SM, RADIUS_SM, TEAL, TEXT_SM,
             VIOLET, draw_kicker, draw_rounded_rect,
         )
@@ -152,6 +193,7 @@ class InChatActionBuilder:
         self._slot_rects = []
         self._popup_row_rects = []
         self._button_rect = None
+        self._suggested_rects = []
 
         # Panel background + kicker
         arcade.draw_rect_filled(arcade.XYWH(x + w / 2, y + h / 2, w, h), BG_2)
@@ -221,6 +263,34 @@ class InChatActionBuilder:
             elif kind == _KIND_TARGET:
                 _draw_text_token(self._target_connector(), INK_3)
             _draw_slot(kind, label)
+
+        # Suggested-verbs quick-pick row — applicable verbs tinted VIOLET, the
+        # rest greyed (INK_4). Capped for width; sits above the action button.
+        sug_y = y + 46
+        arcade.draw_text(
+            "Suggested:", left, sug_y, INK_3,
+            font_size=TEXT_SM, font_name=FONT_UI, anchor_y="center",
+        )
+        sug_x = left + _text_w("Suggested:") + 8
+        for s_label, enabled in self.suggested_verbs()[: self._SUGGESTED_CAP]:
+            text = s_label.upper()
+            chip_w = _text_w(text) + PAD_SM * 2
+            if sug_x + chip_w > right:
+                break
+            tint = VIOLET if enabled else INK_4
+            draw_rounded_rect(
+                sug_x + chip_w / 2, sug_y, chip_w, self._CHIP_H, RADIUS_SM,
+                BG_3, border_color=tint, border_width=1,
+            )
+            arcade.draw_text(
+                text, sug_x + chip_w / 2, sug_y, tint,
+                font_size=TEXT_SM, font_name=FONT_MONO,
+                anchor_x="center", anchor_y="center",
+            )
+            self._suggested_rects.append(
+                (sug_x, sug_y - self._CHIP_H / 2, chip_w, self._CHIP_H, s_label, enabled)
+            )
+            sug_x += chip_w + 6
 
         # Action button — bottom-right of the band
         btn_w, btn_h = 64.0, 24.0

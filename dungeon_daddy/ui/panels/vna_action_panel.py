@@ -223,6 +223,14 @@ class VnaActionPanel:
         """Human-readable label for an offered noun id (for narration/messages)."""
         return next((n.label for n in self._nouns if n.noun_id == noun_id), None)
 
+    def verb_options(self) -> list[VerbOption]:
+        """The full offered verb options (for relevance-ranked suggestion chips)."""
+        return list(self._verbs)
+
+    def selected_noun_option(self) -> NounOption | None:
+        """The currently-selected noun option, or ``None`` when no noun is set."""
+        return self._selected_noun()
+
     def _selected_noun(self) -> NounOption | None:
         return next((n for n in self._nouns if n.noun_id == self._noun_id), None)
 
