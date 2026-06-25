@@ -353,6 +353,81 @@ def test_graph_mode_default_still_uses_graph_metadata() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Phase 50.6 Slice 8 — overlay→builder link: clickable rows + selection ring
+# ---------------------------------------------------------------------------
+
+def _play_setup():
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+    rooms = {"R1": _room("R1")}
+    result = _result(rooms=rooms)
+    view_state = GraphViewState()
+    view_state.select_room("R1")
+    return result, view_state
+
+
+def _teal_outline_count(mock_arcade) -> int:
+    from dungeon_daddy.ui.theme import TEAL
+    return sum(
+        1 for c in mock_arcade.draw_rect_outline.call_args_list
+        if (c.args[1] if len(c.args) > 1 else c.kwargs.get("color")) == TEAL
+    )
+
+
+def test_play_mode_records_thing_rect_for_noun() -> None:
+    result, view_state = _play_setup()
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.draw_chip"), \
+            patch("dungeon_daddy.map.layout_renderer.arcade"):
+        renderer.draw(
+            result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
+            mode="play", room_things=_room_things(),
+        )
+
+    assert "e1" in renderer.thing_rects()
+
+
+def test_play_mode_selected_row_draws_extra_teal_ring() -> None:
+    result, view_state = _play_setup()
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.draw_chip"), \
+            patch("dungeon_daddy.map.layout_renderer.arcade") as mock_unselected:
+        renderer.draw(
+            result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
+            mode="play", room_things=_room_things(),
+        )
+        baseline = _teal_outline_count(mock_unselected)
+
+    with patch("dungeon_daddy.map.layout_renderer.draw_chip"), \
+            patch("dungeon_daddy.map.layout_renderer.arcade") as mock_selected:
+        renderer.draw(
+            result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
+            mode="play", room_things=_room_things(), selected_noun_id="e1",
+        )
+        with_ring = _teal_outline_count(mock_selected)
+
+    assert with_ring == baseline + 1
+
+
+def test_play_mode_footer_shows_suggested_verbs() -> None:
+    result, view_state = _play_setup()
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.draw_chip"), \
+            patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(
+            result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
+            mode="play", room_things=_room_things(),
+            selected_noun_id="e1", suggested_verbs=["MOVE", "LOOK"],
+        )
+        all_text = " ".join(str(c) for c in mock_arcade.draw_text.call_args_list)
+
+    assert "MOVE" in all_text
+    assert "Marketplace Arch" in all_text
+
+
+# ---------------------------------------------------------------------------
 # Cycle 12 — secret connection uses lower alpha than normal
 # ---------------------------------------------------------------------------
 

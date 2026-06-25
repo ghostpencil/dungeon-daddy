@@ -4,9 +4,9 @@
 
 Phase **50 — Hybrid Action Model: COMPLETE & merged to `main`** (2026-06-23).
 Phase **50.5 — Use Noun on Noun: COMPLETE & merged to `main`** (PR #81, 2026-06-24).
-Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–7 committed (+ manual-verify fixes
-+ Command-Sentence Polish CP-1…CP-7, all user-verified) on branch `phase-50.6` (latest 2026-06-25).
-Slice 8 is next.
+Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–8 committed (+ manual-verify fixes
++ Command-Sentence Polish CP-1…CP-7; Slices 1–7 + CP track user-verified, Slice 8 awaiting GUI
+verify) on branch `phase-50.6` (latest 2026-06-25). Slice 9 is next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -14,13 +14,15 @@ Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
 
 ---
 
-## START HERE next session — Phase 50.6, Slice 8
+## START HERE next session — Phase 50.6, Slice 9
 
-Continue with Slice 8 ("Overlay→builder link" — clicking a noun row in the map overlay fills the
-builder's noun slot + refreshes options; clicked row shows a TEAL selection ring; overlay footer
-mirrors `verbs_for_noun` for the selected noun + states the contract, spec §5.3). Slices 1–7 +
-the Command-Sentence Polish track (CP-1…CP-7) are committed and user-verified; the builder band is
-settled (see the CP-6/CP-7 + band-height log below).
+Continue with Slice 9 ("Retire ACTION tab" — remove the right-panel ACTION tab now that the
+in-chat builder is the single source of truth; re-wire the submit callback to the in-chat builder;
+keep CHAR/Scene/Fallout/Memory/Debug tabs; suite stays green, spec §7 + §9). Slices 1–8 are
+committed; Slices 1–7 + the Command-Sentence Polish track (CP-1…CP-7) are user-verified. **Slice 8
+still needs a GUI manual-verify** (`python -m dungeon_daddy` → Play mode: click a "Things Here" row
+→ the row gets a TEAL ring, the in-chat builder's noun slot fills, and the overlay footer lists
+that noun's suggested verbs + the contract line).
 
 Spec is `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md` (read it; design decisions are locked in §3).
 Phase 50.6 is a **BUILD add-on** (dynamic, like 50.5 — not on the 51–53 roadmap, no issue).
@@ -159,9 +161,29 @@ in-chat builder until Slice 9 retires it.
   map layer takes no RPG imports beyond the dataclass type. 9 new tests (3 helper, 3 renderer incl.
   graph-mode regression, 2 MapPanel draw-forwarding, 1 play_view feeds-overlay; + carried-exclusion
   test inverted). Full unit suite green (2916).
-- Then slices 8–11 (overlay→builder link, retire ACTION tab, SAY/ASK swap stub, polish + smoke
-  test). **Slice 8:** clicking a noun row → builder `select_noun` + refresh; TEAL selection ring on
-  the clicked row; overlay footer mirrors `verbs_for_noun` for the selected noun (spec §5.3).
+- **Slice 8 — DONE** (overlay→builder link, spec §5.3; awaiting GUI verify). Clicking a "Things
+  Here" row now fills the in-chat builder's noun slot, rings the clicked row TEAL, and mirrors that
+  noun's suggested verbs in the overlay footer. Four TDD cycles: (1) **view-model** —
+  `detail_panel_renderer.PanelLine` gains `noun_id` + `selected`; `format_things_here(things,
+  selected_noun_id, suggested_verbs)` flags the selected row and appends a footer (`Selected: <label>`
+  / `Suggested: <verbs>` / "Clicking a noun feeds the action builder."); footer only when a noun is
+  selected. (2) **renderer** — `LayoutRenderer.draw` forwards `selected_noun_id`/`suggested_verbs` to
+  `format_things_here`; `_draw_detail_panel` records per-row **screen rects** keyed by `noun_id`
+  (exposed via `thing_rects()`, reset each draw) and draws a TEAL ring (`_SELECTION_WIDTH`) on the
+  selected row. (3) **MapPanel** — new `on_noun_click` ctor callback; `set_things_here` gains
+  `selected_noun_id`/`suggested_verbs` (passed through to the renderer, gated to the current level);
+  `handle_mouse_press` hit-tests `thing_rects()` **first** in play mode so overlay rows take priority
+  over the room/edge select underneath. (4) **play_view** — `_on_overlay_noun_click(noun_id)` calls
+  `self._rpg_vna.select_noun` then a new lighter `_push_things_here_overlay()` (rebuilds `RoomThings`
+  from the **retained** `_last_room_context`/`_last_actor_dict` + reads the panel's selection +
+  `verbs_for_noun` capped at `_OVERLAY_SUGGESTED_CAP=4`) — deliberately **not** a full
+  `_refresh_vna_panel`, because `set_context` resets the noun to default. `_refresh_vna_panel` now
+  retains that context and routes its overlay feed through the same helper; `on_noun_click` is wired
+  into the `MapPanel(...)` ctor. **Design note:** a real move still does a full refresh → resets to
+  the default noun (correct); only a click selects-and-re-pushes without rebuilding. 15 new tests
+  (5 view-model, 3 renderer, 4 MapPanel, 3 play_view). Full unit suite green (2931).
+- Then slices 9–11 (retire ACTION tab, SAY/ASK swap stub, polish + smoke test). **Slice 9:** remove
+  the right-panel ACTION tab, re-wire submit to the in-chat builder, suite stays green (spec §7).
 
   **Known not-yet-done (expected, not bugs):** the free-text **Ask box is still always visible** —
   the contextual SAY/ASK swap is **Slice 10**; the builder band is **not yet responsive/

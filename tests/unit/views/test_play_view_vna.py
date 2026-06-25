@@ -108,6 +108,48 @@ def test_refresh_vna_panel_feeds_things_here_overlay(tmp_path):
     assert "e1" in exit_ids
 
 
+# ---------------------------------------------------------------------------
+# Phase 50.6 Slice 8 — overlay noun click feeds the builder
+# ---------------------------------------------------------------------------
+
+def test_overlay_noun_click_selects_noun_on_builder(tmp_path):
+    view = _make_view(tmp_path)
+    view._map = MagicMock()
+    _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="open")
+    view._refresh_vna_panel()
+
+    view._on_overlay_noun_click("e1")
+
+    assert view._rpg_vna._noun_id == "e1"
+
+
+def test_overlay_noun_click_refreshes_overlay(tmp_path):
+    view = _make_view(tmp_path)
+    view._map = MagicMock()
+    _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="open")
+    view._refresh_vna_panel()
+    view._map.set_things_here.reset_mock()
+
+    view._on_overlay_noun_click("e1")
+
+    view._map.set_things_here.assert_called_once()
+
+
+def test_click_feeds_selected_noun_and_suggested_verbs_to_overlay(tmp_path):
+    view = _make_view(tmp_path)
+    view._map = MagicMock()
+    _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="open")
+    view._refresh_vna_panel()
+    view._map.set_things_here.reset_mock()
+
+    view._on_overlay_noun_click("e1")
+
+    kwargs = view._map.set_things_here.call_args.kwargs
+    assert kwargs["selected_noun_id"] == "e1"
+    assert isinstance(kwargs["suggested_verbs"], list)
+    assert kwargs["suggested_verbs"]  # the selected exit has applicable verbs
+
+
 def test_set_rpg_context_populates_action_builder_on_load(tmp_path):
     # On load the in-chat builder must be ready without first opening the
     # right-panel ACTION tab: set_rpg_context is the chokepoint where mem_repo,

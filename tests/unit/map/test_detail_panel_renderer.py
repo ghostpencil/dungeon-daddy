@@ -163,3 +163,57 @@ def test_things_here_empty_shows_placeholder():
     assert any(ln.kind == "header" for ln in lines)
     value_text = " ".join(ln.text for ln in lines if ln.kind == "value").lower()
     assert value_text.strip() != ""
+
+
+# ---------------------------------------------------------------------------
+# Phase 50.6 Slice 8 — overlay→builder link (noun_id, selection, footer)
+# ---------------------------------------------------------------------------
+
+def _exits_section() -> ThingsSection:
+    return ThingsSection(
+        title="EXITS",
+        things=[
+            RoomThing("e1", "Marketplace Arch", "→", "open", "teal"),
+            RoomThing("e2", "Elevator Door", "→", "locked", "ember"),
+        ],
+    )
+
+
+def test_thing_row_carries_noun_id():
+    lines = format_things_here(_things(sections=[_exits_section()]))
+    row = next(ln for ln in lines if ln.kind == "thing" and "Marketplace" in ln.text)
+    assert row.noun_id == "e1"
+
+
+def test_selected_noun_marks_only_that_row():
+    lines = format_things_here(
+        _things(sections=[_exits_section()]), selected_noun_id="e1"
+    )
+    rows = [ln for ln in lines if ln.kind == "thing"]
+    selected = [r for r in rows if r.selected]
+    assert [r.noun_id for r in selected] == ["e1"]
+
+
+def test_footer_shows_selected_label_and_suggested_verbs():
+    lines = format_things_here(
+        _things(sections=[_exits_section()]),
+        selected_noun_id="e1",
+        suggested_verbs=["MOVE", "LOOK"],
+    )
+    footer_text = " ".join(ln.text for ln in lines if ln.kind == "footer")
+    assert "Marketplace Arch" in footer_text
+    assert "MOVE" in footer_text
+    assert "LOOK" in footer_text
+
+
+def test_footer_states_the_contract_when_a_noun_is_selected():
+    lines = format_things_here(
+        _things(sections=[_exits_section()]), selected_noun_id="e1"
+    )
+    footer_text = " ".join(ln.text for ln in lines if ln.kind == "footer").lower()
+    assert "builder" in footer_text
+
+
+def test_no_footer_without_selection():
+    lines = format_things_here(_things(sections=[_exits_section()]))
+    assert not any(ln.kind == "footer" for ln in lines)

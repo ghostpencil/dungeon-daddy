@@ -123,6 +123,14 @@ class LayoutRenderer:
         self._conn_resolver = GraphConnectionStyleResolver()
         self._cp_presenter = CriticalPathPresenter()
         self._art = None  # MapArtAssets, lazy-loaded on first draw
+        # Screen-space rects of the play-mode "Things Here" rows, keyed by
+        # noun_id — populated each draw so the map panel can hit-test clicks and
+        # feed the action builder (Phase 50.6 §5.3). Empty in graph mode.
+        self._thing_rects: dict[str, ScreenRect] = {}
+
+    def thing_rects(self) -> dict[str, "ScreenRect"]:
+        """Screen-space row rects from the last play-mode draw, by noun_id."""
+        return self._thing_rects
 
     def draw(
         self,
@@ -144,8 +152,12 @@ class LayoutRenderer:
         viewport_y: float = 0.0,
         mode: str = "graph",
         room_things: RoomThings | None = None,
+        selected_noun_id: str | None = None,
+        suggested_verbs: list[str] | None = None,
     ) -> None:
         cfg = presentation_config or GraphPresentationConfig()
+        # Reset each draw; only the play-mode branch repopulates it.
+        self._thing_rects = {}
         if presentation_config is not None:
             self._draw_atmosphere(build_atmosphere_spec(cfg), canvas_w, canvas_h, viewport_x, viewport_y)
         cp_result = self._cp_presenter.present(
@@ -176,7 +188,9 @@ class LayoutRenderer:
                     # Play mode: the player-facing "Things Here" overlay replaces
                     # the graph authoring readout. Placement still anchors to the
                     # selected (== current) room, so positioning is unchanged.
-                    lines = format_things_here(room_things)
+                    lines = format_things_here(
+                        room_things, selected_noun_id, suggested_verbs
+                    )
                 else:
                     panel_data = build_room_detail(sel, level, result) if sel else None
                     lines = format_detail_panel(panel_data)
@@ -470,6 +484,20 @@ class LayoutRenderer:
                 color = _PANEL_SECTION_COLOR
             else:
                 color = _PANEL_VALUE_COLOR
+            row_h = _line_height(line)
+            if line.kind == "thing" and line.noun_id is not None:
+                # Record the clickable row rect (screen space) so the map panel
+                # can route a click → builder select_noun (Phase 50.6 §5.3).
+                row_bottom = y - row_h
+                self._thing_rects[line.noun_id] = ScreenRect(
+                    x=panel_x, y=row_bottom, w=_PANEL_WIDTH, h=row_h,
+                )
+                if line.selected:
+                    ring = arcade.XYWH(
+                        panel_x + _PANEL_WIDTH / 2, row_bottom + row_h / 2,
+                        _PANEL_WIDTH - 2, row_h,
+                    )
+                    arcade.draw_rect_outline(ring, TEAL, _SELECTION_WIDTH)
             arcade.draw_text(
                 line.text,
                 panel_x + _PANEL_PADDING,

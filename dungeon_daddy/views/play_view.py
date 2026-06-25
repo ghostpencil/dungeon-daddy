@@ -91,6 +91,9 @@ class _PositionedRoom:
 _log = logging.getLogger(__name__)
 
 _CELL_PX = 48
+# Max verbs mirrored in the "Things Here" overlay footer for the selected noun
+# (Phase 50.6 §5.3). Keeps the footer to a single short line.
+_OVERLAY_SUGGESTED_CAP = 4
 _OVERLAY_TAB_H = 0   # tab bar is now an in-canvas overlay, not a reserved strip
 _BTN_EDIT_W = 100
 _BTN_EDIT_H = 24
@@ -363,6 +366,7 @@ class PlayView(arcade.View):
             on_activate_loop=self.on_activate_loop,
             on_room_select=self._on_graph_room_select,
             on_connection_select=self._on_graph_connection_select,
+            on_noun_click=self._on_overlay_noun_click,
         )
         self._ui_built = False
         self._result_queue: queue.Queue[DMResult] = queue.Queue()
@@ -1095,7 +1099,6 @@ class PlayView(arcade.View):
     def _refresh_vna_panel(self) -> None:
         """Populate the VNA action panel from the current room + acting actor."""
         from dungeon_daddy.memory.context_bundle import build_room_noun_context
-        from dungeon_daddy.rpg.action_options import room_things
 
         if (self._mem_repo is None or self._rpg_campaign_id is None
                 or self._state is None or not self._state.current_room_id):
@@ -1129,13 +1132,60 @@ class PlayView(arcade.View):
             playbook_slug=actor.playbook_slug or "",
             world_flags=self._room_world_flags(room_id),
         )
+        # Retain the prepared context so the lighter overlay-push path
+        # (_on_overlay_noun_click) can rebuild the "Things Here" view-model
+        # without re-running set_context, which would reset the noun selection.
+        self._last_room_context = room_context
+        self._last_actor_dict = actor_dict
         # Feed the map's "Things Here" overlay from the same room context, so it
         # auto-tracks the current room (Phase 50.6 §5).
-        map_panel = getattr(self, "_map", None)
-        if map_panel is not None:
-            map_panel.set_things_here(room_things(room_context, actor_dict))
+        self._push_things_here_overlay()
         # If the ACTION tab is live, rebuild its dropdowns so they reflect the
         # newly-loaded options (e.g. after the party moves to a new room).
+        side = getattr(self, "_rpg_side", None)
+        if side is not None:
+            side.refresh_action_widget()
+
+    def _push_things_here_overlay(self) -> None:
+        """Push the current room contents + builder selection to the map overlay.
+
+        Rebuilds the :class:`RoomThings` view-model from the retained room
+        context (cheap; no set_context) and mirrors the builder's selected noun —
+        its row gets a TEAL ring and the footer lists that noun's suggested verbs
+        (Phase 50.6 §5.3). Safe to call before the first refresh.
+        """
+        from dungeon_daddy.rpg.action_options import room_things, verbs_for_noun
+
+        map_panel = getattr(self, "_map", None)
+        room_context = getattr(self, "_last_room_context", None)
+        if map_panel is None or room_context is None:
+            return
+        actor_dict = getattr(self, "_last_actor_dict", {})
+        selected = self._rpg_vna.selected_noun_option()
+        selected_noun_id = selected.noun_id if selected is not None else None
+        suggested_verbs: list[str] | None = None
+        if selected is not None:
+            applicable = verbs_for_noun(selected, self._rpg_vna.verb_options())
+            suggested_verbs = [
+                v.label.upper() for v in applicable[:_OVERLAY_SUGGESTED_CAP]
+            ]
+        map_panel.set_things_here(
+            room_things(room_context, actor_dict),
+            selected_noun_id=selected_noun_id,
+            suggested_verbs=suggested_verbs,
+        )
+
+    def _on_overlay_noun_click(self, noun_id: str) -> None:
+        """Overlay "Things Here" row click → fill the builder's noun slot (§5.3).
+
+        Selects the noun on the shared VNA panel (recomputes the adverb/target
+        lists) and re-pushes the overlay so the clicked row shows its TEAL
+        selection ring and suggested-verb footer. Does **not** rebuild the panel
+        context — the room is unchanged, and a full refresh would reset the
+        selection back to the default noun.
+        """
+        self._rpg_vna.select_noun(noun_id)
+        self._push_things_here_overlay()
         side = getattr(self, "_rpg_side", None)
         if side is not None:
             side.refresh_action_widget()
