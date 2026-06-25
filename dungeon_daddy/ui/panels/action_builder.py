@@ -235,15 +235,15 @@ class InChatActionBuilder:
         self._button_rect = None
         self._suggested_rects = []
 
-        # Panel background + kicker
+        # Panel background. No "COMMAND SENTENCE" kicker — a decorative frame will
+        # highlight this region later; the label read too technical and cost rows.
         arcade.draw_rect_filled(arcade.XYWH(x + w / 2, y + h / 2, w, h), BG_2)
         arcade.draw_line(x, y + h, x + w, y + h, LINE, 1)
-        draw_kicker("COMMAND SENTENCE", x + PAD_MD + 6, y + h - 12)
 
         left = x + PAD_MD
         right = x + w - PAD_MD
         cur_x = left
-        cur_y = y + h - 34  # baseline of the first sentence row (chip centre)
+        cur_y = y + h - 16  # baseline of the first sentence row (chip centre)
 
         _SLOT_TINT = {
             _KIND_VERB: VIOLET,

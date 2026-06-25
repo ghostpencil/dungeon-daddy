@@ -910,6 +910,10 @@ class PlayView(arcade.View):
         else:
             self._action_state.select_next_actor()
         self._refresh_chat_mini_card()
+        # The in-chat Action Builder is bound to the acting actor (its sentence,
+        # carried-item nouns, and abilities), so re-populate it on a switch —
+        # mirroring the CHAR-tab picker's _set_acting_actor path.
+        self._refresh_vna_panel()
 
     def _do_no_roll_from_chip(self) -> None:
         if not self._action_state.awaiting_confirmation:
