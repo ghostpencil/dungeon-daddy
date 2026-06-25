@@ -406,6 +406,24 @@ def test_play_mode_thing_rect_is_centred_on_its_text() -> None:
     assert rect.y < text_y < rect.y + rect.h
 
 
+def test_play_mode_selected_marker_drawn_larger_than_row_text() -> None:
+    from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import _SEL_MARKER
+    from dungeon_daddy.map.layout_renderer import _PANEL_FONT_SIZE
+    result, view_state = _play_setup()
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.draw_chip"), \
+            patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(
+            result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
+            mode="play", room_things=_room_things(), selected_noun_id="e1",
+        )
+        marker_call = _thing_text_call(mock_arcade, _SEL_MARKER)
+
+    font_size = marker_call.kwargs.get("font_size")
+    assert font_size is not None and font_size > _PANEL_FONT_SIZE
+
+
 def test_play_mode_selected_row_text_is_teal() -> None:
     from dungeon_daddy.ui.theme import TEAL
     result, view_state = _play_setup()

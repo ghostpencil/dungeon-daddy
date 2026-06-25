@@ -193,6 +193,20 @@ in-chat builder until Slice 9 retires it.
   the selected row's text TEAL (`_PANEL_SELECTED_COLOR`). The ring (`draw_rect_outline` in the
   panel) is gone. Net tests: −1 ring test, +3 (marker, rect-centred regression, selected-text-teal).
   Full map+ui+views suites green (1628).
+- **Slice 8 UX round 2 — DONE** (user-requested; 3 items). (1) **Larger selection marker** — the
+  per-row marker moved out of the row text into `PanelLine.marker`; the renderer draws it in a left
+  gutter (`_PANEL_MARKER_COL_W=16`), the selected `▸` at `_PANEL_MARKER_FONT_SIZE=13` + bold + TEAL,
+  the deselected `·` quiet (dim, normal size). (2) **Click an open exit = auto-move** —
+  `_on_overlay_noun_click` now: if the clicked noun is an **open** exit (`source==SOURCE_EXIT`),
+  `select_verb(move)` + `select_noun` + `submit()` (walks through it, no verb pick); a **locked**
+  exit (`SOURCE_LOCKED_EXIT`) and every non-exit still take the select-and-feed-builder path. (Test
+  helper `_make_view` now wires `set_submit_callback`, matching the real ctor.) **Open follow-up:**
+  if auto-move feels right we may drop the `move` verb from the command sentence — TBD. (3) **Loop
+  chips gated** — `MapPanel.set_loops_visible(bool)` (loop-pattern pills are an authoring/test-drive
+  affordance); `play_view` shows them in `load_dungeon_transient` (test drive) and **hides them in
+  `load_dungeon_session`** (real play). 7 new tests (1 view-model marker, 1 renderer marker-size,
+  2 play_view auto-move, 3 MapPanel loop-gating; 3 prior overlay tests retargeted to locked exits).
+  Full map+ui+views suites green (1634).
 - Then slices 9–11 (retire ACTION tab, SAY/ASK swap stub, polish + smoke test). **Slice 9:** remove
   the right-panel ACTION tab, re-wire submit to the in-chat builder, suite stays green (spec §7).
 

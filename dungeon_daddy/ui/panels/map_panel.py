@@ -147,6 +147,9 @@ class MapPanel:
         self._viewed_level_idx: int = 0
         self._dungeon_title: str = ""
         self._loop_strip_rects: dict[str, tuple[float, float, float, float]] = {}
+        # Loop pattern chips are an authoring/test-drive affordance — hidden in a
+        # normal play session (set False by PlayView for real saves).
+        self._loops_visible: bool = True
         self._active_loop_id: str | None = None
         self._layout_result: LayoutResult | None = None
         self._layout_renderer = LayoutRenderer()
@@ -260,6 +263,16 @@ class MapPanel:
         self._things_here = things
         self._things_selected_noun_id = selected_noun_id
         self._things_suggested_verbs = suggested_verbs
+
+    def set_loops_visible(self, visible: bool) -> None:
+        """Show/hide the loop-pattern chips (authoring/test-drive only).
+
+        Rebuilds the loop strip immediately when a level is loaded so the change
+        takes effect without a reload.
+        """
+        self._loops_visible = visible
+        if self._level is not None:
+            self._build_loop_strip_rects(self._level)
 
     def set_renderer(self, renderer: GridRenderer) -> None:
         self._renderer = renderer
@@ -564,7 +577,7 @@ class MapPanel:
 
     def _build_loop_strip_rects(self, level: Level) -> None:
         self._loop_strip_rects = {}
-        if not level.loops:
+        if not level.loops or not self._loops_visible:
             return
         _PILL_W, _PILL_H, _PILL_GAP, _PILL_PAD = 110.0, 24.0, 6.0, 8.0
         map_w = self._w - PANEL_STEPPER_WIDTH

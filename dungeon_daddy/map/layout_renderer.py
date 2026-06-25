@@ -58,6 +58,8 @@ _PANEL_THING_LINE_HEIGHT = 22  # "thing" rows carry a status chip → taller
 # with the glyphs rather than sitting a row low (Slice 8 fix).
 _THING_ROW_CENTER_DY = 4
 _PANEL_SELECTED_COLOR = (*TEAL, 255)  # selected "Things Here" row text
+_PANEL_MARKER_COL_W = 16  # left gutter reserved for the per-row selection marker
+_PANEL_MARKER_FONT_SIZE = 13  # selected marker is drawn larger so it reads clearly
 _PANEL_PADDING = 10
 _PANEL_WIDTH = 300.0
 _PANEL_FONT_SIZE = 9
@@ -496,21 +498,37 @@ class LayoutRenderer:
                 color = _PANEL_VALUE_COLOR
             row_h = _line_height(line)
             row_center = y + _THING_ROW_CENTER_DY
-            if line.kind == "thing" and line.noun_id is not None:
+            is_thing = line.kind == "thing"
+            if is_thing and line.noun_id is not None:
                 # Record the clickable row rect (screen space), centred on the
                 # drawn text, so a click routes to the right noun (§5.3).
                 self._thing_rects[line.noun_id] = ScreenRect(
                     x=panel_x, y=row_center - row_h / 2,
                     w=_PANEL_WIDTH, h=float(row_h),
                 )
+            if is_thing and line.marker:
+                # Per-row selected/deselected icon, vertically centred on the row.
+                # The selected marker is larger + TEAL so it reads at a glance;
+                # the deselected dot stays quiet (Slice 8 selection cue).
+                arcade.draw_text(
+                    line.marker,
+                    panel_x + _PANEL_PADDING,
+                    row_center,
+                    _PANEL_SELECTED_COLOR if line.selected else _PANEL_SECTION_COLOR,
+                    font_size=_PANEL_MARKER_FONT_SIZE if line.selected else _PANEL_FONT_SIZE,
+                    font_name=FONT_MONO,
+                    anchor_y="center",
+                    bold=line.selected,
+                )
+            text_x = panel_x + _PANEL_PADDING + (_PANEL_MARKER_COL_W if is_thing else 0)
             arcade.draw_text(
                 line.text,
-                panel_x + _PANEL_PADDING,
+                text_x,
                 y,
                 color,
                 font_size=_PANEL_FONT_SIZE,
                 font_name=FONT_MONO,
-                width=int(_PANEL_WIDTH - _PANEL_PADDING * 2),
+                width=int(_PANEL_WIDTH - _PANEL_PADDING - (text_x - panel_x)),
             )
             if line.kind == "thing" and line.status:
                 chip_w = max(48, len(line.status) * 7 + 18)

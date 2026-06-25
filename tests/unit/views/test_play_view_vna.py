@@ -56,6 +56,7 @@ def _make_view(tmp_path: Path, actor: ActorState | None = None):
     )
     view._dungeon = None
     view._rpg_vna = VnaActionPanel()
+    view._rpg_vna.set_submit_callback(view._on_vna_submit)
     view._exit_panel = ExitListPanel()
     view._rpg_action = MagicMock(_actors=[actor])
     view._action_state = PlayerActionState()
@@ -113,9 +114,10 @@ def test_refresh_vna_panel_feeds_things_here_overlay(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_overlay_noun_click_selects_noun_on_builder(tmp_path):
+    # Locked exit → select path (open exits auto-move).
     view = _make_view(tmp_path)
     view._map = MagicMock()
-    _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="open")
+    _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="locked")
     view._refresh_vna_panel()
 
     view._on_overlay_noun_click("e1")
@@ -124,9 +126,10 @@ def test_overlay_noun_click_selects_noun_on_builder(tmp_path):
 
 
 def test_overlay_noun_click_refreshes_overlay(tmp_path):
+    # A locked exit takes the select path (open exits auto-move instead).
     view = _make_view(tmp_path)
     view._map = MagicMock()
-    _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="open")
+    _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="locked")
     view._refresh_vna_panel()
     view._map.set_things_here.reset_mock()
 
@@ -135,10 +138,43 @@ def test_overlay_noun_click_refreshes_overlay(tmp_path):
     view._map.set_things_here.assert_called_once()
 
 
+def test_overlay_click_on_open_exit_auto_moves(tmp_path):
+    """Clicking an open exit in the overlay moves the party through it directly —
+    no verb pick needed (user request)."""
+    view = _make_view(tmp_path)
+    _save_exit(view._mem_repo, exit_id="e1", from_room_id="r1", to_room_id="r2", status="open")
+    view._map = MagicMock()
+    view._rpg_scene = MagicMock()
+    view._spawn_dm_thread = MagicMock()
+    view._compact_history = MagicMock()
+    view._save_session = MagicMock()
+    view._dm_history = []
+    view._refresh_vna_panel()
+
+    view._on_overlay_noun_click("e1")
+
+    assert view._state.current_room_id == "r2"
+
+
+def test_overlay_click_on_locked_exit_selects_not_moves(tmp_path):
+    """A locked exit can't be walked through — click selects it so the player can
+    use a key via the builder, rather than auto-moving."""
+    view = _make_view(tmp_path)
+    _save_exit(view._mem_repo, exit_id="e1", from_room_id="r1", to_room_id="r2", status="locked")
+    view._map = MagicMock()
+    view._refresh_vna_panel()
+
+    view._on_overlay_noun_click("e1")
+
+    assert view._state.current_room_id == "r1"   # did not move
+    assert view._rpg_vna._noun_id == "e1"        # selected instead
+
+
 def test_click_feeds_selected_noun_and_suggested_verbs_to_overlay(tmp_path):
+    # Use a locked exit so the click takes the select path (open exits auto-move).
     view = _make_view(tmp_path)
     view._map = MagicMock()
-    _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="open")
+    _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="locked")
     view._refresh_vna_panel()
     view._map.set_things_here.reset_mock()
 

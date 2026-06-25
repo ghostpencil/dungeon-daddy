@@ -517,6 +517,40 @@ def test_overlay_noun_click_takes_priority_over_room_select() -> None:
     assert rooms == []
 
 
+# ---------------------------------------------------------------------------
+# Phase 50.6 — loop strip chips gated to test-drive / design (not normal play)
+# ---------------------------------------------------------------------------
+
+def _level_with_loop() -> Level:
+    from dungeon_daddy.data.models import Loop
+    lvl = _level(["a", "b"], [_conn("a", "b")])
+    lvl.loops = [Loop(id="lp1", pattern="lock_key", note="", entry="a", goal="b",
+                      path_a=["a"], path_b=["b"])]
+    return lvl
+
+
+def test_loop_strip_shown_by_default() -> None:
+    p = _panel_sized()
+    p.load(_level_with_loop(), _state())
+    assert "lp1" in p._loop_strip_rects
+
+
+def test_loop_strip_hidden_when_loops_invisible() -> None:
+    p = _panel_sized()
+    p.set_loops_visible(False)
+    p.load(_level_with_loop(), _state())
+    assert p._loop_strip_rects == {}
+
+
+def test_set_loops_visible_rebuilds_on_loaded_level() -> None:
+    p = _panel_sized()
+    p.load(_level_with_loop(), _state())
+    p.set_loops_visible(False)
+    assert p._loop_strip_rects == {}
+    p.set_loops_visible(True)
+    assert "lp1" in p._loop_strip_rects
+
+
 def test_draw_forwards_selection_and_suggested_verbs() -> None:
     from dungeon_daddy.rpg.action_options import RoomThing, RoomThings, ThingsSection
     p = _panel()

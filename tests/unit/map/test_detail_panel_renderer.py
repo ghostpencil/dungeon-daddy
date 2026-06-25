@@ -194,7 +194,7 @@ def test_selected_noun_marks_only_that_row():
     assert [r.noun_id for r in selected] == ["e1"]
 
 
-def test_selected_row_text_uses_a_distinct_marker_from_unselected():
+def test_selected_row_uses_a_distinct_marker_from_unselected():
     from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import (
         _SEL_MARKER,
         _UNSEL_MARKER,
@@ -204,8 +204,10 @@ def test_selected_row_text_uses_a_distinct_marker_from_unselected():
     )
     selected_row = next(ln for ln in lines if ln.kind == "thing" and "Marketplace" in ln.text)
     other_row = next(ln for ln in lines if ln.kind == "thing" and "Elevator" in ln.text)
-    assert selected_row.text.startswith(_SEL_MARKER)
-    assert other_row.text.startswith(_UNSEL_MARKER)
+    # The marker is a separate field (drawn larger by the renderer), not baked
+    # into the row text — so it can be sized/coloured independently.
+    assert selected_row.marker == _SEL_MARKER
+    assert other_row.marker == _UNSEL_MARKER
     assert _SEL_MARKER != _UNSEL_MARKER
 
 

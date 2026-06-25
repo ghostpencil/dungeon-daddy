@@ -24,10 +24,12 @@ class PanelLine:
     # "thing" rows (Things Here overlay) carry a trailing status chip:
     status: str | None = None
     status_color: str | None = None  # "teal" | "ember" | "gold" | "default"
-    # "thing" rows also carry the noun id they feed into the builder, plus a
-    # selection flag the renderer uses to draw a TEAL selection ring (Slice 8).
+    # "thing" rows also carry the noun id they feed into the builder, a selection
+    # flag, and a leading marker glyph the renderer draws (larger for the selected
+    # row) as the per-row selected/deselected icon (Slice 8).
     noun_id: str | None = None
     selected: bool = False
+    marker: str | None = None
 
 
 def format_detail_panel(
@@ -110,14 +112,14 @@ def format_things_here(
             is_selected = thing.noun_id == selected_noun_id
             if is_selected:
                 selected_label = thing.label
-            marker = _SEL_MARKER if is_selected else _UNSEL_MARKER
             lines.append(PanelLine(
-                f"{marker} {thing.glyph} {thing.label}",
+                f"{thing.glyph} {thing.label}",
                 "thing",
                 status=thing.status,
                 status_color=thing.status_color,
                 noun_id=thing.noun_id,
                 selected=is_selected,
+                marker=_SEL_MARKER if is_selected else _UNSEL_MARKER,
             ))
 
     if selected_label is not None:

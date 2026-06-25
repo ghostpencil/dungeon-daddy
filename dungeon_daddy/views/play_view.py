@@ -613,6 +613,7 @@ class PlayView(arcade.View):
         self._state = SessionState(dungeon_id="__test_drive__", current_level_idx=0)
         level = dungeon.levels[0]
         self._map.load(level, self._state, len(dungeon.levels))
+        self._map.set_loops_visible(True)  # loop chips are a test-drive affordance
         self._map.set_dungeon_title(dungeon.meta.title)
         self._chat.set_mode_label("Play Mode")
         self._chat.add_message(
@@ -652,6 +653,9 @@ class PlayView(arcade.View):
                 f'Loaded "{dungeon.meta.title}" — Level 1: {level.name}. '
                 "Click rooms on the map to explore.",
             )
+        # Loop pattern chips are an authoring/test-drive affordance, not shown in
+        # a normal play session.
+        self._map.set_loops_visible(False)
         _log.info("PlayView: loaded dungeon=%s (session)", dungeon.meta.title)
         self._refresh_memory_state()
         self._load_player_actors()
@@ -1176,14 +1180,26 @@ class PlayView(arcade.View):
         )
 
     def _on_overlay_noun_click(self, noun_id: str) -> None:
-        """Overlay "Things Here" row click → fill the builder's noun slot (§5.3).
+        """Overlay "Things Here" row click → act on the clicked noun (§5.3).
 
-        Selects the noun on the shared VNA panel (recomputes the adverb/target
-        lists) and re-pushes the overlay so the clicked row shows its TEAL
-        selection ring and suggested-verb footer. Does **not** rebuild the panel
-        context — the room is unchanged, and a full refresh would reset the
-        selection back to the default noun.
+        An **open exit** is walked through immediately (select ``move`` + the exit
+        and submit) — the most common overlay action, so it needs no verb pick.
+        Any other noun (incl. a *locked* exit, which can't be walked) just fills
+        the builder's noun slot and re-pushes the overlay so the clicked row shows
+        its selection cue + suggested-verb footer. Selecting does **not** rebuild
+        the panel context — the room is unchanged, and a full refresh would reset
+        the selection back to the default noun.
         """
+        from dungeon_daddy.rpg.action_options import SOURCE_EXIT, VERB_MOVE
+
+        clicked = next(
+            (n for n in self._rpg_vna._nouns if n.noun_id == noun_id), None
+        )
+        if clicked is not None and clicked.source == SOURCE_EXIT:
+            self._rpg_vna.select_verb(VERB_MOVE)
+            self._rpg_vna.select_noun(noun_id)
+            self._rpg_vna.submit()
+            return
         self._rpg_vna.select_noun(noun_id)
         self._push_things_here_overlay()
         side = getattr(self, "_rpg_side", None)
