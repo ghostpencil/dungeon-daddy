@@ -16,23 +16,27 @@ Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
 
 ---
 
-## START HERE next session — Phase 50.6, Slice 11
+## START HERE next session — Phase 50.6, Slice 11 (in progress)
 
-Continue with **Slice 11 — Polish + smoke test** (spec §9.11). Three pieces:
-1. **Dynamic builder-band height** — `_BUILDER_H` is a fixed **180px**; make the band *size to the
-   actual wrapped-sentence line count* so the sentence↔preview gap stays constant (kills the airy
-   gap when short and collision when long). The CP-1 `_wrap_units` line assignment already yields the
-   line count — expose it so `chat_panel`'s layout (`_builder_extra_h`/`_BUILDER_H`) consults it
-   instead of a constant. See the **Slice 11 requirement** note in spec §9.
-2. **Short-window collapsible fallback** (spec §4.1) — a ▾/▴ toggle that collapses the builder band
-   on short windows; pick the min-height threshold (spec §11 open question).
-3. **Smoke test** — `tools/smoke_test_phase*.py` (Strategy A/B per `spec/TESTING.md` — read the
+**Slice 11 — Polish + smoke test** (spec §9.11). Progress this session:
+1. **Dynamic builder-band height — DONE (uncommitted→committed this session; not yet GUI-verified).**
+   `_BUILDER_H` (fixed 180px) is **removed**; the band now sizes to the actual wrapped-sentence line
+   count via new `InChatActionBuilder.sentence_line_count(w)` / `content_height(w)` (share
+   `_sentence_units()` with `draw()` so the measure matches the render). `chat_panel._builder_extra_h`
+   + the builder draw consult `content_height(self._w)` instead of the constant, keeping a constant
+   `_SENTENCE_PREVIEW_GAP` between sentence and preview.
+2. **Blank-strip reclaim (Slice 10 follow-up) — DONE (committed; not yet GUI-verified).** With the
+   free-text input hidden in builder mode, the mini-card now stacks directly on the band via new
+   `chat_panel._card_bot_off` + `_BUILDER_BOTTOM_PAD`; `_input_area_h` no longer reserves the hidden
+   ~70px input row, so the message area reclaims it.
+3. **Short-window collapsible fallback — TODO** (spec §4.1) — a ▾/▴ toggle that collapses the builder
+   band on short windows; **pick the min-height threshold (spec §11 open question — needs a decision).**
+4. **Smoke test — TODO** — `tools/smoke_test_phase*.py` (Strategy A/B per `spec/TESTING.md` — read the
    A-vs-B guidance first) + manual visual verify by the user.
 
-**Also fold in (Slice 10 follow-up): the bottom-of-column blank strip.** Making the free-text Ask
-box contextual (Slice 10) leaves a ~70px empty band below the builder in default play mode (the
-`_PLAY_INPUT_AREA_H` still reserves the input row's height while it is hidden) — collapse/reclaim
-it as part of the dynamic-height work.
+**GUI-verify pieces 1+2** before building the collapsible toggle on top: in play mode the builder
+band should hug the sentence (no airy gap when short) and the mini-card + message area should reclaim
+the old blank strip at the bottom of the chat column.
 
 **Slice 10 is DONE, committed & GUI-verified** (2026-06-26): in **The Crucible → R3 (Cargo Bay)**,
 selecting **Pinion** + verb **Sway** → builder button reads **TALK**; submitting swaps the bottom of
@@ -314,12 +318,13 @@ in-chat builder until **Slice 9 retired it** (in-chat builder is now the sole ac
   **Files:** `rpg/action_options.py`, `ui/panels/action_builder.py`, `ui/panels/vna_action_panel.py`,
   `ui/panels/chat_panel.py`, `views/play_view.py`, `rpg/models.py`, `memory/repository.py`,
   `memory/context_bundle.py`, `data/migrations/015_actor_disposition.sql`, `tools/populate_crucible_level1.py`.
-- Then **Slice 11** (polish + smoke test) — see START HERE. **Slice 11:** dynamic builder-band height
-  + collapsible short-window fallback + reclaim the Slice-10 bottom blank strip + smoke test.
-
-  **Known not-yet-done (expected, not bugs):** the builder band is **not yet responsive/collapsible**
-  on short windows, and hiding the free-text box leaves a **~70px blank strip** at the bottom in
-  default play mode — both folded into **Slice 11**.
+- **Slice 11 — IN PROGRESS** (polish + smoke test; spec §9.11). **Dynamic band height + blank-strip
+  reclaim DONE** this session (suite green; not yet GUI-verified): `InChatActionBuilder.
+  sentence_line_count(w)`/`content_height(w)` (built on shared `_sentence_units()`) measure the
+  wrapped sentence so `chat_panel._builder_extra_h`/draw size the band to it (`_BUILDER_H` removed);
+  `_card_bot_off`/`_BUILDER_BOTTOM_PAD` reclaim the hidden input row's ~70px in builder mode.
+  **Remaining:** short-window **collapsible ▾/▴ fallback** (spec §4.1; threshold = §11 open question)
+  + **smoke test**. See START HERE.
 
 After 50.6: **Phase 51 — Talk to the Dungeon** (roadmap; 50.6 carves the SAY/ASK input seam).
 Write `spec/PHASE_51_*.md` when starting.

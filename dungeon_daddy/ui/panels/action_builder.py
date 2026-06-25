@@ -250,6 +250,105 @@ class InChatActionBuilder:
     _LINE_H = 26.0
     _CHIP_H = 20.0
     _ROW_H = 18.0  # popup row height
+    _UNIT_GAP = 6.0  # horizontal gap between sentence units
+    _BTN_H = 24.0  # action button height
+    _SENTENCE_TOP_OFF = 16.0  # first-row baseline below the band top
+    _PV_LINE_H = 15.0  # preview inset line height
+    _PV_GAP = 6.0  # gap between the button row and the preview inset
+    # Constant gap kept between the wrapped sentence's lowest chip and the top of
+    # the preview inset; the band sizes to honour it (Slice 11 dynamic height).
+    _SENTENCE_PREVIEW_GAP = 16.0
+
+    def _text_w(self, s: str) -> float:
+        return len(s) * self._CHAR_W
+
+    def _sentence_units(self) -> list[tuple[str, object, float, bool]]:
+        """Ordered draw units for the command sentence with wrap geometry.
+
+        Each unit is ``(utype, payload, width, glued)`` where ``utype`` is
+        ``"text"`` or ``"slot"``. Shared by :meth:`draw` and
+        :meth:`sentence_line_count` so the measured line count always matches
+        what is rendered. Builds "<Actor> will [VERB] (conn) [NOUN] (conn
+        [TARGET]) [ADVERB]"; a noun/target slot is glued to the connector that
+        precedes it so a wrap never orphans the connector.
+        """
+        from dungeon_daddy.ui.theme import INK_2, INK_3, INK_4, PAD_SM, TEAL, VIOLET
+
+        # Per-slot tint encodes slot role (spec §8: verb VIOLET, noun/target TEAL,
+        # adverb INK_2). The adverb uses INK_2 (not the dimmer INK_3) so it does
+        # not read as static text next to the INK_3 connectors.
+        slot_tint = {
+            _KIND_VERB: VIOLET,
+            _KIND_NOUN: TEAL,
+            _KIND_TARGET: TEAL,
+            _KIND_ADVERB: INK_2,
+        }
+        units: list[tuple[str, object, float, bool]] = []
+        actor = self._panel.acting_actor_name() or "—"
+        # The actor name is content (INK_2); "will" is a glue word sharing the
+        # quiet INK_3 weight of the other connectors (CP-5) and glued to the name.
+        units.append(("text", (actor, INK_2), self._text_w(actor), False))
+        units.append(("text", ("will", INK_3), self._text_w("will"), True))
+        for kind, label in self.slots():
+            if kind == _KIND_NOUN:
+                conn = self._noun_connector()
+                units.append(("text", (conn, INK_3), self._text_w(conn), False))
+            elif kind == _KIND_TARGET:
+                conn = self._target_connector()
+                units.append(("text", (conn, INK_3), self._text_w(conn), False))
+            if label is None:
+                # Empty slot → dim placeholder prompt instead of a value (CP-3).
+                text = _SLOT_PLACEHOLDERS.get(kind, "…")
+                tint = INK_4
+            else:
+                text = label.upper() if kind == _KIND_VERB else label
+                tint = slot_tint.get(kind, INK_3)
+            chip_w = self._text_w(text) + PAD_SM * 2 + 14  # +14 for the ▾ caret
+            glued = kind in (_KIND_NOUN, _KIND_TARGET)
+            units.append(("slot", (kind, text, tint, chip_w), chip_w, glued))
+        return units
+
+    def sentence_line_count(self, w: float) -> int:
+        """Number of wrapped rows the command sentence occupies at band width ``w``.
+
+        Mirrors :meth:`draw`'s wrap so the band can be sized to the sentence
+        (Slice 11). ``w`` is the band width; the usable text column is
+        ``w − 2·PAD_MD``.
+        """
+        from dungeon_daddy.ui.theme import PAD_MD
+
+        units = self._sentence_units()
+        if not units:
+            return 1
+        avail = w - 2 * PAD_MD
+        lines = self._wrap_units(
+            [u[2] for u in units], avail, self._UNIT_GAP, [u[3] for u in units]
+        )
+        return max(lines) + 1
+
+    def content_height(self, w: float) -> float:
+        """Band height that keeps the sentence↔preview gap constant (Slice 11).
+
+        The sentence is top-anchored and the button/preview are bottom-anchored
+        (see :meth:`draw`), so sizing the band to the wrapped line count + the
+        preview-line count keeps a constant gap between them — killing both the
+        airy-when-short gap and the collision-when-long overlap of the old fixed
+        180px band (spec §9 Slice 11 requirement).
+        """
+        from dungeon_daddy.ui.theme import PAD_SM
+
+        n = self.sentence_line_count(w)
+        pv = self.preview_lines()
+        pv_h = len(pv) * self._PV_LINE_H + 2 * PAD_SM if pv else 0.0
+        bottom_block = PAD_SM + self._BTN_H + self._PV_GAP  # button row + gap
+        return (
+            self._SENTENCE_PREVIEW_GAP
+            + self._SENTENCE_TOP_OFF
+            + self._CHIP_H / 2
+            + bottom_block
+            + (n - 1) * self._LINE_H
+            + pv_h
+        )
 
     def draw(self, x: float, y: float, w: float, h: float) -> None:
         """Render the wrapped command sentence + slot chips + action button.
@@ -269,7 +368,6 @@ class InChatActionBuilder:
             FONT_UI,
             INK_2,
             INK_3,
-            INK_4,
             LINE,
             LINE_HI,
             PAD_MD,
@@ -277,7 +375,6 @@ class InChatActionBuilder:
             RADIUS_SM,
             TEAL,
             TEXT_SM,
-            VIOLET,
             draw_rounded_rect,
         )
 
@@ -292,52 +389,13 @@ class InChatActionBuilder:
 
         left = x + PAD_MD
         right = x + w - PAD_MD
-        top_y = y + h - 16  # baseline (chip centre) of the first sentence row
-        gap = 6.0
+        top_y = y + h - self._SENTENCE_TOP_OFF  # chip centre of the first row
+        gap = self._UNIT_GAP
 
-        # Per-slot tint encodes slot role (spec §8: verb VIOLET, noun/target TEAL,
-        # adverb INK_2). All slots share identical chip chrome (BG_3 fill, 1px
-        # border, ▾ caret) so they read as the same kind of editable control; the
-        # tint is the only differentiator. The adverb uses INK_2 (not the dimmer
-        # INK_3) so it does not read as static text next to the INK_3 connectors.
-        _SLOT_TINT = {
-            _KIND_VERB: VIOLET,
-            _KIND_NOUN: TEAL,
-            _KIND_TARGET: TEAL,
-            _KIND_ADVERB: INK_2,
-        }
-
-        def _text_w(s: str) -> float:
-            return len(s) * self._CHAR_W
-
-        # Build the command sentence as ordered draw units so wrapping can be
-        # clause-aware: "<Actor> will [VERB] the [NOUN] (conn [TARGET]) [ADVERB]".
-        # Each unit is (utype, payload, width, glued); a noun/target slot is glued
-        # to the connector that precedes it so a wrap never orphans the connector.
-        units: list[tuple[str, object, float, bool]] = []
-        actor = self._panel.acting_actor_name() or "—"
-        # The actor name is content (INK_2); "will" is a glue word and shares the
-        # quiet INK_3 weight of the other connectors so the sentence reads evenly
-        # (CP-5). "will" is glued to the name so it never wraps away from it.
-        units.append(("text", (actor, INK_2), _text_w(actor), False))
-        units.append(("text", ("will", INK_3), _text_w("will"), True))
-        for kind, label in self.slots():
-            if kind == _KIND_NOUN:
-                conn = self._noun_connector()
-                units.append(("text", (conn, INK_3), _text_w(conn), False))
-            elif kind == _KIND_TARGET:
-                conn = self._target_connector()
-                units.append(("text", (conn, INK_3), _text_w(conn), False))
-            if label is None:
-                # Empty slot → dim placeholder prompt instead of a value (CP-3).
-                text = _SLOT_PLACEHOLDERS.get(kind, "…")
-                tint = INK_4
-            else:
-                text = label.upper() if kind == _KIND_VERB else label
-                tint = _SLOT_TINT.get(kind, INK_3)
-            chip_w = _text_w(text) + PAD_SM * 2 + 14  # +14 for the ▾ affordance
-            glued = kind in (_KIND_NOUN, _KIND_TARGET)
-            units.append(("slot", (kind, text, tint, chip_w), chip_w, glued))
+        # Build the command sentence as ordered draw units so wrapping is
+        # clause-aware (see _sentence_units). The same units feed
+        # sentence_line_count so the measured band height matches the render.
+        units = self._sentence_units()
 
         lines = self._wrap_units(
             [u[2] for u in units], right - left, gap, [u[3] for u in units]
@@ -378,7 +436,7 @@ class InChatActionBuilder:
         # suggested row can stack above it.
         label = self.button_label()
         is_roll = label == "ROLL"
-        btn_w, btn_h = 64.0, 24.0
+        btn_w, btn_h = 64.0, self._BTN_H
         btn_x = right - btn_w
         btn_y = y + PAD_SM
         btn_tint = TEAL if is_roll else LINE
@@ -400,8 +458,8 @@ class InChatActionBuilder:
         # above the box. Lines are centred with symmetric top/bottom padding.
         pv_lines = self.preview_lines()
         if pv_lines:
-            pv_line_h = 15.0
-            pv_bot = btn_y + btn_h + 6
+            pv_line_h = self._PV_LINE_H
+            pv_bot = btn_y + btn_h + self._PV_GAP
             pv_h = len(pv_lines) * pv_line_h + 2 * PAD_SM
             draw_rounded_rect(
                 left + (right - left) / 2, pv_bot + pv_h / 2, right - left, pv_h,

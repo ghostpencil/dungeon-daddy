@@ -623,6 +623,48 @@ def test_builder_extra_h_zero_in_dialogue_mode():
     assert p._builder_extra_h == 0.0
 
 
+def test_builder_extra_h_uses_builder_content_height():
+    # Slice 11: the band sizes to the builder's measured content height (which
+    # tracks the wrapped sentence) at the panel width, not a fixed constant.
+    from dungeon_daddy.ui.panels.chat_panel import _BUILDER_BAND_GAP
+
+    p = _play_panel()
+    p._w = 440.0
+    p._action_builder.content_height.return_value = 150.0
+    assert p._builder_extra_h == 150.0 + _BUILDER_BAND_GAP
+    p._action_builder.content_height.assert_called_once_with(440.0)
+
+
+def test_builder_mode_reclaims_hidden_input_row(monkeypatch):
+    # Slice 11 follow-up: with the free-text input hidden (builder mode), the
+    # mini-card stacks directly on the builder band and the input row's reserved
+    # height is reclaimed — the message area is NOT shrunk by a phantom input row.
+    from dungeon_daddy.ui.panels.chat_panel import (
+        _BUILDER_BAND_GAP,
+        _CHAR_CARD_Y_BOT,
+        _PLAY_INPUT_AREA_H,
+    )
+
+    p = _play_panel()
+    p._w = 440.0
+    p._action_builder.content_height.return_value = 150.0
+    band = 150.0 + _BUILDER_BAND_GAP
+    # Card no longer sits a full input-row above the band bottom.
+    assert p._card_bot_off < _CHAR_CARD_Y_BOT + band
+    # The reserved bottom area excludes the hidden free-text input row.
+    assert p._input_area_h < _PLAY_INPUT_AREA_H + band
+
+
+def test_dialogue_mode_keeps_input_row_reserved():
+    # In dialogue mode the free-text SAY box IS the bottom surface, so the input
+    # row's reserved height stays (no builder band).
+    from dungeon_daddy.ui.panels.chat_panel import _PLAY_INPUT_AREA_H
+
+    p = _play_panel()
+    p.set_dialogue_mode(True)
+    assert p._input_area_h == _PLAY_INPUT_AREA_H
+
+
 def test_builder_does_not_consume_clicks_in_dialogue_mode():
     p = _play_panel()
     p._action_builder.on_mouse_press.return_value = True

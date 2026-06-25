@@ -51,9 +51,9 @@ _CHIP_CY_OFF = 86    # distance from panel bottom to chip row centre (design mod
 _PLAY_INPUT_AREA_H = 176  # play mode: char card (96) + gap (6) + input (70) + top pad (4)
 _CHAR_CARD_H = 96         # character card height
 _CHAR_CARD_Y_BOT = 76     # card bottom offset from panel bottom (_INPUT_Y_OFF + INPUT_H + 6)
-_BUILDER_H = 180          # in-chat Action Builder band height (Phase 50.6)
-_BUILDER_BAND_GAP = 6     # gap above/below the builder band
-_BUILDER_Y_BOT = 76       # builder band bottom offset (above the input row)
+_BUILDER_BAND_GAP = 6     # gap above/below the builder band (Phase 50.6)
+_BUILDER_BOTTOM_PAD = 8   # builder band bottom offset when it owns the column
+_MSG_BOTTOM_PAD = 4       # pad above the mini-card before the message area
 _PORTRAIT_W = 96          # width of portrait section including divider
 _LABEL_H = 20  # height reserved at top of each bubble for the role label
 _SCROLL_SPEED = 30  # pixels per mouse wheel click
@@ -451,17 +451,36 @@ class ChatPanel:
     def _builder_extra_h(self) -> float:
         """Extra vertical space the Action Builder band adds in play mode.
 
-        Zero while the builder is swapped out for the SAY/ASK box (dialogue mode).
+        The band sizes to the builder's measured content height (which tracks
+        the wrapped command-sentence line count) rather than a fixed constant,
+        so the sentence↔preview gap stays constant (Phase 50.6 Slice 11). Zero
+        while the builder is swapped out for the SAY/ASK box (dialogue mode).
         """
         if self._builder_visible():
-            return _BUILDER_H + _BUILDER_BAND_GAP
+            return self._action_builder.content_height(self._w) + _BUILDER_BAND_GAP
         return 0.0
 
     @property
+    def _card_bot_off(self) -> float:
+        """Offset from the panel bottom to the actor mini-card's bottom edge.
+
+        In builder mode the free-text input row is hidden, so the card stacks
+        directly on the builder band (reclaiming the input row's reserved height,
+        Slice 11 follow-up). Otherwise it sits above the free-text input row.
+        """
+        if self._builder_visible():
+            return _BUILDER_BOTTOM_PAD + self._builder_extra_h
+        return _CHAR_CARD_Y_BOT
+
+    @property
     def _input_area_h(self) -> float:
-        if self._mode == "play":
-            return _PLAY_INPUT_AREA_H + self._builder_extra_h
-        return INPUT_AREA_H
+        if self._mode != "play":
+            return INPUT_AREA_H
+        if self._builder_visible():
+            # Builder owns the bottom; the free-text input row is hidden, so the
+            # reserved area is just the band + mini-card (no phantom input row).
+            return self._card_bot_off + _CHAR_CARD_H + _MSG_BOTTOM_PAD
+        return _PLAY_INPUT_AREA_H
 
     def on_mouse_scroll(self, x: float, y: float, scroll_y: float) -> None:
         """Handle mouse wheel scroll over the message area."""
@@ -579,7 +598,8 @@ class ChatPanel:
         # the actor mini-card. Drawn last so its open popup overlays the card
         # and message area above it. Hidden while the SAY/ASK box is shown.
         if self._builder_visible():
-            self._action_builder.draw(x, y + _BUILDER_Y_BOT, w, _BUILDER_H)
+            band_h = self._action_builder.content_height(w)
+            self._action_builder.draw(x, y + _BUILDER_BOTTOM_PAD, w, band_h)
 
     def _draw_character_card(self, x: float, y: float, w: float) -> None:
         """Render the character card above the input field (play mode only)."""
@@ -587,7 +607,7 @@ class ChatPanel:
         if card is None:
             return
 
-        card_bot = y + _CHAR_CARD_Y_BOT + self._builder_extra_h
+        card_bot = y + self._card_bot_off
         card_top = card_bot + _CHAR_CARD_H
 
         # Card background + top border

@@ -289,6 +289,30 @@ def test_wrap_keeps_glued_connector_with_its_slot():
 
 
 # ---------------------------------------------------------------------------
+# Dynamic band height (Slice 11) — measure the wrapped sentence so the band can
+# size to the actual line count instead of a fixed constant.
+# ---------------------------------------------------------------------------
+
+def test_sentence_line_count_single_line_when_wide():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    # A very wide band fits the whole sentence on one row.
+    assert builder.sentence_line_count(4000.0) == 1
+
+
+def test_sentence_line_count_wraps_when_narrow():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    # A narrow band forces the sentence to wrap to more than one row.
+    assert builder.sentence_line_count(120.0) > 1
+
+
+def test_content_height_grows_with_wrapped_line_count():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    wide = builder.content_height(4000.0)   # 1 sentence row
+    narrow = builder.content_height(120.0)  # several wrapped rows
+    assert narrow > wide
+
+
+# ---------------------------------------------------------------------------
 # draw() records hit rects consistent with slots() / the action button
 # ---------------------------------------------------------------------------
 
