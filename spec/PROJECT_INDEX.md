@@ -4,9 +4,9 @@
 
 Phase **50 — Hybrid Action Model: COMPLETE & merged to `main`** (2026-06-23).
 Phase **50.5 — Use Noun on Noun: COMPLETE & merged to `main`** (PR #81, 2026-06-24).
-Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–8 committed (+ manual-verify fixes
-+ Command-Sentence Polish CP-1…CP-7; Slices 1–7 + CP track user-verified, Slice 8 awaiting GUI
-verify) on branch `phase-50.6` (latest 2026-06-25). Slice 9 is next.
+Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–8 committed and **user-verified**
+(+ manual-verify fixes + Command-Sentence Polish CP-1…CP-7; Slice 8 incl. three UX rounds, all
+user-verified) on branch `phase-50.6` (latest 2026-06-25). Slice 9 is next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -18,13 +18,14 @@ Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
 
 Continue with Slice 9 ("Retire ACTION tab" — remove the right-panel ACTION tab now that the
 in-chat builder is the single source of truth; re-wire the submit callback to the in-chat builder;
-keep CHAR/Scene/Fallout/Memory/Debug tabs; suite stays green, spec §7 + §9). Slices 1–8 are
-committed; Slices 1–7 + the Command-Sentence Polish track (CP-1…CP-7) are user-verified. **Slice 8
-still needs a final GUI manual-verify** (`python -m dungeon_daddy` → Play mode, after three UX
-rounds): header reads `R4: THINGS HERE` (no separate room row, no footer); the selected row shows a
-larger bold TEAL `▸`; clicking an **open exit** auto-moves and a **loose item** auto-picks-up;
-clicking any other noun (incl. a locked exit) fills the in-chat builder's noun slot; loop-pattern
-chips appear only in test-drive, not a real play session.
+keep CHAR/Scene/Fallout/Memory/Debug tabs; suite stays green, spec §7 + §9). **Slices 1–8 are
+committed and user-verified**, including the three Slice 8 UX rounds (GUI-confirmed 2026-06-25):
+`R4: THINGS HERE` folded header (no footer), larger bold TEAL `▸` selection marker, click-an-
+open-exit-to-move / click-a-loose-item-to-pickup, and loop-pattern chips only in test-drive.
+
+**Possible follow-up to weigh during/after Slice 9 (user, 2026-06-25):** now that clicking an open
+exit auto-moves, consider whether to drop the `move` verb from the in-chat command sentence — TBD,
+revisit once it's been played a bit.
 
 Spec is `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md` (read it; design decisions are locked in §3).
 Phase 50.6 is a **BUILD add-on** (dynamic, like 50.5 — not on the 51–53 roadmap, no issue).
@@ -163,9 +164,11 @@ in-chat builder until Slice 9 retires it.
   map layer takes no RPG imports beyond the dataclass type. 9 new tests (3 helper, 3 renderer incl.
   graph-mode regression, 2 MapPanel draw-forwarding, 1 play_view feeds-overlay; + carried-exclusion
   test inverted). Full unit suite green (2916).
-- **Slice 8 — DONE** (overlay→builder link, spec §5.3; awaiting GUI verify). Clicking a "Things
-  Here" row now fills the in-chat builder's noun slot, rings the clicked row TEAL, and mirrors that
-  noun's suggested verbs in the overlay footer. Four TDD cycles: (1) **view-model** —
+- **Slice 8 — DONE** (overlay→builder link, spec §5.3; **user-verified** after 3 UX rounds below).
+  Clicking a "Things Here" row now fills the in-chat builder's noun slot, rings the clicked row TEAL,
+  and mirrors that noun's suggested verbs in the overlay footer. (NOTE: the ring + footer described
+  here were superseded by the UX rounds — see below for the shipped marker/no-footer design.) Four
+  TDD cycles: (1) **view-model** —
   `detail_panel_renderer.PanelLine` gains `noun_id` + `selected`; `format_things_here(things,
   selected_noun_id, suggested_verbs)` flags the selected row and appends a footer (`Selected: <label>`
   / `Suggested: <verbs>` / "Clicking a noun feeds the action builder."); footer only when a noun is
@@ -221,6 +224,16 @@ in-chat builder until Slice 9 retires it.
   tests: −3 footer/suggested (renderer + 2 view-model), +2 view-model (no-footer, header-folds-id),
   +1 play_view loose-item pickup; the "feeds-selected" test trimmed to selection-only. Full
   map+ui+views suites green (1633).
+- **Reseed / no-playbook crash fix — DONE** (commit `ca9af45`, 2026-06-25; not a slice — surfaced
+  while reseeding the Crucible save to test Slice 8). A `--force` RPG reseed had blanked the PCs'
+  `playbook_slug`, and loading the save then crashed in the action panel (`available_adverbs("")` →
+  `KeyError`). Two fixes + tests: (1) `vna_action_panel._refresh_adverbs` treats an empty playbook
+  slug like `None` (offers no adverbs, no crash); (2) `seed_rpg_state` `--force` now preserves the
+  existing actor's `playbook_slug`/`room_id`/`status` (the pack doesn't own them). The live Crucible
+  save was repaired by restoring the 3 PCs' playbooks from `campaign.duckdb.bak-prepopulate`
+  (kira→fighter, mira→artificer, talvas→thief; `protagonist` is blank by design). Reseed-a-save
+  invocation gotchas captured in **Notes** (`--campaigns-dir` for the saves dir; `PYTHONPATH=.` for
+  the populate scripts). Full unit suite green (2940).
 - Then slices 9–11 (retire ACTION tab, SAY/ASK swap stub, polish + smoke test). **Slice 9:** remove
   the right-panel ACTION tab, re-wire submit to the in-chat builder, suite stays green (spec §7).
 
