@@ -1095,6 +1095,7 @@ class PlayView(arcade.View):
     def _refresh_vna_panel(self) -> None:
         """Populate the VNA action panel from the current room + acting actor."""
         from dungeon_daddy.memory.context_bundle import build_room_noun_context
+        from dungeon_daddy.rpg.action_options import room_things
 
         if (self._mem_repo is None or self._rpg_campaign_id is None
                 or self._state is None or not self._state.current_room_id):
@@ -1116,17 +1117,23 @@ class PlayView(arcade.View):
                 if a.actor_id != actor.actor_id
             ],
         }
+        actor_dict = {
+            "actor_id": actor.actor_id,
+            "display_name": actor.display_name,
+            "carried_items": self._mem_repo.get_items_by_actor(actor.actor_id),
+        }
         self._rpg_vna.set_context(
             actor_abilities=self._mem_repo.get_actor_abilities(actor.actor_id),
             room_context=room_context,
-            actor={
-                "actor_id": actor.actor_id,
-                "display_name": actor.display_name,
-                "carried_items": self._mem_repo.get_items_by_actor(actor.actor_id),
-            },
+            actor=actor_dict,
             playbook_slug=actor.playbook_slug or "",
             world_flags=self._room_world_flags(room_id),
         )
+        # Feed the map's "Things Here" overlay from the same room context, so it
+        # auto-tracks the current room (Phase 50.6 §5).
+        map_panel = getattr(self, "_map", None)
+        if map_panel is not None:
+            map_panel.set_things_here(room_things(room_context, actor_dict))
         # If the ACTION tab is live, rebuild its dropdowns so they reflect the
         # newly-loaded options (e.g. after the party moves to a new room).
         side = getattr(self, "_rpg_side", None)

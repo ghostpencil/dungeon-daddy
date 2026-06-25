@@ -4,9 +4,9 @@
 
 Phase **50 — Hybrid Action Model: COMPLETE & merged to `main`** (2026-06-23).
 Phase **50.5 — Use Noun on Noun: COMPLETE & merged to `main`** (PR #81, 2026-06-24).
-Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–6 committed (+ manual-verify fixes
+Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–7 committed (+ manual-verify fixes
 + Command-Sentence Polish CP-1…CP-7, all user-verified) on branch `phase-50.6` (latest 2026-06-25).
-Slice 7 is next.
+Slice 8 is next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -14,11 +14,13 @@ Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
 
 ---
 
-## START HERE next session — Phase 50.6, Slice 7
+## START HERE next session — Phase 50.6, Slice 8
 
-Continue with Slice 7 ("Things Here" overlay — replace detail content; auto-track current
-room; render sections). Slices 1–6 + the Command-Sentence Polish track (CP-1…CP-7) are committed
-and user-verified; the builder band is settled (see the CP-6/CP-7 + band-height log below).
+Continue with Slice 8 ("Overlay→builder link" — clicking a noun row in the map overlay fills the
+builder's noun slot + refreshes options; clicked row shows a TEAL selection ring; overlay footer
+mirrors `verbs_for_noun` for the selected noun + states the contract, spec §5.3). Slices 1–7 +
+the Command-Sentence Polish track (CP-1…CP-7) are committed and user-verified; the builder band is
+settled (see the CP-6/CP-7 + band-height log below).
 
 Spec is `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md` (read it; design decisions are locked in §3).
 Phase 50.6 is a **BUILD add-on** (dynamic, like 50.5 — not on the 51–53 roadmap, no issue).
@@ -136,10 +138,30 @@ in-chat builder until Slice 9 retires it.
   row space is intentional headroom for the top-anchored command sentence (~3 wrapped lines clear
   the preview, covering transitive `V·N·T·A`). **Dynamic band height** (size to actual sentence
   line count, kill the airy-when-short gap) is now a **Slice 11 requirement** (spec §9).
-- Then slices 7–11 (overlay, overlay→builder link, retire ACTION tab, SAY/ASK swap stub, polish +
-  smoke test). **Slice 7:** replace the technical `_draw_detail_panel` content with the ready
-  `room_things` view-model + a renderer; auto-track the current room; render the EXITS/OBJECTS/
-  CREATURES/ITEMS sections with status chips.
+- **Slice 7 — DONE** (overlay content swap, spec §5; user verified the GUI). The play-mode map
+  room overlay now renders the player-facing **"Things Here"** view-model instead of the graph
+  authoring readout (`GRAPH MODE / Critical Path / Visual Priority`). **Content only — placement
+  untouched:** the overlay already auto-tracks the current room (play mode feeds the party room
+  into `set_selected_room`) and `compute_panel_position` already anchors to it, so `panel_placement`
+  was NOT changed (user constraint). New pure `format_things_here(RoomThings) -> list[PanelLine]`
+  in `detail_panel_renderer.py` (+ `PanelLine` gains optional `status`/`status_color` for chip
+  rows); `layout_renderer.draw()` gains `mode`/`room_things` params — `mode=="play"` renders the
+  Things-Here lines and draws EXITS/OBJECTS/CREATURES/ITEMS status chips via `draw_chip`
+  (teal/ember/gold), with per-line height so chips don't collide; **graph/design mode is the
+  default and unchanged** (regression-guarded). Wiring: `MapPanel.set_things_here()` forwards
+  `mode="play"`+`room_things` (gated to the current level); `play_view._refresh_vna_panel` builds
+  `room_things` from the same room_context/actor it already feeds the builder, so the overlay
+  updates on load **and every move**. **Decision (user, 2026-06-25):** carried **party inventory
+  is dropped from the overlay** (`SOURCE_CARRIED_ITEM` removed from `_SOURCE_SECTION`) — it is on
+  the party, not in the room; the builder noun dropdown still surfaces it via `available_nouns`;
+  inventory gets its own surface later. **Renderer-injection decision (locked):** mode flag in the
+  renderer (not a pre-built-lines override); play_view builds the `RoomThings` view-model so the
+  map layer takes no RPG imports beyond the dataclass type. 9 new tests (3 helper, 3 renderer incl.
+  graph-mode regression, 2 MapPanel draw-forwarding, 1 play_view feeds-overlay; + carried-exclusion
+  test inverted). Full unit suite green (2916).
+- Then slices 8–11 (overlay→builder link, retire ACTION tab, SAY/ASK swap stub, polish + smoke
+  test). **Slice 8:** clicking a noun row → builder `select_noun` + refresh; TEAL selection ring on
+  the clicked row; overlay footer mirrors `verbs_for_noun` for the selected noun (spec §5.3).
 
   **Known not-yet-done (expected, not bugs):** the free-text **Ask box is still always visible** —
   the contextual SAY/ASK swap is **Slice 10**; the builder band is **not yet responsive/

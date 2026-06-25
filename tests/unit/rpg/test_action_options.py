@@ -639,9 +639,14 @@ def test_room_things_loose_item_is_gold():
     assert (row.glyph, row.status, row.status_color) == ("◆", "in room", "gold")
 
 
-def test_room_things_carried_item_is_gold_and_marked_carried():
+def test_room_things_excludes_carried_inventory():
+    # Carried inventory is on the party, not "in the room" — the overlay omits it
+    # (the builder's noun dropdown still surfaces it). Inventory gets its own
+    # surface later (Phase 50.6 follow-up).
     actor = {**_THINGS_ACTOR, "carried_items": [
         {"item_id": "item:c1:key", "slug": "iron-key", "display_name": "Iron Key"},
     ]}
-    row = _row(room_things({}, actor), "ITEMS", "item:c1:key")
-    assert (row.status, row.status_color) == ("carried", "gold")
+    things = room_things({}, actor)
+    all_ids = [t.noun_id for s in things.sections for t in s.things]
+    assert "item:c1:key" not in all_ids
+    assert things.sections == []  # only carried inventory present → nothing in the room

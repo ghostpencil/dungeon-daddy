@@ -4,6 +4,9 @@ No arcade display needed — setup() is never called.
 """
 from __future__ import annotations
 
+import types
+from unittest.mock import MagicMock, patch
+
 import arcade
 
 from dungeon_daddy.data.models import Connection, Level, Room, SessionState
@@ -400,3 +403,48 @@ def test_load_resets_view_state() -> None:
     p.load(_level(["a"]), _state())
     assert p._view_state.selected_room_id is None
     assert p._view_state.hovered_room_id is None
+
+
+# ---------------------------------------------------------------------------
+# Phase 50.6 Slice 7 — "Things Here" overlay forwarding
+# ---------------------------------------------------------------------------
+
+def _draw_with_mock_renderer(p: MapPanel):
+    """Run MapPanel.draw() with the renderer + GPU bits stubbed; return the mock."""
+    p._layout_renderer = MagicMock()
+    p._stepper = MagicMock()
+    p._art = types.SimpleNamespace(background=None)
+    p._active_variant = "Grid"  # skip the Map-background texture branch
+    p._x, p._y, p._w, p._h = 0.0, 0.0, 900.0, 700.0
+    p._draw_level_overlay = lambda *a, **k: None  # type: ignore[method-assign]
+    with patch("dungeon_daddy.ui.panels.map_panel.arcade"), \
+            patch("dungeon_daddy.ui.panels.map_panel.draw_kicker"), \
+            patch("dungeon_daddy.ui.panels.map_panel.draw_chip"):
+        p.draw()
+    return p._layout_renderer.draw
+
+
+def test_draw_forwards_things_here_in_play_mode() -> None:
+    from dungeon_daddy.rpg.action_options import RoomThing, RoomThings, ThingsSection
+    p = _panel()
+    p.load(_level(["a", "b"], [_conn("a", "b")]), _state())
+    things = RoomThings(
+        room_id="a",
+        sections=[ThingsSection("EXITS", [RoomThing("b", "Hall", "→", "open", "teal")])],
+    )
+    p.set_things_here(things)
+
+    draw = _draw_with_mock_renderer(p)
+    _, kwargs = draw.call_args
+    assert kwargs["mode"] == "play"
+    assert kwargs["room_things"] is things
+
+
+def test_draw_stays_graph_mode_without_things_here() -> None:
+    p = _panel()
+    p.load(_level(["a", "b"], [_conn("a", "b")]), _state())
+
+    draw = _draw_with_mock_renderer(p)
+    _, kwargs = draw.call_args
+    assert kwargs["mode"] == "graph"
+    assert kwargs["room_things"] is None

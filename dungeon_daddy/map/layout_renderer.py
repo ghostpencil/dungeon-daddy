@@ -18,7 +18,11 @@ from dungeon_daddy.map.dungeon_layout.critical_path_style import (
     CriticalPathPresentationResult,
     CriticalPathPresenter,
 )
-from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import PanelLine, format_detail_panel
+from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import (
+    PanelLine,
+    format_detail_panel,
+    format_things_here,
+)
 from dungeon_daddy.map.dungeon_layout.graph_presentation_config import GraphPresentationConfig
 from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
 from dungeon_daddy.map.dungeon_layout.panel_placement import ScreenRect, compute_panel_position
@@ -29,7 +33,8 @@ from dungeon_daddy.map.dungeon_layout.style_resolver import resolve_room_render_
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_config import VisualHierarchyConfig
 from dungeon_daddy.map.layout_debug_renderer import LayoutDebugRenderer
 from dungeon_daddy.ui.fog_of_war import HIDDEN_LABEL, fog_of_war_label
-from dungeon_daddy.ui.theme import FONT_MONO, FONT_UI, GOLD, TEAL, TEXT_XS
+from dungeon_daddy.rpg.action_options import RoomThings
+from dungeon_daddy.ui.theme import FONT_MONO, FONT_UI, GOLD, TEAL, TEXT_XS, draw_chip
 
 _ROOM_FILL = (30, 35, 45)
 _ROOM_BORDER = (100, 120, 140)
@@ -47,9 +52,18 @@ _PANEL_HEADER_COLOR = (160, 200, 220, 255)
 _PANEL_SECTION_COLOR = (120, 140, 160, 220)
 _PANEL_VALUE_COLOR = (180, 185, 190, 255)
 _PANEL_LINE_HEIGHT = 16
+_PANEL_THING_LINE_HEIGHT = 22  # "thing" rows carry a status chip → taller
 _PANEL_PADDING = 10
 _PANEL_WIDTH = 300.0
 _PANEL_FONT_SIZE = 9
+
+
+def _line_height(line: PanelLine) -> int:
+    return _PANEL_THING_LINE_HEIGHT if line.kind == "thing" else _PANEL_LINE_HEIGHT
+
+
+def _panel_height(lines: list[PanelLine]) -> float:
+    return _PANEL_PADDING * 2 + sum(_line_height(ln) for ln in lines)
 
 _DEFAULT_ROOM_STYLE = GraphRoomStyleResolver().resolve("unknown")
 _DEFAULT_CONN_STYLE = GraphConnectionStyleResolver().resolve("")
@@ -128,6 +142,8 @@ class LayoutRenderer:
         canvas_h: float = 800.0,
         viewport_x: float = 0.0,
         viewport_y: float = 0.0,
+        mode: str = "graph",
+        room_things: RoomThings | None = None,
     ) -> None:
         cfg = presentation_config or GraphPresentationConfig()
         if presentation_config is not None:
@@ -156,9 +172,15 @@ class LayoutRenderer:
         if level is not None:
             if cfg.show_detail_panel:
                 sel = view_state.selected_room_id if view_state else selected_room_id
-                panel_data = build_room_detail(sel, level, result) if sel else None
-                lines = format_detail_panel(panel_data)
-                panel_h = _PANEL_PADDING * 2 + len(lines) * _PANEL_LINE_HEIGHT
+                if mode == "play" and room_things is not None:
+                    # Play mode: the player-facing "Things Here" overlay replaces
+                    # the graph authoring readout. Placement still anchors to the
+                    # selected (== current) room, so positioning is unchanged.
+                    lines = format_things_here(room_things)
+                else:
+                    panel_data = build_room_detail(sel, level, result) if sel else None
+                    lines = format_detail_panel(panel_data)
+                panel_h = _panel_height(lines)
                 sel_rect: ScreenRect | None = None
                 conn_rects: list[ScreenRect] = []
                 if sel and sel in result.rooms:
@@ -433,7 +455,7 @@ class LayoutRenderer:
         panel_y: float,
     ) -> None:
         # panel_y is the BOTTOM edge; panel grows upward
-        total_h = _PANEL_PADDING * 2 + len(lines) * _PANEL_LINE_HEIGHT
+        total_h = _panel_height(lines)
         bg_cx = panel_x + _PANEL_WIDTH / 2
         bg_cy = panel_y + total_h / 2
         bg_rect = arcade.XYWH(bg_cx, bg_cy, _PANEL_WIDTH, total_h)
@@ -457,7 +479,17 @@ class LayoutRenderer:
                 font_name=FONT_MONO,
                 width=int(_PANEL_WIDTH - _PANEL_PADDING * 2),
             )
-            y -= _PANEL_LINE_HEIGHT
+            if line.kind == "thing" and line.status:
+                chip_w = max(48, len(line.status) * 7 + 18)
+                chip_cx = panel_x + _PANEL_WIDTH - _PANEL_PADDING - chip_w / 2
+                draw_chip(
+                    line.status,
+                    chip_cx,
+                    y + 4,  # align the pill centre with the row's text
+                    line.status_color or "default",
+                    width=chip_w,
+                )
+            y -= _line_height(line)
 
     def _draw_atmosphere(
         self,

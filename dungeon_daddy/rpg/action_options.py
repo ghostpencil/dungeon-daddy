@@ -241,7 +241,10 @@ _SECTION_ORDER: tuple[str, ...] = (
 
 # Which overlay section each noun ``source`` falls into. Synthetic ``self`` and
 # ``room`` (and ally ``party``) sources are intentionally absent — they belong to
-# no "Things Here" section and are dropped.
+# no "Things Here" section and are dropped. Carried inventory (``carried_item``)
+# is likewise absent: it is on the party, not "in the room", so the overlay omits
+# it (the builder's noun dropdown still surfaces it). Inventory gets its own
+# surface later.
 _SOURCE_SECTION: dict[str, str] = {
     SOURCE_EXIT: SECTION_EXITS,
     SOURCE_LOCKED_EXIT: SECTION_EXITS,
@@ -249,7 +252,6 @@ _SOURCE_SECTION: dict[str, str] = {
     SOURCE_MONSTER: SECTION_CREATURES,
     SOURCE_NPC: SECTION_CREATURES,
     SOURCE_LOOSE_ITEM: SECTION_ITEMS,
-    SOURCE_CARRIED_ITEM: SECTION_ITEMS,
 }
 
 # Row glyphs (spec §5.1). Objects show a hazard glyph when their state is alarming.
@@ -307,7 +309,8 @@ def room_things(room_context: Mapping, actor: Mapping) -> RoomThings:
     are exactly the ids the builder's ``select_noun`` expects, then joins each
     noun to its live status from ``room_context`` to derive the chip text/colour
     and glyph. Synthetic ``self``/``room`` (and ally ``party``) nouns map to no
-    section and are dropped; sections with no rows are omitted.
+    section and are dropped, as is carried party inventory (``carried_item`` — it
+    is on the party, not in the room); sections with no rows are omitted.
     """
     objects_by_id = {o["object_id"]: o for o in room_context.get("objects", [])}
     exits_by_id = {e["exit_id"]: e for e in room_context.get("exits", [])}
@@ -354,11 +357,9 @@ def _room_thing(
         creature = creatures_by_id.get(noun.noun_id, {})
         status = creature.get("disposition") or creature.get("status", "")
         return RoomThing(noun.noun_id, noun.label, GLYPH_CREATURE, status, _state_color(status))
-    # SOURCE_LOOSE_ITEM / SOURCE_CARRIED_ITEM — loot, always gold.
-    if src == SOURCE_CARRIED_ITEM:
-        status = "carried"
-    else:
-        status = (loose_by_id.get(noun.noun_id, {}).get("status") or "on floor").replace("_", " ")
+    # SOURCE_LOOSE_ITEM — loose pickups on the floor, always gold. (Carried
+    # inventory is filtered out upstream via _SOURCE_SECTION.)
+    status = (loose_by_id.get(noun.noun_id, {}).get("status") or "on floor").replace("_", " ")
     return RoomThing(noun.noun_id, noun.label, GLYPH_ITEM, status, "gold")
 
 

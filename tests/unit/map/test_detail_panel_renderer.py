@@ -1,5 +1,9 @@
-from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import format_detail_panel
+from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import (
+    format_detail_panel,
+    format_things_here,
+)
 from dungeon_daddy.map.dungeon_layout.room_detail_panel import ConnectionDetail, RoomDetailPanelData
+from dungeon_daddy.rpg.action_options import RoomThing, RoomThings, ThingsSection
 
 
 def _make_data(**kwargs) -> RoomDetailPanelData:
@@ -120,3 +124,42 @@ def test_no_raw_json_in_lines():
             assert False, f"Line looks like raw JSON: {line.text!r}"
         except (json.JSONDecodeError, ValueError):
             pass
+
+
+# ---------------------------------------------------------------------------
+# Phase 50.6 Slice 7 — "Things Here" overlay content (replaces graph metadata)
+# ---------------------------------------------------------------------------
+
+def _things(room_id="R1", sections=None) -> RoomThings:
+    return RoomThings(room_id=room_id, sections=sections or [])
+
+
+def test_things_here_header_and_room_id():
+    lines = format_things_here(_things(room_id="R1"))
+    header = next(ln for ln in lines if ln.kind == "header")
+    assert "THINGS HERE" in header.text.upper()
+    all_text = " ".join(ln.text for ln in lines)
+    assert "R1" in all_text
+
+
+def test_things_here_renders_sections_and_rows():
+    section = ThingsSection(
+        title="EXITS",
+        things=[RoomThing("e1", "Marketplace Arch", "→", "open", "teal")],
+    )
+    lines = format_things_here(_things(sections=[section]))
+    titles = [ln.text for ln in lines if ln.kind == "section"]
+    assert "EXITS" in titles
+    row = next(ln for ln in lines if ln.kind == "thing")
+    assert "Marketplace Arch" in row.text
+    assert "→" in row.text
+    assert row.status == "open"
+    assert row.status_color == "teal"
+
+
+def test_things_here_empty_shows_placeholder():
+    lines = format_things_here(_things(sections=[]))
+    # header still present, plus a non-empty value line describing the empty room
+    assert any(ln.kind == "header" for ln in lines)
+    value_text = " ".join(ln.text for ln in lines if ln.kind == "value").lower()
+    assert value_text.strip() != ""

@@ -14,6 +14,7 @@ from dungeon_daddy.map.dungeon_layout.long_floor_framing import is_long_linear_f
 from dungeon_daddy.map.grid_renderer import GridRenderer
 from dungeon_daddy.map.layout_renderer import LayoutRenderer
 from dungeon_daddy.map.loop_overlay import LoopOverlay
+from dungeon_daddy.rpg.action_options import RoomThings
 from dungeon_daddy.ui.theme import (
     BG_0,
     BG_1,
@@ -151,6 +152,7 @@ class MapPanel:
         self._view_state = GraphViewState()
         self._level_view_states: dict[int, GraphViewState] = {}
         self._selected_room_id = None
+        self._things_here: RoomThings | None = None  # play-mode overlay content
         self._art = None  # MapArtAssets, lazy-loaded on first draw
 
         from dungeon_daddy.ui.widgets.level_stepper import LevelStepper
@@ -236,6 +238,15 @@ class MapPanel:
     def set_selected_room(self, room_id: str | None) -> None:
         """Move the selection cursor (selected frame + detail panel) to a room."""
         self._selected_room_id = room_id
+
+    def set_things_here(self, things: RoomThings | None) -> None:
+        """Feed the play-mode "Things Here" overlay content (Phase 50.6 §5).
+
+        When set, the map's detail panel renders the player-facing room contents
+        (Exits/Objects/Creatures/Items) instead of the graph authoring readout.
+        Pass ``None`` to revert to graph mode (e.g. design view).
+        """
+        self._things_here = things
 
     def set_renderer(self, renderer: GridRenderer) -> None:
         self._renderer = renderer
@@ -425,14 +436,15 @@ class MapPanel:
                 origin_x = x + PAD_MD + self._pan_offset_x
                 origin_y = y + PAD_MD + self._pan_offset_y
                 if self._layout_result is not None:
+                    on_current_level = (
+                        self._viewed_level_idx == self._state.current_level_idx
+                    )
                     self._layout_renderer.draw(
                         self._layout_result, origin_x, origin_y, self._zoom_level,
                         view_state=self._view_state,
                         level=self._level,
                         party_room_id=(
-                            self._state.current_room_id
-                            if self._viewed_level_idx == self._state.current_level_idx
-                            else None
+                            self._state.current_room_id if on_current_level else None
                         ),
                         visited_rooms=self._state.visited_rooms,
                         presentation_config=self._pres_config,
@@ -442,6 +454,8 @@ class MapPanel:
                         canvas_h=float(map_h),
                         viewport_x=float(x),
                         viewport_y=float(y),
+                        mode="play" if (self._things_here is not None and on_current_level) else "graph",
+                        room_things=self._things_here if on_current_level else None,
                     )
                 else:
                     self._renderer.draw(self._level, self._state, origin_x, origin_y, self._zoom_level)

@@ -88,6 +88,26 @@ def test_refresh_vna_panel_surfaces_exit_as_noun(tmp_path):
     assert "e1" in noun_ids
 
 
+def test_refresh_vna_panel_feeds_things_here_overlay(tmp_path):
+    """Phase 50.6 Slice 7: the same refresh feeds the map overlay, tracking the
+    current room — so the overlay updates on load and on every move."""
+    from dungeon_daddy.rpg.action_options import RoomThings, SECTION_EXITS
+    view = _make_view(tmp_path)
+    view._map = MagicMock()
+    _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="open")
+
+    view._refresh_vna_panel()
+
+    view._map.set_things_here.assert_called_once()
+    things = view._map.set_things_here.call_args.args[0]
+    assert isinstance(things, RoomThings)
+    assert things.room_id == "r1"
+    titles = {s.title for s in things.sections}
+    assert SECTION_EXITS in titles
+    exit_ids = {t.noun_id for s in things.sections for t in s.things}
+    assert "e1" in exit_ids
+
+
 def test_set_rpg_context_populates_action_builder_on_load(tmp_path):
     # On load the in-chat builder must be ready without first opening the
     # right-panel ACTION tab: set_rpg_context is the chokepoint where mem_repo,

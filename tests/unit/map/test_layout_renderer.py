@@ -258,6 +258,101 @@ def test_unmarked_room_omits_marker_text() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Phase 50.6 Slice 7 — play-mode "Things Here" detail panel
+# ---------------------------------------------------------------------------
+
+def _level() -> Level:
+    return Level(
+        id=1, name="L", rooms=[], connections=[], entries=[],
+        width=10, height=10, loop="", summary="", ecology="",
+    )
+
+
+def _room_things(room_id="R1"):
+    from dungeon_daddy.rpg.action_options import RoomThing, RoomThings, ThingsSection
+    return RoomThings(
+        room_id=room_id,
+        sections=[
+            ThingsSection(
+                title="EXITS",
+                things=[RoomThing("e1", "Marketplace Arch", "→", "open", "teal")],
+            ),
+        ],
+    )
+
+
+def test_play_mode_renders_things_here_not_graph_metadata() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+    rooms = {"R1": _room("R1")}
+    result = _result(rooms=rooms, room_names={"R1": "Receiving Hall"})
+    view_state = GraphViewState()
+    view_state.select_room("R1")
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.draw_chip"), \
+            patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(
+            result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
+            mode="play", room_things=_room_things(),
+        )
+        all_text = " ".join(str(c) for c in mock_arcade.draw_text.call_args_list)
+
+    assert "THINGS HERE" in all_text
+    assert "Marketplace Arch" in all_text
+    assert "GRAPH MODE" not in all_text
+    assert "Critical Path" not in all_text
+
+
+def test_play_mode_draws_status_chip_with_color() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+    rooms = {"R1": _room("R1")}
+    result = _result(rooms=rooms)
+    view_state = GraphViewState()
+    view_state.select_room("R1")
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.draw_chip") as mock_chip, \
+            patch("dungeon_daddy.map.layout_renderer.arcade"):
+        renderer.draw(
+            result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
+            mode="play", room_things=_room_things(),
+        )
+        colors = [c.args[3] if len(c.args) > 3 else c.kwargs.get("color")
+                  for c in mock_chip.call_args_list]
+        texts = [c.args[0] if c.args else c.kwargs.get("text")
+                 for c in mock_chip.call_args_list]
+
+    assert "open" in texts
+    assert "teal" in colors
+
+
+def test_graph_mode_default_still_uses_graph_metadata() -> None:
+    """Regression: design/graph mode (the default) is untouched by the play branch."""
+    from dungeon_daddy.data.models import Room
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+    rooms = {"R1": _room("R1")}
+    result = _result(rooms=rooms, room_names={"R1": "Receiving Hall"},
+                     room_roles={"R1": "entrance"}, critical_path=["R1"])
+    level = Level(
+        id=1, name="L",
+        rooms=[Room(id="R1", num=1, name="Receiving Hall", x=0, y=0, w=1, h=1,
+                    type="chamber", note="")],
+        connections=[], entries=[], width=10, height=10,
+        loop="", summary="", ecology="",
+    )
+    view_state = GraphViewState()
+    view_state.select_room("R1")
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, 0.0, 0.0, 1.0, view_state=view_state, level=level)
+        all_text = " ".join(str(c) for c in mock_arcade.draw_text.call_args_list)
+
+    assert "Critical Path" in all_text
+    assert "THINGS HERE" not in all_text
+
+
+# ---------------------------------------------------------------------------
 # Cycle 12 — secret connection uses lower alpha than normal
 # ---------------------------------------------------------------------------
 
