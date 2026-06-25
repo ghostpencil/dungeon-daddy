@@ -120,6 +120,16 @@ in-chat builder until Slice 9 retires it.
   5. **CP-5 connector calm** — actor name kept `INK_2` (content), "will" dropped to `INK_3` to
      match the other glue words; all function words now one quiet weight. Visual.
   6 new unit tests total. Full UI+views unit suite green (958).
+- **Builder declutter (CP-6, CP-7) — DONE** (user-requested; user verified the GUI). Two removals
+  on the builder band:
+  1. **CP-6 drop suggested-verbs row** — **retires spec §4.4 / Slice 5** (it cluttered the band).
+     Removed the draw block, click routing, `_suggested_rects`, and
+     `suggested_verbs`/`_suggested_is_active`/`_SUGGESTED_CAP` (+6 tests). The "relevant verbs
+     first" intent moves to **ordering the verb dropdown** later if needed; `verbs_for_noun` stays
+     in `rpg/action_options.py` for that sort + the overlay footer (§5.3).
+  2. **CP-7 remove PREVIEW kicker** — the `draw_kicker` accent bar poked above the inset; dropped
+     it and re-padded so the preview lines sit centred with symmetric top/bottom padding.
+  Net −5 tests. Full UI+views unit suite green (953).
 - Then slices 7–11 (overlay, overlay→builder link, retire ACTION tab, SAY/ASK swap stub, polish +
   smoke test). **Slice 7:** replace the technical `_draw_detail_panel` content with the ready
   `room_things` view-model + a renderer; auto-track the current room; render the EXITS/OBJECTS/

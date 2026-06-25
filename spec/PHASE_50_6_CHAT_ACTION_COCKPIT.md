@@ -125,6 +125,12 @@ new pure helpers (§4.6). The pure-logic core stays Arcade-free and unit-testabl
 
 ### 4.4 Suggested-verbs row
 
+> **RETIRED (2026-06-24, design decision).** Implemented in Slice 5 + polished in CP-4, then
+> removed in **CP-6**: the quick-pick row cluttered the builder band. The intent — surfacing the
+> most relevant verbs first — is instead served by **ordering the verb dropdown** (alter its sort
+> so applicable verbs lead). `verbs_for_noun` stays in `rpg/action_options.py` for that sort and
+> for the overlay footer (§5.3). The text below is kept for history.
+
 Quick-select chips below the sentence, **filtered by the selected noun**. Clicking a chip sets
 the Verb slot (same effect as the verb dropdown). Verbs that cannot apply to the current noun
 render disabled (`INK_4`), matching the greyed `·move·` in the mockup.
@@ -134,6 +140,10 @@ render disabled (`INK_4`), matching the greyed `·move·` in the mockup.
   disabled, capped at ~5 chips by relevance.
 
 ### 4.5 Deterministic Preview box (decision #3 — no LLM)
+
+> **CP-7 (2026-06-24):** the "PREVIEW" kicker was dropped — its accent bar poked above the inset
+> and the three lines are self-describing. The box now holds just the lines, centred with
+> symmetric padding.
 
 A pure function builds the preview from already-loaded state. **Never** calls the LLM.
 
