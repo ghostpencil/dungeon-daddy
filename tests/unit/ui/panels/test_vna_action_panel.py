@@ -498,3 +498,39 @@ class TestTargetSlot:
         panel.select_noun("itm-key")
         target_ids = {n.noun_id for n in panel._targets}
         assert "exit-north" not in target_ids  # open exit without key requirement is NOT a use target
+
+
+# ---------------------------------------------------------------------------
+# selected_noun_is_speakable (Slice 10) — dialogue gate seen by the builder
+# ---------------------------------------------------------------------------
+
+class TestSelectedNounIsSpeakable:
+    def _speak_panel(self):
+        panel = _panel()
+        panel.set_context(
+            actor_abilities=[],
+            room_context=_room_context(
+                npcs=[{"actor_id": "npc-warden", "display_name": "Warden",
+                       "disposition": "willing"}],
+                monsters=[{"actor_id": "mon-gnoll", "display_name": "Gnoll",
+                           "disposition": "hostile"}],
+            ),
+            actor=_actor(),
+            playbook_slug="fighter",
+            world_flags=[],
+        )
+        return panel
+
+    def test_true_for_selected_willing_npc(self):
+        panel = self._speak_panel()
+        panel.select_noun("npc-warden")
+        assert panel.selected_noun_is_speakable() is True
+
+    def test_false_for_selected_hostile_monster(self):
+        panel = self._speak_panel()
+        panel.select_noun("mon-gnoll")
+        assert panel.selected_noun_is_speakable() is False
+
+    def test_false_when_no_noun_selected(self):
+        # A bare panel offers nothing to talk to.
+        assert _panel().selected_noun_is_speakable() is False

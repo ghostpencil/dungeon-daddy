@@ -28,6 +28,7 @@ from dungeon_daddy.rpg.action_options import (
     available_adverbs,
     available_nouns,
     available_verbs,
+    is_speakable,
     is_transitive,
     noun_sources_for_verb,
     target_sources_for_verb,
@@ -249,6 +250,17 @@ class VnaActionPanel:
     def selected_noun_option(self) -> NounOption | None:
         """The currently-selected noun option, or ``None`` when no noun is set."""
         return self._selected_noun()
+
+    def selected_noun_is_speakable(self) -> bool:
+        """True when the selected noun is a creature the party can talk to (§6).
+
+        Delegates to the pure :func:`is_speakable` gate against the retained
+        room context; drives the builder's dialogue (``sway``/talk) affordance.
+        """
+        noun = self._selected_noun()
+        if noun is None:
+            return False
+        return is_speakable(noun, self._room_context)
 
     def _selected_noun(self) -> NounOption | None:
         return next((n for n in self._nouns if n.noun_id == self._noun_id), None)

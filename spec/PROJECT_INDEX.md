@@ -6,8 +6,9 @@ Phase **50 — Hybrid Action Model: COMPLETE & merged to `main`** (2026-06-23).
 Phase **50.5 — Use Noun on Noun: COMPLETE & merged to `main`** (PR #81, 2026-06-24).
 Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–8 committed and **user-verified**
 (+ manual-verify fixes + Command-Sentence Polish CP-1…CP-7; Slice 8 incl. three UX rounds, all
-user-verified); **Slice 9 (retire ACTION tab) DONE & GUI-verified; EXITS/Move tab also retired** on
-branch `phase-50.6` (latest 2026-06-26). Slice 10 is next.
+user-verified); **Slice 9 (retire ACTION tab) DONE & GUI-verified; EXITS/Move tab also retired**;
+**Slice 10 (SAY/ASK swap stub + creature `disposition`) DONE, committed & GUI-verified**
+on branch `phase-50.6` (latest 2026-06-26). Slice 11 (polish + smoke test) is next/in progress.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -15,23 +16,28 @@ Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
 
 ---
 
-## START HERE next session — Phase 50.6, Slice 10
+## START HERE next session — Phase 50.6, Slice 11
 
-Continue with **Slice 10 — SAY/ASK swap (stub)** (spec §6 + §9.10). The bottom-of-column input
-defaults to the in-chat Action Builder; swap it to a free-text **SAY/ASK** box only on a dialogue
-flag (a "Speak to the Dungeon" event, or `talk`/`sway`-family verb on a *willing* NPC/monster),
-and swap back when dialogue ends. **Scope = the swap mechanism + a stubbed/no-op SAY box that can
-be shown/hidden + the "is this target speakable?" gate surfaced in the builder** (e.g. `talk` only
-enabled on willing targets). **Out of scope (Phase 51):** actual conversation flow, NPC memory,
-routing — mark the SAY handler as a Phase 51 extension point. Note: the free-text Ask box is
-*currently always visible*; Slice 10 makes it contextual.
+Continue with **Slice 11 — Polish + smoke test** (spec §9.11). Three pieces:
+1. **Dynamic builder-band height** — `_BUILDER_H` is a fixed **180px**; make the band *size to the
+   actual wrapped-sentence line count* so the sentence↔preview gap stays constant (kills the airy
+   gap when short and collision when long). The CP-1 `_wrap_units` line assignment already yields the
+   line count — expose it so `chat_panel`'s layout (`_builder_extra_h`/`_BUILDER_H`) consults it
+   instead of a constant. See the **Slice 11 requirement** note in spec §9.
+2. **Short-window collapsible fallback** (spec §4.1) — a ▾/▴ toggle that collapses the builder band
+   on short windows; pick the min-height threshold (spec §11 open question).
+3. **Smoke test** — `tools/smoke_test_phase*.py` (Strategy A/B per `spec/TESTING.md` — read the
+   A-vs-B guidance first) + manual visual verify by the user.
 
-**Slice 9 is DONE** (ACTION tab gone — **user-verified in the GUI 2026-06-26**). **EXITS/Move tab
-retired too** (follow-up cleanup, user-requested 2026-06-26; spec §7 had flagged it redundant with
-the "Things Here" overlay): the `ExitListPanel` class + its dedicated tests + `_refresh_exits()`
-were **deleted** (dead code — moving is now driven by the overlay click-to-move + in-chat builder;
-the `_on_exit_move` engine command stays). The right RPG panel now shows **5 tabs
-(CHAR/SCENE/FALLOUT/MEM/DBG)**. Not yet GUI-verified after the EXITS removal — worth a quick look.
+**Also fold in (Slice 10 follow-up): the bottom-of-column blank strip.** Making the free-text Ask
+box contextual (Slice 10) leaves a ~70px empty band below the builder in default play mode (the
+`_PLAY_INPUT_AREA_H` still reserves the input row's height while it is hidden) — collapse/reclaim
+it as part of the dynamic-height work.
+
+**Slice 10 is DONE, committed & GUI-verified** (2026-06-26): in **The Crucible → R3 (Cargo Bay)**,
+selecting **Pinion** + verb **Sway** → builder button reads **TALK**; submitting swaps the bottom of
+the chat column to the free-text **SAY box**; sending a line ends the stub and swaps back to the
+builder. (The live save was migrated + re-populated so Pinion is `disposition="willing"`.)
 
 **Possible follow-up to weigh (user, 2026-06-25):** now that clicking an open exit auto-moves,
 consider dropping the `move` verb from the in-chat command sentence — TBD, revisit once played.
@@ -274,14 +280,46 @@ in-chat builder until **Slice 9 retired it** (in-chat builder is now the sole ac
   list; `test_play_view_exits.py` trimmed to the `_on_exit_move` cases (dropped the two
   `_refresh_exits` tests); `conftest.py`/`test_play_view_vna.py` dropped the `ExitListPanel`
   scaffolding; `test_play_view_party_focus.py` dropped the `_refresh_exits` mock + assertions.
-- Then slices 10–11 (SAY/ASK swap stub, polish + smoke test). **Slice 10:** input surface swaps
-  builder↔SAY box on a dialogue flag; `talk` verb gated to willing targets (conversation logic
-  deferred to Phase 51). **Slice 11:** polish (incl. dynamic builder-band height + collapsible
-  short-window fallback) + smoke test.
+- **Slice 10 — DONE** (SAY/ASK swap stub + creature `disposition`, spec §6 + §9.10; **committed &
+  GUI-verified 2026-06-26**; full unit suite green **2960**). Two halves — the input-surface swap and
+  a real `disposition` field so the gate can fire live. **8 TDD cycles:**
+  1. **`is_speakable(noun, room_context)`** pure helper in `rpg/action_options.py` + consts
+     `VERB_SWAY`/`DIALOGUE_VERBS`/`_SPEAKABLE_DISPOSITIONS={"willing"}`. A creature noun (NPC/monster)
+     is speakable only when its `disposition` is `willing`; non-creatures and hostile/wary never are.
+     (No `talk` verb exists — `sway` is the talk/sway-family social verb.) +6 tests.
+  2. **Builder dialogue gate** — `VnaActionPanel.selected_noun_is_speakable()`; `InChatActionBuilder.
+     is_dialogue_action()` (verb in `DIALOGUE_VERBS` **and** selected noun speakable); `button_label()`
+     returns **TALK** for a dialogue action. +7 tests.
+  3. **`ChatPanel.set_dialogue_mode(bool)`** swap — default play mode shows the builder and **hides**
+     the free-text input; dialogue shows the SAY box and hides the builder. `_builder_visible()`/
+     `_free_text_visible()` gate `_builder_extra_h`, the builder draw, and click-routing; `setup()`/
+     `set_action_builder()` apply visibility. +6 tests.
+  4. **play_view wiring** — `_on_vna_submit`: a `sway` on a **speakable** target calls
+     `_begin_dialogue_stub(noun)` (sets `_dialogue_stub_active`, `chat.set_dialogue_mode(True)`, posts
+     a placeholder) **instead of rolling**; hostile/wary `sway` falls through to the normal roll.
+     `_on_chat_send` routes a line to `_on_dialogue_send_stub` while `_dialogue_stub_active` (ends the
+     stub, swaps back). **Both stub handlers are marked Phase 51 extension points.** Send-interception
+     keyed off the **PlayView flag** (not the mocked chat) — avoids a `MagicMock` truthiness trap that
+     first broke 47 pending-intent tests (caught + fixed pre-green). +3 tests.
+  5–8. **Real `disposition` data** (user chose "Add disposition field" over a tag fallback —
+     authorized override of the §10 "no schema change" non-goal): **migration `015_actor_disposition.
+     sql`** (`actors.disposition TEXT DEFAULT 'neutral'`); `ActorState.disposition: Literal["hostile",
+     "wary","neutral","willing"]="neutral"`; `save_actor`/`get_actor`/`get_actors_by_room` persist +
+     return it; `context_bundle._actor_noun` emits it into npc/monster rows. **Pinion (R3)** seeded
+     `disposition="willing"` in `tools/populate_crucible_level1.py`. End-to-end test: real repo →
+     `build_room_noun_context` → `available_nouns` → `is_speakable` True. +9 tests (model, repo,
+     context incl. 2 exact-equality npc/monster dicts updated to carry `disposition`).
+  **Live save updated this session** (user-requested): backed up to `campaign.duckdb.bak-slice10-*`,
+  applied migration 015, re-ran `populate_crucible_level1` — Pinion now `willing` (verified speakable).
+  **Files:** `rpg/action_options.py`, `ui/panels/action_builder.py`, `ui/panels/vna_action_panel.py`,
+  `ui/panels/chat_panel.py`, `views/play_view.py`, `rpg/models.py`, `memory/repository.py`,
+  `memory/context_bundle.py`, `data/migrations/015_actor_disposition.sql`, `tools/populate_crucible_level1.py`.
+- Then **Slice 11** (polish + smoke test) — see START HERE. **Slice 11:** dynamic builder-band height
+  + collapsible short-window fallback + reclaim the Slice-10 bottom blank strip + smoke test.
 
-  **Known not-yet-done (expected, not bugs):** the free-text **Ask box is still always visible** —
-  the contextual SAY/ASK swap is **Slice 10**; the builder band is **not yet responsive/
-  collapsible** on short windows (Slice 11).
+  **Known not-yet-done (expected, not bugs):** the builder band is **not yet responsive/collapsible**
+  on short windows, and hiding the free-text box leaves a **~70px blank strip** at the bottom in
+  default play mode — both folded into **Slice 11**.
 
 After 50.6: **Phase 51 — Talk to the Dungeon** (roadmap; 50.6 carves the SAY/ASK input seam).
 Write `spec/PHASE_51_*.md` when starting.
@@ -339,7 +377,8 @@ Per-session implementation logs are in git history and the auto-memory (`project
 - UI icons: `dungeon_daddy/assets/ui/icons/` (white/transparent PNG + SVG source); attribution in `CREDITS.json`. Fetch new ones with the `game-icon-finder` skill.
 - `protagonist` actor: `seed_data/campaigns/the-crucible/rpg_seed.json` (use `--seed-pack` + `--force` to reset). Generic `seed_campaign()` no longer creates a placeholder actor.
 - **Reseeding a *save* (not a campaign template):** `seed_rpg_state.py` defaults to the `…/DungeonDaddy/campaigns` dir, so to target a real save pass `--campaigns-dir "%LOCALAPPDATA%\DungeonDaddy\saves" --campaign "<Save Name>"`. The `populate_crucible_level*.py` scripts need `PYTHONPATH=.`. Close the app first (DuckDB single-writer). `--force` now **preserves** each actor's `playbook_slug`/`room_id`/`status` (the pack doesn't own them; previously `--force` nulled them, which blanked PC playbooks → action-panel crash). Playbooks are assigned by the publish pipeline / Seed editor, **not** the rpg_seed pack.
-- Crucible Level 1 content: `tools/populate_crucible_level1.py` (re-run 2026-06-24) — idempotent upserts of 11 objects, 7 loose items, 4 monsters, 1 NPC, and 3 exits into the live save (`%LOCALAPPDATA%\DungeonDaddy\saves\The Crucible\campaign.duckdb`; close app first). Puzzle chain: R1 journal → R2 lift-warden-key → R2→R4 door (key-gated, permanently unlocked on use) → R3 lift-fuse → R4 Great Lift (fuse-gated, consumed on power-up) → Level 2 r01.
+- Crucible Level 1 content: `tools/populate_crucible_level1.py` (re-run 2026-06-26) — idempotent upserts of 11 objects, 7 loose items, 4 monsters, 1 NPC, and 3 exits into the live save (`%LOCALAPPDATA%\DungeonDaddy\saves\The Crucible\campaign.duckdb`; close app first). Puzzle chain: R1 journal → R2 lift-warden-key → R2→R4 door (key-gated, permanently unlocked on use) → R3 lift-fuse → R4 Great Lift (fuse-gated, consumed on power-up) → Level 2 r01. **Pinion (R3 NPC) is now seeded `disposition="willing"`** (Slice 10 dialogue gate).
+- Creature `disposition` (Phase 50.6 Slice 10): `actors.disposition` column via **migration `015_actor_disposition.sql`** (default `'neutral'`); model `ActorState.disposition` is `Literal["hostile","wary","neutral","willing"]`. **Gates dialogue** — only `willing` is speakable (`is_speakable` in `rpg/action_options.py`); surfaced as the CREATURES status chip. The populate script does **not** apply migrations, so a fresh/old save needs migration 015 applied first (auto on app load via `initialize_schema`, or run it once standalone) before `save_actor(disposition=…)` will work. **Live Crucible save was migrated + re-populated 2026-06-26** (backup `campaign.duckdb.bak-slice10-20260625-165748`).
 - Crucible Level 2 content: `tools/populate_crucible_level2.py` (run 2026-06-24) — Great Lift upper landing in r01 (`state=ready`) + open `r01→R4` vertical connector exit (return to Level 1). Re-run to reset.
 - Level-crossing exits: `to_level_id` encodes the **0-based list index** of the target level (not the 1-based level ID used for data scoping). `"level:0"` = Level 1 (index 0), `"level:1"` = Level 2 (index 1). `connector_type` must be set for `apply_move_party` to honour `to_level_id`.
 - Example campaign manifest: `examples/campaign_manifests/bone-cathedral.json` (validates + seeds cleanly).

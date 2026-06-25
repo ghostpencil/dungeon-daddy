@@ -12,6 +12,7 @@ from dungeon_daddy.rpg.action_options import (
     available_nouns,
     available_verbs,
     action_preview,
+    is_speakable,
     is_transitive,
     room_things,
     validate_card,
@@ -650,3 +651,61 @@ def test_room_things_excludes_carried_inventory():
     all_ids = [t.noun_id for s in things.sections for t in s.things]
     assert "item:c1:key" not in all_ids
     assert things.sections == []  # only carried inventory present → nothing in the room
+
+
+# --------------------------------------------------------------------------
+# Phase 50.6 Slice 10 — is_speakable (dialogue-target gate; talk/sway-family)
+# --------------------------------------------------------------------------
+
+_SPEAK_ROOM = {
+    "room_id": "room:level-01:hall",
+    "npcs": [
+        {"actor_id": "actor:c1:warden", "display_name": "The Warden",
+         "disposition": "willing"},
+        {"actor_id": "actor:c1:clerk", "display_name": "Sour Clerk",
+         "disposition": "wary"},
+    ],
+    "monsters": [
+        {"actor_id": "actor:c1:scorps", "display_name": "Scorpions",
+         "disposition": "hostile"},
+        {"actor_id": "actor:c1:imp", "display_name": "Bound Imp",
+         "disposition": "willing"},
+    ],
+}
+
+
+def _speak_noun(noun_id, source):
+    return NounOption(noun_id=noun_id, label="N", target_type="npc", source=source)
+
+
+def test_is_speakable_true_for_willing_npc():
+    noun = _speak_noun("actor:c1:warden", "npc")
+    assert is_speakable(noun, _SPEAK_ROOM) is True
+
+
+def test_is_speakable_true_for_willing_monster():
+    # A willing monster (e.g. a bound imp) can be spoken to as well.
+    noun = _speak_noun("actor:c1:imp", "monster")
+    assert is_speakable(noun, _SPEAK_ROOM) is True
+
+
+def test_is_speakable_false_for_hostile_monster():
+    noun = _speak_noun("actor:c1:scorps", "monster")
+    assert is_speakable(noun, _SPEAK_ROOM) is False
+
+
+def test_is_speakable_false_for_non_willing_npc():
+    # Not all creatures will talk — a wary disposition does not open dialogue.
+    noun = _speak_noun("actor:c1:clerk", "npc")
+    assert is_speakable(noun, _SPEAK_ROOM) is False
+
+
+def test_is_speakable_false_for_non_creature_noun():
+    # Objects, exits, items, self, room are never speakable.
+    for source in ("object", "loose_item", "exit", "locked_exit", "self", "room", "party"):
+        assert is_speakable(_speak_noun("x", source), _SPEAK_ROOM) is False
+
+
+def test_is_speakable_false_when_creature_absent_from_context():
+    noun = _speak_noun("actor:c1:ghost", "npc")
+    assert is_speakable(noun, _SPEAK_ROOM) is False

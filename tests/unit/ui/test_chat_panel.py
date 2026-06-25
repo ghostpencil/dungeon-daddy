@@ -579,3 +579,60 @@ def test_clear_messages_clears_action_cards(panel):
     panel.clear_messages()
     assert panel._action_cards == {}
     assert panel._active_card_index is None
+
+
+# ---------------------------------------------------------------------------
+# Dialogue-mode swap (Slice 10) — builder <-> free-text SAY/ASK box
+# ---------------------------------------------------------------------------
+
+def _play_panel() -> ChatPanel:
+    p = ChatPanel(on_send=MagicMock(), mode="play")
+    p._action_builder = MagicMock()
+    p._input = MagicMock()
+    p._send_btn = MagicMock()
+    return p
+
+
+def test_play_default_shows_builder_hides_free_text():
+    p = _play_panel()
+    assert p._builder_visible() is True
+    assert p._free_text_visible() is False
+
+
+def test_enter_dialogue_swaps_to_say_box():
+    p = _play_panel()
+    p.set_dialogue_mode(True)
+    assert p._builder_visible() is False
+    assert p._free_text_visible() is True
+    assert p._input.visible is True
+    assert p._send_btn.visible is True
+
+
+def test_leave_dialogue_swaps_back_to_builder():
+    p = _play_panel()
+    p.set_dialogue_mode(True)
+    p.set_dialogue_mode(False)
+    assert p._builder_visible() is True
+    assert p._free_text_visible() is False
+    assert p._input.visible is False
+
+
+def test_builder_extra_h_zero_in_dialogue_mode():
+    p = _play_panel()
+    p.set_dialogue_mode(True)
+    assert p._builder_extra_h == 0.0
+
+
+def test_builder_does_not_consume_clicks_in_dialogue_mode():
+    p = _play_panel()
+    p._action_builder.on_mouse_press.return_value = True
+    p.set_dialogue_mode(True)
+    p.on_mouse_press(10.0, 10.0)
+    p._action_builder.on_mouse_press.assert_not_called()
+
+
+def test_design_mode_free_text_always_visible():
+    p = ChatPanel(on_send=MagicMock(), mode="design")
+    assert p._free_text_visible() is True
+    p.set_dialogue_mode(True)  # no-op for design
+    assert p._free_text_visible() is True

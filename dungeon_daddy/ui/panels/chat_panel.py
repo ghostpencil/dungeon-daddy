@@ -119,6 +119,9 @@ class ChatPanel:
         self._mini_card_prev_rect: tuple[float, float, float, float] | None = None
         self._mini_card_next_rect: tuple[float, float, float, float] | None = None
         self._action_builder = None  # InChatActionBuilder (play mode, Phase 50.6)
+        # Play mode defaults to the Action Builder; the free-text SAY/ASK box is
+        # contextual (shown only during dialogue — Phase 50.6 Slice 10, §6).
+        self._dialogue_mode = False
         self._action_cards: dict[int, _ActionCardData] = {}
         self._active_card_index: int | None = None
         self._active_card_button_rects: list[tuple[str, tuple[float, float, float, float]]] = []
@@ -231,6 +234,9 @@ class ChatPanel:
             self._do_send()
 
         manager.add(self._send_btn)
+        # Play mode starts on the Action Builder, so the free-text SAY/ASK box is
+        # hidden until dialogue begins (Slice 10). Design mode keeps it visible.
+        self._apply_input_visibility()
 
     def teardown(self, manager: arcade.gui.UIManager) -> None:
         """Remove UIManager widgets on view hide or rebuild."""
@@ -306,6 +312,45 @@ class ChatPanel:
     def set_action_builder(self, builder) -> None:
         """Attach the in-chat Action Builder (play mode). ``None`` detaches it."""
         self._action_builder = builder
+        self._apply_input_visibility()
+
+    def set_dialogue_mode(self, on: bool) -> None:
+        """Swap the bottom input surface (Phase 50.6 Slice 10, §6).
+
+        Play mode defaults to the Action Builder; entering dialogue hides the
+        builder and reveals the free-text **SAY/ASK** box, and leaving dialogue
+        swaps back. A no-op visually in design mode (where the free-text input is
+        always the input surface). The conversation routed through the SAY box
+        when ``on`` is a **Phase 51 extension point** — this only flips surfaces.
+        """
+        self._dialogue_mode = on
+        self._apply_input_visibility()
+
+    def _free_text_visible(self) -> bool:
+        """Whether the free-text SAY/ASK input occupies the bottom of the column.
+
+        Always in design mode (it is the only input surface). In play mode it is
+        contextual: shown only during dialogue, or as a fallback when no Action
+        Builder is attached.
+        """
+        if self._mode != "play":
+            return True
+        return self._dialogue_mode or self._action_builder is None
+
+    def _builder_visible(self) -> bool:
+        """Whether the in-chat Action Builder is the active bottom surface."""
+        return (
+            self._mode == "play"
+            and self._action_builder is not None
+            and not self._dialogue_mode
+        )
+
+    def _apply_input_visibility(self) -> None:
+        """Sync the free-text widgets' visibility to the current surface."""
+        visible = self._free_text_visible()
+        for widget in (self._input, self._send_btn):
+            if widget is not None:
+                widget.visible = visible
 
     def add_action_card(
         self,
@@ -352,8 +397,9 @@ class ChatPanel:
         if self._busy:
             return False
         # In-chat Action Builder takes priority in play mode (its open popup is
-        # drawn on top and may overlap the mini-card / message area).
-        if self._action_builder is not None and self._action_builder.on_mouse_press(x, y):
+        # drawn on top and may overlap the mini-card / message area). Skipped
+        # while it is swapped out for the SAY/ASK box (dialogue mode).
+        if self._builder_visible() and self._action_builder.on_mouse_press(x, y):
             return True
         if self._mini_card_prev_rect is not None:
             left, bot, right, top = self._mini_card_prev_rect
@@ -403,8 +449,11 @@ class ChatPanel:
 
     @property
     def _builder_extra_h(self) -> float:
-        """Extra vertical space the Action Builder band adds in play mode."""
-        if self._mode == "play" and self._action_builder is not None:
+        """Extra vertical space the Action Builder band adds in play mode.
+
+        Zero while the builder is swapped out for the SAY/ASK box (dialogue mode).
+        """
+        if self._builder_visible():
             return _BUILDER_H + _BUILDER_BAND_GAP
         return 0.0
 
@@ -528,8 +577,8 @@ class ChatPanel:
 
         # In-chat Action Builder band (play mode) — between the input row and
         # the actor mini-card. Drawn last so its open popup overlays the card
-        # and message area above it.
-        if self._mode == "play" and self._action_builder is not None:
+        # and message area above it. Hidden while the SAY/ASK box is shown.
+        if self._builder_visible():
             self._action_builder.draw(x, y + _BUILDER_Y_BOT, w, _BUILDER_H)
 
     def _draw_character_card(self, x: float, y: float, w: float) -> None:

@@ -301,3 +301,45 @@ def test_draw_records_slot_and_button_rects(monkeypatch):
         builder.draw(0.0, 0.0, 440.0, 200.0)
     assert [r[4] for r in builder._slot_rects] == ["verb", "noun", "adverb"]
     assert builder._button_rect is not None
+
+
+# ---------------------------------------------------------------------------
+# Dialogue gate (Slice 10) — a sway/talk action on a speakable target opens the
+# SAY box; the gate is surfaced in the builder as a TALK button.
+# ---------------------------------------------------------------------------
+
+def test_is_dialogue_action_true_for_sway_on_willing_npc():
+    builder = _builder(
+        npcs=[{"actor_id": "npc-1", "display_name": "Warden", "disposition": "willing"}]
+    )
+    builder._panel.select_verb("sway")
+    builder._panel.select_noun("npc-1")
+    assert builder.is_dialogue_action() is True
+
+
+def test_is_dialogue_action_false_for_sway_on_hostile_creature():
+    # Not all creatures will talk — a hostile target stays a contested roll.
+    builder = _builder(
+        monsters=[{"actor_id": "mon-1", "display_name": "Gnoll", "disposition": "hostile"}]
+    )
+    builder._panel.select_verb("sway")
+    builder._panel.select_noun("mon-1")
+    assert builder.is_dialogue_action() is False
+
+
+def test_is_dialogue_action_false_for_non_sway_verb_on_willing_npc():
+    builder = _builder(
+        npcs=[{"actor_id": "npc-1", "display_name": "Warden", "disposition": "willing"}]
+    )
+    builder._panel.select_verb("study")
+    builder._panel.select_noun("npc-1")
+    assert builder.is_dialogue_action() is False
+
+
+def test_button_label_talk_for_dialogue_action():
+    builder = _builder(
+        npcs=[{"actor_id": "npc-1", "display_name": "Warden", "disposition": "willing"}]
+    )
+    builder._panel.select_verb("sway")
+    builder._panel.select_noun("npc-1")
+    assert builder.button_label() == "TALK"

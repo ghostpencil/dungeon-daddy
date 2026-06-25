@@ -52,6 +52,12 @@ _INTERACTION_VERBS: dict[str, str] = {
 # Verbs that require a second noun (Target). Absent from this set = intransitive.
 TRANSITIVE_VERBS: frozenset[str] = frozenset({VERB_GIVE, VERB_USE, VERB_COMBINE})
 
+# The social "talk/sway-family" verb. ``sway`` is one of the 9 universal skill
+# verbs; when aimed at a *speakable* creature it opens dialogue rather than
+# resolving a contested roll (Phase 50.6 §6; conversation flow is Phase 51).
+VERB_SWAY = "sway"
+DIALOGUE_VERBS: frozenset[str] = frozenset({VERB_SWAY})
+
 
 def is_transitive(verb: str) -> bool:
     """True when ``verb`` requires a Target noun."""
@@ -127,6 +133,38 @@ def verbs_for_noun(
         if sources is None or noun.source in sources:
             applicable.append(verb)
     return applicable
+
+
+# Creature dispositions that permit dialogue. Anything else (hostile, wary, …)
+# will not talk — "not all creatures will talk" (Phase 50.6 §6). Kept as a set
+# so Phase 51 can widen the gate without touching call sites.
+_SPEAKABLE_DISPOSITIONS: frozenset[str] = frozenset({"willing"})
+
+
+def is_speakable(noun: "NounOption", room_context: Mapping) -> bool:
+    """True when ``noun`` is a creature the party can open dialogue with (§6).
+
+    A noun is speakable only when it is an NPC or monster present in
+    ``room_context`` whose ``disposition`` permits talking (see
+    ``_SPEAKABLE_DISPOSITIONS``). Non-creature nouns (objects, exits, items, the
+    synthetic self/room, and party PCs) are never speakable. Pure and forgiving
+    of absent context keys, matching :func:`available_nouns`. Drives the
+    builder's dialogue gate (a ``sway``/talk action only opens the SAY box on a
+    speakable target); the conversation itself is a Phase 51 extension point.
+    """
+    if noun.source not in (SOURCE_NPC, SOURCE_MONSTER):
+        return False
+    creature = next(
+        (
+            c
+            for c in (*room_context.get("monsters", []), *room_context.get("npcs", []))
+            if c.get("actor_id") == noun.noun_id
+        ),
+        None,
+    )
+    if creature is None:
+        return False
+    return creature.get("disposition") in _SPEAKABLE_DISPOSITIONS
 
 
 # Deterministic (no-roll) verbs: these resolve straight to a ``PlayerCommand``

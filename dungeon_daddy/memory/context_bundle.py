@@ -183,6 +183,9 @@ def _actor_noun(actor: dict) -> dict:
         "slug": actor["slug"],
         "display_name": actor["display_name"],
         "status": actor["status"],
+        # Carried so the overlay status chip and the dialogue gate (is_speakable)
+        # can read a creature's stance toward the party (Phase 50.6 §5.2/§6).
+        "disposition": actor.get("disposition", "neutral"),
     }
 
 

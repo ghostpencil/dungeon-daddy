@@ -14,7 +14,7 @@ rect-list pattern as :mod:`chat_panel`.
 """
 from __future__ import annotations
 
-from dungeon_daddy.rpg.action_options import VERB_LOOK, VERB_MOVE
+from dungeon_daddy.rpg.action_options import DIALOGUE_VERBS, VERB_LOOK, VERB_MOVE
 from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
 
 # Slot kinds, in the order they appear in the command sentence. ``target`` is
@@ -147,13 +147,29 @@ class InChatActionBuilder:
     # Deterministic verbs that read calmer than a generic "DO" (spec §4.6).
     _DETERMINISTIC_BUTTON_LABELS = {VERB_MOVE: "MOVE", VERB_LOOK: "LOOK"}
 
-    def button_label(self) -> str:
-        """Adaptive action-button label (spec §4.6).
+    def is_dialogue_action(self) -> bool:
+        """True when the current selection opens dialogue (Slice 10, §6).
 
-        ``ROLL`` when the action is contested/uncertain (or no preview yet);
-        otherwise the deterministic ``MOVE`` / ``LOOK`` for those verbs, else
-        ``DO``. Derived from the deterministic :meth:`VnaActionPanel.preview`.
+        A ``sway``/talk-family verb aimed at a *speakable* creature initiates a
+        conversation (which swaps the bottom input to the SAY box) rather than
+        resolving a contested roll. Surfaced in the builder as a ``TALK`` button;
+        the conversation itself is a Phase 51 extension point.
         """
+        verb = self._panel.selected_verb_label()
+        if verb is None or verb.lower() not in DIALOGUE_VERBS:
+            return False
+        return self._panel.selected_noun_is_speakable()
+
+    def button_label(self) -> str:
+        """Adaptive action-button label (spec §4.6, §6).
+
+        ``TALK`` when the action opens dialogue (a sway/talk verb on a speakable
+        target); ``ROLL`` when the action is contested/uncertain (or no preview
+        yet); otherwise the deterministic ``MOVE`` / ``LOOK`` for those verbs,
+        else ``DO``. Derived from the deterministic :meth:`VnaActionPanel.preview`.
+        """
+        if self.is_dialogue_action():
+            return "TALK"
         preview = self._panel.preview()
         if preview is None or preview.requires_roll:
             return "ROLL"

@@ -1189,8 +1189,9 @@ class PlayView(arcade.View):
         pre-routes through trigger selection); (3) skill verbs — action roll.
         """
         from dungeon_daddy.rpg.action_options import (
-            VERB_ACTIVATE, VERB_LOOK, VERB_USE,
+            DIALOGUE_VERBS, VERB_ACTIVATE, VERB_LOOK, VERB_USE,
             SOURCE_EXIT, SOURCE_LOCKED_EXIT, SOURCE_OBJECT,
+            is_speakable,
         )
         from dungeon_daddy.rpg.action_resolution import resolve_card
         from dungeon_daddy.rpg.command import MoveParty
@@ -1198,6 +1199,18 @@ class PlayView(arcade.View):
         actor = self._acting_actor()
         if actor is None:
             return
+
+        # Dialogue gate (Phase 50.6 Slice 10, §6): a sway/talk verb aimed at a
+        # *speakable* creature opens the contextual SAY box instead of rolling.
+        # A hostile/wary target falls through to the normal contested roll.
+        if card.verb in DIALOGUE_VERBS:
+            noun = next(
+                (n for n in self._rpg_vna._nouns if n.noun_id == card.noun_id), None
+            )
+            room_context = getattr(self, "_last_room_context", {})
+            if noun is not None and is_speakable(noun, room_context):
+                self._begin_dialogue_stub(noun)
+                return
 
         if card.verb == VERB_LOOK:
             self._on_look_submit(card)
@@ -1250,6 +1263,34 @@ class PlayView(arcade.View):
             self._on_exit_move(command.exit_id, command.how)
         else:
             self._apply_vna_command(command)
+
+    def _begin_dialogue_stub(self, noun) -> None:
+        """Open the contextual SAY/ASK box for a speakable target (Slice 10 stub).
+
+        **Phase 51 extension point.** Phase 50.6 only carves the input seam: this
+        swaps the bottom of the chat column from the Action Builder to the
+        free-text SAY box and posts a placeholder line. The actual conversation
+        flow — routing what the player types, NPC memory, and DM responses — is
+        deferred to Phase 51 (Talk to the Dungeon).
+        """
+        self._dialogue_stub_active = True
+        self._chat.set_dialogue_mode(True)
+        self._chat.add_message(
+            "system",
+            f"You open a conversation with {noun.label}. (Dialogue — Phase 51)",
+        )
+
+    def _on_dialogue_send_stub(self, text: str) -> None:
+        """Handle a line typed into the SAY box during dialogue (Slice 10 stub).
+
+        **Phase 51 extension point.** For now the line is echoed and the
+        conversation ends immediately, swapping the input back to the Action
+        Builder. Phase 51 replaces this with real dialogue routing and replies.
+        """
+        self._dialogue_stub_active = False
+        self._chat.add_message("gm", text)
+        self._chat.add_message("system", "(Conversation ends — dialogue is Phase 51.)")
+        self._chat.set_dialogue_mode(False)
 
     def _on_look_submit(self, card) -> None:
         """Read-only branch: fetch the noun's authoritative description and post it.
@@ -1732,6 +1773,12 @@ class PlayView(arcade.View):
             self._map.load(level, self._state, len(self._dungeon.levels), viewed_level_idx=new_idx)
 
     def _on_chat_send(self, text: str) -> None:
+        # While the contextual SAY box is up, a sent line is a dialogue line, not
+        # a DM free-text query. Phase 50.6 routes it to the stub (which ends the
+        # conversation); Phase 51 owns real dialogue routing.
+        if getattr(self, "_dialogue_stub_active", False):
+            self._on_dialogue_send_stub(text)
+            return
         self._chat.add_message("gm", text)
         if text.strip() == "/clear":
             self._dm_history = []

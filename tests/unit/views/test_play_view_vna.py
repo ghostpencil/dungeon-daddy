@@ -913,6 +913,59 @@ def test_use_non_matching_item_on_exit_does_not_clear_requires_item_slug(tmp_pat
     assert row["requires_item_slug"] == "lift-warden-key"
 
 
+# ---------------------------------------------------------------------------
+# Slice 10 — sway/talk on a speakable target opens the SAY box (Phase 51 stub)
+# ---------------------------------------------------------------------------
+
+def test_sway_on_willing_npc_opens_dialogue_not_roll(tmp_path):
+    from dungeon_daddy.rpg.action_options import ActionCard, NounOption, SOURCE_NPC
+
+    view = _make_view(tmp_path)
+    view._resolve_vna_roll = MagicMock()
+    view._rpg_vna._nouns = [
+        NounOption(noun_id="npc-1", label="Warden", target_type="npc", source=SOURCE_NPC),
+    ]
+    view._last_room_context = {
+        "npcs": [{"actor_id": "npc-1", "display_name": "Warden", "disposition": "willing"}]
+    }
+
+    view._on_vna_submit(ActionCard(verb="sway", noun_id="npc-1", adverb="cautiously"))
+
+    view._chat.set_dialogue_mode.assert_called_once_with(True)
+    view._resolve_vna_roll.assert_not_called()
+
+
+def test_sway_on_hostile_creature_rolls_not_dialogue(tmp_path):
+    # Not all creatures will talk — a hostile target stays a contested roll.
+    from dungeon_daddy.rpg.action_options import ActionCard, NounOption, SOURCE_MONSTER
+
+    view = _make_view(tmp_path)
+    view._resolve_vna_roll = MagicMock()
+    view._rpg_vna._nouns = [
+        NounOption(noun_id="mon-1", label="Gnoll", target_type="monster", source=SOURCE_MONSTER),
+    ]
+    view._last_room_context = {
+        "monsters": [{"actor_id": "mon-1", "display_name": "Gnoll", "disposition": "hostile"}]
+    }
+
+    view._on_vna_submit(ActionCard(verb="sway", noun_id="mon-1", adverb="cautiously"))
+
+    view._resolve_vna_roll.assert_called_once()
+    view._chat.set_dialogue_mode.assert_not_called()
+
+
+def test_dialogue_send_exits_dialogue_stub(tmp_path):
+    # While the SAY box is up, sending a line ends the (stubbed) conversation and
+    # swaps back to the builder. Real dialogue routing is Phase 51.
+    view = _make_view(tmp_path)
+    view._dialogue_stub_active = True
+
+    view._on_chat_send("hello warden")
+
+    assert view._dialogue_stub_active is False
+    view._chat.set_dialogue_mode.assert_called_once_with(False)
+
+
 def test_build_context_bundle_includes_current_room_objects(tmp_path):
     """The DM context bundle carries the current room's objects (with text)."""
     from dungeon_daddy.rpg.models import RoomObject
