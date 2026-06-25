@@ -365,12 +365,13 @@ def _play_setup():
     return result, view_state
 
 
-def _teal_outline_count(mock_arcade) -> int:
-    from dungeon_daddy.ui.theme import TEAL
-    return sum(
-        1 for c in mock_arcade.draw_rect_outline.call_args_list
-        if (c.args[1] if len(c.args) > 1 else c.kwargs.get("color")) == TEAL
-    )
+def _thing_text_call(mock_arcade, needle: str):
+    """The draw_text call rendering the row whose text contains *needle*."""
+    for c in mock_arcade.draw_text.call_args_list:
+        text = c.args[0] if c.args else c.kwargs.get("text", "")
+        if needle in str(text):
+            return c
+    raise AssertionError(f"no draw_text call containing {needle!r}")
 
 
 def test_play_mode_records_thing_rect_for_noun() -> None:
@@ -387,27 +388,39 @@ def test_play_mode_records_thing_rect_for_noun() -> None:
     assert "e1" in renderer.thing_rects()
 
 
-def test_play_mode_selected_row_draws_extra_teal_ring() -> None:
+def test_play_mode_thing_rect_is_centred_on_its_text() -> None:
+    """Regression: the clickable rect must straddle the row's drawn baseline so
+    a click lands on the right row (the rect used to sit a row too low)."""
     result, view_state = _play_setup()
     renderer = LayoutRenderer()
 
     with patch("dungeon_daddy.map.layout_renderer.draw_chip"), \
-            patch("dungeon_daddy.map.layout_renderer.arcade") as mock_unselected:
+            patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
         renderer.draw(
             result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
             mode="play", room_things=_room_things(),
         )
-        baseline = _teal_outline_count(mock_unselected)
+        text_y = _thing_text_call(mock_arcade, "Marketplace Arch").args[2]
+
+    rect = renderer.thing_rects()["e1"]
+    assert rect.y < text_y < rect.y + rect.h
+
+
+def test_play_mode_selected_row_text_is_teal() -> None:
+    from dungeon_daddy.ui.theme import TEAL
+    result, view_state = _play_setup()
+    renderer = LayoutRenderer()
 
     with patch("dungeon_daddy.map.layout_renderer.draw_chip"), \
-            patch("dungeon_daddy.map.layout_renderer.arcade") as mock_selected:
+            patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
         renderer.draw(
             result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
             mode="play", room_things=_room_things(), selected_noun_id="e1",
         )
-        with_ring = _teal_outline_count(mock_selected)
+        call = _thing_text_call(mock_arcade, "Marketplace Arch")
 
-    assert with_ring == baseline + 1
+    color = call.args[3] if len(call.args) > 3 else call.kwargs.get("color")
+    assert tuple(color)[:3] == tuple(TEAL)[:3]
 
 
 def test_play_mode_footer_shows_suggested_verbs() -> None:

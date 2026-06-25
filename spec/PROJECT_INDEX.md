@@ -182,6 +182,17 @@ in-chat builder until Slice 9 retires it.
   into the `MapPanel(...)` ctor. **Design note:** a real move still does a full refresh → resets to
   the default noun (correct); only a click selects-and-re-pushes without rebuilding. 15 new tests
   (5 view-model, 3 renderer, 4 MapPanel, 3 play_view). Full unit suite green (2931).
+- **Slice 8 selection-cue fix — DONE** (user-reported; GUI screenshot). The TEAL **rectangle ring
+  was misaligned** (drawn a row low) because `arcade.draw_text` anchors at the **baseline** (text
+  draws *above* `y`) while the rect was computed *below* `y` — the hit-rects had the same offset.
+  Fix + redesign per user suggestion: (1) **centre the clickable rect on the drawn text**
+  (`row_center = y + _THING_ROW_CENTER_DY`; the status chip now shares that center too); (2)
+  **replace the rectangle with a per-row marker glyph** — `format_things_here` prepends `_SEL_MARKER`
+  "▸" to the selected row and `_UNSEL_MARKER` "·" to the rest (radio-style; glyphs are in the same
+  Unicode blocks as the existing ●/◆ row glyphs, so no PNG assets needed), and the renderer tints
+  the selected row's text TEAL (`_PANEL_SELECTED_COLOR`). The ring (`draw_rect_outline` in the
+  panel) is gone. Net tests: −1 ring test, +3 (marker, rect-centred regression, selected-text-teal).
+  Full map+ui+views suites green (1628).
 - Then slices 9–11 (retire ACTION tab, SAY/ASK swap stub, polish + smoke test). **Slice 9:** remove
   the right-panel ACTION tab, re-wire submit to the in-chat builder, suite stays green (spec §7).
 

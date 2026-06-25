@@ -9,6 +9,13 @@ from dungeon_daddy.rpg.action_options import RoomThings
 _MAX_NOTE_LEN = 200
 _MAX_LINE_CHARS = 38
 
+# Per-row selection markers for the "Things Here" overlay (Slice 8). The marker
+# is part of the row text so it stays aligned with the label; the pointer ▸ marks
+# the selected noun, a quiet · marks the rest. Both live in already-rendered
+# Unicode blocks (Geometric Shapes / Latin-1), so no PNG assets are needed.
+_SEL_MARKER = "▸"
+_UNSEL_MARKER = "·"
+
 
 @dataclass
 class PanelLine:
@@ -103,8 +110,9 @@ def format_things_here(
             is_selected = thing.noun_id == selected_noun_id
             if is_selected:
                 selected_label = thing.label
+            marker = _SEL_MARKER if is_selected else _UNSEL_MARKER
             lines.append(PanelLine(
-                f"{thing.glyph} {thing.label}",
+                f"{marker} {thing.glyph} {thing.label}",
                 "thing",
                 status=thing.status,
                 status_color=thing.status_color,

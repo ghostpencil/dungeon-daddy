@@ -53,6 +53,11 @@ _PANEL_SECTION_COLOR = (120, 140, 160, 220)
 _PANEL_VALUE_COLOR = (180, 185, 190, 255)
 _PANEL_LINE_HEIGHT = 16
 _PANEL_THING_LINE_HEIGHT = 22  # "thing" rows carry a status chip → taller
+# draw_text anchors at the baseline (text draws *above* y); the chip and the
+# clickable row rect are centred this many px above the baseline so they line up
+# with the glyphs rather than sitting a row low (Slice 8 fix).
+_THING_ROW_CENTER_DY = 4
+_PANEL_SELECTED_COLOR = (*TEAL, 255)  # selected "Things Here" row text
 _PANEL_PADDING = 10
 _PANEL_WIDTH = 300.0
 _PANEL_FONT_SIZE = 9
@@ -482,22 +487,22 @@ class LayoutRenderer:
                 color = _PANEL_HEADER_COLOR
             elif line.kind == "section":
                 color = _PANEL_SECTION_COLOR
+            elif line.kind == "thing" and line.selected:
+                # The selected noun is cued by a leading marker glyph (from
+                # format_things_here) plus TEAL text — no rectangle, which read
+                # misaligned (Slice 8 fix).
+                color = _PANEL_SELECTED_COLOR
             else:
                 color = _PANEL_VALUE_COLOR
             row_h = _line_height(line)
+            row_center = y + _THING_ROW_CENTER_DY
             if line.kind == "thing" and line.noun_id is not None:
-                # Record the clickable row rect (screen space) so the map panel
-                # can route a click → builder select_noun (Phase 50.6 §5.3).
-                row_bottom = y - row_h
+                # Record the clickable row rect (screen space), centred on the
+                # drawn text, so a click routes to the right noun (§5.3).
                 self._thing_rects[line.noun_id] = ScreenRect(
-                    x=panel_x, y=row_bottom, w=_PANEL_WIDTH, h=row_h,
+                    x=panel_x, y=row_center - row_h / 2,
+                    w=_PANEL_WIDTH, h=float(row_h),
                 )
-                if line.selected:
-                    ring = arcade.XYWH(
-                        panel_x + _PANEL_WIDTH / 2, row_bottom + row_h / 2,
-                        _PANEL_WIDTH - 2, row_h,
-                    )
-                    arcade.draw_rect_outline(ring, TEAL, _SELECTION_WIDTH)
             arcade.draw_text(
                 line.text,
                 panel_x + _PANEL_PADDING,
@@ -513,7 +518,7 @@ class LayoutRenderer:
                 draw_chip(
                     line.status,
                     chip_cx,
-                    y + 4,  # align the pill centre with the row's text
+                    row_center,  # align the pill centre with the row's text
                     line.status_color or "default",
                     width=chip_w,
                 )
