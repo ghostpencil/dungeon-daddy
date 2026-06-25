@@ -40,7 +40,6 @@ from dungeon_daddy.ui.panels.memory_inspector_panel import MemoryInspectorPanel
 from dungeon_daddy.ui.panels.player_action_panel import PlayerActionPanel
 from dungeon_daddy.ui.panels.action_builder import InChatActionBuilder
 from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
-from dungeon_daddy.ui.panels.exit_list_panel import ExitListPanel
 from dungeon_daddy.ui.panels.scene_state_panel import SceneStatePanel
 from dungeon_daddy.ui.theme import (
     BG_0,
@@ -99,11 +98,10 @@ _RPG_PANEL_W = 300
 _RPG_TAB_H = 26
 _BTN_RPG_W = 88
 
-_RPG_TAB_LABELS = ["CHAR", "SCENE", "FALLOUT", "MEM", "EXITS", "DBG"]
+_RPG_TAB_LABELS = ["CHAR", "SCENE", "FALLOUT", "MEM", "DBG"]
 _TAB_CHAR = 0
 _TAB_MEM = 3
-_TAB_EXITS = 4
-_TAB_DBG = 5
+_TAB_DBG = 4
 _DBG_LINE_MAX = 36
 
 
@@ -171,7 +169,6 @@ class _RpgSidePanel:
         scene_panel: SceneStatePanel,
         fallout_panel: FalloutPanel,
         memory_panel: MemoryInspectorPanel,
-        exit_panel: ExitListPanel,
         debug_controls: DebugControls | None,
         manager: arcade.gui.UIManager | None = None,
     ) -> None:
@@ -179,7 +176,6 @@ class _RpgSidePanel:
         self._scene = scene_panel
         self._fallout = fallout_panel
         self._memory = memory_panel
-        self._exit = exit_panel
         self._debug = debug_controls
         self._manager = manager
         self._active = 0
@@ -195,7 +191,7 @@ class _RpgSidePanel:
             for i in range(len(_RPG_TAB_LABELS))
         ]
         content_h = h - _RPG_TAB_H
-        for panel in (self._char, self._scene, self._fallout, self._memory, self._exit):
+        for panel in (self._char, self._scene, self._fallout, self._memory):
             panel.setup(x, y, w, content_h)
         if self._active == _TAB_MEM:
             self._memory.setup_widget(self._manager, x, y, w, content_h)
@@ -238,8 +234,6 @@ class _RpgSidePanel:
             self._fallout.draw()
         elif self._active == _TAB_MEM:
             self._memory.draw()
-        elif self._active == _TAB_EXITS:
-            self._exit.draw()
         else:
             self._draw_debug_tab()
 
@@ -356,11 +350,10 @@ class PlayView(arcade.View):
         self._rpg_memory = MemoryInspectorPanel()
         self._rpg_action = PlayerActionPanel()
         self._rpg_vna = VnaActionPanel()
-        self._exit_panel = ExitListPanel()
         self._rpg_debug = DebugControls(rpg_service) if rpg_service is not None else None
         self._rpg_side = _RpgSidePanel(
             self._rpg_char, self._rpg_scene, self._rpg_fallout,
-            self._rpg_memory, self._exit_panel, self._rpg_debug,
+            self._rpg_memory, self._rpg_debug,
             manager=self._manager,
         )
         self._rpg_open: bool = False
@@ -468,8 +461,6 @@ class PlayView(arcade.View):
                         self._load_memory_entries()
                     elif tab_idx == _TAB_DBG:
                         self._build_context_bundle()
-                    elif tab_idx == _TAB_EXITS:
-                        self._refresh_exits()
                 elif self._rpg_side.active_tab == _TAB_CHAR:
                     delta = self._rpg_char.hit_picker(x, y)
                     if delta:
@@ -515,7 +506,6 @@ class PlayView(arcade.View):
                 self._map.update_state(self._state, total)
                 self._chat.set_current_room(room.name, room.note or "", room_id=room.id)
                 self._rpg_scene.set_scene(room.name, str(level.id))
-                self._refresh_exits()
                 _log.debug("Selected room: %s", room.id)
                 self._compact_history()
                 self._dm_history.append(LLMMessage(role="user", content=f"We enter {room.name}."))
@@ -964,7 +954,7 @@ class PlayView(arcade.View):
             _log.exception("resolve_action failed")
 
     # ------------------------------------------------------------------
-    # Dungeon navigation (Phase 48) — exit panel + click-to-move
+    # Dungeon navigation (Phase 48) — click-to-move
     # ------------------------------------------------------------------
 
     def _focus_party_room(self) -> None:
@@ -972,7 +962,7 @@ class PlayView(arcade.View):
 
         Used on load/resume so the player always opens a save where the party
         actually is: the room is selected on the map (selection frame + detail
-        overlay) and the chat/scene/exit panels are populated. No narration.
+        overlay) and the chat/scene panels are populated. No narration.
         """
         if self._dungeon is None or self._state is None:
             return
@@ -986,7 +976,6 @@ class PlayView(arcade.View):
         self._map.set_selected_room(room.id)
         self._chat.set_current_room(room.name, room.note or "", room_id=room.id)
         self._rpg_scene.set_scene(room.name, str(level.id))
-        self._refresh_exits()
 
     def _clear_dungeon_connection_lock(self, from_room: str, to_room: str) -> None:
         """Clear lock styling on the dungeon model connection so the map re-renders it open."""
@@ -998,33 +987,6 @@ class PlayView(arcade.View):
                 conn.connection_style = None
                 conn.layout_connection_role = None
                 break
-
-    def _refresh_exits(self) -> None:
-        """Rebuild the exit-list panel from the room-context bundle."""
-        from dungeon_daddy.rpg.room_context import build_room_context
-
-        if (self._mem_repo is None or self._rpg_campaign_id is None
-                or self._state is None or not self._state.current_room_id):
-            self._exit_panel.set_current_room(None, None)
-            self._exit_panel.set_from_context(
-                {"visible_exits": [], "locked_exits": [], "hidden_exit_hint": 0}
-            )
-            return
-
-        room_id = self._state.current_room_id
-        room_name: str | None = None
-        if self._dungeon is not None:
-            level = self._dungeon.levels[self._state.current_level_idx]
-            room = {r.id: r for r in level.rooms}.get(room_id)
-            if room is not None:
-                room_name = room.name
-        self._exit_panel.set_current_room(room_name, room_id)
-
-        bundle = build_room_context(
-            room_id, self._rpg_campaign_id,
-            self._state, self._mem_repo,
-        )
-        self._exit_panel.set_from_context(bundle)
 
     def _acting_actor(self):
         """The actor a Card acts as: the selected one, else the first PC."""
@@ -1047,7 +1009,7 @@ class PlayView(arcade.View):
         self._refresh_vna_panel()
 
     def _room_world_flags(self, room_id: str) -> set[str]:
-        """World-context flags gating conditional adverbs (mirrors `_refresh_exits`)."""
+        """World-context flags gating conditional adverbs (mirrors the room-context build)."""
         flags: set[str] = set()
         actors = getattr(self._rpg_action, "_actors", []) or []
         if max((a.actions.get("sense", 0) for a in actors), default=0) >= 1:
@@ -1269,7 +1231,6 @@ class PlayView(arcade.View):
                         from dungeon_daddy.rpg.exit_labels import LOCK_PREFIX
                         exit_label = target_noun.label.removeprefix(LOCK_PREFIX)
                         self._chat.add_message("system", f"{exit_label}: unlocked.")
-                        self._refresh_exits()
                         self._refresh_vna_panel()
                         return
                 self._on_exit_move(card.target_id, card.adverb, item_slug=item_slug)
@@ -1478,7 +1439,6 @@ class PlayView(arcade.View):
                 self._chat.set_current_room(room.name, room.note or "", room_id=room.id)
                 self._rpg_scene.set_scene(room.name, str(level.id))
 
-        self._refresh_exits()
         self._refresh_vna_panel()
         self._save_session()
 

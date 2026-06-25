@@ -6,7 +6,7 @@ Phase **50 — Hybrid Action Model: COMPLETE & merged to `main`** (2026-06-23).
 Phase **50.5 — Use Noun on Noun: COMPLETE & merged to `main`** (PR #81, 2026-06-24).
 Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–8 committed and **user-verified**
 (+ manual-verify fixes + Command-Sentence Polish CP-1…CP-7; Slice 8 incl. three UX rounds, all
-user-verified); **Slice 9 (retire ACTION tab) DONE** (suite green 2938, not yet GUI-verified) on
+user-verified); **Slice 9 (retire ACTION tab) DONE & GUI-verified; EXITS/Move tab also retired** on
 branch `phase-50.6` (latest 2026-06-25). Slice 10 is next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
@@ -26,15 +26,15 @@ enabled on willing targets). **Out of scope (Phase 51):** actual conversation fl
 routing — mark the SAY handler as a Phase 51 extension point. Note: the free-text Ask box is
 *currently always visible*; Slice 10 makes it contextual.
 
-**Slice 9 is DONE** (suite green 2938) but **not yet GUI-verified** — the only visible change is the
-right RPG panel now showing **6 tabs (CHAR/SCENE/FALLOUT/MEM/EXITS/DBG)** instead of 7 (ACTION
-gone); the in-chat builder is unchanged (already user-verified through Slice 8). Worth a quick look
-on next launch.
+**Slice 9 is DONE** (ACTION tab gone — **user-verified in the GUI 2026-06-26**). **EXITS/Move tab
+retired too** (follow-up cleanup, user-requested 2026-06-26; spec §7 had flagged it redundant with
+the "Things Here" overlay): the `ExitListPanel` class + its dedicated tests + `_refresh_exits()`
+were **deleted** (dead code — moving is now driven by the overlay click-to-move + in-chat builder;
+the `_on_exit_move` engine command stays). The right RPG panel now shows **5 tabs
+(CHAR/SCENE/FALLOUT/MEM/DBG)**. Not yet GUI-verified after the EXITS removal — worth a quick look.
 
-**Possible follow-ups to weigh (user, 2026-06-25):** (a) now that clicking an open exit auto-moves,
+**Possible follow-up to weigh (user, 2026-06-25):** now that clicking an open exit auto-moves,
 consider dropping the `move` verb from the in-chat command sentence — TBD, revisit once played.
-(b) The **EXITS tab** is now redundant with the "Things Here" overlay — optional retire (spec §7
-notes it as a follow-up, deliberately *not* part of Slice 9).
 
 Spec is `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md` (read it; design decisions are locked in §3).
 Phase 50.6 is a **BUILD add-on** (dynamic, like 50.5 — not on the 51–53 roadmap, no issue).
@@ -243,11 +243,10 @@ in-chat builder until **Slice 9 retired it** (in-chat builder is now the sole ac
   (kira→fighter, mira→artificer, talvas→thief; `protagonist` is blank by design). Reseed-a-save
   invocation gotchas captured in **Notes** (`--campaigns-dir` for the saves dir; `PYTHONPATH=.` for
   the populate scripts). Full unit suite green (2940).
-- **Slice 9 — DONE** (retire ACTION tab, spec §7 + §9.9; suite green 2938, **not yet GUI-verified**).
+- **Slice 9 — DONE** (retire ACTION tab, spec §7 + §9.9; suite green 2938, **GUI-verified 2026-06-26**).
   The right-panel **ACTION tab is removed** — the in-chat builder is now the single action surface.
-  In `play_view.py`: dropped `"ACTION"` from `_RPG_TAB_LABELS` (now 6 tabs:
-  CHAR/SCENE/FALLOUT/MEM/EXITS/DBG), removed `_TAB_ACTION`, reindexed `_TAB_EXITS`/`_TAB_DBG` to
-  4/5; stripped the `action_panel` from `_RpgSidePanel` (ctor param + `setup`/`teardown`/
+  In `play_view.py`: dropped `"ACTION"` from `_RPG_TAB_LABELS`, removed `_TAB_ACTION`, reindexed
+  `_TAB_EXITS`/`_TAB_DBG`; stripped the `action_panel` from `_RpgSidePanel` (ctor param + `setup`/`teardown`/
   `set_active`/`draw` branches + the `refresh_action_widget` method); removed the `_TAB_ACTION`
   branch in `on_mouse_press` and both `side.refresh_action_widget()` calls (the in-chat builder
   reads `_rpg_vna`'s options **live each draw**, so no widget rebuild is needed). `_rpg_vna` + its
@@ -260,6 +259,21 @@ in-chat builder until **Slice 9 retired it** (in-chat builder is now the sole ac
   manual tool (already out of date — hardcoded a 6-tab layout) and isn't in the suite; left as-is,
   the Phase 50.6 smoke test is Slice 11. The legacy `_rpg_action` (`PlayerActionPanel`, Phase 33
   resolve flow) is untouched — it was never a tab.
+- **EXITS / Move tab retired — DONE** (follow-up to Slice 9, user-requested 2026-06-26; spec §7 had
+  flagged it redundant with the "Things Here" overlay now that clicking an exit auto-moves). Right
+  panel now has **5 tabs (CHAR/SCENE/FALLOUT/MEM/DBG)**. The `ExitListPanel` widget became dead code
+  (only the tab used it), so it was **fully deleted** (`dungeon_daddy/ui/panels/exit_list_panel.py`
+  + `tests/unit/ui/panels/test_exit_list_panel.py`) along with `_refresh_exits()` and `_exit_panel`.
+  In `play_view.py`: dropped `"EXITS"`/`_TAB_EXITS`, reindexed `_TAB_DBG` to 4, removed the
+  `exit_panel` from `_RpgSidePanel` (ctor + setup-loop + draw branch), removed the `_TAB_EXITS`
+  mouse-press branch, and removed all 4 `_refresh_exits()` call sites (room-click select,
+  `_focus_party_room`, exit-unlock, `_on_exit_move`) — the overlay/builder are fed by
+  `_refresh_vna_panel`/`_push_things_here_overlay` instead. **Kept:** `_on_exit_move` (the engine
+  move command, still driven by overlay click-to-move + builder `move`). Tests: added
+  `test_exits_tab_retired_from_rpg_tab_labels`, updated `test_remaining_rpg_tabs_kept` to the 5-tab
+  list; `test_play_view_exits.py` trimmed to the `_on_exit_move` cases (dropped the two
+  `_refresh_exits` tests); `conftest.py`/`test_play_view_vna.py` dropped the `ExitListPanel`
+  scaffolding; `test_play_view_party_focus.py` dropped the `_refresh_exits` mock + assertions.
 - Then slices 10–11 (SAY/ASK swap stub, polish + smoke test). **Slice 10:** input surface swaps
   builder↔SAY box on a dialogue flag; `talk` verb gated to willing targets (conversation logic
   deferred to Phase 51). **Slice 11:** polish (incl. dynamic builder-band height + collapsible

@@ -46,11 +46,9 @@ def _make_view(tmp_path: Path, current_room_id: str = "r1"):
     view._chat = MagicMock()
     view._rpg_scene = MagicMock()
     view._rpg_action = MagicMock(_actors=[])
-    view._exit_panel = MagicMock()
     view._spawn_dm_thread = MagicMock()
     view._compact_history = MagicMock()
     view._save_session = MagicMock()
-    view._refresh_exits = MagicMock()
     view._dm_history = []
     return view
 
@@ -90,7 +88,6 @@ def test_focus_party_room_sets_map_selection_and_panels(tmp_path):
     view._chat.set_current_room.assert_called_once()
     assert view._chat.set_current_room.call_args.args[0] == "North Vault"
     view._rpg_scene.set_scene.assert_called_once()
-    view._refresh_exits.assert_called_once()
 
 
 def test_focus_party_room_noop_when_no_current_room(tmp_path):
@@ -100,4 +97,4 @@ def test_focus_party_room_noop_when_no_current_room(tmp_path):
     view._focus_party_room()
 
     view._map.set_selected_room.assert_not_called()
-    view._refresh_exits.assert_not_called()
+    view._chat.set_current_room.assert_not_called()

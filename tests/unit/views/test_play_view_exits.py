@@ -1,4 +1,9 @@
-"""Tests for Phase 48 Slice 10 — exit panel wiring in PlayView."""
+"""Tests for Phase 48 Slice 10 — party-move engine command in PlayView.
+
+(The right-panel EXITS/Move tab was retired in Phase 50.6 — moving is now driven
+by the "Things Here" overlay + in-chat builder. The ``_on_exit_move`` engine
+command they call is exercised here.)
+"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,7 +12,6 @@ from unittest.mock import MagicMock
 from dungeon_daddy.data.models import SessionState
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.models import RoomExit
-from dungeon_daddy.ui.panels.exit_list_panel import ExitListPanel
 
 MIGRATIONS_DIR = (
     Path(__file__).parent.parent.parent.parent
@@ -42,7 +46,6 @@ def _make_view(tmp_path: Path):
         current_room_id="r1", visited_rooms=["r1"],
     )
     view._dungeon = None
-    view._exit_panel = ExitListPanel()
     view._chat = MagicMock()
     view._map = MagicMock()
     view._rpg_scene = MagicMock()
@@ -52,29 +55,6 @@ def _make_view(tmp_path: Path):
     view._save_session = MagicMock()
     view._dm_history = []
     return view
-
-
-# ---------------------------------------------------------------------------
-# _refresh_exits — populates the panel from build_room_context
-# ---------------------------------------------------------------------------
-
-def test_refresh_exits_populates_visible_exit(tmp_path):
-    view = _make_view(tmp_path)
-    _save_exit(view._mem_repo, label="North Door", status="open")
-
-    view._refresh_exits()
-
-    labels = [e["label"] for e in view._exit_panel._visible_exits]
-    assert "North Door" in labels
-
-
-def test_refresh_exits_lists_locked_exit_with_reason(tmp_path):
-    view = _make_view(tmp_path)
-    _save_exit(view._mem_repo, status="locked", requires_item_slug="iron-key")
-
-    view._refresh_exits()
-
-    assert view._exit_panel._locked_exits[0]["missing_condition"] == "iron-key"
 
 
 # ---------------------------------------------------------------------------

@@ -34,9 +34,8 @@ def _make_rpg_side(active: int = 0):
     from dungeon_daddy.views.play_view import _RpgSidePanel
     char, scene, fallout = MagicMock(), MagicMock(), MagicMock()
     mem = MagicMock()
-    exit_panel = MagicMock()
     manager = MagicMock()
-    panel = _RpgSidePanel(char, scene, fallout, mem, exit_panel, None, manager=manager)
+    panel = _RpgSidePanel(char, scene, fallout, mem, None, manager=manager)
     panel._x, panel._y, panel._w, panel._h = 0.0, 0.0, 300.0, 500.0
     panel._tab_rects = []
     panel._active = active
@@ -44,7 +43,8 @@ def _make_rpg_side(active: int = 0):
 
 
 # ---------------------------------------------------------------------------
-# Phase 50.6 Slice 9 — ACTION tab retired (in-chat builder is the sole surface)
+# Phase 50.6 — ACTION tab (Slice 9) + EXITS/Move tab (follow-up) retired:
+# the in-chat builder + "Things Here" overlay are the sole action surfaces.
 # ---------------------------------------------------------------------------
 
 def test_action_tab_retired_from_rpg_tab_labels():
@@ -53,10 +53,16 @@ def test_action_tab_retired_from_rpg_tab_labels():
     assert "ACTION" not in _RPG_TAB_LABELS
 
 
-def test_remaining_rpg_tabs_kept():
-    """CHAR/SCENE/FALLOUT/MEM/EXITS/DBG survive the ACTION-tab retirement."""
+def test_exits_tab_retired_from_rpg_tab_labels():
+    """The right-panel EXITS (Move) tab is gone; the overlay replaces it."""
     from dungeon_daddy.views.play_view import _RPG_TAB_LABELS
-    assert _RPG_TAB_LABELS == ["CHAR", "SCENE", "FALLOUT", "MEM", "EXITS", "DBG"]
+    assert "EXITS" not in _RPG_TAB_LABELS
+
+
+def test_remaining_rpg_tabs_kept():
+    """CHAR/SCENE/FALLOUT/MEM/DBG survive the ACTION- and EXITS-tab retirements."""
+    from dungeon_daddy.views.play_view import _RPG_TAB_LABELS
+    assert _RPG_TAB_LABELS == ["CHAR", "SCENE", "FALLOUT", "MEM", "DBG"]
 
 
 # ---------------------------------------------------------------------------

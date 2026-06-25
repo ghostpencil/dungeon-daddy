@@ -7,7 +7,6 @@ from unittest.mock import MagicMock
 from dungeon_daddy.data.models import SessionState
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.models import ActorState, RoomExit
-from dungeon_daddy.ui.panels.exit_list_panel import ExitListPanel
 from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
 
 MIGRATIONS_DIR = (
@@ -57,7 +56,6 @@ def _make_view(tmp_path: Path, actor: ActorState | None = None):
     view._dungeon = None
     view._rpg_vna = VnaActionPanel()
     view._rpg_vna.set_submit_callback(view._on_vna_submit)
-    view._exit_panel = ExitListPanel()
     view._rpg_action = MagicMock(_actors=[actor])
     view._action_state = PlayerActionState()
     view._action_state.set_actor_roster([actor.actor_id])
