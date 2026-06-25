@@ -193,6 +193,77 @@ def test_click_disabled_suggested_chip_is_noop():
 
 
 # ---------------------------------------------------------------------------
+# Deterministic preview + adaptive action button (Slice 6)
+# ---------------------------------------------------------------------------
+
+def test_button_label_roll_for_contested_action():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    builder._panel.select_noun("mon-1")
+    builder._panel.select_verb("study")  # skill verb → contested
+    assert builder.button_label() == "ROLL"
+
+
+def test_button_label_move_for_deterministic_move():
+    builder = _builder(
+        exits=[{"exit_id": "ex-1", "label": "North Door", "status": "open"}]
+    )
+    builder._panel.select_verb("move")  # defaults noun to the only exit
+    assert builder.button_label() == "MOVE"
+
+
+def test_button_label_look_for_look_verb():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    builder._panel.select_noun("mon-1")
+    builder._panel.select_verb("look")  # deterministic, intransitive
+    assert builder.button_label() == "LOOK"
+
+
+def test_button_label_do_for_other_deterministic_verb():
+    builder = _builder(
+        objects=[
+            {
+                "object_id": "obj-1",
+                "display_name": "Lever",
+                "slug": "lever",
+                "current_state": "ready",
+            }
+        ]
+    )
+    builder._panel.select_verb("activate")  # deterministic, not move/look
+    assert builder.button_label() == "DO"
+
+
+def test_preview_lines_contested_shows_likely_roll_and_memory():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    builder._panel.select_noun("mon-1")
+    builder._panel.select_verb("study")
+    lines = builder.preview_lines()
+    assert lines[0] == "Likely roll: STUDY"
+    assert any(line.startswith("Memory:") for line in lines)
+
+
+def test_preview_lines_deterministic_shows_no_roll():
+    builder = _builder(
+        exits=[{"exit_id": "ex-1", "label": "North Door", "status": "open"}]
+    )
+    builder._panel.select_verb("move")
+    assert builder.preview_lines()[0] == "No roll — automatic"
+
+
+def test_preview_lines_includes_risk_when_threat_present():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    builder._panel.select_noun("mon-1")
+    builder._panel.select_verb("study")
+    assert any("Gnoll may stir" in line for line in builder.preview_lines())
+
+
+def test_preview_lines_empty_without_a_card():
+    # A bare panel with no context cannot build a Card → no preview.
+    builder = InChatActionBuilder(VnaActionPanel())
+    assert builder.preview_lines() == []
+
+
+# ---------------------------------------------------------------------------
 # draw() records hit rects consistent with slots() / the action button
 # ---------------------------------------------------------------------------
 

@@ -4,7 +4,7 @@
 
 Phase **50 — Hybrid Action Model: COMPLETE & merged to `main`** (2026-06-23).
 Phase **50.5 — Use Noun on Noun: COMPLETE & merged to `main`** (PR #81, 2026-06-24).
-Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–5 committed on branch
+Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–6 committed on branch
 `phase-50.6` (2026-06-24).
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
@@ -13,9 +13,10 @@ Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
 
 ---
 
-## START HERE next session — Phase 50.6, Slice 6
+## START HERE next session — Phase 50.6, Slice 7
 
-Continue with Slice 6 (preview render + adaptive button). Slices 1–5 are committed.
+Continue with Slice 7 ("Things Here" overlay — replace detail content; auto-track current
+room; render sections). Slices 1–6 are committed.
 
 Spec is `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md` (read it; design decisions are locked in §3).
 Phase 50.6 is a **BUILD add-on** (dynamic, like 50.5 — not on the 51–53 roadmap, no issue).
@@ -78,11 +79,20 @@ in-chat builder until Slice 9 retires it.
   the pool always has 8+ always-applicable universal verbs, so `suggested_verbs()` returns the
   **full** ranked list (disabled tags stay testable) and the cap lives in `draw()` — in the live
   app the drawn ~5 are normally all enabled. Full UI+views+rpg unit suite green (1525).
-- Then slices 6–11 (preview render + adaptive button, overlay, overlay→builder link, retire
-  ACTION tab, SAY/ASK swap stub, polish + smoke test). **Slice 6:** wire the ready `action_preview`
-  helper into a PREVIEW inset (likely-roll / templated risk / memory tags) + make the action
-  button adaptive (`ROLL` vs `DO`/`MOVE`/`LOOK` from `requires_roll`); `button_label()` is still
-  the `"ROLL"` placeholder.
+- **Slice 6 — DONE** (preview render + adaptive button, spec §4.5–4.6). `VnaActionPanel` now
+  retains the raw `room_context`/`actor` mappings (set in `set_context`) and exposes
+  `preview() -> ActionPreview | None` (builds the Card, delegates to the pure `action_preview`
+  helper from Slice 2). `InChatActionBuilder` gains `preview_lines()` (Likely roll / "No roll —
+  automatic"; a `Risk:` line only when a live room threat is present, drawn EMBER; a `Memory:`
+  line of canonical tags) and an **adaptive `button_label()`** — `ROLL` when contested/no-card,
+  else `MOVE`/`LOOK` for those verbs / `DO`. `draw()` renders a BG_1 PREVIEW inset above an
+  adaptive button (TEAL emphasis for ROLL; calmer BG_3/LINE/INK_2 for DO/MOVE/LOOK); band height
+  `_BUILDER_H` bumped 150→200 to fit. 8 new unit tests (button label per verb-class + 4
+  preview-line cases incl. empty-without-card). Full UI+views unit suite green (947).
+- Then slices 7–11 (overlay, overlay→builder link, retire ACTION tab, SAY/ASK swap stub, polish +
+  smoke test). **Slice 7:** replace the technical `_draw_detail_panel` content with the ready
+  `room_things` view-model + a renderer; auto-track the current room; render the EXITS/OBJECTS/
+  CREATURES/ITEMS sections with status chips.
 
 After 50.6: **Phase 51 — Talk to the Dungeon** (roadmap; 50.6 carves the SAY/ASK input seam).
 Write `spec/PHASE_51_*.md` when starting.

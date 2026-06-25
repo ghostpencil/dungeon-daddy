@@ -18,11 +18,13 @@ from typing import Callable, Collection, Iterable, Mapping
 
 from dungeon_daddy.rpg.action_options import (
     ActionCard,
+    ActionPreview,
     AdverbOption,
     CardError,
     CardOptions,
     NounOption,
     VerbOption,
+    action_preview,
     available_adverbs,
     available_nouns,
     available_verbs,
@@ -50,6 +52,10 @@ class VnaActionPanel:
         self._target_id: str | None = None
         self._playbook_slug: str | None = None
         self._actor_name: str | None = None
+        # Raw context mappings retained so the deterministic Preview box can be
+        # rebuilt from live room threats / the acting actor (Phase 50.6 Slice 6).
+        self._room_context: Mapping = {}
+        self._actor: Mapping = {}
         self._world_flags: list[str] = []
         self._library: object | None = None
         self._on_submit: Callable[[ActionCard], None] | None = None
@@ -79,6 +85,8 @@ class VnaActionPanel:
         """
         self._verbs = available_verbs(actor_abilities)
         self._nouns = available_nouns(room_context, actor)
+        self._room_context = room_context
+        self._actor = actor
         self._actor_name = actor.get("display_name")
         self._playbook_slug = playbook_slug
         self._world_flags = list(world_flags)
@@ -136,6 +144,17 @@ class VnaActionPanel:
             adverb=self._adverb,
             target_id=self._target_id if is_transitive(self._verb) else None,
         )
+
+    def preview(self) -> ActionPreview | None:
+        """Deterministic, engine-derived preview of the current Card (no LLM).
+
+        Returns ``None`` when no Card can be built yet (e.g. before
+        ``set_context``). Reuses the pure :func:`action_preview` helper.
+        """
+        card = self.build_card()
+        if card is None:
+            return None
+        return action_preview(card, self._room_context, self._actor)
 
     # ------------------------------------------------------------------
     # Submit

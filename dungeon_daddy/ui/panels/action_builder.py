@@ -14,7 +14,7 @@ rect-list pattern as :mod:`chat_panel`.
 """
 from __future__ import annotations
 
-from dungeon_daddy.rpg.action_options import verbs_for_noun
+from dungeon_daddy.rpg.action_options import VERB_LOOK, VERB_MOVE, verbs_for_noun
 from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
 
 # Slot kinds, in the order they appear in the command sentence. ``target`` is
@@ -154,13 +154,44 @@ class InChatActionBuilder:
                 return True
         return False
 
-    def button_label(self) -> str:
-        """Label for the action button.
+    # Deterministic verbs that read calmer than a generic "DO" (spec §4.6).
+    _DETERMINISTIC_BUTTON_LABELS = {VERB_MOVE: "MOVE", VERB_LOOK: "LOOK"}
 
-        Adaptive ``ROLL`` vs ``DO``/``MOVE``/``LOOK`` styling is wired to the
-        deterministic preview in Slice 6; for now the contested default holds.
+    def button_label(self) -> str:
+        """Adaptive action-button label (spec §4.6).
+
+        ``ROLL`` when the action is contested/uncertain (or no preview yet);
+        otherwise the deterministic ``MOVE`` / ``LOOK`` for those verbs, else
+        ``DO``. Derived from the deterministic :meth:`VnaActionPanel.preview`.
         """
-        return "ROLL"
+        preview = self._panel.preview()
+        if preview is None or preview.requires_roll:
+            return "ROLL"
+        card = self._panel.build_card()
+        verb = card.verb if card is not None else None
+        return self._DETERMINISTIC_BUTTON_LABELS.get(verb, "DO")
+
+    def preview_lines(self) -> list[str]:
+        """Display lines for the deterministic Preview inset (spec §4.5).
+
+        Empty when no Card can be built. The first line is the likely roll (or
+        "No roll — automatic"); a Risk line follows only when the room holds a
+        live threat; a Memory line lists the canonical memory types the action
+        could create.
+        """
+        preview = self._panel.preview()
+        if preview is None:
+            return []
+        lines: list[str] = []
+        if preview.likely_roll:
+            lines.append(f"Likely roll: {preview.likely_roll.upper()}")
+        else:
+            lines.append("No roll — automatic")
+        if preview.risk:
+            lines.append(f"Risk: {preview.risk}")
+        if preview.memory_tags:
+            lines.append("Memory: " + ", ".join(preview.memory_tags))
+        return lines
 
     def _target_connector(self) -> str:
         verb_label = (self._panel.selected_verb_label() or "").lower()
@@ -185,7 +216,7 @@ class InChatActionBuilder:
         """
         import arcade
         from dungeon_daddy.ui.theme import (
-            BG_1, BG_2, BG_3, FONT_MONO, FONT_UI, INK_2, INK_3, INK_4,
+            BG_1, BG_2, BG_3, EMBER, FONT_MONO, FONT_UI, INK_2, INK_3, INK_4,
             LINE, LINE_HI, PAD_MD, PAD_SM, RADIUS_SM, TEAL, TEXT_SM,
             VIOLET, draw_kicker, draw_rounded_rect,
         )
@@ -264,9 +295,52 @@ class InChatActionBuilder:
                 _draw_text_token(self._target_connector(), INK_3)
             _draw_slot(kind, label)
 
+        # Action button — bottom-right of the band. Styling is adaptive: a
+        # contested ROLL gets TEAL emphasis; a deterministic DO/MOVE/LOOK reads
+        # calmer (LINE border, INK_2 text). Drawn first so the preview inset and
+        # suggested row can stack above it.
+        label = self.button_label()
+        is_roll = label == "ROLL"
+        btn_w, btn_h = 64.0, 24.0
+        btn_x = right - btn_w
+        btn_y = y + PAD_SM
+        btn_tint = TEAL if is_roll else LINE
+        btn_text = TEAL if is_roll else INK_2
+        draw_rounded_rect(
+            btn_x + btn_w / 2, btn_y + btn_h / 2, btn_w, btn_h, RADIUS_SM,
+            BG_1 if is_roll else BG_3, border_color=btn_tint, border_width=1,
+        )
+        arcade.draw_text(
+            label, btn_x + btn_w / 2, btn_y + btn_h / 2, btn_text,
+            font_size=TEXT_SM, font_name=FONT_MONO,
+            anchor_x="center", anchor_y="center", bold=True,
+        )
+        self._button_rect = (btn_x, btn_y, btn_w, btn_h)
+
+        # Deterministic PREVIEW inset — likely roll / templated risk / memory
+        # tags (spec §4.5). Stacks just above the button row.
+        pv_lines = self.preview_lines()
+        pv_line_h = 15.0
+        pv_bot = btn_y + btn_h + 6
+        pv_h = 12 + len(pv_lines) * pv_line_h + PAD_SM
+        if pv_lines:
+            draw_rounded_rect(
+                left + (right - left) / 2, pv_bot + pv_h / 2, right - left, pv_h,
+                RADIUS_SM, BG_1, border_color=LINE, border_width=1,
+            )
+            draw_kicker("PREVIEW", left + 6, pv_bot + pv_h - 6)
+            line_y = pv_bot + pv_h - 22
+            for pv_line in pv_lines:
+                color = EMBER if pv_line.startswith("Risk:") else INK_3
+                arcade.draw_text(
+                    pv_line, left + 6, line_y, color,
+                    font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="center",
+                )
+                line_y -= pv_line_h
+
         # Suggested-verbs quick-pick row — applicable verbs tinted VIOLET, the
-        # rest greyed (INK_4). Capped for width; sits above the action button.
-        sug_y = y + 46
+        # rest greyed (INK_4). Capped for width; sits above the preview inset.
+        sug_y = pv_bot + pv_h + 16
         arcade.draw_text(
             "Suggested:", left, sug_y, INK_3,
             font_size=TEXT_SM, font_name=FONT_UI, anchor_y="center",
@@ -291,21 +365,6 @@ class InChatActionBuilder:
                 (sug_x, sug_y - self._CHIP_H / 2, chip_w, self._CHIP_H, s_label, enabled)
             )
             sug_x += chip_w + 6
-
-        # Action button — bottom-right of the band
-        btn_w, btn_h = 64.0, 24.0
-        btn_x = right - btn_w
-        btn_y = y + PAD_SM
-        draw_rounded_rect(
-            btn_x + btn_w / 2, btn_y + btn_h / 2, btn_w, btn_h, RADIUS_SM,
-            BG_1, border_color=TEAL, border_width=1,
-        )
-        arcade.draw_text(
-            self.button_label(), btn_x + btn_w / 2, btn_y + btn_h / 2, TEAL,
-            font_size=TEXT_SM, font_name=FONT_MONO,
-            anchor_x="center", anchor_y="center", bold=True,
-        )
-        self._button_rect = (btn_x, btn_y, btn_w, btn_h)
 
         # Open popup — drawn last, stacked upward from its slot so it never
         # spills off the bottom of the column.
