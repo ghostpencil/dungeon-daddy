@@ -655,6 +655,26 @@ def test_builder_mode_reclaims_hidden_input_row(monkeypatch):
     assert p._input_area_h < _PLAY_INPUT_AREA_H + band
 
 
+def test_builder_auto_collapses_on_short_window():
+    from dungeon_daddy.ui.panels.chat_panel import _BUILDER_AUTOCOLLAPSE_H
+
+    p = _play_panel()
+    p._w = 440.0
+    p._h = _BUILDER_AUTOCOLLAPSE_H - 1  # below threshold → collapse
+    p._apply_builder_auto_collapse()
+    p._action_builder.apply_auto_collapse.assert_called_once_with(True)
+
+
+def test_builder_expanded_on_tall_window():
+    from dungeon_daddy.ui.panels.chat_panel import _BUILDER_AUTOCOLLAPSE_H
+
+    p = _play_panel()
+    p._w = 440.0
+    p._h = _BUILDER_AUTOCOLLAPSE_H + 100  # above threshold → expand
+    p._apply_builder_auto_collapse()
+    p._action_builder.apply_auto_collapse.assert_called_once_with(False)
+
+
 def test_dialogue_mode_keeps_input_row_reserved():
     # In dialogue mode the free-text SAY box IS the bottom surface, so the input
     # row's reserved height stays (no builder band).

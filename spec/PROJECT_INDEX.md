@@ -29,14 +29,18 @@ Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
    free-text input hidden in builder mode, the mini-card now stacks directly on the band via new
    `chat_panel._card_bot_off` + `_BUILDER_BOTTOM_PAD`; `_input_area_h` no longer reserves the hidden
    ~70px input row, so the message area reclaims it.
-3. **Short-window collapsible fallback — TODO** (spec §4.1) — a ▾/▴ toggle that collapses the builder
-   band on short windows; **pick the min-height threshold (spec §11 open question — needs a decision).**
+3. **Short-window collapsible fallback — DONE (committed; not yet GUI-verified).** Builder band has an
+   **ACTION + ▾/▴ header row**; `InChatActionBuilder.is_collapsed()`/`toggle_collapsed()`/
+   `apply_auto_collapse(bool)` (manual toggle latches `_user_toggled` so it overrides auto). `chat_panel.
+   _apply_builder_auto_collapse()` (called first in `draw()`) auto-collapses when panel height <
+   **`_BUILDER_AUTOCOLLAPSE_H = 620`** (user-chosen "auto-collapse below threshold", 2026-06-26 — tune
+   in GUI). Collapsed band = header row only (`content_height` returns `_HEADER_H`).
 4. **Smoke test — TODO** — `tools/smoke_test_phase*.py` (Strategy A/B per `spec/TESTING.md` — read the
    A-vs-B guidance first) + manual visual verify by the user.
 
-**GUI-verify pieces 1+2** before building the collapsible toggle on top: in play mode the builder
-band should hug the sentence (no airy gap when short) and the mini-card + message area should reclaim
-the old blank strip at the bottom of the chat column.
+**GUI-verify pieces 1–3**: in play mode the builder band should hug the sentence (no airy gap), the
+mini-card + message area should reclaim the old bottom blank strip, and the **ACTION ▾/▴ toggle**
+should collapse/expand the band (auto-collapsing on a short window). Then only the smoke test remains.
 
 **Slice 10 is DONE, committed & GUI-verified** (2026-06-26): in **The Crucible → R3 (Cargo Bay)**,
 selecting **Pinion** + verb **Sway** → builder button reads **TALK**; submitting swaps the bottom of

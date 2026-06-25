@@ -313,6 +313,75 @@ def test_content_height_grows_with_wrapped_line_count():
 
 
 # ---------------------------------------------------------------------------
+# Collapsible band (Slice 11) — a ▾/▴ toggle; auto-collapses on short windows
+# until the user manually toggles it.
+# ---------------------------------------------------------------------------
+
+def test_builder_not_collapsed_by_default():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    assert builder.is_collapsed() is False
+
+
+def test_toggle_collapsed_flips_state():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    builder.toggle_collapsed()
+    assert builder.is_collapsed() is True
+    builder.toggle_collapsed()
+    assert builder.is_collapsed() is False
+
+
+def test_collapsed_content_height_smaller_than_expanded():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    expanded = builder.content_height(440.0)
+    builder.toggle_collapsed()
+    collapsed = builder.content_height(440.0)
+    assert collapsed < expanded
+
+
+def test_apply_auto_collapse_sets_state():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    builder.apply_auto_collapse(True)
+    assert builder.is_collapsed() is True
+    builder.apply_auto_collapse(False)
+    assert builder.is_collapsed() is False
+
+
+def test_manual_toggle_overrides_auto_collapse():
+    # Once the user expresses a preference, auto-collapse stops overriding it.
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    builder.toggle_collapsed()  # user expands/collapses manually
+    expanded_after_toggle = builder.is_collapsed()
+    builder.apply_auto_collapse(not expanded_after_toggle)
+    assert builder.is_collapsed() == expanded_after_toggle
+
+
+def test_draw_collapsed_records_toggle_not_slots():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    builder.toggle_collapsed()
+    with patch("dungeon_daddy.ui.theme.draw_rounded_rect"), \
+         patch("arcade.draw_rect_filled"), \
+         patch("arcade.draw_line"), \
+         patch("arcade.draw_text"):
+        builder.draw(0.0, 0.0, 440.0, builder.content_height(440.0))
+    assert builder._toggle_rect is not None
+    assert builder._slot_rects == []
+    assert builder._button_rect is None
+
+
+def test_clicking_toggle_rect_collapses():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    with patch("dungeon_daddy.ui.theme.draw_rounded_rect"), \
+         patch("arcade.draw_rect_filled"), \
+         patch("arcade.draw_line"), \
+         patch("arcade.draw_text"):
+        builder.draw(0.0, 0.0, 440.0, builder.content_height(440.0))
+    tx, ty, tw, th = builder._toggle_rect
+    consumed = builder.on_mouse_press(tx + tw / 2, ty + th / 2)
+    assert consumed is True
+    assert builder.is_collapsed() is True
+
+
+# ---------------------------------------------------------------------------
 # draw() records hit rects consistent with slots() / the action button
 # ---------------------------------------------------------------------------
 

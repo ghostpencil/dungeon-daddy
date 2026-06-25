@@ -53,6 +53,12 @@ class InChatActionBuilder:
         self._slot_rects: list[tuple[float, float, float, float, str]] = []
         self._popup_row_rects: list[tuple[float, float, float, float, str]] = []
         self._button_rect: tuple[float, float, float, float] | None = None
+        # Collapsible band (Slice 11): collapsed shows only the header/toggle row.
+        # ``_user_toggled`` latches once the user clicks the toggle so that
+        # auto-collapse (driven by window height) stops overriding their choice.
+        self._collapsed = False
+        self._user_toggled = False
+        self._toggle_rect: tuple[float, float, float, float] | None = None
 
     # ------------------------------------------------------------------
     # Command sentence model (drawn + hit-tested)
@@ -90,6 +96,32 @@ class InChatActionBuilder:
         return False
 
     # ------------------------------------------------------------------
+    # Collapsible band (Slice 11)
+    # ------------------------------------------------------------------
+
+    def is_collapsed(self) -> bool:
+        """Whether the band is collapsed to its header/toggle row only."""
+        return self._collapsed
+
+    def toggle_collapsed(self) -> None:
+        """Flip the collapsed state in response to a user click on the toggle.
+
+        Latches ``_user_toggled`` so subsequent :meth:`apply_auto_collapse`
+        calls (driven by window height) no longer override the user's choice.
+        """
+        self._collapsed = not self._collapsed
+        self._user_toggled = True
+
+    def apply_auto_collapse(self, should_collapse: bool) -> None:
+        """Auto-collapse on short windows, unless the user has toggled manually.
+
+        The host panel calls this each layout with ``window height < threshold``;
+        once the user clicks the ▾/▴ toggle their preference wins.
+        """
+        if not self._user_toggled:
+            self._collapsed = should_collapse
+
+    # ------------------------------------------------------------------
     # Interaction — slot chips open a popup list (custom combobox)
     # ------------------------------------------------------------------
 
@@ -122,8 +154,15 @@ class InChatActionBuilder:
         """Route a click. Returns ``True`` when the builder consumed it.
 
         An open popup takes priority (it is drawn on top): a click on one of its
-        rows selects that option and closes the popup.
+        rows selects that option and closes the popup. The collapse toggle in the
+        header row is hit-tested before the slots/button.
         """
+        if self._toggle_rect is not None:
+            left, bottom, w, h = self._toggle_rect
+            if left <= x < left + w and bottom <= y < bottom + h:
+                self.toggle_collapsed()
+                self._open_slot = None
+                return True
         if self._open_slot is not None:
             for left, bottom, w, h, label in self._popup_row_rects:
                 if left <= x < left + w and bottom <= y < bottom + h:
@@ -252,6 +291,7 @@ class InChatActionBuilder:
     _ROW_H = 18.0  # popup row height
     _UNIT_GAP = 6.0  # horizontal gap between sentence units
     _BTN_H = 24.0  # action button height
+    _HEADER_H = 22.0  # top header/toggle row height (also the collapsed height)
     _SENTENCE_TOP_OFF = 16.0  # first-row baseline below the band top
     _PV_LINE_H = 15.0  # preview inset line height
     _PV_GAP = 6.0  # gap between the button row and the preview inset
@@ -333,16 +373,20 @@ class InChatActionBuilder:
         (see :meth:`draw`), so sizing the band to the wrapped line count + the
         preview-line count keeps a constant gap between them — killing both the
         airy-when-short gap and the collision-when-long overlap of the old fixed
-        180px band (spec §9 Slice 11 requirement).
+        180px band (spec §9 Slice 11 requirement). When collapsed only the
+        header/toggle row is shown.
         """
         from dungeon_daddy.ui.theme import PAD_SM
 
+        if self._collapsed:
+            return self._HEADER_H
         n = self.sentence_line_count(w)
         pv = self.preview_lines()
         pv_h = len(pv) * self._PV_LINE_H + 2 * PAD_SM if pv else 0.0
         bottom_block = PAD_SM + self._BTN_H + self._PV_GAP  # button row + gap
         return (
-            self._SENTENCE_PREVIEW_GAP
+            self._HEADER_H
+            + self._SENTENCE_PREVIEW_GAP
             + self._SENTENCE_TOP_OFF
             + self._CHIP_H / 2
             + bottom_block
@@ -381,6 +425,7 @@ class InChatActionBuilder:
         self._slot_rects = []
         self._popup_row_rects = []
         self._button_rect = None
+        self._toggle_rect = None
 
         # Panel background. No "COMMAND SENTENCE" kicker — a decorative frame will
         # highlight this region later; the label read too technical and cost rows.
@@ -389,7 +434,29 @@ class InChatActionBuilder:
 
         left = x + PAD_MD
         right = x + w - PAD_MD
-        top_y = y + h - self._SENTENCE_TOP_OFF  # chip centre of the first row
+
+        # Header/toggle row across the top of the band. The ▾/▴ caret collapses
+        # or expands the band; when collapsed only this row is drawn (Slice 11).
+        header_cy = y + h - self._HEADER_H / 2
+        caret = "▾" if self._collapsed else "▴"
+        arcade.draw_text(
+            "ACTION", left, header_cy, INK_3,
+            font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="center",
+        )
+        tog_w = tog_h = 18.0
+        tog_x = right - tog_w
+        tog_y = header_cy - tog_h / 2
+        arcade.draw_text(
+            caret, tog_x + tog_w / 2, header_cy, INK_2,
+            font_size=TEXT_SM, font_name=FONT_MONO,
+            anchor_x="center", anchor_y="center",
+        )
+        self._toggle_rect = (tog_x, tog_y, tog_w, tog_h)
+        if self._collapsed:
+            return
+
+        # Sentence chips sit below the header row.
+        top_y = y + h - self._HEADER_H - self._SENTENCE_TOP_OFF
         gap = self._UNIT_GAP
 
         # Build the command sentence as ordered draw units so wrapping is

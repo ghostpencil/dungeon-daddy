@@ -54,6 +54,9 @@ _CHAR_CARD_Y_BOT = 76     # card bottom offset from panel bottom (_INPUT_Y_OFF +
 _BUILDER_BAND_GAP = 6     # gap above/below the builder band (Phase 50.6)
 _BUILDER_BOTTOM_PAD = 8   # builder band bottom offset when it owns the column
 _MSG_BOTTOM_PAD = 4       # pad above the mini-card before the message area
+# Below this panel height the builder auto-collapses to its header row so it does
+# not crowd out the message area on short windows (Slice 11; tune in GUI).
+_BUILDER_AUTOCOLLAPSE_H = 620
 _PORTRAIT_W = 96          # width of portrait section including divider
 _LABEL_H = 20  # height reserved at top of each bubble for the role label
 _SCROLL_SPEED = 30  # pixels per mouse wheel click
@@ -460,6 +463,15 @@ class ChatPanel:
             return self._action_builder.content_height(self._w) + _BUILDER_BAND_GAP
         return 0.0
 
+    def _apply_builder_auto_collapse(self) -> None:
+        """Collapse the builder band on short windows (Slice 11).
+
+        Driven by the current panel height; the builder latches a manual toggle
+        so the user's choice wins once they click the ▾/▴ caret.
+        """
+        if self._builder_visible():
+            self._action_builder.apply_auto_collapse(self._h < _BUILDER_AUTOCOLLAPSE_H)
+
     @property
     def _card_bot_off(self) -> float:
         """Offset from the panel bottom to the actor mini-card's bottom edge.
@@ -500,6 +512,10 @@ class ChatPanel:
 
     def draw(self) -> None:
         x, y, w, h = self._x, self._y, self._w, self._h
+
+        # Auto-collapse the builder on short windows before the layout reads the
+        # band height (so the message area below reflects it the same frame).
+        self._apply_builder_auto_collapse()
 
         # Panel background
         arcade.draw_rect_filled(arcade.XYWH(x + w / 2, y + h / 2, w, h), BG_1)
