@@ -40,6 +40,7 @@ class ClockState(BaseModel):
     stakes: str | None = None
     completion_effect: str | None = None
     visible_to_player: bool = True
+    monotonic: bool = True
 
     @model_validator(mode="after")
     def filled_within_segments(self) -> "ClockState":

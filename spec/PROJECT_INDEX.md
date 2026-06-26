@@ -9,7 +9,7 @@ All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds;
 tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
 bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
 Phase **51 — Talk to the Dungeon: IN PROGRESS** on branch `phase-51` (started 2026-06-26).
-Decisions locked; **Slice 1 DONE (uncommitted)**; Slice 2 next.
+Decisions locked; **Slices 1–2 DONE & committed**; Slice 3 (resonance archetype) next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -18,26 +18,24 @@ Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 
 ---
 
-## START HERE next session — Phase 51 in progress; Slice 2 next
+## START HERE next session — Phase 51 in progress; Slice 3 next
 
 **Phase 51 — Talk to the Dungeon** is underway on branch `phase-51` (off `main`). The spec is
 **finalized** (`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions are locked (§3).
 
-**Slice 1 — DONE (uncommitted on the working tree).** Added three optional fields to
-`CampaignManifest` (`dungeon_daddy/campaign/manifest.py`), all backward-compatible with defaults:
-`dungeon_voice: str | None = None`, `dungeon_knowledge: list[str] = []`,
-`dungeon_corruption_clock: bool = False`. +2 tests in `tests/unit/campaign/test_campaign_manifest.py`
-(defaults; explicit-values JSON round-trip). No validator/seeder changes needed (fields optional,
-not cross-referenced; `bone-cathedral.json` still parses). Campaign suite green (138). **Not yet
-committed** — next session: commit (`feat(manifest): Phase 51 Slice 1 — dungeon voice/knowledge/
-corruption fields`) then start Slice 2.
+**Slices 1–2 — DONE & committed.** S1 (`d4770a7`): three optional `CampaignManifest` fields. S2
+(recedable clock engine): `ClockState.monotonic: bool = True` (`rpg/models.py`) + signed
+`tick_clock(clock, delta) -> ClockState` (`rpg/clocks.py`, clamps `[0, segments]`; latches
+`completed` at full only when monotonic; non-monotonic recedes and never latches) +
+`advance_clock` unchanged (regression-guarded) + migration `016_clock_monotonic.sql`
+(`clocks.monotonic BOOLEAN DEFAULT true`). +7 tests (2 model, 5 engine). rpg+memory+campaign
+suites green (922). **Note:** repo `save_clock`/`get_clocks` do NOT yet persist `monotonic` (named
+SELECT, so the new column is harmless/default-true on read) — wire it in the seed slice when the
+intimacy clock needs `monotonic=False` persisted.
 
-**Slice 2 next — Recedable clock engine (the risky backward-compat slice).** Add `monotonic: bool =
-True` to `ClockState` (`dungeon_daddy/rpg/models.py`) + signed `tick_clock(clock, delta) -> ClockState`
-in `dungeon_daddy/rpg/clocks.py` (clamp `[0, segments]`; no status-latch when non-monotonic; latch
-`completed` at full when monotonic). Preserve `advance_clock` behavior for all existing callers
-(spec §4.2). Add migration `0NN_clock_monotonic.sql` (`clocks.monotonic` column, default true).
-**All existing clock/seed/suite tests must stay green.** Use the TDD skill (read `spec/TESTING.md` first).
+**Slice 3 next — `resonance_point` object archetype (D2).** Add the archetype so seeds can mark
+rooms where the dungeon-voice channel opens (spec §4 / §7.3). Use the TDD skill (read
+`spec/TESTING.md` first).
 
 Scope: a freeform **dungeon-voice** channel gated by **resonance points** (seed-marked rooms) + a
 **recedable dungeon-intimacy clock** (`monotonic=False`). The LLM plays the dungeon's voice (advisory
@@ -381,13 +379,26 @@ Spec written & finalized: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`. **In progress*
 
 Spec `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`; decisions locked §3. 10-slice TDD plan (§7).
 
-- **Slice 1 — DONE (uncommitted)** (manifest fields, spec §4.1 / §7.1; campaign suite green 138).
+- **Slice 1 — DONE** (commit `d4770a7`; manifest fields, spec §4.1 / §7.1; campaign suite green 138).
   `CampaignManifest` (`dungeon_daddy/campaign/manifest.py`) gains three optional, backward-compatible
   fields: `dungeon_voice: str | None = None` (personality fed to the LLM), `dungeon_knowledge:
   list[str] = []` (secrets revealed progressively by intimacy), `dungeon_corruption_clock: bool =
   False` (D5 scaffold flag). 2 TDD cycles: defaults; explicit-values + JSON round-trip. No
   validator/seeder changes (optional, not cross-referenced). +2 tests in
-  `tests/unit/campaign/test_campaign_manifest.py`. **Not yet committed.**
+  `tests/unit/campaign/test_campaign_manifest.py`.
+- **Slice 2 — DONE** (recedable clock engine, spec §4.2 / §7.2; rpg+memory+campaign suites green 922).
+  The intimacy clock must move **both ways**, added backward-compatibly: (1) `ClockState.monotonic:
+  bool = True` (`rpg/models.py`) — default keeps every existing clock monotonic; intimacy/relationship
+  clocks set `False`. (2) signed `tick_clock(clock, delta) -> ClockState` (`rpg/clocks.py`) — clamps
+  `filled` to `[0, segments]`; a **monotonic** clock latches `status="completed"` at full (current
+  `advance_clock` behavior); a **non-monotonic** clock may recede and **never latches** (thresholds
+  read live by callers). (3) `advance_clock` **unchanged** (existing 4 tests are the regression guard).
+  (4) migration `016_clock_monotonic.sql` (`clocks.monotonic BOOLEAN DEFAULT true`; auto-discovered by
+  the sorted-glob runner). +7 tests (2 model defaults/set-false, 5 engine: +delta increment, monotonic
+  latch-at-full, -delta clamp-to-0, non-monotonic no-latch, non-monotonic recede). **Deferred:** repo
+  `save_clock`/`get_clocks` do **not** yet read/write `monotonic` (named-column SELECT → new column is
+  harmless, reconstructs default-true); wire persistence in the seed slice when `monotonic=False` must
+  survive a round-trip.
 
 ---
 

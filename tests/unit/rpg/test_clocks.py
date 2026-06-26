@@ -1,4 +1,4 @@
-from dungeon_daddy.rpg.clocks import advance_clock, create_clock
+from dungeon_daddy.rpg.clocks import advance_clock, create_clock, tick_clock
 from dungeon_daddy.rpg.models import ClockState
 
 
@@ -33,6 +33,41 @@ def test_advance_clock_overflow_clamps_to_segments() -> None:
     updated = advance_clock(clock, ticks=10)
     assert updated.filled == 4
     assert updated.status == "completed"
+
+
+def test_tick_clock_positive_delta_increments() -> None:
+    clock = _clock(segments=6, filled=1)
+    updated = tick_clock(clock, 2)
+    assert updated.filled == 3
+    assert updated.status == "active"
+
+
+def test_tick_clock_monotonic_latches_completed_at_full() -> None:
+    clock = _clock(segments=4, filled=3, monotonic=True)
+    updated = tick_clock(clock, 5)
+    assert updated.filled == 4
+    assert updated.status == "completed"
+
+
+def test_tick_clock_negative_delta_clamps_to_zero() -> None:
+    clock = _clock(segments=6, filled=2)
+    updated = tick_clock(clock, -5)
+    assert updated.filled == 0
+    assert updated.status == "active"
+
+
+def test_tick_clock_non_monotonic_does_not_latch_at_full() -> None:
+    clock = _clock(segments=4, filled=3, monotonic=False)
+    updated = tick_clock(clock, 1)
+    assert updated.filled == 4
+    assert updated.status == "active"
+
+
+def test_tick_clock_non_monotonic_can_recede() -> None:
+    clock = _clock(segments=6, filled=5, monotonic=False)
+    updated = tick_clock(clock, -2)
+    assert updated.filled == 3
+    assert updated.status == "active"
 
 
 def test_create_clock_defaults() -> None:

@@ -191,6 +191,14 @@ class TestClockState:
         c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4)
         assert c.clock_level == "dungeon"
 
+    def test_monotonic_defaults_to_true(self) -> None:
+        c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4)
+        assert c.monotonic is True
+
+    def test_monotonic_can_be_set_false(self) -> None:
+        c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4, monotonic=False)
+        assert c.monotonic is False
+
     def test_clock_level_accepts_all_valid_values(self) -> None:
         for level in ("room", "level", "dungeon", "quest", "character", "faction"):
             c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4, clock_level=level)
