@@ -9,7 +9,8 @@ All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds;
 tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
 bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
 Phase **51 — Talk to the Dungeon: IN PROGRESS** on branch `phase-51` (started 2026-06-26).
-Decisions locked; **Slices 1–5 DONE & committed**; Slice 6 (dungeon-voice bundle + agent) next.
+Decisions locked; **Slices 1–6 DONE & committed**; Slice 7 (engine side-effects: intimacy tick +
+draft memory) next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -18,20 +19,21 @@ Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 
 ---
 
-## START HERE next session — Phase 51 in progress; Slice 6 next
+## START HERE next session — Phase 51 in progress; Slice 7 next
 
 **Phase 51 — Talk to the Dungeon** is underway on branch `phase-51` (off `main`). The spec is
 **finalized** (`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions are locked (§3).
 
-**Slices 1–5 DONE & committed** (pure data/helper slices — no UI, no LLM, no live persistence yet).
-Per-slice detail is in the **Phase 51 history section below**; in brief: S1 (`d4770a7`) three optional
-`CampaignManifest` fields · S2 recedable clock engine (`ClockState.monotonic` + signed `tick_clock`;
-`advance_clock` unchanged; migration `016_clock_monotonic.sql`) · S3 `"resonance_point"`
+**Slices 1–6 DONE & committed** (pure data/helper slices + the LLM seam — still no live persistence,
+no UI). Per-slice detail is in the **Phase 51 history section below**; in brief: S1 (`d4770a7`) three
+optional `CampaignManifest` fields · S2 recedable clock engine (`ClockState.monotonic` + signed
+`tick_clock`; `advance_clock` unchanged; migration `016_clock_monotonic.sql`) · S3 `"resonance_point"`
 `ObjectArchetype` + `build_room_context` derives the flag · S4 intimacy gate
-`dungeon_channel_available` · S5 (`5767bf1`) knowledge filter `reveal_knowledge`. Both helpers live in
-`rpg/dungeon_channel.py` with **tunable band constants** (`INTIMACY_THRESHOLD=0.5`,
-`HIGH_INTIMACY_THRESHOLD=0.85`, `CRYPTIC_REVEAL_FRACTION=0.5`) pointing at §6 / BALANCE_NOTES.
-rpg+memory+campaign suites green (938).
+`dungeon_channel_available` · S5 (`5767bf1`) knowledge filter `reveal_knowledge` (both helpers in
+`rpg/dungeon_channel.py` with **tunable band constants** `INTIMACY_THRESHOLD=0.5` /
+`HIGH_INTIMACY_THRESHOLD=0.85` / `CRYPTIC_REVEAL_FRACTION=0.5`, §6 / BALANCE_NOTES pointers) · S6 thin
+`DungeonVoiceAgent` (`llm/agents/dungeon_voice_agent.py`) + `prompts/dungeon_voice_system.txt`.
+llm suite green (175).
 
 **Two deferred items to wire in the seed slice** (carried, don't forget): (1) repo
 `save_clock`/`get_clocks` do **not** yet persist `ClockState.monotonic` (named SELECT → new column is
@@ -39,14 +41,24 @@ harmless/default-true on read) — wire it when the intimacy clock needs `monoto
 round-trip. (2) The **manifest** object `archetype` Literal (`campaign/manifest.py:95`) does **not**
 yet include `resonance_point` (no seeding in the pure slices) — add it when authoring resonance rooms.
 
-**Slice 6 next — dungeon-voice bundle + agent (spec §4.4 / §7.6).** Build the §4.4 input bundle
-(`mode: dungeon_voice`, `dungeon_voice` string, `intimacy_level` filled/segments, `dungeon_knowledge`
-slice from `reveal_knowledge`, `player_message`, `actor`, `recent_memories` via `MemoryRetriever`) and
-a thin `DungeonVoiceAgent` (or a `mode="dungeon_voice"` path on `DungeonMasterAgent` — TBD; both
-inject the `LLMProvider`, **no new dependency**). The LLM seam: test with a **fake provider** (per
-`spec/TESTING.md` mock policy) — assert the assembled prompt carries voice/intimacy/knowledge/message;
-**no live API call**. The reply is pure narration (advisory only — no mechanics, no proposals, D6).
-Use the TDD skill (read `spec/TESTING.md` first).
+**Slice 6 design note (for the wiring slices):** `DungeonVoiceAgent` is **provider-only and stateless**
+— keyword-only `respond(*, dungeon_voice, intimacy_filled, intimacy_segments, dungeon_knowledge,
+player_message, actor, recent_memories=None) -> str`. It assembles the §4.4 system prompt (Your Voice /
+Intimacy `filled/segments` / Knowledge / Recent Memories, the latter two omitted when empty) + a
+`"<actor> says: <message>"` user turn, and returns the raw reply (propagates `LLMError`). It does
+**no** gate check, clock read, or memory write — **the caller** computes `reveal_knowledge(...)` and
+pulls `recent_memories` (via `MemoryRetriever`) before calling, and Slice 7 applies the engine
+side-effects. Chose a **separate agent** over a `DungeonMasterAgent` mode (keeps the no-proposal
+authority boundary obvious; leaves the mature DM `respond`/`request_proposal` paths untouched).
+
+**Slice 7 next — engine side-effects per exchange (spec §4.7 / §7.7).** After each dungeon reply the
+**engine** (service code, never the LLM): (1) `tick_clock(intimacy, +delta)` — applied **and
+persisted** (this is where the deferred `save_clock`/`get_clocks` `monotonic` round-trip must be wired,
+since the intimacy clock is `monotonic=False`); (2) drafts a `MemoryEntry` (status `draft`, type
+`dungeon_state` or `relationship`, default importance) summarizing the exchange (D4) via the existing
+memory curation path. Assert clock persisted + memory drafted; assert **no** authoritative LLM write
+path is touched (D6). Per-exchange `+delta` is an open §6 balance question. Use the TDD skill (read
+`spec/TESTING.md` first).
 
 Scope: a freeform **dungeon-voice** channel gated by **resonance points** (seed-marked rooms) + a
 **recedable dungeon-intimacy clock** (`monotonic=False`). The LLM plays the dungeon's voice (advisory
@@ -443,6 +455,23 @@ Spec `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`; decisions locked §3. 10-slice TDD 
   `INTIMACY_THRESHOLD` pattern — the exact banding is the open §6 balance question). +7 tests
   (none-below, full-at-high, cryptic head slice, empty-list, zero-segments guard, cryptic ≥1 floor,
   exact-high-boundary `>=`).
+- **Slice 6 — DONE** (dungeon-voice bundle + agent, spec §4.4 / §7.6; llm suite green 175). New thin
+  **`DungeonVoiceAgent`** (`dungeon_daddy/llm/agents/dungeon_voice_agent.py`) + system prompt
+  `prompts/dungeon_voice_system.txt` (voice-only; explicitly forbids dice/clocks/consequences —
+  authority boundary / D6). **Chose a separate agent** over a `DungeonMasterAgent` mode (the open §4.4
+  "TBD"): keeps the no-proposal boundary obvious and the mature DM `respond`/`request_proposal` paths
+  untouched. Keyword-only `respond(*, dungeon_voice, intimacy_filled, intimacy_segments,
+  dungeon_knowledge, player_message, actor, recent_memories=None) -> str` injects the `LLMProvider`
+  (**no new dependency**) and assembles the §4.4 system prompt (`# Your Voice` / `# Intimacy`
+  `filled/segments` / `# Knowledge you may draw on` / `# Recent Memories` — the last two **omitted when
+  empty**) + a `"<actor> says: <message>"` user turn; returns the raw reply and **propagates
+  `LLMError`** (no swallowing, matching `DungeonMasterAgent.respond`). **Provider-only and stateless**
+  — does no gate check, clock read, or memory write; the **caller** computes `reveal_knowledge(...)`
+  and pulls `recent_memories` (via `MemoryRetriever`), and Slice 7 applies the engine side-effects.
+  Tested with a **fake provider** (per `spec/TESTING.md`) — 9 tests (returns-reply, voice carried,
+  intimacy `filled/segments`, knowledge slice + omit-when-empty, player_message+actor in user turn,
+  recent memories rendered + omit-when-empty, LLMError propagated); **no live API call**. 7 red→green
+  TDD cycles (cycles 5 & 7 pinned contracts already satisfied by earlier cycles).
 
 ---
 
