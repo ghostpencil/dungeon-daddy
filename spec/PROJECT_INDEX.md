@@ -9,8 +9,8 @@ All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds;
 tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
 bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
 Phase **51 — Talk to the Dungeon: IN PROGRESS** on branch `phase-51` (started 2026-06-26).
-Decisions locked; **Slices 1–6 DONE & committed**; Slice 7 (engine side-effects: intimacy tick +
-draft memory) next.
+Decisions locked; **Slices 1–7 DONE & committed**; Slice 8 (PlayView dialogue routing — `DialogueSession`,
+real `_on_dialogue_send`, fold in NPC `sway→willing` kind) next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -19,13 +19,13 @@ Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 
 ---
 
-## START HERE next session — Phase 51 in progress; Slice 7 next
+## START HERE next session — Phase 51 in progress; Slice 8 next
 
 **Phase 51 — Talk to the Dungeon** is underway on branch `phase-51` (off `main`). The spec is
 **finalized** (`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions are locked (§3).
 
-**Slices 1–6 DONE & committed** (pure data/helper slices + the LLM seam — still no live persistence,
-no UI). Per-slice detail is in the **Phase 51 history section below**; in brief: S1 (`d4770a7`) three
+**Slices 1–7 DONE & committed** (pure data/helper slices + the LLM seam + the first engine
+side-effect service — still no UI). Per-slice detail is in the **Phase 51 history section below**; in brief: S1 (`d4770a7`) three
 optional `CampaignManifest` fields · S2 recedable clock engine (`ClockState.monotonic` + signed
 `tick_clock`; `advance_clock` unchanged; migration `016_clock_monotonic.sql`) · S3 `"resonance_point"`
 `ObjectArchetype` + `build_room_context` derives the flag · S4 intimacy gate
@@ -35,11 +35,11 @@ optional `CampaignManifest` fields · S2 recedable clock engine (`ClockState.mon
 `DungeonVoiceAgent` (`llm/agents/dungeon_voice_agent.py`) + `prompts/dungeon_voice_system.txt`.
 llm suite green (175).
 
-**Two deferred items to wire in the seed slice** (carried, don't forget): (1) repo
-`save_clock`/`get_clocks` do **not** yet persist `ClockState.monotonic` (named SELECT → new column is
-harmless/default-true on read) — wire it when the intimacy clock needs `monotonic=False` to survive a
+**Deferred items** (carried): (1) ✅ **RESOLVED in Slice 7** — repo `save_clock`/`get_clocks` now
+persist `ClockState.monotonic` (default-true), so a `monotonic=False` intimacy clock survives a DB
 round-trip. (2) The **manifest** object `archetype` Literal (`campaign/manifest.py:95`) does **not**
-yet include `resonance_point` (no seeding in the pure slices) — add it when authoring resonance rooms.
+yet include `resonance_point` (no seeding in the pure slices) — add it when authoring resonance rooms
+(the seed slice).
 
 **Slice 6 design note (for the wiring slices):** `DungeonVoiceAgent` is **provider-only and stateless**
 — keyword-only `respond(*, dungeon_voice, intimacy_filled, intimacy_segments, dungeon_knowledge,
@@ -51,14 +51,25 @@ pulls `recent_memories` (via `MemoryRetriever`) before calling, and Slice 7 appl
 side-effects. Chose a **separate agent** over a `DungeonMasterAgent` mode (keeps the no-proposal
 authority boundary obvious; leaves the mature DM `respond`/`request_proposal` paths untouched).
 
-**Slice 7 next — engine side-effects per exchange (spec §4.7 / §7.7).** After each dungeon reply the
-**engine** (service code, never the LLM): (1) `tick_clock(intimacy, +delta)` — applied **and
-persisted** (this is where the deferred `save_clock`/`get_clocks` `monotonic` round-trip must be wired,
-since the intimacy clock is `monotonic=False`); (2) drafts a `MemoryEntry` (status `draft`, type
-`dungeon_state` or `relationship`, default importance) summarizing the exchange (D4) via the existing
-memory curation path. Assert clock persisted + memory drafted; assert **no** authoritative LLM write
-path is touched (D6). Per-exchange `+delta` is an open §6 balance question. Use the TDD skill (read
-`spec/TESTING.md` first).
+**Slice 7 DONE (commit `ad0a673`) — engine side-effects per exchange (spec §4.7 / §7.7).** New
+memory-layer service `memory/dungeon_exchange.py` → `record_dungeon_exchange(repo, *, intimacy_clock,
+actor, player_message, dungeon_reply, delta=DUNGEON_EXCHANGE_INTIMACY_DELTA) ->
+DungeonExchangeResult(clock, memory_id)`: ticks + persists the intimacy clock (`tick_clock` +
+`update_clock_progress`) and drafts a `MemoryEntry` (status `draft`, type `relationship`) summarizing
+the exchange (D4). Also wired the carried `monotonic` round-trip into `save_clock`/`get_clocks`.
+Per-exchange `+delta` = **1** (conservative; tunable `DUNGEON_EXCHANGE_INTIMACY_DELTA` constant with a
+§6/BALANCE_NOTES pointer — still the open balance question). +5 tests (2 repo round-trip, 3 service
+incl. a D6 "writes-only-drafts" guard). The agent + service are **provider-only consumers** — the
+**caller** (Slice 8) computes `reveal_knowledge(...)`, runs `DungeonVoiceAgent.respond(...)`, then
+calls `record_dungeon_exchange(...)`.
+
+**Slice 8 next — PlayView dialogue routing (spec §7.8).** Replace the 50.6 `_on_dialogue_send_stub`
+with real routing via an in-memory `DialogueSession` (`kind` `"dungeon"`/`"npc"`, `target_id`,
+`room_id`, `turns` — §4.3); `_begin_dialogue` opens the dungeon (resonance+intimacy gated) vs. npc
+channel; the dungeon reply is posted to the distinct bubble; leaving the room / `/leave` closes and
+swaps back to the Action Builder. Wire the per-exchange engine side-effect (`record_dungeon_exchange`)
+after the reply, and rebind the NPC `sway→willing` stub onto the shared engine (D1a). Use the TDD
+skill (read `spec/TESTING.md` first).
 
 Scope: a freeform **dungeon-voice** channel gated by **resonance points** (seed-marked rooms) + a
 **recedable dungeon-intimacy clock** (`monotonic=False`). The LLM plays the dungeon's voice (advisory
@@ -472,6 +483,22 @@ Spec `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`; decisions locked §3. 10-slice TDD 
   intimacy `filled/segments`, knowledge slice + omit-when-empty, player_message+actor in user turn,
   recent memories rendered + omit-when-empty, LLMError propagated); **no live API call**. 7 red→green
   TDD cycles (cycles 5 & 7 pinned contracts already satisfied by earlier cycles).
+- **Slice 7 — DONE** (commit `ad0a673`; engine side-effects per exchange, spec §4.7 / §7.7;
+  memory+rpg+campaign suites green 943, clock/memory integration green). Two parts: (a) wired the
+  carried **`ClockState.monotonic` round-trip** into `MemoryRepository.save_clock`/`get_clocks` (new
+  `monotonic=True` param → INSERT + ON CONFLICT; SELECT/returns it, default-true) so a seed's
+  `monotonic=False` intimacy clock survives a DB round-trip (else the reconstructed `ClockState` would
+  wrongly latch at full). (b) New memory-layer service `dungeon_daddy/memory/dungeon_exchange.py` →
+  `record_dungeon_exchange(repo, *, intimacy_clock, actor, player_message, dungeon_reply,
+  delta=DUNGEON_EXCHANGE_INTIMACY_DELTA) -> DungeonExchangeResult(clock, memory_id)`: ticks + persists
+  the intimacy clock (`tick_clock` then `update_clock_progress`) and drafts a `MemoryEntry` (status
+  `draft`, type `relationship` via `DUNGEON_EXCHANGE_MEMORY_TYPE`) summarizing the exchange (D4).
+  **Engine-applied, never the LLM** — no provider/proposal path (authority boundary / D6). Per-exchange
+  `+delta` = **1** (conservative; tunable constant + §6/BALANCE_NOTES pointer — open balance question).
+  **Placement:** the service lives in `memory/` (not `rpg/`) because it orchestrates `MemoryRepository`
+  (clocks + memory both) and memory already depends on rpg. +5 tests (2 repo round-trip:
+  default-true / non-monotonic-survives; 3 service: tick+persist, draft summary, a D6 "writes-only-
+  drafts" `count_by_status == {"draft": 1}` guard).
 
 ---
 
