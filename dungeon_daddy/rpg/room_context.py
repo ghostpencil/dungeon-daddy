@@ -21,6 +21,11 @@ def build_room_context(
     *,
     resonance_point: bool = False,
 ) -> dict:
+    objects = repo.get_objects_by_room(campaign_id, room_id)
+    resonance_point = resonance_point or any(
+        o["archetype"] == "resonance_point" for o in objects
+    )
+
     exits = repo.get_exits_by_room(campaign_id, room_id)
 
     visible_exits = [

@@ -9,7 +9,7 @@ All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds;
 tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
 bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
 Phase **51 — Talk to the Dungeon: IN PROGRESS** on branch `phase-51` (started 2026-06-26).
-Decisions locked; **Slices 1–2 DONE & committed**; Slice 3 (resonance archetype) next.
+Decisions locked; **Slices 1–3 DONE & committed**; Slice 4 (intimacy gate) next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -18,30 +18,33 @@ Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 
 ---
 
-## START HERE next session — Phase 51 in progress; Slice 3 next
+## START HERE next session — Phase 51 in progress; Slice 4 next
 
 **Phase 51 — Talk to the Dungeon** is underway on branch `phase-51` (off `main`). The spec is
 **finalized** (`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions are locked (§3).
 
-**Slices 1–2 — DONE & committed.** S1 (`d4770a7`): three optional `CampaignManifest` fields. S2
+**Slices 1–3 — DONE & committed.** S1 (`d4770a7`): three optional `CampaignManifest` fields. S2
 (recedable clock engine): `ClockState.monotonic: bool = True` (`rpg/models.py`) + signed
 `tick_clock(clock, delta) -> ClockState` (`rpg/clocks.py`, clamps `[0, segments]`; latches
 `completed` at full only when monotonic; non-monotonic recedes and never latches) +
 `advance_clock` unchanged (regression-guarded) + migration `016_clock_monotonic.sql`
-(`clocks.monotonic BOOLEAN DEFAULT true`). +7 tests (2 model, 5 engine). rpg+memory+campaign
-suites green (922). **Note:** repo `save_clock`/`get_clocks` do NOT yet persist `monotonic` (named
-SELECT, so the new column is harmless/default-true on read) — wire it in the seed slice when the
-intimacy clock needs `monotonic=False` persisted.
+(`clocks.monotonic BOOLEAN DEFAULT true`). +7 tests (2 model, 5 engine). S3 (resonance archetype):
+`"resonance_point"` added to the `ObjectArchetype` Literal (`rpg/models.py`); `build_room_context`
+(`rpg/room_context.py`) now **derives** `resonance_point` — `True` when the room contains a
+`resonance_point` object (OR'd with the explicit param, which stays for callers). +3 tests (1 model,
+2 context). rpg+memory suites green (787). **Note:** repo `save_clock`/`get_clocks` do NOT yet
+persist `monotonic` (named SELECT, so the new column is harmless/default-true on read) — wire it in
+the seed slice when the intimacy clock needs `monotonic=False` persisted. The **manifest** object
+`archetype` Literal (`campaign/manifest.py:95`) was deliberately **left without** `resonance_point`
+(no seeding in this pure slice) — add it in the seed slice when authoring resonance rooms.
 
-**Slice 3 next — `resonance_point` archetype + flag wiring (D2; spec §4 / §7.3).** Two behaviors:
-(1) add `"resonance_point"` to the `ObjectArchetype` Literal (`dungeon_daddy/rpg/models.py:225` —
-a `RoomObject` of this archetype has **no** state-transition interaction; interacting opens the
-dungeon channel). (2) wire the archetype **end-to-end → the room flag**: `build_room_context`
-(`dungeon_daddy/rpg/room_context.py:16`) already accepts `resonance_point: bool = False` and emits
-`"resonance_point"` into the bundle (line 53), but the caller always passes the default — derive it
-from the room's objects so a room containing a `resonance_point` object reports `resonance_point=True`.
-Pure/data-layer slice (no new lib, no LLM, no UI yet). All existing room-context tests stay green.
-Use the TDD skill (read `spec/TESTING.md` first).
+**Slice 4 next — intimacy gate (spec §4.3 / §7.4).** Pure helper
+`dungeon_channel_available(room_context, intimacy_clock) -> (bool, reason)`: open only when the room
+is a **resonance point** (`room_context["resonance_point"]`) **AND** the intimacy clock is at/above
+threshold; returns the lock reason string when closed (not-here vs. not-intimate-enough). Reads
+`filled`/`segments` **live** (non-monotonic clock; never a completion event). Pure helper slice (no
+lib, no LLM, no UI). Use the TDD skill (read `spec/TESTING.md` first); check spec §4.3 for the band
+thresholds.
 
 Scope: a freeform **dungeon-voice** channel gated by **resonance points** (seed-marked rooms) + a
 **recedable dungeon-intimacy clock** (`monotonic=False`). The LLM plays the dungeon's voice (advisory
@@ -405,6 +408,16 @@ Spec `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`; decisions locked §3. 10-slice TDD 
   `save_clock`/`get_clocks` do **not** yet read/write `monotonic` (named-column SELECT → new column is
   harmless, reconstructs default-true); wire persistence in the seed slice when `monotonic=False` must
   survive a round-trip.
+- **Slice 3 — DONE** (resonance archetype, spec §4.1 / §7.3; rpg+memory suites green 787). Two TDD
+  cycles: (1) `"resonance_point"` added to the `ObjectArchetype` Literal (`rpg/models.py`) — a
+  `RoomObject` of this archetype has no state-transition interaction (interacting opens the dungeon
+  channel, later slices). (2) `build_room_context` (`rpg/room_context.py`) now **derives** the
+  `resonance_point` bundle flag from the room's objects via `get_objects_by_room` — `True` when any
+  object has the `resonance_point` archetype, OR'd with the explicit `resonance_point` param (kept
+  for direct callers). +3 tests (1 model `test_resonance_point_archetype_accepted`, 2 context:
+  derived-from-object, false-when-no-resonance-object). **Left out of scope:** the **manifest** object
+  `archetype` Literal (`campaign/manifest.py:95`) does NOT yet include `resonance_point` — no seeding
+  happens in this pure data slice; add it when the seed slice authors resonance rooms.
 
 ---
 

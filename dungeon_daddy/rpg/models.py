@@ -223,7 +223,14 @@ class Item(BaseModel):
 
 
 ObjectArchetype = Literal[
-    "container", "door", "mechanism", "structure", "trap", "lore_fixture", "resource"
+    "container",
+    "door",
+    "mechanism",
+    "structure",
+    "trap",
+    "lore_fixture",
+    "resource",
+    "resonance_point",
 ]
 
 

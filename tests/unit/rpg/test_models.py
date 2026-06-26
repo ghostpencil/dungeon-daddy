@@ -543,6 +543,20 @@ class TestRoomObject:
             )
             assert obj.archetype == archetype
 
+    def test_resonance_point_archetype_accepted(self) -> None:
+        obj = RoomObject(
+            object_id="obj:c:font",
+            campaign_id="c",
+            room_id="room:r",
+            level_id="level:1",
+            slug="resonance-font",
+            display_name="Humming Font",
+            archetype="resonance_point",
+            description="A font that hums when you draw near.",
+            current_state="dormant",
+        )
+        assert obj.archetype == "resonance_point"
+
     def test_unknown_archetype_rejected(self) -> None:
         with pytest.raises(ValidationError):
             RoomObject(
