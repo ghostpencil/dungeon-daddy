@@ -1,11 +1,20 @@
 from __future__ import annotations
 
+import math
+
 from dungeon_daddy.rpg.models import ClockState
 
 # Tunable intimacy gate threshold, as a fraction of the clock's segments filled.
 # Open balance question — see spec/PHASE_51_TALK_TO_THE_DUNGEON.md §6 and
 # BALANCE_NOTES.md when tuning the band boundaries.
 INTIMACY_THRESHOLD = 0.5
+
+# Knowledge-revelation banding (spec §4.5; tunable — see §6 / BALANCE_NOTES.md).
+# At/above HIGH_INTIMACY_THRESHOLD the dungeon draws on its full knowledge;
+# in the cryptic band [INTIMACY_THRESHOLD, HIGH_INTIMACY_THRESHOLD) it reveals
+# only a head fragment — CRYPTIC_REVEAL_FRACTION of the list (at least one item).
+HIGH_INTIMACY_THRESHOLD = 0.85
+CRYPTIC_REVEAL_FRACTION = 0.5
 
 # Lock reasons surfaced to the player when the channel is closed.
 REASON_NOT_HERE = "You are not standing where the dungeon can hear you."
@@ -33,3 +42,22 @@ def dungeon_channel_available(
     if intimacy_clock.filled / intimacy_clock.segments < INTIMACY_THRESHOLD:
         return (False, REASON_NOT_INTIMATE)
     return (True, None)
+
+
+def reveal_knowledge(knowledge: list[str], filled: int, segments: int) -> list[str]:
+    """Return the slice of ``dungeon_knowledge`` the dungeon may draw on now.
+
+    Banding by intimacy fraction ``filled / segments`` (spec §4.5):
+      * below ``INTIMACY_THRESHOLD`` → nothing (the dungeon stays silent);
+      * in the cryptic band → a fragmentary head slice;
+      * at/above ``HIGH_INTIMACY_THRESHOLD`` → the full list.
+    """
+    if segments <= 0:
+        return []
+    ratio = filled / segments
+    if ratio < INTIMACY_THRESHOLD:
+        return []
+    if ratio >= HIGH_INTIMACY_THRESHOLD:
+        return list(knowledge)
+    count = max(1, math.ceil(len(knowledge) * CRYPTIC_REVEAL_FRACTION))
+    return list(knowledge[:count])
