@@ -1,10 +1,12 @@
 # Phase 50.6 — Chat Action Cockpit
 
-**Status:** SPEC (not yet started)
+**Status:** ✅ **COMPLETE & GUI-verified (2026-06-26)** — all 11 slices on branch `phase-50.6`
+(not yet merged to `main`). The Slice 11 smoke test was **skipped by user choice** (manual verify
+sufficient; the cockpit is expected to evolve). Per-slice implementation log: `spec/PROJECT_INDEX.md`.
 **Type:** BUILD add-on (dynamic, like Phase 50.5 — *not* on the 51–53 roadmap, no GitHub issue).
 **Depends on:** Phase 50 (Hybrid Action Model), Phase 50.5 (Use-on grammar).
 **Seam toward:** Phase 51 (Talk to the Dungeon) — this phase carves the SAY/ASK input slot
-that Phase 51 fills.
+that Phase 51 fills (stub handlers `_begin_dialogue_stub`/`_on_dialogue_send_stub` in `play_view`).
 
 ---
 
@@ -79,6 +81,14 @@ ACTION BUILDER (~200, replaces the old always-on Ask input)
 Because the free-text Ask box is now contextual (decision #2), only **one** input surface
 occupies the bottom at a time, so vertical budget is preserved. On short windows the builder
 is **collapsible** (header row with a ▾/▴ toggle) as a responsive fallback.
+
+> **Shipped (Slice 11):** the band **sizes dynamically** to the wrapped command-sentence line count
+> (`content_height(w)`), so the sentence↔preview gap stays constant — `_BUILDER_H` (the old fixed
+> 180px) is removed. A full-width **ACTION … ▾ show / ▴ hide** bar collapses the band; it
+> **auto-collapses** when the chat panel height drops below `_BUILDER_AUTOCOLLAPSE_H = 620`px (a
+> manual toggle then overrides auto). Reclaiming the hidden free-text input row required **removing
+> the SAY/ASK widgets from the UIManager while hidden** — an invisible-but-registered `UIInputText`
+> still intercepts clicks (see auto-memory `feedback_arcade_gui`).
 
 ### 4.2 Layout — wrapped command sentence (re-skinned to tokens)
 
@@ -298,9 +308,10 @@ Logic-first, then widgets via the ui-test harness. Each slice is one behavior.
 9. **Retire ACTION tab** — remove tab, re-wire submit to in-chat builder; suite stays green.
 10. **SAY/ASK swap (stub)** — input surface swaps builder↔SAY box on a dialogue flag; `talk`
     verb gated to willing targets. (Conversation logic deferred to Phase 51.)
-11. **Polish + smoke test** — `tools/smoke_test_phase*.py` (Strategy A/B per TESTING.md); manual
-    visual verify by the user. **Includes dynamic builder-band height** (see below) and the
-    short-window collapsible fallback (§4.1).
+11. **Polish + smoke test — DONE** (smoke test **skipped by user choice**; manual verify done).
+    Dynamic builder-band height (see below) + short-window collapsible ▾/▴ fallback (§4.1) +
+    blank-strip reclaim + the bottom-click UIManager fix (hidden SAY-box widgets were intercepting
+    clicks). All four pieces GUI-verified.
 
 > **Slice 11 requirement — dynamic band height.** `_BUILDER_H` is currently a fixed **180px**
 > (chosen 2026-06-25 after CP-6 freed the suggested-row space). At 180 the top-anchored command
@@ -320,12 +331,14 @@ Logic-first, then widgets via the ui-test harness. Each slice is one behavior.
 - No LLM call in the preview or the builder (advisory-only boundary holds).
 - No palette/visual-language change beyond applying existing tokens.
 
-## 11. Open questions / to confirm at implementation time
+## 11. Open questions — RESOLVED
 
-- Exact memory **type names** for the preview's "Memory" line (verify against
-  `MEMORY_SYSTEM_SPEC.md`).
-- Whether the redundant **Exits tab** on the right panel is retired now or left as follow-up.
-- Glyph set for overlay rows (→ ↓ ✦ ⚠ ● ◆) — confirm font glyph coverage or use icon PNGs
-  (`assets/ui/icons/`, `game-icon-finder` skill) if `FONT_MONO` lacks them.
-- Minimum window height threshold at which the builder auto-collapses.
+- **Memory type names** (preview "Memory" line) → use the **canonical** `MEMORY_SYSTEM_SPEC` names
+  (event/fallout/location/dungeon_state/relationship), not the mockup's flavor words (Slice 2).
+- **Exits tab** → **retired** (follow-up to Slice 9): redundant with the "Things Here" overlay now
+  that clicking an open exit auto-moves. Right panel = CHAR/SCENE/FALLOUT/MEM/DBG.
+- **Overlay glyph set** (→ ↓ ✦ ⚠ ● ◆) → confirmed covered by `FONT_MONO`; no icon PNGs needed
+  (Slices 3/7/8).
+- **Auto-collapse threshold** → `_BUILDER_AUTOCOLLAPSE_H = 620`px panel height (user-chosen
+  "auto-collapse below threshold", Slice 11; tune in GUI if needed).
 ```

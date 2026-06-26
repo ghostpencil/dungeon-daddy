@@ -1270,14 +1270,43 @@ Post-playtest fixes: locked exits as `use` targets; key-unlock persists to DB; f
 on `ActivateObject`; map level-refresh fix (`map.load()` on level transition, not `update_state`).
 LLM narration hook after deterministic `ActivateObject`. Level 2 seed (`tools/populate_crucible_level2.py`).
 
+## Phase 50.6 — Chat Action Cockpit (COMPLETE)
+
+**Status: Complete & GUI-verified (2026-06-26) — suite green**
+Spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`
+Branch: `phase-50.6` (not yet merged to `main`)
+
+Dynamic add-on to Phase 50 (not on the roadmap, no GitHub issue). Closes the action loop inside the
+**left chat column**: the in-chat **Action Builder** (relocated out of the right RPG panel) is now the
+sole action surface, and the map room overlay became a player-facing **"Things Here"** noun picker
+that feeds the builder on click.
+
+11 TDD slices: pure helpers `verbs_for_noun` / `action_preview` (`ActionPreview`) / `room_things`
+(`RoomThings`) in `rpg/action_options.py`; `InChatActionBuilder` (`ui/panels/action_builder.py`) —
+wrapped command sentence with custom-drawn popup slot chips, deterministic preview inset, adaptive
+ROLL/DO/MOVE/LOOK/**TALK** button; "Things Here" overlay (`detail_panel_renderer.format_things_here`
++ renderer) auto-tracking the current room with click-to-select / **auto-move on exit** /
+**auto-pickup on loose item**; **retired the right-panel ACTION tab** (and the redundant EXITS/Move
+tab); **SAY/ASK swap stub** + creature **`disposition`** gate (migration `015_actor_disposition.sql`,
+`ActorState.disposition`, `is_speakable`) carving the Phase-51 dialogue seam.
+
+Slice 11 polish: **dynamic builder-band height** (sizes to the wrapped-sentence line count; fixed
+`_BUILDER_H` removed), **blank-strip reclaim**, **collapsible ▾/▴ ACTION bar** (auto-collapse below
+620px panel height), and a **bottom-click UIManager fix** — hidden free-text `UIInputText`/
+`UIFlatButton` were still registered with the UIManager and intercepted clicks in the bottom band, so
+they are now removed from the manager while hidden. Smoke test skipped by user choice (manual verify).
+
+Also from the same review: Command-Sentence Polish CP-1…CP-7 (clause-aware wrap, slot tints/
+placeholders, dropped the suggested-verbs row + PREVIEW kicker); a reseed/no-playbook crash fix.
+
 ---
 
 # Planned Roadmap — Phases 49–53
 
 These phases are **defined on the GitHub Projects roadmap** (`ghostpencil/dungeon-daddy`,
-project #1). Phases 48–50.5 are **complete**; **51–53 are not yet implemented**. Numbering and
-scope below mirror that board. A detailed `spec/PHASE_NN_*.md` is written when each phase
-actually starts.
+project #1). Phases 48–50, plus the off-roadmap add-ons **50.5** and **50.6**, are **complete**;
+**51–53 are not yet implemented**. Numbering and scope below mirror that board. A detailed
+`spec/PHASE_NN_*.md` is written when each phase actually starts.
 
 | Phase | Title | One-line scope |
 |---|---|---|

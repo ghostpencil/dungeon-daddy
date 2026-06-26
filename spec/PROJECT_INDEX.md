@@ -318,13 +318,23 @@ in-chat builder until **Slice 9 retired it** (in-chat builder is now the sole ac
   **Files:** `rpg/action_options.py`, `ui/panels/action_builder.py`, `ui/panels/vna_action_panel.py`,
   `ui/panels/chat_panel.py`, `views/play_view.py`, `rpg/models.py`, `memory/repository.py`,
   `memory/context_bundle.py`, `data/migrations/015_actor_disposition.sql`, `tools/populate_crucible_level1.py`.
-- **Slice 11 — IN PROGRESS** (polish + smoke test; spec §9.11). **Dynamic band height + blank-strip
-  reclaim DONE** this session (suite green; not yet GUI-verified): `InChatActionBuilder.
-  sentence_line_count(w)`/`content_height(w)` (built on shared `_sentence_units()`) measure the
-  wrapped sentence so `chat_panel._builder_extra_h`/draw size the band to it (`_BUILDER_H` removed);
-  `_card_bot_off`/`_BUILDER_BOTTOM_PAD` reclaim the hidden input row's ~70px in builder mode.
-  **Remaining:** short-window **collapsible ▾/▴ fallback** (spec §4.1; threshold = §11 open question)
-  + **smoke test**. See START HERE.
+- **Slice 11 — DONE & GUI-verified** (polish; spec §9.11; **smoke test skipped by user choice** —
+  manual verify sufficient, cockpit likely to evolve). Four pieces:
+  1. **Dynamic band height** — `InChatActionBuilder.sentence_line_count(w)`/`content_height(w)` (built
+     on shared `_sentence_units()`) measure the wrapped sentence so `chat_panel._builder_extra_h`/draw
+     size the band to it (`_BUILDER_H` removed), keeping a constant `_SENTENCE_PREVIEW_GAP`.
+  2. **Blank-strip reclaim** — `_card_bot_off`/`_BUILDER_BOTTOM_PAD` stack the mini-card directly on
+     the band; `_input_area_h` no longer reserves the hidden input row's ~70px.
+  3. **Collapsible ▾/▴ toggle** — full-width **ACTION … ▾ show / ▴ hide** bar; `is_collapsed()`/
+     `toggle_collapsed()`/`apply_auto_collapse(bool)` (manual latches `_user_toggled`); `chat_panel.
+     _apply_builder_auto_collapse()` auto-collapses when panel height < `_BUILDER_AUTOCOLLAPSE_H = 620`
+     (user-chosen "auto-collapse below threshold").
+  4. **Bottom-click UIManager fix** (GUI feedback: dead action button + un-reopenable toggle) — the
+     reclaim pushed the builder's button/toggle into the bottom ~62px where the **hidden free-text
+     `UIInputText`/`UIFlatButton`, though `visible=False`, were still registered with the UIManager and
+     intercepted every click there**. Fix: `_apply_input_visibility` **adds/removes the free-text
+     widgets from the UIManager** with visibility; `chat_panel` tracks `_manager`/`_free_text_in_manager`.
+     See auto-memory [[feedback_arcade_gui]].
 
 After 50.6: **Phase 51 — Talk to the Dungeon** (roadmap; 50.6 carves the SAY/ASK input seam).
 Write `spec/PHASE_51_*.md` when starting.
