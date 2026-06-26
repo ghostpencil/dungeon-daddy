@@ -33,9 +33,15 @@ suites green (922). **Note:** repo `save_clock`/`get_clocks` do NOT yet persist 
 SELECT, so the new column is harmless/default-true on read) — wire it in the seed slice when the
 intimacy clock needs `monotonic=False` persisted.
 
-**Slice 3 next — `resonance_point` object archetype (D2).** Add the archetype so seeds can mark
-rooms where the dungeon-voice channel opens (spec §4 / §7.3). Use the TDD skill (read
-`spec/TESTING.md` first).
+**Slice 3 next — `resonance_point` archetype + flag wiring (D2; spec §4 / §7.3).** Two behaviors:
+(1) add `"resonance_point"` to the `ObjectArchetype` Literal (`dungeon_daddy/rpg/models.py:225` —
+a `RoomObject` of this archetype has **no** state-transition interaction; interacting opens the
+dungeon channel). (2) wire the archetype **end-to-end → the room flag**: `build_room_context`
+(`dungeon_daddy/rpg/room_context.py:16`) already accepts `resonance_point: bool = False` and emits
+`"resonance_point"` into the bundle (line 53), but the caller always passes the default — derive it
+from the room's objects so a room containing a `resonance_point` object reports `resonance_point=True`.
+Pure/data-layer slice (no new lib, no LLM, no UI yet). All existing room-context tests stay green.
+Use the TDD skill (read `spec/TESTING.md` first).
 
 Scope: a freeform **dungeon-voice** channel gated by **resonance points** (seed-marked rooms) + a
 **recedable dungeon-intimacy clock** (`monotonic=False`). The LLM plays the dungeon's voice (advisory
