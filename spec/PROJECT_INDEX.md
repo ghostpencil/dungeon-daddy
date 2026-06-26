@@ -4,11 +4,12 @@
 
 Phase **50 — Hybrid Action Model: COMPLETE & merged to `main`** (2026-06-23).
 Phase **50.5 — Use Noun on Noun: COMPLETE & merged to `main`** (PR #81, 2026-06-24).
-Phase **50.6 — Chat Action Cockpit: IN PROGRESS** — Slices 1–8 committed and **user-verified**
-(+ manual-verify fixes + Command-Sentence Polish CP-1…CP-7; Slice 8 incl. three UX rounds, all
-user-verified); **Slice 9 (retire ACTION tab) DONE & GUI-verified; EXITS/Move tab also retired**;
-**Slice 10 (SAY/ASK swap stub + creature `disposition`) DONE, committed & GUI-verified**
-on branch `phase-50.6` (latest 2026-06-26). Slice 11 (polish + smoke test) is next/in progress.
+Phase **50.6 — Chat Action Cockpit: COMPLETE & GUI-verified** (all 11 slices) on branch
+`phase-50.6`, **not yet merged to `main`** (2026-06-26). Slices 1–10 done/user-verified (+ CP-1…CP-7
+polish; Slice 8 three UX rounds; Slice 9 retired ACTION tab; EXITS/Move tab also retired); **Slice 11
+(dynamic band height + blank-strip reclaim + collapsible ▾/▴ toggle + bottom-click UIManager fix) DONE
+& GUI-verified — smoke test skipped by user choice** (manual verify sufficient; cockpit likely to
+evolve). Branch is ready for PR/merge when desired.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -16,50 +17,37 @@ Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
 
 ---
 
-## START HERE next session — Phase 50.6, Slice 11 (in progress)
+## START HERE next session — Phase 50.6 COMPLETE; choose next
 
-**Slice 11 — Polish + smoke test** (spec §9.11). Progress this session:
-1. **Dynamic builder-band height — DONE (uncommitted→committed this session; not yet GUI-verified).**
-   `_BUILDER_H` (fixed 180px) is **removed**; the band now sizes to the actual wrapped-sentence line
-   count via new `InChatActionBuilder.sentence_line_count(w)` / `content_height(w)` (share
-   `_sentence_units()` with `draw()` so the measure matches the render). `chat_panel._builder_extra_h`
-   + the builder draw consult `content_height(self._w)` instead of the constant, keeping a constant
-   `_SENTENCE_PREVIEW_GAP` between sentence and preview.
-2. **Blank-strip reclaim (Slice 10 follow-up) — DONE (committed; not yet GUI-verified).** With the
-   free-text input hidden in builder mode, the mini-card now stacks directly on the band via new
-   `chat_panel._card_bot_off` + `_BUILDER_BOTTOM_PAD`; `_input_area_h` no longer reserves the hidden
-   ~70px input row, so the message area reclaims it.
-3. **Short-window collapsible fallback — DONE (committed; pieces 1–2 GUI-verified, piece 3 + bottom-
-   click fix pending re-verify).** Builder band has a full-width **ACTION … ▾ show / ▴ hide header bar**
-   (whole bar is the click target). `InChatActionBuilder.is_collapsed()`/`toggle_collapsed()`/
-   `apply_auto_collapse(bool)` (manual toggle latches `_user_toggled` so it overrides auto). `chat_panel.
-   _apply_builder_auto_collapse()` (called first in `draw()`) auto-collapses when panel height <
-   **`_BUILDER_AUTOCOLLAPSE_H = 620`** (user-chosen "auto-collapse below threshold", 2026-06-26 — tune
-   in GUI). Collapsed band = header bar only (`content_height` returns `_HEADER_H=26`).
-   **BOTTOM-CLICK BUG FIXED (root cause of "can collapse but not reopen" AND a dead action button):**
-   the reclaim (piece 2) moved the builder's button/toggle into the bottom ~62px where the **hidden
-   free-text `UIInputText`/`UIFlatButton` still intercepted clicks** (invisible-but-registered widgets
-   grab the press). Fix: `_apply_input_visibility` now **removes the free-text widgets from the
-   UIManager** when hidden (builder mode) and re-adds on dialogue; `chat_panel` tracks `_manager` +
-   `_free_text_in_manager`. Pre-Slice-11 this was masked because the band sat 76px up, above the input
-   row.
-4. **Smoke test — TODO** — `tools/smoke_test_phase*.py` (Strategy A/B per `spec/TESTING.md` — read the
-   A-vs-B guidance first) + manual visual verify by the user.
+Phase 50.6 is **done & GUI-verified** on branch `phase-50.6` (not yet merged). Two paths:
+1. **Merge 50.6 to `main`** (open a PR / fast-forward) when ready — no blockers.
+2. **Start Phase 51 — Talk to the Dungeon** (roadmap; 50.6 carved the SAY/ASK input seam +
+   `disposition` gate + a Phase-51 stub in `_begin_dialogue_stub`/`_on_dialogue_send_stub`). Write
+   `spec/PHASE_51_*.md` when starting.
 
-**GUI-verify pieces 1–3**: in play mode the builder band should hug the sentence (no airy gap), the
-mini-card + message area should reclaim the old bottom blank strip, and the **ACTION ▾/▴ toggle**
-should collapse/expand the band (auto-collapsing on a short window). Then only the smoke test remains.
-
-**Slice 10 is DONE, committed & GUI-verified** (2026-06-26): in **The Crucible → R3 (Cargo Bay)**,
-selecting **Pinion** + verb **Sway** → builder button reads **TALK**; submitting swaps the bottom of
-the chat column to the free-text **SAY box**; sending a line ends the stub and swaps back to the
-builder. (The live save was migrated + re-populated so Pinion is `disposition="willing"`.)
+**Slice 11 (final) — DONE & GUI-verified, smoke test skipped by user** (manual verify sufficient;
+cockpit likely to evolve). Four pieces:
+1. **Dynamic band height** — `_BUILDER_H` (fixed 180) **removed**; band sizes to the wrapped sentence
+   via `InChatActionBuilder.sentence_line_count(w)`/`content_height(w)` (share `_sentence_units()` with
+   `draw()`); `chat_panel._builder_extra_h` + builder draw consult `content_height(self._w)`, keeping a
+   constant `_SENTENCE_PREVIEW_GAP`.
+2. **Blank-strip reclaim** — mini-card stacks directly on the band via `_card_bot_off` +
+   `_BUILDER_BOTTOM_PAD`; `_input_area_h` no longer reserves the hidden input row.
+3. **Collapsible ▾/▴ toggle** — full-width **ACTION … ▾ show / ▴ hide** bar; `is_collapsed()`/
+   `toggle_collapsed()`/`apply_auto_collapse(bool)` (manual latches `_user_toggled`); `chat_panel.
+   _apply_builder_auto_collapse()` auto-collapses when panel height < `_BUILDER_AUTOCOLLAPSE_H = 620`.
+4. **Bottom-click UIManager fix** (the big one) — the reclaim pushed the builder's button/toggle into
+   the bottom ~62px where the **hidden free-text `UIInputText`/`UIFlatButton`, though `visible=False`,
+   were still registered with the UIManager and intercepted every click there** (dead action button +
+   "can collapse but not reopen"). Fix: `_apply_input_visibility` **adds/removes the free-text widgets
+   from the UIManager** with visibility (removed in builder mode, re-added on dialogue); `chat_panel`
+   tracks `_manager` + `_free_text_in_manager`. See auto-memory [[feedback_arcade_gui]].
 
 **Possible follow-up to weigh (user, 2026-06-25):** now that clicking an open exit auto-moves,
 consider dropping the `move` verb from the in-chat command sentence — TBD, revisit once played.
 
-Spec is `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md` (read it; design decisions are locked in §3).
-Phase 50.6 is a **BUILD add-on** (dynamic, like 50.5 — not on the 51–53 roadmap, no issue).
+Spec is `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md` (design decisions locked in §3). Phase 50.6 is a
+**BUILD add-on** (dynamic, like 50.5 — not on the 51–53 roadmap, no issue).
 Goal: close the action loop in the left chat column — move the Action Builder out of the right
 RPG panel into the chat, and turn the map room overlay into a clickable "Things Here" noun picker.
 
