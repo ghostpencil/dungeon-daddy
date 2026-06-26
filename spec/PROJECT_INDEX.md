@@ -11,9 +11,9 @@ bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user c
 Phase **51 — Talk to the Dungeon: IN PROGRESS** on branch `phase-51` (started 2026-06-26).
 Decisions locked; **Slices 1–8 DONE & committed**. **Voice/knowledge-at-play-time decision made
 (2026-06-26): Markdown-backed, DB-referenced** — persona text lives in the save's `memory/` tree,
-DuckDB holds path references. **Persona Persistence: P1–P3 DONE** (persona Markdown helpers +
-DuckDB ref columns + seed-time writer); **P4 next** (attach-time reader), **then** Slice 9 (UI
-treatment) + the seeding step. See the START HERE section below.
+DuckDB holds path references. **Persona Persistence: P1–P4 DONE** (persona Markdown helpers +
+DuckDB ref columns + seed-time writer + attach-time reader); **next** = the seeding step + Slice 9
+(UI treatment) — both gate a live playtest. See the START HERE section below.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -22,12 +22,12 @@ Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 
 ---
 
-## START HERE next session — Phase 51; Persona Persistence P4 next, then Slice 9
+## START HERE next session — Phase 51; Persona Persistence P1–P4 DONE → seeding step + Slice 9 next
 
 **Phase 51 — Talk to the Dungeon** is underway on branch `phase-51` (off `main`). The spec is
 **finalized** (`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions are locked (§3).
 
-### ⮕ NEXT: Persona Persistence — **P1–P3 DONE**, P4 next (resolves Slice 8 carried gap (c))
+### ⮕ NEXT: the seeding step + Slice 9 (Persona Persistence **P1–P4 DONE** — Slice 8 carried gap (c) resolved)
 
 **Decision (2026-06-26): voice/knowledge reach play time via Markdown-backed, DB-referenced
 storage.** This was the open "how do `dungeon_voice`/`dungeon_knowledge` reach play time" question
@@ -76,13 +76,15 @@ option) violates that pattern. Doc location (settled): **`‹save_dir›/memory/
   `save_campaign(...)`; absent persona → no docs written, refs `None`. 2 tests in
   `tests/unit/campaign/test_publish.py` (docs-on-disk + campaigns-row refs round-trip; no-persona null
   refs + no `memory/dungeon` dir).
-- **P4 — Attach-time reader** *(window → play_view)*. New
-  `play_view.set_dungeon_persona(voice: str | None, knowledge: list[str])` sets the `_dungeon_voice`/
-  `_dungeon_knowledge` attrs the agent inputs already read (`play_view.py:1484`/`1488`). In
-  `window._attach_rpg_context`: after `mem_repo`, `get_campaign(campaign_id)` → resolve refs relative
-  to `campaign_dir` → read docs via P1 → `set_dungeon_persona(...)`; missing → `(None, [])`. Tests:
-  play_view unit (persona feeds `_dungeon_agent_inputs` end-to-end) + attach test (docs present →
-  populated; absent → `None`/`[]`).
+- **P4 — Attach-time reader — DONE** *(commit `ad63282`; window → play_view; views+memory+campaign
+  suites green 661)*. New `play_view.set_dungeon_persona(voice: str | None, knowledge: list[str])`
+  sets the `_dungeon_voice`/`_dungeon_knowledge` attrs the agent inputs already read. In
+  `window._attach_rpg_context`: after `set_rpg_context`, when `mem_repo`/`campaign_id` are set, a new
+  static `_read_dungeon_persona(mem_repo, campaign_id, campaign_dir)` does `get_campaign(campaign_id)`
+  → resolves the save-relative refs against `campaign_dir` → reads docs via the P1 helpers →
+  `set_dungeon_persona(...)`; missing refs/files → `(None, [])`. 4 tests (2 play_view: persona feeds
+  `_dungeon_agent_inputs`, defaults clear; 2 window attach: docs present → populated, absent →
+  `None`/`[]`).
 
 **After P1–P4:** the **seeding step** (author the Crucible's persona docs + a `monotonic=False`
 `dungeon_intimacy` clock + a `resonance_point` object via `populate_crucible_level*.py`; **add
