@@ -11,9 +11,9 @@ bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user c
 Phase **51 — Talk to the Dungeon: IN PROGRESS** on branch `phase-51` (started 2026-06-26).
 Decisions locked; **Slices 1–8 DONE & committed**. **Voice/knowledge-at-play-time decision made
 (2026-06-26): Markdown-backed, DB-referenced** — persona text lives in the save's `memory/` tree,
-DuckDB holds path references. **Persona Persistence: P1–P2 DONE** (persona Markdown helpers +
-DuckDB ref columns); **P3 next** (seed-time writer), then P4, **then** Slice 9 (UI treatment) +
-the seeding step. See the START HERE section below.
+DuckDB holds path references. **Persona Persistence: P1–P3 DONE** (persona Markdown helpers +
+DuckDB ref columns + seed-time writer); **P4 next** (attach-time reader), **then** Slice 9 (UI
+treatment) + the seeding step. See the START HERE section below.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -22,12 +22,12 @@ Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 
 ---
 
-## START HERE next session — Phase 51; Persona Persistence (P1–P4) next, then Slice 9
+## START HERE next session — Phase 51; Persona Persistence P4 next, then Slice 9
 
 **Phase 51 — Talk to the Dungeon** is underway on branch `phase-51` (off `main`). The spec is
 **finalized** (`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions are locked (§3).
 
-### ⮕ NEXT: Persona Persistence — **P1–P2 DONE**, P3 next (resolves Slice 8 carried gap (c))
+### ⮕ NEXT: Persona Persistence — **P1–P3 DONE**, P4 next (resolves Slice 8 carried gap (c))
 
 **Decision (2026-06-26): voice/knowledge reach play time via Markdown-backed, DB-referenced
 storage.** This was the open "how do `dungeon_voice`/`dungeon_knowledge` reach play time" question
@@ -68,11 +68,14 @@ option) violates that pattern. Doc location (settled): **`‹save_dir›/memory/
   unaffected); `get_campaign` returns both keys. Paths are stored as-is (callers pass **relative to the
   save dir** — references, not text). 2 tests in `tests/unit/memory/test_repository.py` (ref round-trip;
   defaults `None`). *(Honors the "DB holds references" rule.)*
-- **P3 — Seed-time writer** *(publish wiring)*. New `publish._write_dungeon_persona(manifest,
-  save_dir, campaign_id)` called from `_seed_duckdb`: when `manifest.dungeon_voice`/`dungeon_knowledge`
-  are non-empty, write the two docs under `save_dir/memory/dungeon/` and pass their **relative** paths
-  into `save_campaign(...)`. Tests: publish w/ voice+knowledge → docs on disk + campaigns row carries
-  refs; manifest without → no docs, refs `None`.
+- **P3 — Seed-time writer — DONE** *(commit `4119abc`; publish wiring; campaign suite green 140)*. New
+  `publish._write_dungeon_persona(manifest, save_dir, campaign_id) -> (voice_ref, knowledge_ref)` called
+  from `_seed_duckdb` **before** `save_campaign`: when `manifest.dungeon_voice`/`dungeon_knowledge` are
+  non-empty, writes the two docs under `save_dir/memory/dungeon/` (via the P1 helpers) and returns their
+  **save-relative** `as_posix()` refs (`memory/dungeon/voice.md`), which `_seed_duckdb` passes into
+  `save_campaign(...)`; absent persona → no docs written, refs `None`. 2 tests in
+  `tests/unit/campaign/test_publish.py` (docs-on-disk + campaigns-row refs round-trip; no-persona null
+  refs + no `memory/dungeon` dir).
 - **P4 — Attach-time reader** *(window → play_view)*. New
   `play_view.set_dungeon_persona(voice: str | None, knowledge: list[str])` sets the `_dungeon_voice`/
   `_dungeon_knowledge` attrs the agent inputs already read (`play_view.py:1484`/`1488`). In
