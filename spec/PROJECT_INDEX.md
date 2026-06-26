@@ -4,26 +4,47 @@
 
 Phase **50 — Hybrid Action Model: COMPLETE & merged to `main`** (2026-06-23).
 Phase **50.5 — Use Noun on Noun: COMPLETE & merged to `main`** (PR #81, 2026-06-24).
-Phase **50.6 — Chat Action Cockpit: COMPLETE & GUI-verified** (all 11 slices) on branch
-`phase-50.6`, **not yet merged to `main`** (2026-06-26). Slices 1–10 done/user-verified (+ CP-1…CP-7
-polish; Slice 8 three UX rounds; Slice 9 retired ACTION tab; EXITS/Move tab also retired); **Slice 11
-(dynamic band height + blank-strip reclaim + collapsible ▾/▴ toggle + bottom-click UIManager fix) DONE
-& GUI-verified — smoke test skipped by user choice** (manual verify sufficient; cockpit likely to
-evolve). Branch is ready for PR/merge when desired.
+Phase **50.6 — Chat Action Cockpit: COMPLETE, GUI-verified & merged to `main`** (PR #82, 2026-06-26).
+All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds; Slice 9 retired ACTION
+tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
+bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
+Phase **51 — Talk to the Dungeon: SPEC FINALIZED, IN PROGRESS** on branch `phase-51` (started
+2026-06-26). Decisions locked; Slice 1 next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
 Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
+Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 
 ---
 
-## START HERE next session — Phase 50.6 COMPLETE; choose next
+## START HERE next session — Phase 51 in progress; Slice 1 next
 
-Phase 50.6 is **done & GUI-verified** on branch `phase-50.6` (not yet merged). Two paths:
-1. **Merge 50.6 to `main`** (open a PR / fast-forward) when ready — no blockers.
-2. **Start Phase 51 — Talk to the Dungeon** (roadmap; 50.6 carved the SAY/ASK input seam +
-   `disposition` gate + a Phase-51 stub in `_begin_dialogue_stub`/`_on_dialogue_send_stub`). Write
-   `spec/PHASE_51_*.md` when starting.
+**Phase 51 — Talk to the Dungeon** is underway on branch `phase-51` (off `main`). The spec is
+**finalized** (`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions are locked (§3).
+**No code yet — Slice 1 is the next action.**
+
+Scope: a freeform **dungeon-voice** channel gated by **resonance points** (seed-marked rooms) + a
+**recedable dungeon-intimacy clock** (`monotonic=False`). The LLM plays the dungeon's voice (advisory
+only); the **engine** ticks intimacy + drafts memory. The 50.6 NPC `sway→willing` stub folds into the
+same shared dialogue engine (decision D1).
+
+**Slice plan (TDD, spec §7):** 1 manifest fields → 2 **recedable clock engine** (`monotonic` +
+signed `tick_clock`; the risky backward-compat slice — keep all clock/seed tests green) → 3 resonance
+archetype → 4 intimacy gate → 5 knowledge filter → 6 dungeon-voice bundle+agent → 7 engine
+side-effects (tick + draft memory) → 8 PlayView routing (fold in NPC kind) → 9 UI treatment →
+10 (optional) corruption scaffold. Use the TDD skill (read `spec/TESTING.md` first).
+
+**Locked decisions (spec §3):** D1 shared engine (dungeon full + NPC folded in) · D2 `resonance_point`
+archetype + overlay affordance · D3 seed-authored intimacy clock · D4 engine-drafted memory ·
+D5 corruption scaffold only · D6 no LLM proposals.
+
+**Branch note:** an earlier docs-only index sync (50.6-merged wording) is on `docs/index-50.6-merged`
+(commit `699495d`), not yet merged to `main`; this index now carries that correction directly.
+
+---
+
+## Phase 50.6 — COMPLETE & merged (history)
 
 **Slice 11 (final) — DONE & GUI-verified, smoke test skipped by user** (manual verify sufficient;
 cockpit likely to evolve). Four pieces:
@@ -54,7 +75,7 @@ RPG panel into the chat, and turn the map room overlay into a clickable "Things 
 Mostly a relocation + re-skin: `VnaActionPanel`'s pure-logic core is reused verbatim; only the
 Arcade widget layer is rebuilt, plus 3 new pure helpers. 11-slice TDD plan in spec §9.
 
-**Work is on branch `phase-50.6`** (off `main`; not yet pushed/PR'd). Use the TDD skill
+**Phase 50.6 was on branch `phase-50.6`, now merged to `main`** (PR #82). Use the TDD skill
 (read `spec/TESTING.md` first).
 
 **Slot-widget decision (locked, 2026-06-24):** the in-chat builder's V/N/T/A slots are
@@ -336,8 +357,8 @@ in-chat builder until **Slice 9 retired it** (in-chat builder is now the sole ac
      widgets from the UIManager** with visibility; `chat_panel` tracks `_manager`/`_free_text_in_manager`.
      See auto-memory [[feedback_arcade_gui]].
 
-After 50.6: **Phase 51 — Talk to the Dungeon** (roadmap; 50.6 carves the SAY/ASK input seam).
-Write `spec/PHASE_51_*.md` when starting.
+After 50.6: **Phase 51 — Talk to the Dungeon** (roadmap; 50.6 carved the SAY/ASK input seam).
+Spec written & finalized: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`. **In progress** (branch `phase-51`).
 
 ---
 
