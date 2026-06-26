@@ -9,7 +9,7 @@ All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds;
 tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
 bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
 Phase **51 — Talk to the Dungeon: IN PROGRESS** on branch `phase-51` (started 2026-06-26).
-Decisions locked; **Slices 1–4 DONE & committed**; Slice 5 (knowledge filter) next.
+Decisions locked; **Slices 1–5 DONE & committed**; Slice 6 (dungeon-voice bundle + agent) next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -18,7 +18,7 @@ Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 
 ---
 
-## START HERE next session — Phase 51 in progress; Slice 5 next
+## START HERE next session — Phase 51 in progress; Slice 6 next
 
 **Phase 51 — Talk to the Dungeon** is underway on branch `phase-51` (off `main`). The spec is
 **finalized** (`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions are locked (§3).
@@ -46,13 +46,23 @@ completion event). Closed returns `REASON_NOT_HERE` (not a resonance point; **ta
 both gates fail) or `REASON_NOT_INTIMATE` (clock `None`/missing or below threshold). +6 tests
 (`tests/unit/rpg/test_dungeon_channel.py`). rpg+memory+campaign suites green (931).
 
-**Slice 5 next — knowledge filtering (spec §4.5 / §7.5).** Pure helper
-`reveal_knowledge(knowledge: list[str], filled: int, segments: int) -> list[str]` in the same
-`rpg/dungeon_channel.py`: returns the slice of `dungeon_knowledge` the dungeon may draw on at the
-current intimacy band — none below threshold, a fragmentary head slice at the cryptic band, the full
-list at high fill. Exact banding is the open §6 balance question — pick tunable constants and point at
-BALANCE_NOTES (mirror the `INTIMACY_THRESHOLD` pattern from Slice 4). Pure helper slice (no lib, no
-LLM, no UI). Use the TDD skill (read `spec/TESTING.md` first).
+**Slices 1–5 DONE & committed.** S5 (`5767bf1`, knowledge filter): pure helper
+`reveal_knowledge(knowledge: list[str], filled: int, segments: int) -> list[str]` added to
+`rpg/dungeon_channel.py`. Bands on `filled/segments`: below `INTIMACY_THRESHOLD` (0.5) → `[]`;
+cryptic band `[0.5, HIGH_INTIMACY_THRESHOLD=0.85)` → head fragment (`CRYPTIC_REVEAL_FRACTION=0.5` of
+the list via `ceil`, **floored at 1** so a non-empty list always yields one fragment); `≥ 0.85` →
+full list. Guards `segments<=0` (no divide-by-zero) and empty `knowledge`. The two new band constants
+are **tunable module constants** pointing at §6 / BALANCE_NOTES (mirrors the Slice 4
+`INTIMACY_THRESHOLD` pattern). +7 tests. rpg+memory+campaign suites green (938).
+
+**Slice 6 next — dungeon-voice bundle + agent (spec §4.4 / §7.6).** Build the §4.4 input bundle
+(`mode: dungeon_voice`, `dungeon_voice` string, `intimacy_level` filled/segments, `dungeon_knowledge`
+slice from `reveal_knowledge`, `player_message`, `actor`, `recent_memories` via `MemoryRetriever`) and
+a thin `DungeonVoiceAgent` (or a `mode="dungeon_voice"` path on `DungeonMasterAgent` — TBD; both
+inject the `LLMProvider`, **no new dependency**). The LLM seam: test with a **fake provider** (per
+`spec/TESTING.md` mock policy) — assert the assembled prompt carries voice/intimacy/knowledge/message;
+**no live API call**. The reply is pure narration (advisory only — no mechanics, no proposals, D6).
+Use the TDD skill (read `spec/TESTING.md` first).
 
 Scope: a freeform **dungeon-voice** channel gated by **resonance points** (seed-marked rooms) + a
 **recedable dungeon-intimacy clock** (`monotonic=False`). The LLM plays the dungeon's voice (advisory
@@ -437,6 +447,18 @@ Spec `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`; decisions locked §3. 10-slice TDD 
   open §6 balance question; pointer to BALANCE_NOTES in the source). +6 tests
   (`tests/unit/rpg/test_dungeon_channel.py`): open-at-threshold tracer, not-resonance, below-threshold,
   absent-clock, exact-boundary (`>=`), not-here precedence.
+- **Slice 5 — DONE** (commit `5767bf1`; knowledge filter, spec §4.5 / §7.5; rpg+memory+campaign suites
+  green 938). Pure helper `reveal_knowledge(knowledge: list[str], filled: int, segments: int) ->
+  list[str]` in `rpg/dungeon_channel.py`. Bands on the **live** intimacy fraction `filled/segments`:
+  below `INTIMACY_THRESHOLD` (0.5) → `[]` (the dungeon stays silent); cryptic band `[0.5,
+  HIGH_INTIMACY_THRESHOLD=0.85)` → a **fragmentary head slice** (`ceil(len * CRYPTIC_REVEAL_FRACTION)`
+  with `CRYPTIC_REVEAL_FRACTION=0.5`, **floored at 1** so a non-empty list always surfaces ≥1
+  fragment); `≥ 0.85` → the **full list**. Guards `segments<=0` (no divide-by-zero) and empty
+  `knowledge`. The two new band constants (`HIGH_INTIMACY_THRESHOLD`, `CRYPTIC_REVEAL_FRACTION`) are
+  **tunable module constants** with a §6 / BALANCE_NOTES pointer (mirrors the Slice 4
+  `INTIMACY_THRESHOLD` pattern — the exact banding is the open §6 balance question). +7 tests
+  (none-below, full-at-high, cryptic head slice, empty-list, zero-segments guard, cryptic ≥1 floor,
+  exact-high-boundary `>=`).
 
 ---
 
