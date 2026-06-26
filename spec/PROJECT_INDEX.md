@@ -8,8 +8,8 @@ Phase **50.6 — Chat Action Cockpit: COMPLETE, GUI-verified & merged to `main`*
 All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds; Slice 9 retired ACTION
 tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
 bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
-Phase **51 — Talk to the Dungeon: SPEC FINALIZED, IN PROGRESS** on branch `phase-51` (started
-2026-06-26). Decisions locked; Slice 1 next.
+Phase **51 — Talk to the Dungeon: IN PROGRESS** on branch `phase-51` (started 2026-06-26).
+Decisions locked; **Slice 1 DONE (uncommitted)**; Slice 2 next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -18,11 +18,26 @@ Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 
 ---
 
-## START HERE next session — Phase 51 in progress; Slice 1 next
+## START HERE next session — Phase 51 in progress; Slice 2 next
 
 **Phase 51 — Talk to the Dungeon** is underway on branch `phase-51` (off `main`). The spec is
 **finalized** (`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions are locked (§3).
-**No code yet — Slice 1 is the next action.**
+
+**Slice 1 — DONE (uncommitted on the working tree).** Added three optional fields to
+`CampaignManifest` (`dungeon_daddy/campaign/manifest.py`), all backward-compatible with defaults:
+`dungeon_voice: str | None = None`, `dungeon_knowledge: list[str] = []`,
+`dungeon_corruption_clock: bool = False`. +2 tests in `tests/unit/campaign/test_campaign_manifest.py`
+(defaults; explicit-values JSON round-trip). No validator/seeder changes needed (fields optional,
+not cross-referenced; `bone-cathedral.json` still parses). Campaign suite green (138). **Not yet
+committed** — next session: commit (`feat(manifest): Phase 51 Slice 1 — dungeon voice/knowledge/
+corruption fields`) then start Slice 2.
+
+**Slice 2 next — Recedable clock engine (the risky backward-compat slice).** Add `monotonic: bool =
+True` to `ClockState` (`dungeon_daddy/rpg/models.py`) + signed `tick_clock(clock, delta) -> ClockState`
+in `dungeon_daddy/rpg/clocks.py` (clamp `[0, segments]`; no status-latch when non-monotonic; latch
+`completed` at full when monotonic). Preserve `advance_clock` behavior for all existing callers
+(spec §4.2). Add migration `0NN_clock_monotonic.sql` (`clocks.monotonic` column, default true).
+**All existing clock/seed/suite tests must stay green.** Use the TDD skill (read `spec/TESTING.md` first).
 
 Scope: a freeform **dungeon-voice** channel gated by **resonance points** (seed-marked rooms) + a
 **recedable dungeon-intimacy clock** (`monotonic=False`). The LLM plays the dungeon's voice (advisory
@@ -359,6 +374,20 @@ in-chat builder until **Slice 9 retired it** (in-chat builder is now the sole ac
 
 After 50.6: **Phase 51 — Talk to the Dungeon** (roadmap; 50.6 carved the SAY/ASK input seam).
 Spec written & finalized: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`. **In progress** (branch `phase-51`).
+
+---
+
+## Phase 51 — Talk to the Dungeon (in progress, branch `phase-51`)
+
+Spec `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`; decisions locked §3. 10-slice TDD plan (§7).
+
+- **Slice 1 — DONE (uncommitted)** (manifest fields, spec §4.1 / §7.1; campaign suite green 138).
+  `CampaignManifest` (`dungeon_daddy/campaign/manifest.py`) gains three optional, backward-compatible
+  fields: `dungeon_voice: str | None = None` (personality fed to the LLM), `dungeon_knowledge:
+  list[str] = []` (secrets revealed progressively by intimacy), `dungeon_corruption_clock: bool =
+  False` (D5 scaffold flag). 2 TDD cycles: defaults; explicit-values + JSON round-trip. No
+  validator/seeder changes (optional, not cross-referenced). +2 tests in
+  `tests/unit/campaign/test_campaign_manifest.py`. **Not yet committed.**
 
 ---
 

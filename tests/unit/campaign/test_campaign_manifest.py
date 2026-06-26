@@ -149,6 +149,31 @@ def test_campaign_manifest_round_trips_to_json():
     assert restored.clocks[0].slug == "doom-clock"
 
 
+def test_campaign_manifest_dungeon_voice_fields_default():
+    campaign = CampaignManifest(slug="x", title="X", dungeon_slug="x")
+    assert campaign.dungeon_voice is None
+    assert campaign.dungeon_knowledge == []
+    assert campaign.dungeon_corruption_clock is False
+
+
+def test_campaign_manifest_dungeon_voice_fields_round_trip():
+    original = CampaignManifest(
+        slug="x",
+        title="X",
+        dungeon_slug="x",
+        dungeon_voice="cold, industrial, analytical — speaks in diagnostics",
+        dungeon_knowledge=["the warden was once human", "the lift hides a vault"],
+        dungeon_corruption_clock=True,
+    )
+    restored = CampaignManifest.model_validate_json(original.model_dump_json())
+    assert restored.dungeon_voice == "cold, industrial, analytical — speaks in diagnostics"
+    assert restored.dungeon_knowledge == [
+        "the warden was once human",
+        "the lift hides a vault",
+    ]
+    assert restored.dungeon_corruption_clock is True
+
+
 def test_item_manifest_parses_minimal_fields():
     item = ItemManifest(
         slug="lockpick-kit",

@@ -129,3 +129,6 @@ class CampaignManifest(BaseModel):
     items: list[ItemManifest] = Field(default_factory=list)
     room_objects: list[RoomObjectManifest] = Field(default_factory=list)
     room_exits: list[RoomExitSeed] = Field(default_factory=list)
+    dungeon_voice: str | None = None
+    dungeon_knowledge: list[str] = Field(default_factory=list)
+    dungeon_corruption_clock: bool = False
