@@ -954,16 +954,19 @@ def test_sway_on_hostile_creature_rolls_not_dialogue(tmp_path):
     view._chat.set_dialogue_mode.assert_not_called()
 
 
-def test_dialogue_send_exits_dialogue_stub(tmp_path):
-    # While the SAY box is up, sending a line ends the (stubbed) conversation and
-    # swaps back to the builder. Real dialogue routing is Phase 51.
+def test_dialogue_send_routes_to_dialogue_channel(tmp_path):
+    # While a dialogue session is open, a sent line is routed to the dialogue
+    # channel (not the DM free-text path). Phase 51 Slice 8.
+    from dungeon_daddy.views.play_view import DialogueSession
+
     view = _make_view(tmp_path)
-    view._dialogue_stub_active = True
+    view._dialogue = DialogueSession(kind="npc", room_id="r1", target_id="npc-1")
 
     view._on_chat_send("hello warden")
 
-    assert view._dialogue_stub_active is False
-    view._chat.set_dialogue_mode.assert_called_once_with(False)
+    # The npc thin binding records the turn and keeps the channel open.
+    assert view._dialogue is not None
+    assert ("player", "hello warden") in view._dialogue.turns
 
 
 def test_build_context_bundle_includes_current_room_objects(tmp_path):

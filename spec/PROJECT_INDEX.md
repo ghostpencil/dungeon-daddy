@@ -9,8 +9,9 @@ All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds;
 tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
 bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
 Phase **51 — Talk to the Dungeon: IN PROGRESS** on branch `phase-51` (started 2026-06-26).
-Decisions locked; **Slices 1–7 DONE & committed**; Slice 8 (PlayView dialogue routing — `DialogueSession`,
-real `_on_dialogue_send`, fold in NPC `sway→willing` kind) next.
+Decisions locked; **Slices 1–8 DONE & committed**; Slice 9 (UI treatment — distinct dungeon
+input/bubble styling + the D2b resonance-point entry affordance that calls `_begin_dungeon_dialogue`)
+next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -19,10 +20,47 @@ Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 
 ---
 
-## START HERE next session — Phase 51 in progress; Slice 8 next
+## START HERE next session — Phase 51 in progress; Slice 9 next
 
 **Phase 51 — Talk to the Dungeon** is underway on branch `phase-51` (off `main`). The spec is
 **finalized** (`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions are locked (§3).
+
+**Slice 8 DONE — PlayView dialogue routing (spec §7.8; full unit suite green 3035).** Replaced the
+50.6 dialogue stub with real routing through an in-memory **`DialogueSession`** (`kind`
+`"dungeon"`/`"npc"`, `room_id`, `target_id`, `turns`) in `dungeon_daddy/views/play_view.py`.
+`_on_chat_send` routes a sent line to **`_on_dialogue_send`** whenever `_dialogue` is set, which
+**dispatches by `kind`** (D1). **NPC** (`sway→willing`, folded onto the shared engine per D1a):
+`_on_vna_submit` now calls `_begin_dialogue(kind="npc", target_id=…)`; `_send_npc_line` is a thin
+binding (records the turn, posts it, **stays open** until `/leave` or a room change). **Dungeon:**
+`_begin_dungeon_dialogue()` is gated by `dungeon_channel_available(room_context, intimacy_clock)`
+(resonance + intimacy; posts the lock reason when closed); `_dungeon_intimacy_clock()` reads the
+seed-authored `category="dungeon_intimacy"` clock from `repo.get_clocks`. The **send pipeline**:
+`_dungeon_agent_inputs(text)` assembles the §4.4 kwargs (voice / intimacy `filled/segments` /
+`reveal_knowledge(...)` slice / `recent_memories` via `MemoryRetriever` / actor / message); the
+threaded **`_send_dungeon_line`** echoes the player line, calls `DungeonVoiceAgent.respond(**inputs)`
+off-thread, and queues a dungeon-marked `DMResult` (`dungeon=True`, `player_message`); `on_update`
+drains it to **`_apply_dungeon_reply`** (main thread) which posts the distinct **`"dm"` ◆ Dungeon
+bubble** and applies the engine side-effect **`record_dungeon_exchange(...)`** (intimacy tick + draft
+memory — never the LLM, D6). `/leave` (`_end_dialogue`) and a room change
+(`_maybe_end_dialogue_on_room_change`, wired into `_on_exit_move`) close the session and swap back to
+the Action Builder. The `DungeonVoiceAgent` is built in `__init__` from `dm_agent._provider` (no new
+dependency); `_dungeon_voice`/`_dungeon_knowledge` are instance attrs (default `None`/`[]`). 15 new
+tests in `tests/unit/views/test_play_view_dialogue.py` (routing, npc thin-binding, /leave, gate
+open/closed, clock lookup, agent-input knowledge banding, side-effects via real repo, threaded
+queue + `on_update` routing, room-leave close); the 50.6 stub test in `test_play_view_vna.py`
+retargeted to the new session.
+
+**Slice 8 carried gaps (Slice 9 / seeding own these):** (a) **No dungeon-channel ENTRY in the GUI
+yet** — `_begin_dungeon_dialogue()` exists and is tested but nothing calls it; the **D2b
+resonance-point overlay button** is Slice 9. (b) **Bubble styling** — the dungeon reply reuses the
+existing `"dm"` violet "◆ Dungeon" bubble (visually distinct from the player's "GM" bubble but shared
+with DM narration); a dedicated dungeon-voice role/treatment is Slice 9 (§4.6). (c) **Voice/knowledge
+sourcing is unresolved at play time** — there is **no manifest persistence in the save DB**, so
+`_dungeon_voice`/`_dungeon_knowledge` stay `None`/`[]` and the intimacy clock + `resonance_point`
+object are unseeded; the channel is therefore **locked in the live app** until the **seeding step**
+authors them (Crucible manifest/seed + `tools/populate_crucible_level*.py`, per the spec §7 seeding
+note). The routing reads those instance attrs, so seeding is the only thing between this and a live
+playable channel.
 
 **Slices 1–7 DONE & committed** (pure data/helper slices + the LLM seam + the first engine
 side-effect service — still no UI). Per-slice detail is in the **Phase 51 history section below**; in brief: S1 (`d4770a7`) three
@@ -63,13 +101,17 @@ incl. a D6 "writes-only-drafts" guard). The agent + service are **provider-only 
 **caller** (Slice 8) computes `reveal_knowledge(...)`, runs `DungeonVoiceAgent.respond(...)`, then
 calls `record_dungeon_exchange(...)`.
 
-**Slice 8 next — PlayView dialogue routing (spec §7.8).** Replace the 50.6 `_on_dialogue_send_stub`
-with real routing via an in-memory `DialogueSession` (`kind` `"dungeon"`/`"npc"`, `target_id`,
-`room_id`, `turns` — §4.3); `_begin_dialogue` opens the dungeon (resonance+intimacy gated) vs. npc
-channel; the dungeon reply is posted to the distinct bubble; leaving the room / `/leave` closes and
-swaps back to the Action Builder. Wire the per-exchange engine side-effect (`record_dungeon_exchange`)
-after the reply, and rebind the NPC `sway→willing` stub onto the shared engine (D1a). Use the TDD
-skill (read `spec/TESTING.md` first).
+**Slice 9 next — UI treatment (spec §7.9 / §4.6).** Slice 8 built and tested all the dialogue
+routing; what's missing is the **GUI surface**: (a) the **D2b resonance-point entry affordance** (the
+"Speak to the Dungeon" overlay button, shown only at a resonance point with intimacy met) that calls
+the existing `_begin_dungeon_dialogue()`; (b) a **distinct dungeon-voice input/bubble treatment**
+(darker/uncanny palette; possibly a dedicated chat role to keep DM-narration and dungeon-voice apart —
+today the reply reuses the `"dm"` ◆ Dungeon violet bubble); (c) gated visibility. Manual GUI verify
+per house practice; smoke test optional (50.6 precedent). **Then the seeding step** (spec §7 note) —
+author `dungeon_voice` + `dungeon_knowledge`, a `monotonic=False` `dungeon_intimacy` clock, and a
+`resonance_point` object into the Crucible (manifest/seed + `populate_crucible_level*.py`) so the
+channel is actually enterable; **decide how voice/knowledge reach play time** (no manifest persistence
+in the save DB yet — see Slice 8 carried gap (c)). Use the TDD skill (read `spec/TESTING.md` first).
 
 Scope: a freeform **dungeon-voice** channel gated by **resonance points** (seed-marked rooms) + a
 **recedable dungeon-intimacy clock** (`monotonic=False`). The LLM plays the dungeon's voice (advisory
@@ -499,6 +541,35 @@ Spec `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`; decisions locked §3. 10-slice TDD 
   (clocks + memory both) and memory already depends on rpg. +5 tests (2 repo round-trip:
   default-true / non-monotonic-survives; 3 service: tick+persist, draft summary, a D6 "writes-only-
   drafts" `count_by_status == {"draft": 1}` guard).
+- **Slice 8 — DONE** (PlayView dialogue routing, spec §7.8; full unit suite green **3035**). The
+  integration slice: the 50.6 dialogue stub (`_dialogue_stub_active`/`_begin_dialogue_stub`/
+  `_on_dialogue_send_stub`) is replaced by real routing through an in-memory **`DialogueSession`**
+  (`@dataclass` in `views/play_view.py`: `kind` `"dungeon"`/`"npc"`, `room_id`, `target_id`, `turns`).
+  `_on_chat_send` routes to **`_on_dialogue_send`** while `_dialogue` is set; that **dispatches by
+  `kind`** (D1) and intercepts `/leave` (→ `_end_dialogue`). **NPC** (D1a fold-in): `_on_vna_submit`'s
+  `sway→willing` branch calls `_begin_dialogue(kind="npc", target_id=…)`; `_send_npc_line` is the thin
+  binding (records the player turn, posts the `"gm"` bubble, **stays open**). **Dungeon:**
+  `_begin_dungeon_dialogue()` gated by `dungeon_channel_available(room_context, intimacy_clock)` (posts
+  the lock reason when closed); `_dungeon_intimacy_clock()` reconstructs the seed clock from
+  `repo.get_clocks` by `category="dungeon_intimacy"`. **Send pipeline:** `_dungeon_agent_inputs(text)`
+  assembles the §4.4 kwargs (voice / intimacy `filled/segments` / `reveal_knowledge(...)` slice /
+  `recent_memories` via `MemoryRetriever` capped at 3 / actor slug / message); **`_send_dungeon_line`**
+  echoes the line then calls `DungeonVoiceAgent.respond(**inputs)` **off-thread** (mirrors
+  `_spawn_dm_thread`) and queues a dungeon-marked `DMResult` (`dungeon: bool`, `player_message`);
+  `on_update` drains it (main thread) to **`_apply_dungeon_reply`** → posts the distinct `"dm"` ◆
+  Dungeon bubble + applies **`record_dungeon_exchange(...)`** (engine intimacy tick + draft memory; no
+  LLM write — D6). **Close conditions:** `/leave` and a room change
+  (`_maybe_end_dialogue_on_room_change`, wired into `_on_exit_move` after `self._state = new_session`;
+  uses `getattr` so the many `__new__`-built move tests don't `AttributeError`). The `DungeonVoiceAgent`
+  is built in `__init__` from **`dm_agent._provider`** (no new dependency, `None` when no DM agent);
+  `_dungeon_voice`/`_dungeon_knowledge` are instance attrs (default `None`/`[]`, seeded later). **10
+  TDD cycles → 15 tests** in `tests/unit/views/test_play_view_dialogue.py` (real `MemoryRepository` +
+  `_FakeProvider`, no network); the 50.6 stub test in `test_play_view_vna.py` retargeted to the new
+  session. **Carried to Slice 9 / seeding** (see START HERE): no GUI entry affordance for the dungeon
+  channel yet (`_begin_dungeon_dialogue` is unwired to any button — D2b is Slice 9), the reply reuses
+  the shared `"dm"` bubble (dedicated dungeon-voice styling is Slice 9), and **voice/knowledge/intimacy
+  clock/resonance object are unseeded** so the channel is locked in the live app until the seeding step
+  (no manifest persistence at play time — that sourcing decision is open).
 
 ---
 
