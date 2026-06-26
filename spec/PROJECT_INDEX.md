@@ -9,7 +9,7 @@ All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds;
 tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
 bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
 Phase **51 — Talk to the Dungeon: IN PROGRESS** on branch `phase-51` (started 2026-06-26).
-Decisions locked; **Slices 1–3 DONE & committed**; Slice 4 (intimacy gate) next.
+Decisions locked; **Slices 1–4 DONE & committed**; Slice 5 (knowledge filter) next.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -18,7 +18,7 @@ Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 
 ---
 
-## START HERE next session — Phase 51 in progress; Slice 4 next
+## START HERE next session — Phase 51 in progress; Slice 5 next
 
 **Phase 51 — Talk to the Dungeon** is underway on branch `phase-51` (off `main`). The spec is
 **finalized** (`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions are locked (§3).
@@ -38,13 +38,21 @@ the seed slice when the intimacy clock needs `monotonic=False` persisted. The **
 `archetype` Literal (`campaign/manifest.py:95`) was deliberately **left without** `resonance_point`
 (no seeding in this pure slice) — add it in the seed slice when authoring resonance rooms.
 
-**Slice 4 next — intimacy gate (spec §4.3 / §7.4).** Pure helper
-`dungeon_channel_available(room_context, intimacy_clock) -> (bool, reason)`: open only when the room
-is a **resonance point** (`room_context["resonance_point"]`) **AND** the intimacy clock is at/above
-threshold; returns the lock reason string when closed (not-here vs. not-intimate-enough). Reads
-`filled`/`segments` **live** (non-monotonic clock; never a completion event). Pure helper slice (no
-lib, no LLM, no UI). Use the TDD skill (read `spec/TESTING.md` first); check spec §4.3 for the band
-thresholds.
+**Slices 1–4 DONE & committed.** S4 (intimacy gate): new pure helper module
+`rpg/dungeon_channel.py` → `dungeon_channel_available(room_context, intimacy_clock) -> (bool, reason)`
+— open only when `room_context["resonance_point"]` **AND** the intimacy clock's `filled/segments` ≥
+`INTIMACY_THRESHOLD` (0.5, a **tunable module constant** — the open §6 balance question; never a
+completion event). Closed returns `REASON_NOT_HERE` (not a resonance point; **takes precedence** when
+both gates fail) or `REASON_NOT_INTIMATE` (clock `None`/missing or below threshold). +6 tests
+(`tests/unit/rpg/test_dungeon_channel.py`). rpg+memory+campaign suites green (931).
+
+**Slice 5 next — knowledge filtering (spec §4.5 / §7.5).** Pure helper
+`reveal_knowledge(knowledge: list[str], filled: int, segments: int) -> list[str]` in the same
+`rpg/dungeon_channel.py`: returns the slice of `dungeon_knowledge` the dungeon may draw on at the
+current intimacy band — none below threshold, a fragmentary head slice at the cryptic band, the full
+list at high fill. Exact banding is the open §6 balance question — pick tunable constants and point at
+BALANCE_NOTES (mirror the `INTIMACY_THRESHOLD` pattern from Slice 4). Pure helper slice (no lib, no
+LLM, no UI). Use the TDD skill (read `spec/TESTING.md` first).
 
 Scope: a freeform **dungeon-voice** channel gated by **resonance points** (seed-marked rooms) + a
 **recedable dungeon-intimacy clock** (`monotonic=False`). The LLM plays the dungeon's voice (advisory
@@ -418,6 +426,17 @@ Spec `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`; decisions locked §3. 10-slice TDD 
   derived-from-object, false-when-no-resonance-object). **Left out of scope:** the **manifest** object
   `archetype` Literal (`campaign/manifest.py:95`) does NOT yet include `resonance_point` — no seeding
   happens in this pure data slice; add it when the seed slice authors resonance rooms.
+- **Slice 4 — DONE** (intimacy gate, spec §4.3 / §7.4; rpg+memory+campaign suites green 931). New pure
+  helper module `dungeon_daddy/rpg/dungeon_channel.py` →
+  `dungeon_channel_available(room_context, intimacy_clock) -> tuple[bool, str | None]`: returns
+  `(True, None)` only when the room is a **resonance point** (`room_context["resonance_point"]`) **AND**
+  the intimacy clock's `filled/segments` ≥ `INTIMACY_THRESHOLD` (read **live**; non-monotonic clock,
+  never a completion event). Closed → `(False, reason)`: `REASON_NOT_HERE` (not a resonance point;
+  **checked first**, so it wins when both gates fail) or `REASON_NOT_INTIMATE` (clock `None`/missing,
+  `segments<=0`, or below threshold). `INTIMACY_THRESHOLD = 0.5` is a **tunable module constant** (the
+  open §6 balance question; pointer to BALANCE_NOTES in the source). +6 tests
+  (`tests/unit/rpg/test_dungeon_channel.py`): open-at-threshold tracer, not-resonance, below-threshold,
+  absent-clock, exact-boundary (`>=`), not-here precedence.
 
 ---
 

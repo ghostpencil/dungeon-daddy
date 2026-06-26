@@ -1,0 +1,35 @@
+from __future__ import annotations
+
+from dungeon_daddy.rpg.models import ClockState
+
+# Tunable intimacy gate threshold, as a fraction of the clock's segments filled.
+# Open balance question — see spec/PHASE_51_TALK_TO_THE_DUNGEON.md §6 and
+# BALANCE_NOTES.md when tuning the band boundaries.
+INTIMACY_THRESHOLD = 0.5
+
+# Lock reasons surfaced to the player when the channel is closed.
+REASON_NOT_HERE = "You are not standing where the dungeon can hear you."
+REASON_NOT_INTIMATE = "The dungeon does not yet know you well enough to speak."
+
+
+def dungeon_channel_available(
+    room_context: dict,
+    intimacy_clock: ClockState | None,
+) -> tuple[bool, str | None]:
+    """Decide whether the freeform dungeon-voice channel may open.
+
+    Two gates, both required (spec §2 / §4.3):
+      * **Location** — the current room is a resonance point.
+      * **Intimacy** — a non-monotonic intimacy clock is at/above threshold,
+        read **live** from ``filled``/``segments`` (never a completion event).
+
+    Returns ``(True, None)`` when open, else ``(False, reason)`` where reason is
+    the not-here vs. not-intimate-enough lock message.
+    """
+    if not room_context.get("resonance_point"):
+        return (False, REASON_NOT_HERE)
+    if intimacy_clock is None or intimacy_clock.segments <= 0:
+        return (False, REASON_NOT_INTIMATE)
+    if intimacy_clock.filled / intimacy_clock.segments < INTIMACY_THRESHOLD:
+        return (False, REASON_NOT_INTIMATE)
+    return (True, None)
