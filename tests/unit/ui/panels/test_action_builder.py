@@ -381,6 +381,41 @@ def test_clicking_toggle_rect_collapses():
     assert builder.is_collapsed() is True
 
 
+def test_toggle_rect_spans_header_width():
+    # The whole header bar is the click target — a tiny caret box was too hard to
+    # hit, especially when collapsed at the bottom edge of the column.
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    with patch("dungeon_daddy.ui.theme.draw_rounded_rect"), \
+         patch("arcade.draw_rect_filled"), \
+         patch("arcade.draw_line"), \
+         patch("arcade.draw_text"):
+        builder.draw(0.0, 0.0, 440.0, builder.content_height(440.0))
+    _tx, _ty, tw, _th = builder._toggle_rect
+    assert tw > 200  # spans most of the 440px band width
+
+
+def test_toggle_round_trips_collapse_then_expand():
+    # Collapsing then clicking the (re-laid-out) toggle must expand again.
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    patches = (
+        patch("dungeon_daddy.ui.theme.draw_rounded_rect"),
+        patch("arcade.draw_rect_filled"),
+        patch("arcade.draw_line"),
+        patch("arcade.draw_text"),
+    )
+
+    def _draw_and_click():
+        with patches[0], patches[1], patches[2], patches[3]:
+            builder.draw(0.0, 0.0, 440.0, builder.content_height(440.0))
+        tx, ty, tw, th = builder._toggle_rect
+        builder.on_mouse_press(tx + tw / 2, ty + th / 2)
+
+    _draw_and_click()
+    assert builder.is_collapsed() is True
+    _draw_and_click()
+    assert builder.is_collapsed() is False
+
+
 # ---------------------------------------------------------------------------
 # draw() records hit rects consistent with slots() / the action button
 # ---------------------------------------------------------------------------

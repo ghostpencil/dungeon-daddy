@@ -291,7 +291,7 @@ class InChatActionBuilder:
     _ROW_H = 18.0  # popup row height
     _UNIT_GAP = 6.0  # horizontal gap between sentence units
     _BTN_H = 24.0  # action button height
-    _HEADER_H = 22.0  # top header/toggle row height (also the collapsed height)
+    _HEADER_H = 26.0  # top header/toggle bar height (also the collapsed height)
     _SENTENCE_TOP_OFF = 16.0  # first-row baseline below the band top
     _PV_LINE_H = 15.0  # preview inset line height
     _PV_GAP = 6.0  # gap between the button row and the preview inset
@@ -435,23 +435,27 @@ class InChatActionBuilder:
         left = x + PAD_MD
         right = x + w - PAD_MD
 
-        # Header/toggle row across the top of the band. The ▾/▴ caret collapses
-        # or expands the band; when collapsed only this row is drawn (Slice 11).
-        header_cy = y + h - self._HEADER_H / 2
-        caret = "▾" if self._collapsed else "▴"
+        # Header/toggle bar across the top of the band. The WHOLE bar is the
+        # click target (a tiny corner caret was too hard to hit, especially when
+        # collapsed at the bottom edge) — clicking anywhere on it collapses or
+        # expands the band. When collapsed only this bar is drawn (Slice 11).
+        header_bot = y + h - self._HEADER_H
+        header_cy = header_bot + self._HEADER_H / 2
+        arcade.draw_rect_filled(
+            arcade.XYWH(x + w / 2, header_cy, w, self._HEADER_H), BG_3
+        )
+        arcade.draw_line(x, header_bot, x + w, header_bot, LINE, 1)
         arcade.draw_text(
             "ACTION", left, header_cy, INK_3,
             font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="center",
         )
-        tog_w = tog_h = 18.0
-        tog_x = right - tog_w
-        tog_y = header_cy - tog_h / 2
+        caret = "▾ show" if self._collapsed else "▴ hide"
         arcade.draw_text(
-            caret, tog_x + tog_w / 2, header_cy, INK_2,
+            caret, right, header_cy, INK_2,
             font_size=TEXT_SM, font_name=FONT_MONO,
-            anchor_x="center", anchor_y="center",
+            anchor_x="right", anchor_y="center",
         )
-        self._toggle_rect = (tog_x, tog_y, tog_w, tog_h)
+        self._toggle_rect = (x, header_bot, w, self._HEADER_H)
         if self._collapsed:
             return
 

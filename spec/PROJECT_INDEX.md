@@ -29,12 +29,15 @@ Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
    free-text input hidden in builder mode, the mini-card now stacks directly on the band via new
    `chat_panel._card_bot_off` + `_BUILDER_BOTTOM_PAD`; `_input_area_h` no longer reserves the hidden
    ~70px input row, so the message area reclaims it.
-3. **Short-window collapsible fallback — DONE (committed; not yet GUI-verified).** Builder band has an
-   **ACTION + ▾/▴ header row**; `InChatActionBuilder.is_collapsed()`/`toggle_collapsed()`/
-   `apply_auto_collapse(bool)` (manual toggle latches `_user_toggled` so it overrides auto). `chat_panel.
-   _apply_builder_auto_collapse()` (called first in `draw()`) auto-collapses when panel height <
-   **`_BUILDER_AUTOCOLLAPSE_H = 620`** (user-chosen "auto-collapse below threshold", 2026-06-26 — tune
-   in GUI). Collapsed band = header row only (`content_height` returns `_HEADER_H`).
+3. **Short-window collapsible fallback — DONE (committed; pieces 1–2 GUI-verified, piece 3 toggle-fix
+   pending re-verify).** Builder band has a full-width **ACTION … ▾ show / ▴ hide header bar** (the
+   **whole bar** is the click target — a first pass used a tiny 18px corner caret that was unhittable
+   when collapsed at the bottom edge, so the user "could collapse but not reopen"; fixed). `InChat
+   ActionBuilder.is_collapsed()`/`toggle_collapsed()`/`apply_auto_collapse(bool)` (manual toggle latches
+   `_user_toggled` so it overrides auto). `chat_panel._apply_builder_auto_collapse()` (called first in
+   `draw()`) auto-collapses when panel height < **`_BUILDER_AUTOCOLLAPSE_H = 620`** (user-chosen
+   "auto-collapse below threshold", 2026-06-26 — tune in GUI). Collapsed band = header bar only
+   (`content_height` returns `_HEADER_H=26`).
 4. **Smoke test — TODO** — `tools/smoke_test_phase*.py` (Strategy A/B per `spec/TESTING.md` — read the
    A-vs-B guidance first) + manual visual verify by the user.
 
