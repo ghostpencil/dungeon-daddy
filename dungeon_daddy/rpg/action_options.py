@@ -52,6 +52,12 @@ _INTERACTION_VERBS: dict[str, str] = {
 # Verbs that require a second noun (Target). Absent from this set = intransitive.
 TRANSITIVE_VERBS: frozenset[str] = frozenset({VERB_GIVE, VERB_USE, VERB_COMBINE})
 
+# The social "talk/sway-family" verb. ``sway`` is one of the 9 universal skill
+# verbs; when aimed at a *speakable* creature it opens dialogue rather than
+# resolving a contested roll (Phase 50.6 §6; conversation flow is Phase 51).
+VERB_SWAY = "sway"
+DIALOGUE_VERBS: frozenset[str] = frozenset({VERB_SWAY})
+
 
 def is_transitive(verb: str) -> bool:
     """True when ``verb`` requires a Target noun."""
@@ -107,6 +113,302 @@ def noun_sources_for_verb(verb: str) -> set[str] | None:
 def target_sources_for_verb(verb: str) -> set[str] | None:
     """Source filter for the Target slot, or ``None`` if verb is intransitive."""
     return _VERB_TARGET_SOURCES.get(verb)
+
+
+def verbs_for_noun(
+    noun: "NounOption", all_verbs: Iterable["VerbOption"]
+) -> list["VerbOption"]:
+    """The verbs from ``all_verbs`` that may target ``noun`` — inverse of
+    :func:`noun_sources_for_verb`.
+
+    A verb applies when it is unrestricted (skill verbs, for which
+    ``noun_sources_for_verb`` returns ``None``) or when ``noun.source`` is among
+    the sources the verb accepts for its primary Noun slot. Input order is
+    preserved. Used to populate the suggested-verbs chip row for the selected
+    noun; verbs *not* returned are rendered disabled by the widget layer.
+    """
+    applicable: list[VerbOption] = []
+    for verb in all_verbs:
+        sources = noun_sources_for_verb(verb.verb)
+        if sources is None or noun.source in sources:
+            applicable.append(verb)
+    return applicable
+
+
+# Creature dispositions that permit dialogue. Anything else (hostile, wary, …)
+# will not talk — "not all creatures will talk" (Phase 50.6 §6). Kept as a set
+# so Phase 51 can widen the gate without touching call sites.
+_SPEAKABLE_DISPOSITIONS: frozenset[str] = frozenset({"willing"})
+
+
+def is_speakable(noun: "NounOption", room_context: Mapping) -> bool:
+    """True when ``noun`` is a creature the party can open dialogue with (§6).
+
+    A noun is speakable only when it is an NPC or monster present in
+    ``room_context`` whose ``disposition`` permits talking (see
+    ``_SPEAKABLE_DISPOSITIONS``). Non-creature nouns (objects, exits, items, the
+    synthetic self/room, and party PCs) are never speakable. Pure and forgiving
+    of absent context keys, matching :func:`available_nouns`. Drives the
+    builder's dialogue gate (a ``sway``/talk action only opens the SAY box on a
+    speakable target); the conversation itself is a Phase 51 extension point.
+    """
+    if noun.source not in (SOURCE_NPC, SOURCE_MONSTER):
+        return False
+    creature = next(
+        (
+            c
+            for c in (*room_context.get("monsters", []), *room_context.get("npcs", []))
+            if c.get("actor_id") == noun.noun_id
+        ),
+        None,
+    )
+    if creature is None:
+        return False
+    return creature.get("disposition") in _SPEAKABLE_DISPOSITIONS
+
+
+# Deterministic (no-roll) verbs: these resolve straight to a ``PlayerCommand``
+# (or pure observation) rather than an action roll. ``use`` is conditional —
+# use-on-self is a deterministic Consume, use-on-creature is a roll — so it is
+# handled separately in :func:`action_preview`, not listed here.
+_DETERMINISTIC_VERBS: frozenset[str] = frozenset(
+    {VERB_MOVE, VERB_PICK_UP, VERB_EQUIP, VERB_ACTIVATE, VERB_GIVE, VERB_COMBINE, VERB_LOOK}
+)
+
+# Canonical memory types a deterministic verb could create, per the
+# creation-trigger rules in MEMORY_SYSTEM_SPEC.md (move → a new room/`location`;
+# activate/use/combine → `dungeon_state`; give → forms/damages a bond
+# (`relationship`); look → a discovered clue (`event`)). Inventory shuffles
+# (pick-up/equip) trigger no memory. Contested rolls use ``_CONTESTED_MEMORY_TAGS``.
+_DETERMINISTIC_MEMORY_TAGS: dict[str, list[str]] = {
+    VERB_MOVE: ["location"],
+    VERB_ACTIVATE: ["dungeon_state"],
+    VERB_USE: ["dungeon_state"],
+    VERB_COMBINE: ["dungeon_state"],
+    VERB_GIVE: ["relationship"],
+    VERB_LOOK: ["event"],
+    VERB_PICK_UP: [],
+    VERB_EQUIP: [],
+}
+
+# Any action roll resolves a major action (`event`) and risks fallout on a
+# failed/partial outcome (`fallout`).
+_CONTESTED_MEMORY_TAGS: list[str] = ["event", "fallout"]
+
+# Actor status that means a creature is a live threat (see Actor.status).
+_LIVE_ACTOR_STATUS = "active"
+
+
+@dataclass(frozen=True)
+class ActionPreview:
+    """A deterministic, engine-derived preview of an action Card (no LLM call).
+
+    ``likely_roll`` is the action rating the verb resolves against (the verb
+    name for skill verbs), or ``None`` for a deterministic action that shows
+    "No roll — automatic". ``requires_roll`` drives the adaptive button
+    (``ROLL`` vs ``DO``/``MOVE``/``LOOK``). ``risk`` is a templated line built
+    from threats *present in the room* (``None`` when the room is calm).
+    ``memory_tags`` are the canonical memory types this action could create.
+    """
+
+    likely_roll: str | None
+    requires_roll: bool
+    risk: str | None
+    memory_tags: list[str] = field(default_factory=list)
+
+
+def action_preview(
+    card: "ActionCard", room_context: Mapping, actor: Mapping
+) -> ActionPreview:
+    """Build the deterministic Preview box for an action Card (spec §4.5).
+
+    Pure and unit-testable — it reads only already-loaded state and **never**
+    calls the LLM. ``requires_roll`` is true for skill/class verbs and for
+    use-on-a-creature (use-on-self is a deterministic Consume). ``risk`` names
+    the live threats in ``room_context`` (active creatures, disturbed objects).
+    """
+    verb = card.verb
+    if verb == VERB_USE:
+        requires_roll = card.target_id != actor.get("actor_id")
+    else:
+        requires_roll = verb not in _DETERMINISTIC_VERBS
+
+    likely_roll = verb if requires_roll else None
+    if requires_roll:
+        memory_tags = list(_CONTESTED_MEMORY_TAGS)
+    else:
+        memory_tags = list(_DETERMINISTIC_MEMORY_TAGS.get(verb, []))
+
+    return ActionPreview(
+        likely_roll=likely_roll,
+        requires_roll=requires_roll,
+        risk=_templated_risk(room_context),
+        memory_tags=memory_tags,
+    )
+
+
+def _templated_risk(room_context: Mapping) -> str | None:
+    """Template a risk line from threats present in the room, or ``None``.
+
+    Active creatures may stir; disturbed objects are named hazards. Forgiving of
+    absent keys, matching :func:`available_nouns`.
+    """
+    threats: list[str] = []
+    for monster in room_context.get("monsters", []):
+        if monster.get("status", _LIVE_ACTOR_STATUS) == _LIVE_ACTOR_STATUS:
+            threats.append(f"{monster['display_name']} may stir")
+    for obj in room_context.get("objects", []):
+        if obj.get("current_state") == "disturbed":
+            threats.append(f"{obj['display_name']} is disturbed")
+    return "; ".join(threats) if threats else None
+
+
+# --------------------------------------------------------------------------
+# "Things Here" overlay view-model (spec §5.2) — pure, no Arcade, no LLM.
+# --------------------------------------------------------------------------
+
+SECTION_EXITS = "EXITS"
+SECTION_OBJECTS = "OBJECTS"
+SECTION_CREATURES = "CREATURES"
+SECTION_ITEMS = "ITEMS"
+
+# Fixed display order; empty sections are omitted by :func:`room_things`.
+_SECTION_ORDER: tuple[str, ...] = (
+    SECTION_EXITS, SECTION_OBJECTS, SECTION_CREATURES, SECTION_ITEMS,
+)
+
+# Which overlay section each noun ``source`` falls into. Synthetic ``self`` and
+# ``room`` (and ally ``party``) sources are intentionally absent — they belong to
+# no "Things Here" section and are dropped. Carried inventory (``carried_item``)
+# is likewise absent: it is on the party, not "in the room", so the overlay omits
+# it (the builder's noun dropdown still surfaces it). Inventory gets its own
+# surface later.
+_SOURCE_SECTION: dict[str, str] = {
+    SOURCE_EXIT: SECTION_EXITS,
+    SOURCE_LOCKED_EXIT: SECTION_EXITS,
+    SOURCE_OBJECT: SECTION_OBJECTS,
+    SOURCE_MONSTER: SECTION_CREATURES,
+    SOURCE_NPC: SECTION_CREATURES,
+    SOURCE_LOOSE_ITEM: SECTION_ITEMS,
+}
+
+# Row glyphs (spec §5.1). Objects show a hazard glyph when their state is alarming.
+GLYPH_EXIT = "→"
+GLYPH_OBJECT = "✦"
+GLYPH_OBJECT_HAZARD = "⚠"
+GLYPH_CREATURE = "●"
+GLYPH_ITEM = "◆"
+
+# Status string → ``draw_chip`` colour token (spec §8). Anything unlisted is neutral.
+_TEAL_STATES: frozenset[str] = frozenset({"open", "discovered", "ready", "willing"})
+_EMBER_STATES: frozenset[str] = frozenset(
+    {"locked", "blocked", "sealed", "one_way", "disturbed", "armed", "hostile", "active"}
+)
+
+
+def _state_color(status: str) -> str:
+    if status in _EMBER_STATES:
+        return "ember"
+    if status in _TEAL_STATES:
+        return "teal"
+    return "default"
+
+
+@dataclass(frozen=True)
+class RoomThing:
+    """One clickable row in the overlay: ``noun_id`` feeds the builder's noun slot."""
+
+    noun_id: str
+    label: str
+    glyph: str
+    status: str
+    status_color: str  # "teal" | "ember" | "gold" | "default"
+
+
+@dataclass(frozen=True)
+class ThingsSection:
+    title: str  # one of SECTION_*
+    things: list[RoomThing] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class RoomThings:
+    """Ordered, non-empty overlay sections for the current room (spec §5.2)."""
+
+    room_id: str | None = None
+    sections: list[ThingsSection] = field(default_factory=list)
+
+
+def room_things(room_context: Mapping, actor: Mapping) -> RoomThings:
+    """Group the room's :func:`available_nouns` into the overlay's EXITS / OBJECTS /
+    CREATURES / ITEMS sections with per-row status chips (spec §5.2).
+
+    Pure and unit-testable. Reuses ``available_nouns`` so the row ``noun_id``\\ s
+    are exactly the ids the builder's ``select_noun`` expects, then joins each
+    noun to its live status from ``room_context`` to derive the chip text/colour
+    and glyph. Synthetic ``self``/``room`` (and ally ``party``) nouns map to no
+    section and are dropped, as is carried party inventory (``carried_item`` — it
+    is on the party, not in the room); sections with no rows are omitted.
+    """
+    objects_by_id = {o["object_id"]: o for o in room_context.get("objects", [])}
+    exits_by_id = {e["exit_id"]: e for e in room_context.get("exits", [])}
+    creatures_by_id = {
+        c["actor_id"]: c
+        for c in (*room_context.get("monsters", []), *room_context.get("npcs", []))
+    }
+    loose_by_id = {i["item_id"]: i for i in room_context.get("loose_items", [])}
+
+    buckets: dict[str, list[RoomThing]] = {title: [] for title in _SECTION_ORDER}
+    for noun in available_nouns(room_context, actor):
+        section = _SOURCE_SECTION.get(noun.source)
+        if section is None:
+            continue
+        buckets[section].append(
+            _room_thing(noun, objects_by_id, exits_by_id, creatures_by_id, loose_by_id)
+        )
+
+    sections = [
+        ThingsSection(title=title, things=buckets[title])
+        for title in _SECTION_ORDER
+        if buckets[title]
+    ]
+    return RoomThings(room_id=room_context.get("room_id"), sections=sections)
+
+
+def _room_thing(
+    noun: "NounOption",
+    objects_by_id: Mapping,
+    exits_by_id: Mapping,
+    creatures_by_id: Mapping,
+    loose_by_id: Mapping,
+) -> RoomThing:
+    src = noun.source
+    if src in (SOURCE_EXIT, SOURCE_LOCKED_EXIT):
+        status = _exit_status(exits_by_id.get(noun.noun_id, {}))
+        return RoomThing(noun.noun_id, noun.label, GLYPH_EXIT, status, _state_color(status))
+    if src == SOURCE_OBJECT:
+        status = objects_by_id.get(noun.noun_id, {}).get("current_state", "")
+        color = _state_color(status)
+        glyph = GLYPH_OBJECT_HAZARD if color == "ember" else GLYPH_OBJECT
+        return RoomThing(noun.noun_id, noun.label, glyph, status, color)
+    if src in (SOURCE_MONSTER, SOURCE_NPC):
+        creature = creatures_by_id.get(noun.noun_id, {})
+        status = creature.get("disposition") or creature.get("status", "")
+        return RoomThing(noun.noun_id, noun.label, GLYPH_CREATURE, status, _state_color(status))
+    # SOURCE_LOOSE_ITEM — loose pickups on the floor, always gold. (Carried
+    # inventory is filtered out upstream via _SOURCE_SECTION.)
+    status = (loose_by_id.get(noun.noun_id, {}).get("status") or "on floor").replace("_", " ")
+    return RoomThing(noun.noun_id, noun.label, GLYPH_ITEM, status, "gold")
+
+
+def _exit_status(exit_row: Mapping) -> str:
+    """Display status for an exit row: explicit blocked states, else key-gated → ``locked``."""
+    status = exit_row.get("status", "open")
+    if status in _LOCKED_EXIT_STATUSES:
+        return status
+    if exit_row.get("requires_item_slug"):
+        return "locked"
+    return status
 
 
 @dataclass(frozen=True)

@@ -258,6 +258,190 @@ def test_unmarked_room_omits_marker_text() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Phase 50.6 Slice 7 — play-mode "Things Here" detail panel
+# ---------------------------------------------------------------------------
+
+def _level() -> Level:
+    return Level(
+        id=1, name="L", rooms=[], connections=[], entries=[],
+        width=10, height=10, loop="", summary="", ecology="",
+    )
+
+
+def _room_things(room_id="R1"):
+    from dungeon_daddy.rpg.action_options import RoomThing, RoomThings, ThingsSection
+    return RoomThings(
+        room_id=room_id,
+        sections=[
+            ThingsSection(
+                title="EXITS",
+                things=[RoomThing("e1", "Marketplace Arch", "→", "open", "teal")],
+            ),
+        ],
+    )
+
+
+def test_play_mode_renders_things_here_not_graph_metadata() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+    rooms = {"R1": _room("R1")}
+    result = _result(rooms=rooms, room_names={"R1": "Receiving Hall"})
+    view_state = GraphViewState()
+    view_state.select_room("R1")
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.draw_chip"), \
+            patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(
+            result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
+            mode="play", room_things=_room_things(),
+        )
+        all_text = " ".join(str(c) for c in mock_arcade.draw_text.call_args_list)
+
+    assert "THINGS HERE" in all_text
+    assert "Marketplace Arch" in all_text
+    assert "GRAPH MODE" not in all_text
+    assert "Critical Path" not in all_text
+
+
+def test_play_mode_draws_status_chip_with_color() -> None:
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+    rooms = {"R1": _room("R1")}
+    result = _result(rooms=rooms)
+    view_state = GraphViewState()
+    view_state.select_room("R1")
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.draw_chip") as mock_chip, \
+            patch("dungeon_daddy.map.layout_renderer.arcade"):
+        renderer.draw(
+            result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
+            mode="play", room_things=_room_things(),
+        )
+        colors = [c.args[3] if len(c.args) > 3 else c.kwargs.get("color")
+                  for c in mock_chip.call_args_list]
+        texts = [c.args[0] if c.args else c.kwargs.get("text")
+                 for c in mock_chip.call_args_list]
+
+    assert "open" in texts
+    assert "teal" in colors
+
+
+def test_graph_mode_default_still_uses_graph_metadata() -> None:
+    """Regression: design/graph mode (the default) is untouched by the play branch."""
+    from dungeon_daddy.data.models import Room
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+    rooms = {"R1": _room("R1")}
+    result = _result(rooms=rooms, room_names={"R1": "Receiving Hall"},
+                     room_roles={"R1": "entrance"}, critical_path=["R1"])
+    level = Level(
+        id=1, name="L",
+        rooms=[Room(id="R1", num=1, name="Receiving Hall", x=0, y=0, w=1, h=1,
+                    type="chamber", note="")],
+        connections=[], entries=[], width=10, height=10,
+        loop="", summary="", ecology="",
+    )
+    view_state = GraphViewState()
+    view_state.select_room("R1")
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(result, 0.0, 0.0, 1.0, view_state=view_state, level=level)
+        all_text = " ".join(str(c) for c in mock_arcade.draw_text.call_args_list)
+
+    assert "Critical Path" in all_text
+    assert "THINGS HERE" not in all_text
+
+
+# ---------------------------------------------------------------------------
+# Phase 50.6 Slice 8 — overlay→builder link: clickable rows + selection ring
+# ---------------------------------------------------------------------------
+
+def _play_setup():
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+    rooms = {"R1": _room("R1")}
+    result = _result(rooms=rooms)
+    view_state = GraphViewState()
+    view_state.select_room("R1")
+    return result, view_state
+
+
+def _thing_text_call(mock_arcade, needle: str):
+    """The draw_text call rendering the row whose text contains *needle*."""
+    for c in mock_arcade.draw_text.call_args_list:
+        text = c.args[0] if c.args else c.kwargs.get("text", "")
+        if needle in str(text):
+            return c
+    raise AssertionError(f"no draw_text call containing {needle!r}")
+
+
+def test_play_mode_records_thing_rect_for_noun() -> None:
+    result, view_state = _play_setup()
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.draw_chip"), \
+            patch("dungeon_daddy.map.layout_renderer.arcade"):
+        renderer.draw(
+            result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
+            mode="play", room_things=_room_things(),
+        )
+
+    assert "e1" in renderer.thing_rects()
+
+
+def test_play_mode_thing_rect_is_centred_on_its_text() -> None:
+    """Regression: the clickable rect must straddle the row's drawn baseline so
+    a click lands on the right row (the rect used to sit a row too low)."""
+    result, view_state = _play_setup()
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.draw_chip"), \
+            patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(
+            result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
+            mode="play", room_things=_room_things(),
+        )
+        text_y = _thing_text_call(mock_arcade, "Marketplace Arch").args[2]
+
+    rect = renderer.thing_rects()["e1"]
+    assert rect.y < text_y < rect.y + rect.h
+
+
+def test_play_mode_selected_marker_drawn_larger_than_row_text() -> None:
+    from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import _SEL_MARKER
+    from dungeon_daddy.map.layout_renderer import _PANEL_FONT_SIZE
+    result, view_state = _play_setup()
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.draw_chip"), \
+            patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(
+            result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
+            mode="play", room_things=_room_things(), selected_noun_id="e1",
+        )
+        marker_call = _thing_text_call(mock_arcade, _SEL_MARKER)
+
+    font_size = marker_call.kwargs.get("font_size")
+    assert font_size is not None and font_size > _PANEL_FONT_SIZE
+
+
+def test_play_mode_selected_row_text_is_teal() -> None:
+    from dungeon_daddy.ui.theme import TEAL
+    result, view_state = _play_setup()
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.draw_chip"), \
+            patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(
+            result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
+            mode="play", room_things=_room_things(), selected_noun_id="e1",
+        )
+        call = _thing_text_call(mock_arcade, "Marketplace Arch")
+
+    color = call.args[3] if len(call.args) > 3 else call.kwargs.get("color")
+    assert tuple(color)[:3] == tuple(TEAL)[:3]
+
+
+# ---------------------------------------------------------------------------
 # Cycle 12 — secret connection uses lower alpha than normal
 # ---------------------------------------------------------------------------
 

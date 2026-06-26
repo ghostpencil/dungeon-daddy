@@ -34,23 +34,35 @@ def _make_rpg_side(active: int = 0):
     from dungeon_daddy.views.play_view import _RpgSidePanel
     char, scene, fallout = MagicMock(), MagicMock(), MagicMock()
     mem = MagicMock()
-    action = MagicMock()
-    exit_panel = MagicMock()
     manager = MagicMock()
-    panel = _RpgSidePanel(char, scene, fallout, mem, action, exit_panel, None, manager=manager)
+    panel = _RpgSidePanel(char, scene, fallout, mem, None, manager=manager)
     panel._x, panel._y, panel._w, panel._h = 0.0, 0.0, 300.0, 500.0
     panel._tab_rects = []
     panel._active = active
-    return panel, manager, action
+    return panel, manager
 
 
 # ---------------------------------------------------------------------------
-# Slice 4 — ACTION tab registered in _RPG_TAB_LABELS
+# Phase 50.6 — ACTION tab (Slice 9) + EXITS/Move tab (follow-up) retired:
+# the in-chat builder + "Things Here" overlay are the sole action surfaces.
 # ---------------------------------------------------------------------------
 
-def test_action_tab_in_rpg_tab_labels():
+def test_action_tab_retired_from_rpg_tab_labels():
+    """The right-panel ACTION tab is gone; the in-chat builder replaces it."""
     from dungeon_daddy.views.play_view import _RPG_TAB_LABELS
-    assert "ACTION" in _RPG_TAB_LABELS
+    assert "ACTION" not in _RPG_TAB_LABELS
+
+
+def test_exits_tab_retired_from_rpg_tab_labels():
+    """The right-panel EXITS (Move) tab is gone; the overlay replaces it."""
+    from dungeon_daddy.views.play_view import _RPG_TAB_LABELS
+    assert "EXITS" not in _RPG_TAB_LABELS
+
+
+def test_remaining_rpg_tabs_kept():
+    """CHAR/SCENE/FALLOUT/MEM/DBG survive the ACTION- and EXITS-tab retirements."""
+    from dungeon_daddy.views.play_view import _RPG_TAB_LABELS
+    assert _RPG_TAB_LABELS == ["CHAR", "SCENE", "FALLOUT", "MEM", "DBG"]
 
 
 # ---------------------------------------------------------------------------
@@ -113,37 +125,6 @@ def _make_view(tmp_path: Path, with_rpg: bool = True):
     view._rpg_campaign_id = None
     return view, room, level
 
-
-# ---------------------------------------------------------------------------
-# Slice 7 — _RpgSidePanel: set_active(ACTION) calls action.setup_widget
-# ---------------------------------------------------------------------------
-
-class TestRpgSidePanelActionLifecycle:
-    def test_set_active_action_tab_calls_setup_widget(self):
-        from dungeon_daddy.views.play_view import _TAB_ACTION
-        panel, manager, action = _make_rpg_side(active=0)
-        panel.set_active(_TAB_ACTION)
-        action.setup_widget.assert_called_once()
-
-    def test_leaving_action_tab_calls_teardown_widget(self):
-        from dungeon_daddy.views.play_view import _TAB_ACTION
-        panel, manager, action = _make_rpg_side(active=_TAB_ACTION)
-        panel.set_active(0)
-        action.teardown_widget.assert_called_once()
-
-    def test_setup_widget_receives_manager_and_dimensions(self):
-        from dungeon_daddy.views.play_view import _TAB_ACTION, _RPG_TAB_H
-        panel, manager, action = _make_rpg_side(active=0)
-        panel.set_active(_TAB_ACTION)
-        args = action.setup_widget.call_args
-        assert args[0][0] is manager
-        assert args[0][3] == 300.0   # w
-        assert args[0][4] == 500.0 - _RPG_TAB_H  # content_h
-
-
-# ---------------------------------------------------------------------------
-# Slice 5 — bundle passed when RPG service + mem_repo are available
-# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # Slice 8 — _load_player_actors populates the action panel

@@ -14,6 +14,7 @@ from dungeon_daddy.map.dungeon_layout.long_floor_framing import is_long_linear_f
 from dungeon_daddy.map.grid_renderer import GridRenderer
 from dungeon_daddy.map.layout_renderer import LayoutRenderer
 from dungeon_daddy.map.loop_overlay import LoopOverlay
+from dungeon_daddy.rpg.action_options import RoomThings
 from dungeon_daddy.ui.theme import (
     BG_0,
     BG_1,
@@ -123,6 +124,7 @@ class MapPanel:
         on_activate_loop: Callable[[str | None], None] | None = None,
         on_room_select: Callable[[str], None] | None = None,
         on_connection_select: Callable[[str, str], None] | None = None,
+        on_noun_click: Callable[[str], None] | None = None,
     ) -> None:
         self._on_level_change = on_level_change
         self._renderer = renderer or GridRenderer()
@@ -131,6 +133,7 @@ class MapPanel:
         self._on_activate_loop = on_activate_loop
         self._on_room_select = on_room_select
         self._on_connection_select = on_connection_select
+        self._on_noun_click = on_noun_click
         self._variant_btns: list[arcade.gui.UIFlatButton] = []
         self._active_variant = "Map"
         self._active_tool: str = "select"   # "select" | "pan"
@@ -144,6 +147,9 @@ class MapPanel:
         self._viewed_level_idx: int = 0
         self._dungeon_title: str = ""
         self._loop_strip_rects: dict[str, tuple[float, float, float, float]] = {}
+        # Loop pattern chips are an authoring/test-drive affordance — hidden in a
+        # normal play session (set False by PlayView for real saves).
+        self._loops_visible: bool = True
         self._active_loop_id: str | None = None
         self._layout_result: LayoutResult | None = None
         self._layout_renderer = LayoutRenderer()
@@ -151,6 +157,8 @@ class MapPanel:
         self._view_state = GraphViewState()
         self._level_view_states: dict[int, GraphViewState] = {}
         self._selected_room_id = None
+        self._things_here: RoomThings | None = None  # play-mode overlay content
+        self._things_selected_noun_id: str | None = None
         self._art = None  # MapArtAssets, lazy-loaded on first draw
 
         from dungeon_daddy.ui.widgets.level_stepper import LevelStepper
@@ -237,6 +245,31 @@ class MapPanel:
         """Move the selection cursor (selected frame + detail panel) to a room."""
         self._selected_room_id = room_id
 
+    def set_things_here(
+        self,
+        things: RoomThings | None,
+        selected_noun_id: str | None = None,
+    ) -> None:
+        """Feed the play-mode "Things Here" overlay content (Phase 50.6 §5).
+
+        When set, the map's detail panel renders the player-facing room contents
+        (Exits/Objects/Creatures/Items) instead of the graph authoring readout.
+        ``selected_noun_id`` marks one row as selected (larger TEAL marker). Pass
+        ``None`` for *things* to revert to graph mode (e.g. design view).
+        """
+        self._things_here = things
+        self._things_selected_noun_id = selected_noun_id
+
+    def set_loops_visible(self, visible: bool) -> None:
+        """Show/hide the loop-pattern chips (authoring/test-drive only).
+
+        Rebuilds the loop strip immediately when a level is loaded so the change
+        takes effect without a reload.
+        """
+        self._loops_visible = visible
+        if self._level is not None:
+            self._build_loop_strip_rects(self._level)
+
     def set_renderer(self, renderer: GridRenderer) -> None:
         self._renderer = renderer
 
@@ -317,6 +350,20 @@ class MapPanel:
                     self._active_loop_id = new_id
                     if self._on_activate_loop is not None:
                         self._on_activate_loop(new_id)
+                    return True
+        # Play-mode "Things Here" overlay: a noun row click feeds the action
+        # builder (Phase 50.6 §5.3). The overlay is drawn on top of the rooms, so
+        # its rows take priority over room/edge selection underneath.
+        if (
+            button == arcade.MOUSE_BUTTON_LEFT
+            and self._things_here is not None
+            and self._on_noun_click is not None
+            and self._active_variant == "Map"
+            and self._in_map_viewport(x, y)
+        ):
+            for noun_id, rect in self._layout_renderer.thing_rects().items():
+                if rect.x <= x < rect.x + rect.w and rect.y <= y < rect.y + rect.h:
+                    self._on_noun_click(noun_id)
                     return True
         if (
             button == arcade.MOUSE_BUTTON_LEFT
@@ -425,14 +472,15 @@ class MapPanel:
                 origin_x = x + PAD_MD + self._pan_offset_x
                 origin_y = y + PAD_MD + self._pan_offset_y
                 if self._layout_result is not None:
+                    on_current_level = (
+                        self._viewed_level_idx == self._state.current_level_idx
+                    )
                     self._layout_renderer.draw(
                         self._layout_result, origin_x, origin_y, self._zoom_level,
                         view_state=self._view_state,
                         level=self._level,
                         party_room_id=(
-                            self._state.current_room_id
-                            if self._viewed_level_idx == self._state.current_level_idx
-                            else None
+                            self._state.current_room_id if on_current_level else None
                         ),
                         visited_rooms=self._state.visited_rooms,
                         presentation_config=self._pres_config,
@@ -442,6 +490,9 @@ class MapPanel:
                         canvas_h=float(map_h),
                         viewport_x=float(x),
                         viewport_y=float(y),
+                        mode="play" if (self._things_here is not None and on_current_level) else "graph",
+                        room_things=self._things_here if on_current_level else None,
+                        selected_noun_id=self._things_selected_noun_id if on_current_level else None,
                     )
                 else:
                     self._renderer.draw(self._level, self._state, origin_x, origin_y, self._zoom_level)
@@ -521,7 +572,7 @@ class MapPanel:
 
     def _build_loop_strip_rects(self, level: Level) -> None:
         self._loop_strip_rects = {}
-        if not level.loops:
+        if not level.loops or not self._loops_visible:
             return
         _PILL_W, _PILL_H, _PILL_GAP, _PILL_PAD = 110.0, 24.0, 6.0, 8.0
         map_w = self._w - PANEL_STEPPER_WIDTH

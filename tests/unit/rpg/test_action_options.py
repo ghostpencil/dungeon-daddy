@@ -4,12 +4,19 @@ from dungeon_daddy.rpg.action_options import (
     CardError,
     CardOptions,
     NounOption,
+    RoomThing,
+    RoomThings,
+    ThingsSection,
     VerbOption,
     available_adverbs,
     available_nouns,
     available_verbs,
+    action_preview,
+    is_speakable,
     is_transitive,
+    room_things,
     validate_card,
+    verbs_for_noun,
 )
 from dungeon_daddy.rpg.models import ActorAbility
 
@@ -402,3 +409,303 @@ def test_validate_card_rejects_transitive_verb_with_target_not_in_offered_set():
     card = ActionCard(verb="give", noun_id="item:c1:key", adverb="boldly", target_id="actor:c1:nobody")
     err = validate_card(card, _OPTIONS_WITH_GIVE)
     assert isinstance(err, CardError) and err.field == "target"
+
+
+# --------------------------------------------------------------------------
+# Phase 50.6 Slice 1 — verbs_for_noun (inverse of noun_sources_for_verb)
+# --------------------------------------------------------------------------
+
+_FIGHT = VerbOption(verb="fight", label="Fight", kind="universal")
+_MOVE = VerbOption(verb="move", label="Move", kind="universal")
+_PICK_UP = VerbOption(verb="pick-up", label="Pick Up", kind="interaction")
+_ACTIVATE = VerbOption(verb="activate", label="Activate", kind="interaction")
+
+_ALL_VERBS = [_FIGHT, _MOVE, _PICK_UP, _ACTIVATE]
+
+
+def _noun(source):
+    return NounOption(noun_id="n", label="N", target_type="object", source=source)
+
+
+def test_verbs_for_noun_includes_unrestricted_skill_verb_for_any_source():
+    # fight is a skill verb (noun_sources_for_verb -> None): applies to anything.
+    for source in ("object", "loose_item", "exit", "self", "room"):
+        applicable = verbs_for_noun(_noun(source), _ALL_VERBS)
+        assert _FIGHT in applicable
+
+
+def test_verbs_for_noun_includes_restricted_verb_only_for_matching_source():
+    # activate -> {object}: applies to an object noun, not a loose item.
+    assert _ACTIVATE in verbs_for_noun(_noun("object"), _ALL_VERBS)
+    assert _ACTIVATE not in verbs_for_noun(_noun("loose_item"), _ALL_VERBS)
+
+
+def test_verbs_for_noun_excludes_move_for_non_exit_source():
+    # the greyed `·move·` chip: move -> {exit, locked_exit}, not an object.
+    assert _MOVE not in verbs_for_noun(_noun("object"), _ALL_VERBS)
+    assert _MOVE in verbs_for_noun(_noun("exit"), _ALL_VERBS)
+    assert _MOVE in verbs_for_noun(_noun("locked_exit"), _ALL_VERBS)
+
+
+def test_verbs_for_noun_preserves_input_order_and_returns_subset():
+    result = verbs_for_noun(_noun("object"), _ALL_VERBS)
+    assert result == [_FIGHT, _ACTIVATE]  # move/pick-up dropped, order kept
+
+
+# --------------------------------------------------------------------------
+# Phase 50.6 Slice 2 — action_preview (deterministic preview; never calls LLM)
+# --------------------------------------------------------------------------
+
+_PREVIEW_ACTOR = {"actor_id": "pc-1", "display_name": "Talvas"}
+
+
+def _preview_card(verb, *, noun_id="n", adverb="cautiously", target_id=None):
+    return ActionCard(verb=verb, noun_id=noun_id, adverb=adverb, target_id=target_id)
+
+
+def test_action_preview_contested_verb_requires_roll_and_names_rating():
+    # A skill verb resolves against the rating named by the verb itself.
+    preview = action_preview(_preview_card("study"), {}, _PREVIEW_ACTOR)
+    assert preview.requires_roll is True
+    assert preview.likely_roll == "study"
+
+
+def test_action_preview_contested_verb_could_create_event_and_fallout_memory():
+    preview = action_preview(_preview_card("fight"), {}, _PREVIEW_ACTOR)
+    assert "event" in preview.memory_tags
+    assert "fallout" in preview.memory_tags
+
+
+def test_action_preview_move_is_deterministic_with_no_roll():
+    preview = action_preview(_preview_card("move"), {}, _PREVIEW_ACTOR)
+    assert preview.requires_roll is False
+    assert preview.likely_roll is None
+
+
+def test_action_preview_move_could_create_location_memory():
+    preview = action_preview(_preview_card("move"), {}, _PREVIEW_ACTOR)
+    assert preview.memory_tags == ["location"]
+
+
+def test_action_preview_activate_is_deterministic_dungeon_state_memory():
+    preview = action_preview(_preview_card("activate"), {}, _PREVIEW_ACTOR)
+    assert preview.requires_roll is False
+    assert preview.memory_tags == ["dungeon_state"]
+
+
+def test_action_preview_use_on_self_is_deterministic_consume():
+    # use targeting the actor itself = ConsumeItem (no roll).
+    card = _preview_card("use", target_id="pc-1")
+    preview = action_preview(card, {}, _PREVIEW_ACTOR)
+    assert preview.requires_roll is False
+    assert preview.likely_roll is None
+
+
+def test_action_preview_use_on_creature_requires_roll():
+    card = _preview_card("use", target_id="monster-9")
+    preview = action_preview(card, {}, _PREVIEW_ACTOR)
+    assert preview.requires_roll is True
+
+
+def test_action_preview_risk_names_present_active_creature():
+    room = {"monsters": [{"actor_id": "m1", "display_name": "Scorpions", "status": "active"}]}
+    preview = action_preview(_preview_card("study"), room, _PREVIEW_ACTOR)
+    assert preview.risk is not None
+    assert "Scorpions" in preview.risk
+
+
+def test_action_preview_risk_hidden_when_only_dead_creature_present():
+    room = {"monsters": [{"actor_id": "m1", "display_name": "Scorpions", "status": "dead"}]}
+    preview = action_preview(_preview_card("study"), room, _PREVIEW_ACTOR)
+    assert preview.risk is None
+
+
+def test_action_preview_risk_names_disturbed_object_hazard():
+    room = {"objects": [{"object_id": "o1", "display_name": "Scorpion Nest", "current_state": "disturbed"}]}
+    preview = action_preview(_preview_card("study"), room, _PREVIEW_ACTOR)
+    assert preview.risk is not None
+    assert "Scorpion Nest" in preview.risk
+
+
+# --------------------------------------------------------------------------
+# Phase 50.6 Slice 3 — room_things ("Things Here" view-model)
+# --------------------------------------------------------------------------
+
+_THINGS_ACTOR = {"actor_id": "actor:c1:talvas", "display_name": "Talvas"}
+
+_THINGS_ROOM = {
+    "room_id": "room:level-01:hall",
+    "objects": [
+        {"object_id": "obj:c1:symbols", "slug": "wall-symbols",
+         "display_name": "Wall Symbols", "current_state": "unexamined"},
+        {"object_id": "obj:c1:nest", "slug": "scorpion-nest",
+         "display_name": "Scorpion Nest", "current_state": "disturbed"},
+    ],
+    "loose_items": [
+        {"item_id": "item:c1:fuse", "slug": "brass-fuse",
+         "display_name": "Brass Fuse", "status": "in_room"},
+    ],
+    "monsters": [
+        {"actor_id": "actor:c1:scorps", "slug": "scorpions",
+         "display_name": "Scorpions", "status": "active"},
+    ],
+    "exits": [
+        {"exit_id": "exit:c1:arch", "label": "Marketplace Arch", "status": "open"},
+        {"exit_id": "exit:c1:shaft", "label": "Elevator Shaft Door", "status": "locked"},
+    ],
+}
+
+
+def _section(things: RoomThings, title: str) -> ThingsSection:
+    return next(s for s in things.sections if s.title == title)
+
+
+def _row(things: RoomThings, title: str, noun_id: str) -> RoomThing:
+    return next(t for t in _section(things, title).things if t.noun_id == noun_id)
+
+
+def test_room_things_groups_into_four_ordered_sections():
+    things = room_things(_THINGS_ROOM, _THINGS_ACTOR)
+    assert [s.title for s in things.sections] == ["EXITS", "OBJECTS", "CREATURES", "ITEMS"]
+
+
+def test_room_things_exposes_room_id():
+    things = room_things(_THINGS_ROOM, _THINGS_ACTOR)
+    assert things.room_id == "room:level-01:hall"
+
+
+def test_room_things_omits_empty_sections():
+    # An empty room yields only the synthetic self noun, which has no section.
+    things = room_things({}, _THINGS_ACTOR)
+    assert things.sections == []
+    assert things.room_id is None
+
+
+def test_room_things_drops_synthetic_self_and_room_nouns():
+    things = room_things({"room_id": "room:level-01:hall"}, _THINGS_ACTOR)
+    all_ids = [t.noun_id for s in things.sections for t in s.things]
+    assert _THINGS_ACTOR["actor_id"] not in all_ids
+    assert "room:level-01:hall" not in all_ids
+
+
+def test_room_things_open_exit_is_teal():
+    row = _row(room_things(_THINGS_ROOM, _THINGS_ACTOR), "EXITS", "exit:c1:arch")
+    assert (row.label, row.glyph, row.status, row.status_color) == (
+        "Marketplace Arch", "→", "open", "teal",
+    )
+
+
+def test_room_things_locked_exit_is_ember():
+    row = _row(room_things(_THINGS_ROOM, _THINGS_ACTOR), "EXITS", "exit:c1:shaft")
+    assert row.status == "locked"
+    assert row.status_color == "ember"
+
+
+def test_room_things_key_gated_open_exit_reads_locked():
+    room = {"exits": [
+        {"exit_id": "exit:c1:lift", "label": "Lift", "status": "open",
+         "requires_item_slug": "lift-warden-key"},
+    ]}
+    row = _row(room_things(room, _THINGS_ACTOR), "EXITS", "exit:c1:lift")
+    assert row.status == "locked"
+    assert row.status_color == "ember"
+
+
+def test_room_things_unexamined_object_is_neutral_with_star_glyph():
+    row = _row(room_things(_THINGS_ROOM, _THINGS_ACTOR), "OBJECTS", "obj:c1:symbols")
+    assert (row.glyph, row.status, row.status_color) == ("✦", "unexamined", "default")
+
+
+def test_room_things_disturbed_object_is_ember_with_hazard_glyph():
+    row = _row(room_things(_THINGS_ROOM, _THINGS_ACTOR), "OBJECTS", "obj:c1:nest")
+    assert (row.glyph, row.status, row.status_color) == ("⚠", "disturbed", "ember")
+
+
+def test_room_things_active_creature_is_ember():
+    row = _row(room_things(_THINGS_ROOM, _THINGS_ACTOR), "CREATURES", "actor:c1:scorps")
+    assert (row.glyph, row.status, row.status_color) == ("●", "active", "ember")
+
+
+def test_room_things_creature_prefers_disposition_over_status():
+    room = {"npcs": [
+        {"actor_id": "actor:c1:warden", "slug": "warden",
+         "display_name": "The Warden", "status": "active", "disposition": "willing"},
+    ]}
+    row = _row(room_things(room, _THINGS_ACTOR), "CREATURES", "actor:c1:warden")
+    assert (row.status, row.status_color) == ("willing", "teal")
+
+
+def test_room_things_loose_item_is_gold():
+    row = _row(room_things(_THINGS_ROOM, _THINGS_ACTOR), "ITEMS", "item:c1:fuse")
+    assert (row.glyph, row.status, row.status_color) == ("◆", "in room", "gold")
+
+
+def test_room_things_excludes_carried_inventory():
+    # Carried inventory is on the party, not "in the room" — the overlay omits it
+    # (the builder's noun dropdown still surfaces it). Inventory gets its own
+    # surface later (Phase 50.6 follow-up).
+    actor = {**_THINGS_ACTOR, "carried_items": [
+        {"item_id": "item:c1:key", "slug": "iron-key", "display_name": "Iron Key"},
+    ]}
+    things = room_things({}, actor)
+    all_ids = [t.noun_id for s in things.sections for t in s.things]
+    assert "item:c1:key" not in all_ids
+    assert things.sections == []  # only carried inventory present → nothing in the room
+
+
+# --------------------------------------------------------------------------
+# Phase 50.6 Slice 10 — is_speakable (dialogue-target gate; talk/sway-family)
+# --------------------------------------------------------------------------
+
+_SPEAK_ROOM = {
+    "room_id": "room:level-01:hall",
+    "npcs": [
+        {"actor_id": "actor:c1:warden", "display_name": "The Warden",
+         "disposition": "willing"},
+        {"actor_id": "actor:c1:clerk", "display_name": "Sour Clerk",
+         "disposition": "wary"},
+    ],
+    "monsters": [
+        {"actor_id": "actor:c1:scorps", "display_name": "Scorpions",
+         "disposition": "hostile"},
+        {"actor_id": "actor:c1:imp", "display_name": "Bound Imp",
+         "disposition": "willing"},
+    ],
+}
+
+
+def _speak_noun(noun_id, source):
+    return NounOption(noun_id=noun_id, label="N", target_type="npc", source=source)
+
+
+def test_is_speakable_true_for_willing_npc():
+    noun = _speak_noun("actor:c1:warden", "npc")
+    assert is_speakable(noun, _SPEAK_ROOM) is True
+
+
+def test_is_speakable_true_for_willing_monster():
+    # A willing monster (e.g. a bound imp) can be spoken to as well.
+    noun = _speak_noun("actor:c1:imp", "monster")
+    assert is_speakable(noun, _SPEAK_ROOM) is True
+
+
+def test_is_speakable_false_for_hostile_monster():
+    noun = _speak_noun("actor:c1:scorps", "monster")
+    assert is_speakable(noun, _SPEAK_ROOM) is False
+
+
+def test_is_speakable_false_for_non_willing_npc():
+    # Not all creatures will talk — a wary disposition does not open dialogue.
+    noun = _speak_noun("actor:c1:clerk", "npc")
+    assert is_speakable(noun, _SPEAK_ROOM) is False
+
+
+def test_is_speakable_false_for_non_creature_noun():
+    # Objects, exits, items, self, room are never speakable.
+    for source in ("object", "loose_item", "exit", "locked_exit", "self", "room", "party"):
+        assert is_speakable(_speak_noun("x", source), _SPEAK_ROOM) is False
+
+
+def test_is_speakable_false_when_creature_absent_from_context():
+    noun = _speak_noun("actor:c1:ghost", "npc")
+    assert is_speakable(noun, _SPEAK_ROOM) is False

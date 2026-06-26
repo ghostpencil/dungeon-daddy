@@ -579,3 +579,202 @@ def test_clear_messages_clears_action_cards(panel):
     panel.clear_messages()
     assert panel._action_cards == {}
     assert panel._active_card_index is None
+
+
+# ---------------------------------------------------------------------------
+# Dialogue-mode swap (Slice 10) — builder <-> free-text SAY/ASK box
+# ---------------------------------------------------------------------------
+
+def _play_panel() -> ChatPanel:
+    p = ChatPanel(on_send=MagicMock(), mode="play")
+    p._action_builder = MagicMock()
+    p._input = MagicMock()
+    p._send_btn = MagicMock()
+    return p
+
+
+def test_play_default_shows_builder_hides_free_text():
+    p = _play_panel()
+    assert p._builder_visible() is True
+    assert p._free_text_visible() is False
+
+
+def test_enter_dialogue_swaps_to_say_box():
+    p = _play_panel()
+    p.set_dialogue_mode(True)
+    assert p._builder_visible() is False
+    assert p._free_text_visible() is True
+    assert p._input.visible is True
+    assert p._send_btn.visible is True
+
+
+def test_leave_dialogue_swaps_back_to_builder():
+    p = _play_panel()
+    p.set_dialogue_mode(True)
+    p.set_dialogue_mode(False)
+    assert p._builder_visible() is True
+    assert p._free_text_visible() is False
+    assert p._input.visible is False
+
+
+def test_builder_extra_h_zero_in_dialogue_mode():
+    p = _play_panel()
+    p.set_dialogue_mode(True)
+    assert p._builder_extra_h == 0.0
+
+
+def test_builder_extra_h_uses_builder_content_height():
+    # Slice 11: the band sizes to the builder's measured content height (which
+    # tracks the wrapped sentence) at the panel width, not a fixed constant.
+    from dungeon_daddy.ui.panels.chat_panel import _BUILDER_BAND_GAP
+
+    p = _play_panel()
+    p._w = 440.0
+    p._action_builder.content_height.return_value = 150.0
+    assert p._builder_extra_h == 150.0 + _BUILDER_BAND_GAP
+    p._action_builder.content_height.assert_called_once_with(440.0)
+
+
+def test_builder_mode_reclaims_hidden_input_row(monkeypatch):
+    # Slice 11 follow-up: with the free-text input hidden (builder mode), the
+    # mini-card stacks directly on the builder band and the input row's reserved
+    # height is reclaimed — the message area is NOT shrunk by a phantom input row.
+    from dungeon_daddy.ui.panels.chat_panel import (
+        _BUILDER_BAND_GAP,
+        _CHAR_CARD_Y_BOT,
+        _PLAY_INPUT_AREA_H,
+    )
+
+    p = _play_panel()
+    p._w = 440.0
+    p._action_builder.content_height.return_value = 150.0
+    band = 150.0 + _BUILDER_BAND_GAP
+    # Card no longer sits a full input-row above the band bottom.
+    assert p._card_bot_off < _CHAR_CARD_Y_BOT + band
+    # The reserved bottom area excludes the hidden free-text input row.
+    assert p._input_area_h < _PLAY_INPUT_AREA_H + band
+
+
+def test_builder_auto_collapses_on_short_window():
+    from dungeon_daddy.ui.panels.chat_panel import _BUILDER_AUTOCOLLAPSE_H
+
+    p = _play_panel()
+    p._w = 440.0
+    p._h = _BUILDER_AUTOCOLLAPSE_H - 1  # below threshold → collapse
+    p._apply_builder_auto_collapse()
+    p._action_builder.apply_auto_collapse.assert_called_once_with(True)
+
+
+def test_builder_expanded_on_tall_window():
+    from dungeon_daddy.ui.panels.chat_panel import _BUILDER_AUTOCOLLAPSE_H
+
+    p = _play_panel()
+    p._w = 440.0
+    p._h = _BUILDER_AUTOCOLLAPSE_H + 100  # above threshold → expand
+    p._apply_builder_auto_collapse()
+    p._action_builder.apply_auto_collapse.assert_called_once_with(False)
+
+
+def test_hiding_free_text_detaches_from_manager():
+    # Builder mode hides the SAY box; its widgets must leave the UIManager so an
+    # invisible UIInputText does not intercept clicks at the bottom of the column.
+    p = _play_panel()
+    p._manager = MagicMock()
+    p._free_text_in_manager = True
+    p._apply_input_visibility()  # play + builder → free text hidden
+    p._manager.remove.assert_any_call(p._input)
+    p._manager.remove.assert_any_call(p._send_btn)
+    assert p._free_text_in_manager is False
+
+
+def test_entering_dialogue_reattaches_free_text_to_manager():
+    p = _play_panel()
+    p._manager = MagicMock()
+    p._free_text_in_manager = False  # detached while in builder mode
+    p.set_dialogue_mode(True)        # → SAY box shown
+    p._manager.add.assert_any_call(p._input)
+    p._manager.add.assert_any_call(p._send_btn)
+    assert p._free_text_in_manager is True
+
+
+def test_apply_input_visibility_idempotent_when_already_detached():
+    p = _play_panel()
+    p._manager = MagicMock()
+    p._free_text_in_manager = False  # already detached
+    p._apply_input_visibility()      # still hidden → no double remove
+    p._manager.remove.assert_not_called()
+
+
+def test_dialogue_mode_keeps_input_row_reserved():
+    # In dialogue mode the free-text SAY box IS the bottom surface, so the input
+    # row's reserved height stays (no builder band).
+    from dungeon_daddy.ui.panels.chat_panel import _PLAY_INPUT_AREA_H
+
+    p = _play_panel()
+    p.set_dialogue_mode(True)
+    assert p._input_area_h == _PLAY_INPUT_AREA_H
+
+
+def test_collapse_then_expand_routes_through_chat_panel():
+    # Regression for "can collapse but clicking Show does nothing": route real
+    # clicks through ChatPanel.on_mouse_press with a REAL builder, collapsing
+    # then expanding via the laid-out toggle rect on a tall (non-auto) window.
+    from dungeon_daddy.ui.panels.action_builder import InChatActionBuilder
+    from dungeon_daddy.ui.panels.chat_panel import _BUILDER_BOTTOM_PAD
+    from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
+
+    panel = VnaActionPanel()
+    panel.set_context(
+        actor_abilities=[],
+        room_context={
+            "room_id": "r1", "objects": [], "loose_items": [],
+            "npcs": [], "monsters": [{"actor_id": "m1", "display_name": "Gnoll"}],
+            "exits": [],
+        },
+        actor={"actor_id": "a1", "display_name": "Kira", "carried_items": []},
+        playbook_slug="fighter",
+        world_flags=[],
+    )
+    builder = InChatActionBuilder(panel)
+
+    chat = ChatPanel(on_send=MagicMock(), mode="play")
+    chat._action_builder = builder
+    chat._input = MagicMock()
+    chat._send_btn = MagicMock()
+    chat._x, chat._y, chat._w, chat._h = 0.0, 0.0, 440.0, 951.0  # tall → no auto
+
+    patches = (
+        patch("dungeon_daddy.ui.theme.draw_rounded_rect"),
+        patch("arcade.draw_rect_filled"),
+        patch("arcade.draw_line"),
+        patch("arcade.draw_text"),
+    )
+
+    def _layout_and_click():
+        # Mirror what ChatPanel.draw does to position the band.
+        chat._apply_builder_auto_collapse()
+        band_h = builder.content_height(chat._w)
+        with patches[0], patches[1], patches[2], patches[3]:
+            builder.draw(chat._x, chat._y + _BUILDER_BOTTOM_PAD, chat._w, band_h)
+        tx, ty, tw, th = builder._toggle_rect
+        chat.on_mouse_press(tx + tw / 2, ty + th / 2)
+
+    _layout_and_click()
+    assert builder.is_collapsed() is True
+    _layout_and_click()
+    assert builder.is_collapsed() is False  # Show must re-expand
+
+
+def test_builder_does_not_consume_clicks_in_dialogue_mode():
+    p = _play_panel()
+    p._action_builder.on_mouse_press.return_value = True
+    p.set_dialogue_mode(True)
+    p.on_mouse_press(10.0, 10.0)
+    p._action_builder.on_mouse_press.assert_not_called()
+
+
+def test_design_mode_free_text_always_visible():
+    p = ChatPanel(on_send=MagicMock(), mode="design")
+    assert p._free_text_visible() is True
+    p.set_dialogue_mode(True)  # no-op for design
+    assert p._free_text_visible() is True

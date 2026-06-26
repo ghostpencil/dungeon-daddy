@@ -254,10 +254,13 @@ def main() -> None:
         for ex in exits:
             repo.save_room_exit(ex)
         # NPC — a still-sane caretaker construct sheltering in the Cargo Bay.
+        # Disposition "willing" → speakable, so a sway/talk action opens the
+        # SAY box (Phase 50.6 §6 dialogue gate).
         repo.save_actor(
             _aid("R3", "pinion-caretaker"), CAMPAIGN_ID, "npc", "pinion-caretaker",
             "Pinion, the Caretaker Cog", status="active",
             tags=["construct", "friendly", "lore"], room_id="R3",
+            disposition="willing",
         )
         # Monsters — new room-specific threats.
         repo.save_actor(

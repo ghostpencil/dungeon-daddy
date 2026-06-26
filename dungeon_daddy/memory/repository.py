@@ -147,13 +147,14 @@ class MemoryRepository:
         playbook_slug: str | None = None,
         tags: list[str] | None = None,
         room_id: str | None = None,
+        disposition: str = "neutral",
     ) -> None:
         import json as _json
         assert self._conn is not None
         self._conn.execute(
             """
-            INSERT INTO actors (actor_id, campaign_id, actor_type, slug, display_name, status, playbook_slug, tags, room_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO actors (actor_id, campaign_id, actor_type, slug, display_name, status, playbook_slug, tags, room_id, disposition)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (actor_id) DO UPDATE SET
                 actor_type    = excluded.actor_type,
                 slug          = excluded.slug,
@@ -161,10 +162,11 @@ class MemoryRepository:
                 status        = excluded.status,
                 playbook_slug = excluded.playbook_slug,
                 tags          = excluded.tags,
-                room_id       = excluded.room_id
+                room_id       = excluded.room_id,
+                disposition   = excluded.disposition
             """,
             [actor_id, campaign_id, actor_type, slug, display_name, status, playbook_slug,
-             _json.dumps(tags or []), room_id],
+             _json.dumps(tags or []), room_id, disposition],
         )
 
     def get_actor(self, actor_id: str) -> dict | None:
@@ -172,7 +174,7 @@ class MemoryRepository:
         assert self._conn is not None
         row = self._conn.execute(
             """
-            SELECT actor_id, campaign_id, actor_type, slug, display_name, status, playbook_slug, tags, room_id
+            SELECT actor_id, campaign_id, actor_type, slug, display_name, status, playbook_slug, tags, room_id, disposition
             FROM actors WHERE actor_id = ?
             """,
             [actor_id],
@@ -189,6 +191,7 @@ class MemoryRepository:
             "playbook_slug": row[6],
             "tags": _json.loads(row[7]) if row[7] else [],
             "room_id": row[8],
+            "disposition": row[9],
         }
 
     def get_actors_by_campaign(self, campaign_id: str) -> list[dict]:
@@ -221,7 +224,7 @@ class MemoryRepository:
         assert self._conn is not None
         sql = (
             "SELECT actor_id, campaign_id, actor_type, slug, display_name, status, "
-            "playbook_slug, room_id "
+            "playbook_slug, room_id, disposition "
             "FROM actors WHERE campaign_id = ? AND room_id = ?"
         )
         params: list = [campaign_id, room_id]
@@ -240,6 +243,7 @@ class MemoryRepository:
                 "status": row[5],
                 "playbook_slug": row[6],
                 "room_id": row[7],
+                "disposition": row[8],
             }
             for row in rows
         ]

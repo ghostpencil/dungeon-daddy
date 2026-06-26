@@ -101,6 +101,24 @@ class TestActorState:
         )
         assert b.room_id == "room:level-01:antechamber"
 
+    def test_disposition_defaults_to_neutral_and_accepts_willing(self) -> None:
+        a = ActorState(
+            actor_id="x", campaign_id="c", actor_type="npc", slug="s", display_name="D"
+        )
+        assert a.disposition == "neutral"
+        b = ActorState(
+            actor_id="y", campaign_id="c", actor_type="npc", slug="s2",
+            display_name="D2", disposition="willing",
+        )
+        assert b.disposition == "willing"
+
+    def test_invalid_disposition_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            ActorState(
+                actor_id="x", campaign_id="c", actor_type="npc", slug="s",
+                display_name="D", disposition="ecstatic",
+            )
+
     def test_all_actor_types_accepted(self) -> None:
         for t in ("pc", "npc", "monster", "dungeon"):
             a = ActorState(

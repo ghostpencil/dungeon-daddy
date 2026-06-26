@@ -7,7 +7,6 @@ from unittest.mock import MagicMock
 from dungeon_daddy.data.models import SessionState
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.models import ActorState, RoomExit
-from dungeon_daddy.ui.panels.exit_list_panel import ExitListPanel
 from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
 
 MIGRATIONS_DIR = (
@@ -56,7 +55,7 @@ def _make_view(tmp_path: Path, actor: ActorState | None = None):
     )
     view._dungeon = None
     view._rpg_vna = VnaActionPanel()
-    view._exit_panel = ExitListPanel()
+    view._rpg_vna.set_submit_callback(view._on_vna_submit)
     view._rpg_action = MagicMock(_actors=[actor])
     view._action_state = PlayerActionState()
     view._action_state.set_actor_roster([actor.actor_id])
@@ -86,6 +85,139 @@ def test_refresh_vna_panel_surfaces_exit_as_noun(tmp_path):
 
     noun_ids = {n.noun_id for n in view._rpg_vna._nouns}
     assert "e1" in noun_ids
+
+
+def test_refresh_vna_panel_feeds_things_here_overlay(tmp_path):
+    """Phase 50.6 Slice 7: the same refresh feeds the map overlay, tracking the
+    current room — so the overlay updates on load and on every move."""
+    from dungeon_daddy.rpg.action_options import RoomThings, SECTION_EXITS
+    view = _make_view(tmp_path)
+    view._map = MagicMock()
+    _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="open")
+
+    view._refresh_vna_panel()
+
+    view._map.set_things_here.assert_called_once()
+    things = view._map.set_things_here.call_args.args[0]
+    assert isinstance(things, RoomThings)
+    assert things.room_id == "r1"
+    titles = {s.title for s in things.sections}
+    assert SECTION_EXITS in titles
+    exit_ids = {t.noun_id for s in things.sections for t in s.things}
+    assert "e1" in exit_ids
+
+
+# ---------------------------------------------------------------------------
+# Phase 50.6 Slice 8 — overlay noun click feeds the builder
+# ---------------------------------------------------------------------------
+
+def test_overlay_noun_click_selects_noun_on_builder(tmp_path):
+    # Locked exit → select path (open exits auto-move).
+    view = _make_view(tmp_path)
+    view._map = MagicMock()
+    _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="locked")
+    view._refresh_vna_panel()
+
+    view._on_overlay_noun_click("e1")
+
+    assert view._rpg_vna._noun_id == "e1"
+
+
+def test_overlay_noun_click_refreshes_overlay(tmp_path):
+    # A locked exit takes the select path (open exits auto-move instead).
+    view = _make_view(tmp_path)
+    view._map = MagicMock()
+    _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="locked")
+    view._refresh_vna_panel()
+    view._map.set_things_here.reset_mock()
+
+    view._on_overlay_noun_click("e1")
+
+    view._map.set_things_here.assert_called_once()
+
+
+def test_overlay_click_on_open_exit_auto_moves(tmp_path):
+    """Clicking an open exit in the overlay moves the party through it directly —
+    no verb pick needed (user request)."""
+    view = _make_view(tmp_path)
+    _save_exit(view._mem_repo, exit_id="e1", from_room_id="r1", to_room_id="r2", status="open")
+    view._map = MagicMock()
+    view._rpg_scene = MagicMock()
+    view._spawn_dm_thread = MagicMock()
+    view._compact_history = MagicMock()
+    view._save_session = MagicMock()
+    view._dm_history = []
+    view._refresh_vna_panel()
+
+    view._on_overlay_noun_click("e1")
+
+    assert view._state.current_room_id == "r2"
+
+
+def test_overlay_click_on_locked_exit_selects_not_moves(tmp_path):
+    """A locked exit can't be walked through — click selects it so the player can
+    use a key via the builder, rather than auto-moving."""
+    view = _make_view(tmp_path)
+    _save_exit(view._mem_repo, exit_id="e1", from_room_id="r1", to_room_id="r2", status="locked")
+    view._map = MagicMock()
+    view._refresh_vna_panel()
+
+    view._on_overlay_noun_click("e1")
+
+    assert view._state.current_room_id == "r1"   # did not move
+    assert view._rpg_vna._noun_id == "e1"        # selected instead
+
+
+def test_click_feeds_selected_noun_to_overlay(tmp_path):
+    # Use a locked exit so the click takes the select path (open exits auto-move).
+    view = _make_view(tmp_path)
+    view._map = MagicMock()
+    _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="locked")
+    view._refresh_vna_panel()
+    view._map.set_things_here.reset_mock()
+
+    view._on_overlay_noun_click("e1")
+
+    kwargs = view._map.set_things_here.call_args.kwargs
+    assert kwargs["selected_noun_id"] == "e1"
+
+
+def test_overlay_click_on_loose_item_auto_picks_up(tmp_path):
+    """Clicking a loose floor item picks it up with the acting character."""
+    from dungeon_daddy.rpg.models import Item
+
+    view = _make_view(tmp_path)
+    view._map = MagicMock()
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_item(Item(
+        item_id="itm-1", campaign_id="camp-1", slug="gold-coin",
+        display_name="Gold Coin", item_type="dungeon_item",
+        description="A coin.", room_id="r1", status="active",
+    ))
+    view._refresh_vna_panel()
+
+    view._on_overlay_noun_click("itm-1")
+
+    picked = next(i for i in view._mem_repo.get_items("camp-1") if i["item_id"] == "itm-1")
+    assert picked["owner_actor_id"] == "pc-1"
+    assert picked["room_id"] is None
+
+
+def test_set_rpg_context_populates_action_builder_on_load(tmp_path):
+    # On load the in-chat builder must be ready without first opening the
+    # right-panel ACTION tab: set_rpg_context is the chokepoint where mem_repo,
+    # actors, and the current room are all finally available, so it refreshes
+    # the VNA panel. (_load_player_actors is exercised by its own tests; stub it
+    # here to isolate the on-load refresh.)
+    view = _make_view(tmp_path)
+    _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="open")
+    view._load_player_actors = lambda: None
+    assert view._rpg_vna._verbs == []  # empty before context attaches
+
+    view.set_rpg_context(view._mem_repo, "camp-1")
+
+    assert view._rpg_vna._verbs  # builder now has its verb options
+    assert "e1" in {n.noun_id for n in view._rpg_vna._nouns}
 
 
 # ---------------------------------------------------------------------------
@@ -779,6 +911,59 @@ def test_use_non_matching_item_on_exit_does_not_clear_requires_item_slug(tmp_pat
 
     row = view._mem_repo.get_exit_by_id("e1")
     assert row["requires_item_slug"] == "lift-warden-key"
+
+
+# ---------------------------------------------------------------------------
+# Slice 10 — sway/talk on a speakable target opens the SAY box (Phase 51 stub)
+# ---------------------------------------------------------------------------
+
+def test_sway_on_willing_npc_opens_dialogue_not_roll(tmp_path):
+    from dungeon_daddy.rpg.action_options import ActionCard, NounOption, SOURCE_NPC
+
+    view = _make_view(tmp_path)
+    view._resolve_vna_roll = MagicMock()
+    view._rpg_vna._nouns = [
+        NounOption(noun_id="npc-1", label="Warden", target_type="npc", source=SOURCE_NPC),
+    ]
+    view._last_room_context = {
+        "npcs": [{"actor_id": "npc-1", "display_name": "Warden", "disposition": "willing"}]
+    }
+
+    view._on_vna_submit(ActionCard(verb="sway", noun_id="npc-1", adverb="cautiously"))
+
+    view._chat.set_dialogue_mode.assert_called_once_with(True)
+    view._resolve_vna_roll.assert_not_called()
+
+
+def test_sway_on_hostile_creature_rolls_not_dialogue(tmp_path):
+    # Not all creatures will talk — a hostile target stays a contested roll.
+    from dungeon_daddy.rpg.action_options import ActionCard, NounOption, SOURCE_MONSTER
+
+    view = _make_view(tmp_path)
+    view._resolve_vna_roll = MagicMock()
+    view._rpg_vna._nouns = [
+        NounOption(noun_id="mon-1", label="Gnoll", target_type="monster", source=SOURCE_MONSTER),
+    ]
+    view._last_room_context = {
+        "monsters": [{"actor_id": "mon-1", "display_name": "Gnoll", "disposition": "hostile"}]
+    }
+
+    view._on_vna_submit(ActionCard(verb="sway", noun_id="mon-1", adverb="cautiously"))
+
+    view._resolve_vna_roll.assert_called_once()
+    view._chat.set_dialogue_mode.assert_not_called()
+
+
+def test_dialogue_send_exits_dialogue_stub(tmp_path):
+    # While the SAY box is up, sending a line ends the (stubbed) conversation and
+    # swaps back to the builder. Real dialogue routing is Phase 51.
+    view = _make_view(tmp_path)
+    view._dialogue_stub_active = True
+
+    view._on_chat_send("hello warden")
+
+    assert view._dialogue_stub_active is False
+    view._chat.set_dialogue_mode.assert_called_once_with(False)
 
 
 def test_build_context_bundle_includes_current_room_objects(tmp_path):

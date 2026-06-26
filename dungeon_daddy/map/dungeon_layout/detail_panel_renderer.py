@@ -4,15 +4,32 @@ import textwrap
 from dataclasses import dataclass
 
 from dungeon_daddy.map.dungeon_layout.room_detail_panel import RoomDetailPanelData
+from dungeon_daddy.rpg.action_options import RoomThings
 
 _MAX_NOTE_LEN = 200
 _MAX_LINE_CHARS = 38
+
+# Per-row selection markers for the "Things Here" overlay (Slice 8). The marker
+# is part of the row text so it stays aligned with the label; the pointer ▸ marks
+# the selected noun, a quiet · marks the rest. Both live in already-rendered
+# Unicode blocks (Geometric Shapes / Latin-1), so no PNG assets are needed.
+_SEL_MARKER = "▸"
+_UNSEL_MARKER = "·"
 
 
 @dataclass
 class PanelLine:
     text: str
-    kind: str  # "header", "section", "value", "empty"
+    kind: str  # "header", "section", "value", "empty", "thing"
+    # "thing" rows (Things Here overlay) carry a trailing status chip:
+    status: str | None = None
+    status_color: str | None = None  # "teal" | "ember" | "gold" | "default"
+    # "thing" rows also carry the noun id they feed into the builder, a selection
+    # flag, and a leading marker glyph the renderer draws (larger for the selected
+    # row) as the per-row selected/deselected icon (Slice 8).
+    noun_id: str | None = None
+    selected: bool = False
+    marker: str | None = None
 
 
 def format_detail_panel(
@@ -59,5 +76,44 @@ def format_detail_panel(
             notes = notes[:max_note_len].rstrip() + "…"
         for wrapped in textwrap.wrap(notes, width=max_line_chars) or [notes]:
             lines.append(PanelLine(wrapped, "value"))
+
+    return lines
+
+
+def format_things_here(
+    things: RoomThings,
+    selected_noun_id: str | None = None,
+) -> list[PanelLine]:
+    """Render the play-mode "Things Here" overlay content (Phase 50.6 §5.1, §5.3).
+
+    Pure: turns the :class:`RoomThings` view-model into drawable panel lines — a
+    header that folds the room id in to save a row (``"R4: THINGS HERE"``), then
+    each section title followed by its clickable rows. Each ``"thing"`` row carries
+    its ``status``/``status_color`` (for the trailing status chip) plus its
+    ``noun_id``, a ``selected`` flag (the row matching ``selected_noun_id``), and a
+    leading marker glyph the renderer draws as the selected/deselected icon.
+    Replaces the technical graph-metadata readout (``format_detail_panel``) when
+    the map is in play mode.
+    """
+    header = f"{things.room_id}: THINGS HERE" if things.room_id else "THINGS HERE"
+    lines: list[PanelLine] = [PanelLine(header, "header")]
+
+    if not things.sections:
+        lines.append(PanelLine("Nothing of note here.", "value"))
+        return lines
+
+    for section in things.sections:
+        lines.append(PanelLine(section.title, "section"))
+        for thing in section.things:
+            is_selected = thing.noun_id == selected_noun_id
+            lines.append(PanelLine(
+                f"{thing.glyph} {thing.label}",
+                "thing",
+                status=thing.status,
+                status_color=thing.status_color,
+                noun_id=thing.noun_id,
+                selected=is_selected,
+                marker=_SEL_MARKER if is_selected else _UNSEL_MARKER,
+            ))
 
     return lines

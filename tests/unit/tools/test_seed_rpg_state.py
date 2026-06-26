@@ -293,6 +293,29 @@ class TestSeedCampaignWithPack:
         result = seed_campaign_with_pack(campaign_dir, pack_path, dry_run=True)
         assert isinstance(result, SeedResult)
 
+    def test_force_reseed_preserves_playbook_and_room(self, tmp_path: Path) -> None:
+        # The seed pack does not own playbook_slug or room_id (assigned by the
+        # publish pipeline / movement). A --force reseed must not null them.
+        campaign_dir = _make_campaign_dir(tmp_path)
+        pack_path = _write_pack(tmp_path)
+        seed_campaign_with_pack(campaign_dir, pack_path)
+
+        repo = _open_repo(campaign_dir)
+        mara = next(a for a in repo.get_actors_by_campaign("campaign:test-campaign")
+                    if a["slug"] == "mara")
+        repo.save_actor(mara["actor_id"], "campaign:test-campaign", "pc", "mara", "Mara",
+                        playbook_slug="fighter", room_id="r1")
+        repo.close()
+
+        seed_campaign_with_pack(campaign_dir, pack_path, force=True)
+
+        repo = _open_repo(campaign_dir)
+        mara = next(a for a in repo.get_actors_by_campaign("campaign:test-campaign")
+                    if a["slug"] == "mara")
+        repo.close()
+        assert mara["playbook_slug"] == "fighter"
+        assert mara["room_id"] == "r1"
+
     def test_force_reseed_persists_clock_metadata(self, tmp_path: Path) -> None:
         pack_data = {
             **_PACK_DATA,

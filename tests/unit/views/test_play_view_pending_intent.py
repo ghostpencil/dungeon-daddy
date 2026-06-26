@@ -475,6 +475,21 @@ class TestActorSwitcher:
         view._on_actor_switch("next")
         view._chat.set_actor_mini_card.assert_called()
 
+    def test_on_actor_switch_refreshes_action_builder(self):
+        """Switching the acting actor re-populates the in-chat Action Builder."""
+        view = _make_multi_actor_view()
+        view._refresh_vna_panel = MagicMock()
+        view._on_actor_switch("next")
+        view._refresh_vna_panel.assert_called_once()
+
+    def test_on_actor_switch_awaiting_confirmation_skips_builder_refresh(self):
+        """A no-op switch (awaiting confirmation) must not refresh the builder."""
+        view = _make_multi_actor_view()
+        view._action_state.set_awaiting_confirmation(True)
+        view._refresh_vna_panel = MagicMock()
+        view._on_actor_switch("next")
+        view._refresh_vna_panel.assert_not_called()
+
     def test_on_actor_switch_disabled_when_awaiting_confirmation(self):
         """_on_actor_switch is a no-op when awaiting_confirmation=True."""
         view = _make_multi_actor_view()

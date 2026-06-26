@@ -4,6 +4,9 @@ No arcade display needed — setup() is never called.
 """
 from __future__ import annotations
 
+import types
+from unittest.mock import MagicMock, patch
+
 import arcade
 
 from dungeon_daddy.data.models import Connection, Level, Room, SessionState
@@ -400,3 +403,164 @@ def test_load_resets_view_state() -> None:
     p.load(_level(["a"]), _state())
     assert p._view_state.selected_room_id is None
     assert p._view_state.hovered_room_id is None
+
+
+# ---------------------------------------------------------------------------
+# Phase 50.6 Slice 7 — "Things Here" overlay forwarding
+# ---------------------------------------------------------------------------
+
+def _draw_with_mock_renderer(p: MapPanel):
+    """Run MapPanel.draw() with the renderer + GPU bits stubbed; return the mock."""
+    p._layout_renderer = MagicMock()
+    p._stepper = MagicMock()
+    p._art = types.SimpleNamespace(background=None)
+    p._active_variant = "Grid"  # skip the Map-background texture branch
+    p._x, p._y, p._w, p._h = 0.0, 0.0, 900.0, 700.0
+    p._draw_level_overlay = lambda *a, **k: None  # type: ignore[method-assign]
+    with patch("dungeon_daddy.ui.panels.map_panel.arcade"), \
+            patch("dungeon_daddy.ui.panels.map_panel.draw_kicker"), \
+            patch("dungeon_daddy.ui.panels.map_panel.draw_chip"):
+        p.draw()
+    return p._layout_renderer.draw
+
+
+def test_draw_forwards_things_here_in_play_mode() -> None:
+    from dungeon_daddy.rpg.action_options import RoomThing, RoomThings, ThingsSection
+    p = _panel()
+    p.load(_level(["a", "b"], [_conn("a", "b")]), _state())
+    things = RoomThings(
+        room_id="a",
+        sections=[ThingsSection("EXITS", [RoomThing("b", "Hall", "→", "open", "teal")])],
+    )
+    p.set_things_here(things)
+
+    draw = _draw_with_mock_renderer(p)
+    _, kwargs = draw.call_args
+    assert kwargs["mode"] == "play"
+    assert kwargs["room_things"] is things
+
+
+def test_draw_stays_graph_mode_without_things_here() -> None:
+    p = _panel()
+    p.load(_level(["a", "b"], [_conn("a", "b")]), _state())
+
+    draw = _draw_with_mock_renderer(p)
+    _, kwargs = draw.call_args
+    assert kwargs["mode"] == "graph"
+    assert kwargs["room_things"] is None
+
+
+# ---------------------------------------------------------------------------
+# Phase 50.6 Slice 8 — overlay noun-row click feeds the action builder
+# ---------------------------------------------------------------------------
+
+def _play_panel_with_noun_rect(
+    on_noun_click=None, on_room_select=None, rect=None,
+):
+    from dungeon_daddy.map.dungeon_layout.panel_placement import ScreenRect
+    from dungeon_daddy.rpg.action_options import RoomThing, RoomThings, ThingsSection
+    p = MapPanel(
+        on_level_change=lambda _: None,
+        on_noun_click=on_noun_click,  # type: ignore[arg-type]
+        on_room_select=on_room_select,  # type: ignore[arg-type]
+    )
+    p._x, p._y, p._w, p._h = 0.0, 0.0, 900.0, 700.0
+    p._active_variant = "Map"
+    p._active_tool = "select"
+    p._pan_offset_x = p._pan_offset_y = 0.0
+    p._zoom_level = 1.0
+    p._things_here = RoomThings(
+        room_id="a",
+        sections=[ThingsSection("EXITS", [RoomThing("e1", "Hall", "→", "open", "teal")])],
+    )
+    p._layout_renderer._thing_rects = {
+        "e1": rect or ScreenRect(x=100.0, y=100.0, w=200.0, h=20.0)
+    }
+    return p
+
+
+def test_overlay_noun_click_fires_on_noun_click() -> None:
+    fired: list[str] = []
+    p = _play_panel_with_noun_rect(on_noun_click=lambda nid: fired.append(nid))
+    consumed = p.handle_mouse_press(150.0, 110.0, arcade.MOUSE_BUTTON_LEFT)
+    assert fired == ["e1"]
+    assert consumed is True
+
+
+def test_overlay_noun_click_outside_rows_does_not_fire() -> None:
+    fired: list[str] = []
+    p = _play_panel_with_noun_rect(on_noun_click=lambda nid: fired.append(nid))
+    p.handle_mouse_press(400.0, 400.0, arcade.MOUSE_BUTTON_LEFT)
+    assert fired == []
+
+
+def test_overlay_noun_click_takes_priority_over_room_select() -> None:
+    from dungeon_daddy.map.dungeon_layout.panel_placement import ScreenRect
+    from dungeon_daddy.map.dungeon_layout.models import LayoutBounds, RoomRect
+    from dungeon_daddy.map.dungeon_layout.debug_overlay import DebugOverlay
+    nouns: list[str] = []
+    rooms: list[str] = []
+    # The noun row overlaps the room rect at screen (PAD_MD..PAD_MD+120, ...).
+    p = _play_panel_with_noun_rect(
+        on_noun_click=lambda nid: nouns.append(nid),
+        on_room_select=lambda rid: rooms.append(rid),
+        rect=ScreenRect(x=PAD_MD, y=PAD_MD, w=120.0, h=80.0),
+    )
+    room = RoomRect(room_id="a", x=0.0, y=0.0, w=120.0, h=80.0)
+    bounds = LayoutBounds(min_x=0.0, min_y=0.0, max_x=200.0, max_y=200.0)
+    p._layout_result = LayoutResult(
+        rooms={"a": room}, edges=[], labels=[], bounds=bounds,
+        debug_overlay=DebugOverlay(enabled=False, bounds=bounds),
+    )
+    p.handle_mouse_press(PAD_MD + 60.0, PAD_MD + 40.0, arcade.MOUSE_BUTTON_LEFT)
+    assert nouns == ["e1"]
+    assert rooms == []
+
+
+# ---------------------------------------------------------------------------
+# Phase 50.6 — loop strip chips gated to test-drive / design (not normal play)
+# ---------------------------------------------------------------------------
+
+def _level_with_loop() -> Level:
+    from dungeon_daddy.data.models import Loop
+    lvl = _level(["a", "b"], [_conn("a", "b")])
+    lvl.loops = [Loop(id="lp1", pattern="lock_key", note="", entry="a", goal="b",
+                      path_a=["a"], path_b=["b"])]
+    return lvl
+
+
+def test_loop_strip_shown_by_default() -> None:
+    p = _panel_sized()
+    p.load(_level_with_loop(), _state())
+    assert "lp1" in p._loop_strip_rects
+
+
+def test_loop_strip_hidden_when_loops_invisible() -> None:
+    p = _panel_sized()
+    p.set_loops_visible(False)
+    p.load(_level_with_loop(), _state())
+    assert p._loop_strip_rects == {}
+
+
+def test_set_loops_visible_rebuilds_on_loaded_level() -> None:
+    p = _panel_sized()
+    p.load(_level_with_loop(), _state())
+    p.set_loops_visible(False)
+    assert p._loop_strip_rects == {}
+    p.set_loops_visible(True)
+    assert "lp1" in p._loop_strip_rects
+
+
+def test_draw_forwards_selection() -> None:
+    from dungeon_daddy.rpg.action_options import RoomThing, RoomThings, ThingsSection
+    p = _panel()
+    p.load(_level(["a", "b"], [_conn("a", "b")]), _state())
+    things = RoomThings(
+        room_id="a",
+        sections=[ThingsSection("EXITS", [RoomThing("b", "Hall", "→", "open", "teal")])],
+    )
+    p.set_things_here(things, selected_noun_id="b")
+
+    draw = _draw_with_mock_renderer(p)
+    _, kwargs = draw.call_args
+    assert kwargs["selected_noun_id"] == "b"

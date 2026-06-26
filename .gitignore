@@ -45,6 +45,7 @@ presentation/*.pptx
 
 # Local databases
 *.duckdb
+*.db
 
 # Logs
 *.log

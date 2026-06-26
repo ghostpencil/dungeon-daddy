@@ -167,9 +167,51 @@ class TestContextBundleCurrentRoomBuilder:
                 "slug": "warden",
                 "display_name": "The Warden",
                 "status": "active",
+                "disposition": "neutral",
             }
         ]
         assert bundle.current_room["monsters"] == []
+
+    def test_npc_disposition_surfaces_in_room_context(
+        self, repo: MemoryRepository
+    ) -> None:
+        # A willing NPC carries its disposition into the room context so the
+        # dialogue gate (is_speakable) can open the SAY box (Phase 50.6 §6).
+        repo.save_actor(
+            "actor:c1:pinion", "camp_001", "npc", "pinion", "Pinion", "active",
+            room_id="room:level-01:antechamber", disposition="willing",
+        )
+        bundle = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=[],
+            token_budget=500,
+            current_room_id="room:level-01:antechamber",
+        ).build(repo)
+        assert bundle.current_room["npcs"][0]["disposition"] == "willing"
+
+    def test_willing_npc_is_speakable_end_to_end(
+        self, repo: MemoryRepository
+    ) -> None:
+        # Full data path: a willing NPC saved in the repo flows through
+        # build_room_noun_context → available_nouns → is_speakable, so the
+        # builder's dialogue gate opens for it (Phase 50.6 §6).
+        from dungeon_daddy.memory.context_bundle import build_room_noun_context
+        from dungeon_daddy.rpg.action_options import available_nouns, is_speakable
+
+        room_id = "room:level-01:antechamber"
+        repo.save_actor(
+            "actor:c1:pinion", "camp_001", "npc", "pinion", "Pinion", "active",
+            room_id=room_id, disposition="willing",
+        )
+        room_context = build_room_noun_context(repo, "camp_001", room_id)
+        actor = {"actor_id": "actor:c1:hero", "display_name": "Hero", "carried_items": []}
+        pinion = next(
+            n for n in available_nouns(room_context, actor)
+            if n.noun_id == "actor:c1:pinion"
+        )
+        assert is_speakable(pinion, room_context) is True
 
     def test_monster_in_room_appears_in_monsters(self, repo: MemoryRepository) -> None:
         repo.save_actor(
@@ -190,6 +232,7 @@ class TestContextBundleCurrentRoomBuilder:
                 "slug": "ghoul",
                 "display_name": "Pale Ghoul",
                 "status": "active",
+                "disposition": "neutral",
             }
         ]
         assert bundle.current_room["npcs"] == []

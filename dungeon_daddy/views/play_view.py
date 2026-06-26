@@ -38,8 +38,8 @@ from dungeon_daddy.ui.panels.fallout_panel import FalloutPanel
 from dungeon_daddy.ui.panels.map_panel import MapPanel
 from dungeon_daddy.ui.panels.memory_inspector_panel import MemoryInspectorPanel
 from dungeon_daddy.ui.panels.player_action_panel import PlayerActionPanel
+from dungeon_daddy.ui.panels.action_builder import InChatActionBuilder
 from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
-from dungeon_daddy.ui.panels.exit_list_panel import ExitListPanel
 from dungeon_daddy.ui.panels.scene_state_panel import SceneStatePanel
 from dungeon_daddy.ui.theme import (
     BG_0,
@@ -98,12 +98,10 @@ _RPG_PANEL_W = 300
 _RPG_TAB_H = 26
 _BTN_RPG_W = 88
 
-_RPG_TAB_LABELS = ["CHAR", "SCENE", "FALLOUT", "MEM", "ACTION", "EXITS", "DBG"]
+_RPG_TAB_LABELS = ["CHAR", "SCENE", "FALLOUT", "MEM", "DBG"]
 _TAB_CHAR = 0
 _TAB_MEM = 3
-_TAB_ACTION = 4
-_TAB_EXITS = 5
-_TAB_DBG = 6
+_TAB_DBG = 4
 _DBG_LINE_MAX = 36
 
 
@@ -171,8 +169,6 @@ class _RpgSidePanel:
         scene_panel: SceneStatePanel,
         fallout_panel: FalloutPanel,
         memory_panel: MemoryInspectorPanel,
-        action_panel: VnaActionPanel,
-        exit_panel: ExitListPanel,
         debug_controls: DebugControls | None,
         manager: arcade.gui.UIManager | None = None,
     ) -> None:
@@ -180,8 +176,6 @@ class _RpgSidePanel:
         self._scene = scene_panel
         self._fallout = fallout_panel
         self._memory = memory_panel
-        self._action = action_panel
-        self._exit = exit_panel
         self._debug = debug_controls
         self._manager = manager
         self._active = 0
@@ -197,48 +191,25 @@ class _RpgSidePanel:
             for i in range(len(_RPG_TAB_LABELS))
         ]
         content_h = h - _RPG_TAB_H
-        for panel in (self._char, self._scene, self._fallout, self._memory, self._exit):
+        for panel in (self._char, self._scene, self._fallout, self._memory):
             panel.setup(x, y, w, content_h)
         if self._active == _TAB_MEM:
             self._memory.setup_widget(self._manager, x, y, w, content_h)
-        if self._active == _TAB_ACTION:
-            self._action.setup_widget(self._manager, x, y, w, content_h)
 
     def teardown(self) -> None:
         """Remove any active UI widgets (call before hiding the panel)."""
         self._memory.teardown_widget(self._manager)
-        self._action.teardown_widget(self._manager)
 
     def set_active(self, index: int) -> None:
         if 0 <= index < len(_RPG_TAB_LABELS):
             if self._active == _TAB_MEM:
                 self._memory.teardown_widget(self._manager)
-            if self._active == _TAB_ACTION:
-                self._action.teardown_widget(self._manager)
             self._active = index
             if self._active == _TAB_MEM:
                 content_h = self._h - _RPG_TAB_H
                 self._memory.setup_widget(
                     self._manager, self._x, self._y, self._w, content_h,
                 )
-            if self._active == _TAB_ACTION:
-                content_h = self._h - _RPG_TAB_H
-                self._action.setup_widget(
-                    self._manager, self._x, self._y, self._w, content_h,
-                )
-
-    def refresh_action_widget(self) -> None:
-        """Rebuild the ACTION dropdowns from the panel's current options.
-
-        Used after the panel's logic state changes while the tab is already
-        live (e.g. a party move repopulates the noun list) so the on-screen
-        dropdowns don't show the previous room's exits.
-        """
-        if self._active != _TAB_ACTION:
-            return
-        content_h = self._h - _RPG_TAB_H
-        self._action.teardown_widget(self._manager)
-        self._action.setup_widget(self._manager, self._x, self._y, self._w, content_h)
 
     @property
     def active_tab(self) -> int:
@@ -263,12 +234,6 @@ class _RpgSidePanel:
             self._fallout.draw()
         elif self._active == _TAB_MEM:
             self._memory.draw()
-        elif self._active == _TAB_ACTION:
-            self._action.draw(
-                self._x, self._y, self._w, self._h - _RPG_TAB_H
-            )
-        elif self._active == _TAB_EXITS:
-            self._exit.draw()
         else:
             self._draw_debug_tab()
 
@@ -362,6 +327,7 @@ class PlayView(arcade.View):
             on_activate_loop=self.on_activate_loop,
             on_room_select=self._on_graph_room_select,
             on_connection_select=self._on_graph_connection_select,
+            on_noun_click=self._on_overlay_noun_click,
         )
         self._ui_built = False
         self._result_queue: queue.Queue[DMResult] = queue.Queue()
@@ -384,11 +350,10 @@ class PlayView(arcade.View):
         self._rpg_memory = MemoryInspectorPanel()
         self._rpg_action = PlayerActionPanel()
         self._rpg_vna = VnaActionPanel()
-        self._exit_panel = ExitListPanel()
         self._rpg_debug = DebugControls(rpg_service) if rpg_service is not None else None
         self._rpg_side = _RpgSidePanel(
             self._rpg_char, self._rpg_scene, self._rpg_fallout,
-            self._rpg_memory, self._rpg_vna, self._exit_panel, self._rpg_debug,
+            self._rpg_memory, self._rpg_debug,
             manager=self._manager,
         )
         self._rpg_open: bool = False
@@ -396,6 +361,11 @@ class PlayView(arcade.View):
         self._rpg_action.set_resolve_callback(self._on_resolve_action)
         self._rpg_action.set_action_select_callback(self._on_action_key_selected)
         self._rpg_vna.set_submit_callback(self._on_vna_submit)
+        # In-chat Action Builder (Phase 50.6) — relocates the V·N·A surface into
+        # the left chat column. Wraps the same VnaActionPanel logic core, so
+        # _refresh_vna_panel feeds it and submit() routes through _on_vna_submit.
+        self._chat_action_builder = InChatActionBuilder(self._rpg_vna)
+        self._chat.set_action_builder(self._chat_action_builder)
         self._rpg_campaign_id: str | None = None
         self._action_state = PlayerActionState()
         self._chat.set_actor_switch_callback(self._on_actor_switch)
@@ -486,16 +456,11 @@ class PlayView(arcade.View):
             if x >= rpg_x and y < content_h:
                 tab_idx = self._rpg_side.hit_tab(x, y)
                 if tab_idx is not None:
-                    # Populate VNA options before set_active builds its dropdowns.
-                    if tab_idx == _TAB_ACTION:
-                        self._refresh_vna_panel()
                     self._rpg_side.set_active(tab_idx)
                     if tab_idx == _TAB_MEM:
                         self._load_memory_entries()
                     elif tab_idx == _TAB_DBG:
                         self._build_context_bundle()
-                    elif tab_idx == _TAB_EXITS:
-                        self._refresh_exits()
                 elif self._rpg_side.active_tab == _TAB_CHAR:
                     delta = self._rpg_char.hit_picker(x, y)
                     if delta:
@@ -541,7 +506,6 @@ class PlayView(arcade.View):
                 self._map.update_state(self._state, total)
                 self._chat.set_current_room(room.name, room.note or "", room_id=room.id)
                 self._rpg_scene.set_scene(room.name, str(level.id))
-                self._refresh_exits()
                 _log.debug("Selected room: %s", room.id)
                 self._compact_history()
                 self._dm_history.append(LLMMessage(role="user", content=f"We enter {room.name}."))
@@ -603,6 +567,7 @@ class PlayView(arcade.View):
         self._state = SessionState(dungeon_id="__test_drive__", current_level_idx=0)
         level = dungeon.levels[0]
         self._map.load(level, self._state, len(dungeon.levels))
+        self._map.set_loops_visible(True)  # loop chips are a test-drive affordance
         self._map.set_dungeon_title(dungeon.meta.title)
         self._chat.set_mode_label("Play Mode")
         self._chat.add_message(
@@ -642,6 +607,9 @@ class PlayView(arcade.View):
                 f'Loaded "{dungeon.meta.title}" — Level 1: {level.name}. '
                 "Click rooms on the map to explore.",
             )
+        # Loop pattern chips are an authoring/test-drive affordance, not shown in
+        # a normal play session.
+        self._map.set_loops_visible(False)
         _log.info("PlayView: loaded dungeon=%s (session)", dungeon.meta.title)
         self._refresh_memory_state()
         self._load_player_actors()
@@ -681,6 +649,11 @@ class PlayView(arcade.View):
         self._rpg_campaign_id = campaign_id
         self._portraits_dir = portraits_dir
         self._load_player_actors()
+        # set_rpg_context runs *after* load_dungeon_session (where _focus_party_room
+        # fires while _mem_repo is still None), so this is the first point where the
+        # room, actors, and repo are all available. Populate the in-chat Action
+        # Builder now so it is usable on load.
+        self._refresh_vna_panel()
 
     def _sync_debug_level_id(self) -> None:
         if self._rpg_debug is None or self._state is None:
@@ -899,6 +872,10 @@ class PlayView(arcade.View):
         else:
             self._action_state.select_next_actor()
         self._refresh_chat_mini_card()
+        # The in-chat Action Builder is bound to the acting actor (its sentence,
+        # carried-item nouns, and abilities), so re-populate it on a switch —
+        # mirroring the CHAR-tab picker's _set_acting_actor path.
+        self._refresh_vna_panel()
 
     def _do_no_roll_from_chip(self) -> None:
         if not self._action_state.awaiting_confirmation:
@@ -977,7 +954,7 @@ class PlayView(arcade.View):
             _log.exception("resolve_action failed")
 
     # ------------------------------------------------------------------
-    # Dungeon navigation (Phase 48) — exit panel + click-to-move
+    # Dungeon navigation (Phase 48) — click-to-move
     # ------------------------------------------------------------------
 
     def _focus_party_room(self) -> None:
@@ -985,7 +962,7 @@ class PlayView(arcade.View):
 
         Used on load/resume so the player always opens a save where the party
         actually is: the room is selected on the map (selection frame + detail
-        overlay) and the chat/scene/exit panels are populated. No narration.
+        overlay) and the chat/scene panels are populated. No narration.
         """
         if self._dungeon is None or self._state is None:
             return
@@ -999,7 +976,6 @@ class PlayView(arcade.View):
         self._map.set_selected_room(room.id)
         self._chat.set_current_room(room.name, room.note or "", room_id=room.id)
         self._rpg_scene.set_scene(room.name, str(level.id))
-        self._refresh_exits()
 
     def _clear_dungeon_connection_lock(self, from_room: str, to_room: str) -> None:
         """Clear lock styling on the dungeon model connection so the map re-renders it open."""
@@ -1011,33 +987,6 @@ class PlayView(arcade.View):
                 conn.connection_style = None
                 conn.layout_connection_role = None
                 break
-
-    def _refresh_exits(self) -> None:
-        """Rebuild the exit-list panel from the room-context bundle."""
-        from dungeon_daddy.rpg.room_context import build_room_context
-
-        if (self._mem_repo is None or self._rpg_campaign_id is None
-                or self._state is None or not self._state.current_room_id):
-            self._exit_panel.set_current_room(None, None)
-            self._exit_panel.set_from_context(
-                {"visible_exits": [], "locked_exits": [], "hidden_exit_hint": 0}
-            )
-            return
-
-        room_id = self._state.current_room_id
-        room_name: str | None = None
-        if self._dungeon is not None:
-            level = self._dungeon.levels[self._state.current_level_idx]
-            room = {r.id: r for r in level.rooms}.get(room_id)
-            if room is not None:
-                room_name = room.name
-        self._exit_panel.set_current_room(room_name, room_id)
-
-        bundle = build_room_context(
-            room_id, self._rpg_campaign_id,
-            self._state, self._mem_repo,
-        )
-        self._exit_panel.set_from_context(bundle)
 
     def _acting_actor(self):
         """The actor a Card acts as: the selected one, else the first PC."""
@@ -1060,7 +1009,7 @@ class PlayView(arcade.View):
         self._refresh_vna_panel()
 
     def _room_world_flags(self, room_id: str) -> set[str]:
-        """World-context flags gating conditional adverbs (mirrors `_refresh_exits`)."""
+        """World-context flags gating conditional adverbs (mirrors the room-context build)."""
         flags: set[str] = set()
         actors = getattr(self._rpg_action, "_actors", []) or []
         if max((a.actions.get("sense", 0) for a in actors), default=0) >= 1:
@@ -1101,22 +1050,78 @@ class PlayView(arcade.View):
                 if a.actor_id != actor.actor_id
             ],
         }
+        actor_dict = {
+            "actor_id": actor.actor_id,
+            "display_name": actor.display_name,
+            "carried_items": self._mem_repo.get_items_by_actor(actor.actor_id),
+        }
         self._rpg_vna.set_context(
             actor_abilities=self._mem_repo.get_actor_abilities(actor.actor_id),
             room_context=room_context,
-            actor={
-                "actor_id": actor.actor_id,
-                "display_name": actor.display_name,
-                "carried_items": self._mem_repo.get_items_by_actor(actor.actor_id),
-            },
+            actor=actor_dict,
             playbook_slug=actor.playbook_slug or "",
             world_flags=self._room_world_flags(room_id),
         )
-        # If the ACTION tab is live, rebuild its dropdowns so they reflect the
-        # newly-loaded options (e.g. after the party moves to a new room).
-        side = getattr(self, "_rpg_side", None)
-        if side is not None:
-            side.refresh_action_widget()
+        # Retain the prepared context so the lighter overlay-push path
+        # (_on_overlay_noun_click) can rebuild the "Things Here" view-model
+        # without re-running set_context, which would reset the noun selection.
+        self._last_room_context = room_context
+        self._last_actor_dict = actor_dict
+        # Feed the map's "Things Here" overlay from the same room context, so it
+        # auto-tracks the current room (Phase 50.6 §5). The in-chat Action
+        # Builder reads _rpg_vna's options live each draw, so no widget rebuild
+        # is needed here.
+        self._push_things_here_overlay()
+
+    def _push_things_here_overlay(self) -> None:
+        """Push the current room contents + builder selection to the map overlay.
+
+        Rebuilds the :class:`RoomThings` view-model from the retained room
+        context (cheap; no set_context) and marks the builder's selected noun so
+        its row shows the larger TEAL marker (Phase 50.6 §5.3). Safe to call
+        before the first refresh.
+        """
+        from dungeon_daddy.rpg.action_options import room_things
+
+        map_panel = getattr(self, "_map", None)
+        room_context = getattr(self, "_last_room_context", None)
+        if map_panel is None or room_context is None:
+            return
+        actor_dict = getattr(self, "_last_actor_dict", {})
+        selected = self._rpg_vna.selected_noun_option()
+        selected_noun_id = selected.noun_id if selected is not None else None
+        map_panel.set_things_here(
+            room_things(room_context, actor_dict),
+            selected_noun_id=selected_noun_id,
+        )
+
+    def _on_overlay_noun_click(self, noun_id: str) -> None:
+        """Overlay "Things Here" row click → act on the clicked noun (§5.3).
+
+        The two most common overlay actions are done in one click, no verb pick:
+        an **open exit** is walked through (``move``) and a **loose item** is
+        picked up (``pick_up``) by the acting character. Any other noun (incl. a
+        *locked* exit, which can't be walked) just fills the builder's noun slot
+        and re-pushes the overlay so the clicked row shows its selection cue.
+        Selecting does **not** rebuild the panel context — the room is unchanged,
+        and a full refresh would reset the selection back to the default noun.
+        """
+        from dungeon_daddy.rpg.action_options import (
+            SOURCE_EXIT, SOURCE_LOOSE_ITEM, VERB_MOVE, VERB_PICK_UP,
+        )
+
+        _AUTO_VERB = {SOURCE_EXIT: VERB_MOVE, SOURCE_LOOSE_ITEM: VERB_PICK_UP}
+        clicked = next(
+            (n for n in self._rpg_vna._nouns if n.noun_id == noun_id), None
+        )
+        auto_verb = _AUTO_VERB.get(clicked.source) if clicked is not None else None
+        if auto_verb is not None:
+            self._rpg_vna.select_verb(auto_verb)
+            self._rpg_vna.select_noun(noun_id)
+            self._rpg_vna.submit()
+            return
+        self._rpg_vna.select_noun(noun_id)
+        self._push_things_here_overlay()
 
     def _prepare_vna_exits(self, room_context: dict, room_id: str) -> dict:
         """Player-facing exit nouns: drop unknown exits and disambiguate labels.
@@ -1184,8 +1189,9 @@ class PlayView(arcade.View):
         pre-routes through trigger selection); (3) skill verbs — action roll.
         """
         from dungeon_daddy.rpg.action_options import (
-            VERB_ACTIVATE, VERB_LOOK, VERB_USE,
+            DIALOGUE_VERBS, VERB_ACTIVATE, VERB_LOOK, VERB_USE,
             SOURCE_EXIT, SOURCE_LOCKED_EXIT, SOURCE_OBJECT,
+            is_speakable,
         )
         from dungeon_daddy.rpg.action_resolution import resolve_card
         from dungeon_daddy.rpg.command import MoveParty
@@ -1193,6 +1199,18 @@ class PlayView(arcade.View):
         actor = self._acting_actor()
         if actor is None:
             return
+
+        # Dialogue gate (Phase 50.6 Slice 10, §6): a sway/talk verb aimed at a
+        # *speakable* creature opens the contextual SAY box instead of rolling.
+        # A hostile/wary target falls through to the normal contested roll.
+        if card.verb in DIALOGUE_VERBS:
+            noun = next(
+                (n for n in self._rpg_vna._nouns if n.noun_id == card.noun_id), None
+            )
+            room_context = getattr(self, "_last_room_context", {})
+            if noun is not None and is_speakable(noun, room_context):
+                self._begin_dialogue_stub(noun)
+                return
 
         if card.verb == VERB_LOOK:
             self._on_look_submit(card)
@@ -1226,7 +1244,6 @@ class PlayView(arcade.View):
                         from dungeon_daddy.rpg.exit_labels import LOCK_PREFIX
                         exit_label = target_noun.label.removeprefix(LOCK_PREFIX)
                         self._chat.add_message("system", f"{exit_label}: unlocked.")
-                        self._refresh_exits()
                         self._refresh_vna_panel()
                         return
                 self._on_exit_move(card.target_id, card.adverb, item_slug=item_slug)
@@ -1246,6 +1263,34 @@ class PlayView(arcade.View):
             self._on_exit_move(command.exit_id, command.how)
         else:
             self._apply_vna_command(command)
+
+    def _begin_dialogue_stub(self, noun) -> None:
+        """Open the contextual SAY/ASK box for a speakable target (Slice 10 stub).
+
+        **Phase 51 extension point.** Phase 50.6 only carves the input seam: this
+        swaps the bottom of the chat column from the Action Builder to the
+        free-text SAY box and posts a placeholder line. The actual conversation
+        flow — routing what the player types, NPC memory, and DM responses — is
+        deferred to Phase 51 (Talk to the Dungeon).
+        """
+        self._dialogue_stub_active = True
+        self._chat.set_dialogue_mode(True)
+        self._chat.add_message(
+            "system",
+            f"You open a conversation with {noun.label}. (Dialogue — Phase 51)",
+        )
+
+    def _on_dialogue_send_stub(self, text: str) -> None:
+        """Handle a line typed into the SAY box during dialogue (Slice 10 stub).
+
+        **Phase 51 extension point.** For now the line is echoed and the
+        conversation ends immediately, swapping the input back to the Action
+        Builder. Phase 51 replaces this with real dialogue routing and replies.
+        """
+        self._dialogue_stub_active = False
+        self._chat.add_message("gm", text)
+        self._chat.add_message("system", "(Conversation ends — dialogue is Phase 51.)")
+        self._chat.set_dialogue_mode(False)
 
     def _on_look_submit(self, card) -> None:
         """Read-only branch: fetch the noun's authoritative description and post it.
@@ -1435,7 +1480,6 @@ class PlayView(arcade.View):
                 self._chat.set_current_room(room.name, room.note or "", room_id=room.id)
                 self._rpg_scene.set_scene(room.name, str(level.id))
 
-        self._refresh_exits()
         self._refresh_vna_panel()
         self._save_session()
 
@@ -1729,6 +1773,12 @@ class PlayView(arcade.View):
             self._map.load(level, self._state, len(self._dungeon.levels), viewed_level_idx=new_idx)
 
     def _on_chat_send(self, text: str) -> None:
+        # While the contextual SAY box is up, a sent line is a dialogue line, not
+        # a DM free-text query. Phase 50.6 routes it to the stub (which ends the
+        # conversation); Phase 51 owns real dialogue routing.
+        if getattr(self, "_dialogue_stub_active", False):
+            self._on_dialogue_send_stub(text)
+            return
         self._chat.add_message("gm", text)
         if text.strip() == "/clear":
             self._dm_history = []

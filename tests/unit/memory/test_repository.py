@@ -185,6 +185,29 @@ class TestMemoryRepository:
         assert actors[0]["room_id"] == "room:1"
         repo.close()
 
+    def test_save_actor_persists_disposition(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.save_actor(
+            "a1", "camp-A", "npc", "warden", "The Warden", "active",
+            room_id="room:1", disposition="willing",
+        )
+        actor = repo.get_actor("a1")
+        by_room = repo.get_actors_by_room("camp-A", "room:1")
+        repo.close()
+        assert actor is not None
+        assert actor["disposition"] == "willing"
+        assert by_room[0]["disposition"] == "willing"
+
+    def test_save_actor_defaults_disposition_to_neutral(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.save_actor("a1", "camp-A", "npc", "warden", "Warden", "active")
+        actor = repo.get_actor("a1")
+        repo.close()
+        assert actor is not None
+        assert actor["disposition"] == "neutral"
+
     def test_migration_006_converts_old_memory_statuses(self, tmp_path: Path) -> None:
         import duckdb
         # Apply migrations 001-005 first, then insert rows with old status values

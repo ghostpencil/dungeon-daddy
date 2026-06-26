@@ -1,5 +1,9 @@
-from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import format_detail_panel
+from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import (
+    format_detail_panel,
+    format_things_here,
+)
 from dungeon_daddy.map.dungeon_layout.room_detail_panel import ConnectionDetail, RoomDetailPanelData
+from dungeon_daddy.rpg.action_options import RoomThing, RoomThings, ThingsSection
 
 
 def _make_data(**kwargs) -> RoomDetailPanelData:
@@ -120,3 +124,110 @@ def test_no_raw_json_in_lines():
             assert False, f"Line looks like raw JSON: {line.text!r}"
         except (json.JSONDecodeError, ValueError):
             pass
+
+
+# ---------------------------------------------------------------------------
+# Phase 50.6 Slice 7 — "Things Here" overlay content (replaces graph metadata)
+# ---------------------------------------------------------------------------
+
+def _things(room_id="R1", sections=None) -> RoomThings:
+    return RoomThings(room_id=room_id, sections=sections or [])
+
+
+def test_things_here_header_and_room_id():
+    lines = format_things_here(_things(room_id="R1"))
+    header = next(ln for ln in lines if ln.kind == "header")
+    assert "THINGS HERE" in header.text.upper()
+    all_text = " ".join(ln.text for ln in lines)
+    assert "R1" in all_text
+
+
+def test_things_here_renders_sections_and_rows():
+    section = ThingsSection(
+        title="EXITS",
+        things=[RoomThing("e1", "Marketplace Arch", "→", "open", "teal")],
+    )
+    lines = format_things_here(_things(sections=[section]))
+    titles = [ln.text for ln in lines if ln.kind == "section"]
+    assert "EXITS" in titles
+    row = next(ln for ln in lines if ln.kind == "thing")
+    assert "Marketplace Arch" in row.text
+    assert "→" in row.text
+    assert row.status == "open"
+    assert row.status_color == "teal"
+
+
+def test_things_here_empty_shows_placeholder():
+    lines = format_things_here(_things(sections=[]))
+    # header still present, plus a non-empty value line describing the empty room
+    assert any(ln.kind == "header" for ln in lines)
+    value_text = " ".join(ln.text for ln in lines if ln.kind == "value").lower()
+    assert value_text.strip() != ""
+
+
+# ---------------------------------------------------------------------------
+# Phase 50.6 Slice 8 — overlay→builder link (noun_id, selection, footer)
+# ---------------------------------------------------------------------------
+
+def _exits_section() -> ThingsSection:
+    return ThingsSection(
+        title="EXITS",
+        things=[
+            RoomThing("e1", "Marketplace Arch", "→", "open", "teal"),
+            RoomThing("e2", "Elevator Door", "→", "locked", "ember"),
+        ],
+    )
+
+
+def test_thing_row_carries_noun_id():
+    lines = format_things_here(_things(sections=[_exits_section()]))
+    row = next(ln for ln in lines if ln.kind == "thing" and "Marketplace" in ln.text)
+    assert row.noun_id == "e1"
+
+
+def test_selected_noun_marks_only_that_row():
+    lines = format_things_here(
+        _things(sections=[_exits_section()]), selected_noun_id="e1"
+    )
+    rows = [ln for ln in lines if ln.kind == "thing"]
+    selected = [r for r in rows if r.selected]
+    assert [r.noun_id for r in selected] == ["e1"]
+
+
+def test_selected_row_uses_a_distinct_marker_from_unselected():
+    from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import (
+        _SEL_MARKER,
+        _UNSEL_MARKER,
+    )
+    lines = format_things_here(
+        _things(sections=[_exits_section()]), selected_noun_id="e1"
+    )
+    selected_row = next(ln for ln in lines if ln.kind == "thing" and "Marketplace" in ln.text)
+    other_row = next(ln for ln in lines if ln.kind == "thing" and "Elevator" in ln.text)
+    # The marker is a separate field (drawn larger by the renderer), not baked
+    # into the row text — so it can be sized/coloured independently.
+    assert selected_row.marker == _SEL_MARKER
+    assert other_row.marker == _UNSEL_MARKER
+    assert _SEL_MARKER != _UNSEL_MARKER
+
+
+def test_no_footer_lines_rendered():
+    # The Selected/Suggested/contract footer was removed (user request).
+    lines = format_things_here(
+        _things(sections=[_exits_section()]), selected_noun_id="e1"
+    )
+    assert not any(ln.kind == "footer" for ln in lines)
+    all_text = " ".join(ln.text for ln in lines)
+    assert "Selected:" not in all_text
+    assert "Suggested:" not in all_text
+    assert "feeds the action builder" not in all_text
+
+
+def test_room_id_folded_into_header():
+    # Room code lives in the header to save a vertical row ("R1: THINGS HERE").
+    lines = format_things_here(_things(room_id="R1", sections=[_exits_section()]))
+    header = next(ln for ln in lines if ln.kind == "header")
+    assert "R1" in header.text
+    assert "THINGS HERE" in header.text.upper()
+    # no standalone room-id value row anymore
+    assert not any(ln.kind == "value" and ln.text.strip() == "R1" for ln in lines)

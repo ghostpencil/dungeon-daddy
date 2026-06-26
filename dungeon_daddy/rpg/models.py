@@ -76,6 +76,10 @@ class ActorState(BaseModel):
     tags: list[str] = Field(default_factory=list)
     playbook_slug: str | None = None
     room_id: str | None = None
+    # Stance toward the party. Gates dialogue: only a "willing" creature can be
+    # spoken to (Phase 50.6 §6); "wary"/"hostile" stay contested. Surfaced as the
+    # CREATURES status chip in the "Things Here" overlay (§5.2).
+    disposition: Literal["hostile", "wary", "neutral", "willing"] = "neutral"
 
 
 class Ability(BaseModel):

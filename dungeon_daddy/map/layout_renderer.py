@@ -18,7 +18,11 @@ from dungeon_daddy.map.dungeon_layout.critical_path_style import (
     CriticalPathPresentationResult,
     CriticalPathPresenter,
 )
-from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import PanelLine, format_detail_panel
+from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import (
+    PanelLine,
+    format_detail_panel,
+    format_things_here,
+)
 from dungeon_daddy.map.dungeon_layout.graph_presentation_config import GraphPresentationConfig
 from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
 from dungeon_daddy.map.dungeon_layout.panel_placement import ScreenRect, compute_panel_position
@@ -29,7 +33,8 @@ from dungeon_daddy.map.dungeon_layout.style_resolver import resolve_room_render_
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_config import VisualHierarchyConfig
 from dungeon_daddy.map.layout_debug_renderer import LayoutDebugRenderer
 from dungeon_daddy.ui.fog_of_war import HIDDEN_LABEL, fog_of_war_label
-from dungeon_daddy.ui.theme import FONT_MONO, FONT_UI, GOLD, TEAL, TEXT_XS
+from dungeon_daddy.rpg.action_options import RoomThings
+from dungeon_daddy.ui.theme import FONT_MONO, FONT_UI, GOLD, TEAL, TEXT_XS, draw_chip
 
 _ROOM_FILL = (30, 35, 45)
 _ROOM_BORDER = (100, 120, 140)
@@ -47,9 +52,25 @@ _PANEL_HEADER_COLOR = (160, 200, 220, 255)
 _PANEL_SECTION_COLOR = (120, 140, 160, 220)
 _PANEL_VALUE_COLOR = (180, 185, 190, 255)
 _PANEL_LINE_HEIGHT = 16
+_PANEL_THING_LINE_HEIGHT = 22  # "thing" rows carry a status chip → taller
+# draw_text anchors at the baseline (text draws *above* y); the chip and the
+# clickable row rect are centred this many px above the baseline so they line up
+# with the glyphs rather than sitting a row low (Slice 8 fix).
+_THING_ROW_CENTER_DY = 4
+_PANEL_SELECTED_COLOR = (*TEAL, 255)  # selected "Things Here" row text
+_PANEL_MARKER_COL_W = 16  # left gutter reserved for the per-row selection marker
+_PANEL_MARKER_FONT_SIZE = 13  # selected marker is drawn larger so it reads clearly
 _PANEL_PADDING = 10
 _PANEL_WIDTH = 300.0
 _PANEL_FONT_SIZE = 9
+
+
+def _line_height(line: PanelLine) -> int:
+    return _PANEL_THING_LINE_HEIGHT if line.kind == "thing" else _PANEL_LINE_HEIGHT
+
+
+def _panel_height(lines: list[PanelLine]) -> float:
+    return _PANEL_PADDING * 2 + sum(_line_height(ln) for ln in lines)
 
 _DEFAULT_ROOM_STYLE = GraphRoomStyleResolver().resolve("unknown")
 _DEFAULT_CONN_STYLE = GraphConnectionStyleResolver().resolve("")
@@ -109,6 +130,14 @@ class LayoutRenderer:
         self._conn_resolver = GraphConnectionStyleResolver()
         self._cp_presenter = CriticalPathPresenter()
         self._art = None  # MapArtAssets, lazy-loaded on first draw
+        # Screen-space rects of the play-mode "Things Here" rows, keyed by
+        # noun_id — populated each draw so the map panel can hit-test clicks and
+        # feed the action builder (Phase 50.6 §5.3). Empty in graph mode.
+        self._thing_rects: dict[str, ScreenRect] = {}
+
+    def thing_rects(self) -> dict[str, "ScreenRect"]:
+        """Screen-space row rects from the last play-mode draw, by noun_id."""
+        return self._thing_rects
 
     def draw(
         self,
@@ -128,8 +157,13 @@ class LayoutRenderer:
         canvas_h: float = 800.0,
         viewport_x: float = 0.0,
         viewport_y: float = 0.0,
+        mode: str = "graph",
+        room_things: RoomThings | None = None,
+        selected_noun_id: str | None = None,
     ) -> None:
         cfg = presentation_config or GraphPresentationConfig()
+        # Reset each draw; only the play-mode branch repopulates it.
+        self._thing_rects = {}
         if presentation_config is not None:
             self._draw_atmosphere(build_atmosphere_spec(cfg), canvas_w, canvas_h, viewport_x, viewport_y)
         cp_result = self._cp_presenter.present(
@@ -156,9 +190,15 @@ class LayoutRenderer:
         if level is not None:
             if cfg.show_detail_panel:
                 sel = view_state.selected_room_id if view_state else selected_room_id
-                panel_data = build_room_detail(sel, level, result) if sel else None
-                lines = format_detail_panel(panel_data)
-                panel_h = _PANEL_PADDING * 2 + len(lines) * _PANEL_LINE_HEIGHT
+                if mode == "play" and room_things is not None:
+                    # Play mode: the player-facing "Things Here" overlay replaces
+                    # the graph authoring readout. Placement still anchors to the
+                    # selected (== current) room, so positioning is unchanged.
+                    lines = format_things_here(room_things, selected_noun_id)
+                else:
+                    panel_data = build_room_detail(sel, level, result) if sel else None
+                    lines = format_detail_panel(panel_data)
+                panel_h = _panel_height(lines)
                 sel_rect: ScreenRect | None = None
                 conn_rects: list[ScreenRect] = []
                 if sel and sel in result.rooms:
@@ -433,7 +473,7 @@ class LayoutRenderer:
         panel_y: float,
     ) -> None:
         # panel_y is the BOTTOM edge; panel grows upward
-        total_h = _PANEL_PADDING * 2 + len(lines) * _PANEL_LINE_HEIGHT
+        total_h = _panel_height(lines)
         bg_cx = panel_x + _PANEL_WIDTH / 2
         bg_cy = panel_y + total_h / 2
         bg_rect = arcade.XYWH(bg_cx, bg_cy, _PANEL_WIDTH, total_h)
@@ -446,18 +486,58 @@ class LayoutRenderer:
                 color = _PANEL_HEADER_COLOR
             elif line.kind == "section":
                 color = _PANEL_SECTION_COLOR
+            elif line.kind == "thing" and line.selected:
+                # The selected noun is cued by a leading marker glyph (from
+                # format_things_here) plus TEAL text — no rectangle, which read
+                # misaligned (Slice 8 fix).
+                color = _PANEL_SELECTED_COLOR
             else:
                 color = _PANEL_VALUE_COLOR
+            row_h = _line_height(line)
+            row_center = y + _THING_ROW_CENTER_DY
+            is_thing = line.kind == "thing"
+            if is_thing and line.noun_id is not None:
+                # Record the clickable row rect (screen space), centred on the
+                # drawn text, so a click routes to the right noun (§5.3).
+                self._thing_rects[line.noun_id] = ScreenRect(
+                    x=panel_x, y=row_center - row_h / 2,
+                    w=_PANEL_WIDTH, h=float(row_h),
+                )
+            if is_thing and line.marker:
+                # Per-row selected/deselected icon, vertically centred on the row.
+                # The selected marker is larger + TEAL so it reads at a glance;
+                # the deselected dot stays quiet (Slice 8 selection cue).
+                arcade.draw_text(
+                    line.marker,
+                    panel_x + _PANEL_PADDING,
+                    row_center,
+                    _PANEL_SELECTED_COLOR if line.selected else _PANEL_SECTION_COLOR,
+                    font_size=_PANEL_MARKER_FONT_SIZE if line.selected else _PANEL_FONT_SIZE,
+                    font_name=FONT_MONO,
+                    anchor_y="center",
+                    bold=line.selected,
+                )
+            text_x = panel_x + _PANEL_PADDING + (_PANEL_MARKER_COL_W if is_thing else 0)
             arcade.draw_text(
                 line.text,
-                panel_x + _PANEL_PADDING,
+                text_x,
                 y,
                 color,
                 font_size=_PANEL_FONT_SIZE,
                 font_name=FONT_MONO,
-                width=int(_PANEL_WIDTH - _PANEL_PADDING * 2),
+                width=int(_PANEL_WIDTH - _PANEL_PADDING - (text_x - panel_x)),
             )
-            y -= _PANEL_LINE_HEIGHT
+            if line.kind == "thing" and line.status:
+                chip_w = max(48, len(line.status) * 7 + 18)
+                chip_cx = panel_x + _PANEL_WIDTH - _PANEL_PADDING - chip_w / 2
+                draw_chip(
+                    line.status,
+                    chip_cx,
+                    row_center,  # align the pill centre with the row's text
+                    line.status_color or "default",
+                    width=chip_w,
+                )
+            y -= _line_height(line)
 
     def _draw_atmosphere(
         self,

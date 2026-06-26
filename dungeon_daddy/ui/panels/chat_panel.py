@@ -51,6 +51,12 @@ _CHIP_CY_OFF = 86    # distance from panel bottom to chip row centre (design mod
 _PLAY_INPUT_AREA_H = 176  # play mode: char card (96) + gap (6) + input (70) + top pad (4)
 _CHAR_CARD_H = 96         # character card height
 _CHAR_CARD_Y_BOT = 76     # card bottom offset from panel bottom (_INPUT_Y_OFF + INPUT_H + 6)
+_BUILDER_BAND_GAP = 6     # gap above/below the builder band (Phase 50.6)
+_BUILDER_BOTTOM_PAD = 8   # builder band bottom offset when it owns the column
+_MSG_BOTTOM_PAD = 4       # pad above the mini-card before the message area
+# Below this panel height the builder auto-collapses to its header row so it does
+# not crowd out the message area on short windows (Slice 11; tune in GUI).
+_BUILDER_AUTOCOLLAPSE_H = 620
 _PORTRAIT_W = 96          # width of portrait section including divider
 _LABEL_H = 20  # height reserved at top of each bubble for the role label
 _SCROLL_SPEED = 30  # pixels per mouse wheel click
@@ -102,6 +108,12 @@ class ChatPanel:
         self._turn: int = 0
         self._input: arcade.gui.UIInputText | None = None
         self._send_btn: arcade.gui.UIFlatButton | None = None
+        # The UIManager the free-text widgets are registered with, and whether
+        # they are currently added. While hidden (builder mode) they are REMOVED
+        # from the manager — otherwise the invisible widgets still intercept
+        # clicks in the bottom of the column (Slice 11 fix).
+        self._manager: arcade.gui.UIManager | None = None
+        self._free_text_in_manager = False
         self._x = self._y = self._w = self._h = 0.0
         self._scroll_offset: float = 0.0
         self._chip_rects: list[tuple[float, float, float, float, str]] = []
@@ -115,6 +127,10 @@ class ChatPanel:
         self._actor_switch_callback: Callable[[str], None] | None = None
         self._mini_card_prev_rect: tuple[float, float, float, float] | None = None
         self._mini_card_next_rect: tuple[float, float, float, float] | None = None
+        self._action_builder = None  # InChatActionBuilder (play mode, Phase 50.6)
+        # Play mode defaults to the Action Builder; the free-text SAY/ASK box is
+        # contextual (shown only during dialogue — Phase 50.6 Slice 10, §6).
+        self._dialogue_mode = False
         self._action_cards: dict[int, _ActionCardData] = {}
         self._active_card_index: int | None = None
         self._active_card_button_rects: list[tuple[str, tuple[float, float, float, float]]] = []
@@ -130,6 +146,7 @@ class ChatPanel:
         x: float, y: float, w: float, h: float,
     ) -> None:
         """Create and register UIManager widgets for this panel."""
+        self._manager = manager
         self._x, self._y, self._w, self._h = x, y, w, h
         # input_w leaves room for: left-pad + gap + button + right-pad
         input_w = w - PAD_SM - 4 - 76 - PAD_SM
@@ -227,15 +244,23 @@ class ChatPanel:
             self._do_send()
 
         manager.add(self._send_btn)
+        self._free_text_in_manager = True
+        # Play mode starts on the Action Builder, so the free-text SAY/ASK box is
+        # hidden until dialogue begins (Slice 10). Design mode keeps it visible.
+        self._apply_input_visibility()
 
     def teardown(self, manager: arcade.gui.UIManager) -> None:
         """Remove UIManager widgets on view hide or rebuild."""
-        if self._input is not None:
-            manager.remove(self._input)
-            self._input = None
-        if self._send_btn is not None:
-            manager.remove(self._send_btn)
-            self._send_btn = None
+        # Only remove from the manager if currently added — while the free-text
+        # box is hidden (builder mode) the widgets are already detached.
+        if self._free_text_in_manager:
+            if self._input is not None:
+                manager.remove(self._input)
+            if self._send_btn is not None:
+                manager.remove(self._send_btn)
+            self._free_text_in_manager = False
+        self._input = None
+        self._send_btn = None
         self._label_cache.clear()
 
     def resize(self, x: float, y: float, w: float, h: float) -> None:
@@ -299,6 +324,68 @@ class ChatPanel:
     def set_actor_switch_callback(self, fn: Callable[[str], None]) -> None:
         self._actor_switch_callback = fn
 
+    def set_action_builder(self, builder) -> None:
+        """Attach the in-chat Action Builder (play mode). ``None`` detaches it."""
+        self._action_builder = builder
+        self._apply_input_visibility()
+
+    def set_dialogue_mode(self, on: bool) -> None:
+        """Swap the bottom input surface (Phase 50.6 Slice 10, §6).
+
+        Play mode defaults to the Action Builder; entering dialogue hides the
+        builder and reveals the free-text **SAY/ASK** box, and leaving dialogue
+        swaps back. A no-op visually in design mode (where the free-text input is
+        always the input surface). The conversation routed through the SAY box
+        when ``on`` is a **Phase 51 extension point** — this only flips surfaces.
+        """
+        self._dialogue_mode = on
+        self._apply_input_visibility()
+
+    def _free_text_visible(self) -> bool:
+        """Whether the free-text SAY/ASK input occupies the bottom of the column.
+
+        Always in design mode (it is the only input surface). In play mode it is
+        contextual: shown only during dialogue, or as a fallback when no Action
+        Builder is attached.
+        """
+        if self._mode != "play":
+            return True
+        return self._dialogue_mode or self._action_builder is None
+
+    def _builder_visible(self) -> bool:
+        """Whether the in-chat Action Builder is the active bottom surface."""
+        return (
+            self._mode == "play"
+            and self._action_builder is not None
+            and not self._dialogue_mode
+        )
+
+    def _apply_input_visibility(self) -> None:
+        """Sync the free-text widgets to the current surface.
+
+        Beyond toggling ``visible``, the widgets are ADDED to / REMOVED from the
+        UIManager so a hidden input does not intercept clicks in the bottom of
+        the column — an invisible-but-registered ``UIInputText`` still grabs the
+        press, which made the in-chat builder's button/toggle unclickable once
+        the band was reclaimed to the bottom (Slice 11 fix).
+        """
+        visible = self._free_text_visible()
+        for widget in (self._input, self._send_btn):
+            if widget is not None:
+                widget.visible = visible
+        if self._manager is None:
+            return
+        if visible and not self._free_text_in_manager:
+            for widget in (self._input, self._send_btn):
+                if widget is not None:
+                    self._manager.add(widget)
+            self._free_text_in_manager = True
+        elif not visible and self._free_text_in_manager:
+            for widget in (self._input, self._send_btn):
+                if widget is not None:
+                    self._manager.remove(widget)
+            self._free_text_in_manager = False
+
     def add_action_card(
         self,
         actor_name: str,
@@ -343,6 +430,11 @@ class ChatPanel:
     def on_mouse_press(self, x: float, y: float) -> bool:
         if self._busy:
             return False
+        # In-chat Action Builder takes priority in play mode (its open popup is
+        # drawn on top and may overlap the mini-card / message area). Skipped
+        # while it is swapped out for the SAY/ASK box (dialogue mode).
+        if self._builder_visible() and self._action_builder.on_mouse_press(x, y):
+            return True
         if self._mini_card_prev_rect is not None:
             left, bot, right, top = self._mini_card_prev_rect
             if left <= x <= right and bot <= y <= top:
@@ -390,8 +482,48 @@ class ChatPanel:
         self._hovered_card_button = None
 
     @property
+    def _builder_extra_h(self) -> float:
+        """Extra vertical space the Action Builder band adds in play mode.
+
+        The band sizes to the builder's measured content height (which tracks
+        the wrapped command-sentence line count) rather than a fixed constant,
+        so the sentence↔preview gap stays constant (Phase 50.6 Slice 11). Zero
+        while the builder is swapped out for the SAY/ASK box (dialogue mode).
+        """
+        if self._builder_visible():
+            return self._action_builder.content_height(self._w) + _BUILDER_BAND_GAP
+        return 0.0
+
+    def _apply_builder_auto_collapse(self) -> None:
+        """Collapse the builder band on short windows (Slice 11).
+
+        Driven by the current panel height; the builder latches a manual toggle
+        so the user's choice wins once they click the ▾/▴ caret.
+        """
+        if self._builder_visible():
+            self._action_builder.apply_auto_collapse(self._h < _BUILDER_AUTOCOLLAPSE_H)
+
+    @property
+    def _card_bot_off(self) -> float:
+        """Offset from the panel bottom to the actor mini-card's bottom edge.
+
+        In builder mode the free-text input row is hidden, so the card stacks
+        directly on the builder band (reclaiming the input row's reserved height,
+        Slice 11 follow-up). Otherwise it sits above the free-text input row.
+        """
+        if self._builder_visible():
+            return _BUILDER_BOTTOM_PAD + self._builder_extra_h
+        return _CHAR_CARD_Y_BOT
+
+    @property
     def _input_area_h(self) -> float:
-        return _PLAY_INPUT_AREA_H if self._mode == "play" else INPUT_AREA_H
+        if self._mode != "play":
+            return INPUT_AREA_H
+        if self._builder_visible():
+            # Builder owns the bottom; the free-text input row is hidden, so the
+            # reserved area is just the band + mini-card (no phantom input row).
+            return self._card_bot_off + _CHAR_CARD_H + _MSG_BOTTOM_PAD
+        return _PLAY_INPUT_AREA_H
 
     def on_mouse_scroll(self, x: float, y: float, scroll_y: float) -> None:
         """Handle mouse wheel scroll over the message area."""
@@ -411,6 +543,10 @@ class ChatPanel:
 
     def draw(self) -> None:
         x, y, w, h = self._x, self._y, self._w, self._h
+
+        # Auto-collapse the builder on short windows before the layout reads the
+        # band height (so the message area below reflects it the same frame).
+        self._apply_builder_auto_collapse()
 
         # Panel background
         arcade.draw_rect_filled(arcade.XYWH(x + w / 2, y + h / 2, w, h), BG_1)
@@ -505,13 +641,20 @@ class ChatPanel:
         if self._mode == "play" and self._actor_mini_card is not None:
             self._draw_character_card(x, y, w)
 
+        # In-chat Action Builder band (play mode) — between the input row and
+        # the actor mini-card. Drawn last so its open popup overlays the card
+        # and message area above it. Hidden while the SAY/ASK box is shown.
+        if self._builder_visible():
+            band_h = self._action_builder.content_height(w)
+            self._action_builder.draw(x, y + _BUILDER_BOTTOM_PAD, w, band_h)
+
     def _draw_character_card(self, x: float, y: float, w: float) -> None:
         """Render the character card above the input field (play mode only)."""
         card = self._actor_mini_card
         if card is None:
             return
 
-        card_bot = y + _CHAR_CARD_Y_BOT
+        card_bot = y + self._card_bot_off
         card_top = card_bot + _CHAR_CARD_H
 
         # Card background + top border
