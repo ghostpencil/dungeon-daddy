@@ -1458,6 +1458,18 @@ class PlayView(arcade.View):
             opener="The dungeon stirs, and turns its attention to you.",
         )
 
+    def set_dungeon_persona(
+        self, voice: str | None, knowledge: list[str]
+    ) -> None:
+        """Attach the seed-authored dungeon persona (P4 attach-time reader).
+
+        ``window._attach_rpg_context`` resolves the campaign's persona Markdown
+        refs and calls this so the voice agent reads them at play time
+        (``_dungeon_agent_inputs``). Missing docs → ``(None, [])``.
+        """
+        self._dungeon_voice = voice
+        self._dungeon_knowledge = list(knowledge)
+
     _RECENT_MEMORY_LIMIT = 3
 
     def _recent_dungeon_memories(self) -> list:

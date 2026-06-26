@@ -218,6 +218,32 @@ def test_dungeon_agent_inputs_filters_knowledge_below_high_band(tmp_path):
     assert inputs["dungeon_knowledge"] == ["a", "b"]
 
 
+# ---------------------------------------------------------------------------
+# P4 — set_dungeon_persona feeds the agent inputs end-to-end
+# ---------------------------------------------------------------------------
+
+def test_set_dungeon_persona_feeds_agent_inputs(tmp_path):
+    view = _make_view(tmp_path)
+    _seed_intimacy_clock(view._mem_repo, filled=6, segments=6)  # full → all knowledge
+
+    view.set_dungeon_persona("cold, ancient, watchful", ["the heart still beats"])
+
+    inputs = view._dungeon_agent_inputs("who built you?")
+    assert inputs["dungeon_voice"] == "cold, ancient, watchful"
+    assert inputs["dungeon_knowledge"] == ["the heart still beats"]
+
+
+def test_set_dungeon_persona_defaults_clear_attrs(tmp_path):
+    view = _make_view(tmp_path)
+    view._dungeon_voice = "stale"
+    view._dungeon_knowledge = ["stale secret"]
+
+    view.set_dungeon_persona(None, [])
+
+    assert view._dungeon_voice is None
+    assert view._dungeon_knowledge == []
+
+
 def test_apply_dungeon_reply_posts_bubble_and_records_exchange(tmp_path):
     from dungeon_daddy.views.play_view import DialogueSession
 

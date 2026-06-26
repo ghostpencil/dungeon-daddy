@@ -34,6 +34,80 @@ def test_attach_rpg_context_passes_portraits_dir(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# P4 — _attach_rpg_context reads seed persona docs into PlayView
+# ---------------------------------------------------------------------------
+
+from pathlib import Path
+
+MIGRATIONS_DIR = (
+    Path(__file__).parent.parent.parent.parent
+    / "dungeon_daddy" / "data" / "migrations"
+)
+
+
+def _build_campaign(campaign_dir, *, voice=None, knowledge=None):
+    """Create a campaign.duckdb (and optional persona docs) for save_name."""
+    from dungeon_daddy.memory.repository import MemoryRepository
+    from dungeon_daddy.memory.dungeon_persona import (
+        write_dungeon_voice, write_dungeon_knowledge,
+    )
+    from dungeon_daddy.window import _slugify
+
+    campaign_dir.mkdir(parents=True, exist_ok=True)
+    campaign_id = f"campaign:{_slugify(campaign_dir.name)}"
+    repo = MemoryRepository(campaign_dir / "campaign.duckdb")
+    repo.initialize_schema(MIGRATIONS_DIR)
+
+    voice_ref = knowledge_ref = None
+    if voice is not None or knowledge:
+        dungeon_dir = campaign_dir / "memory" / "dungeon"
+        if voice is not None:
+            p = write_dungeon_voice(dungeon_dir, campaign_id, voice)
+            voice_ref = p.relative_to(campaign_dir).as_posix()
+        if knowledge:
+            p = write_dungeon_knowledge(dungeon_dir, campaign_id, knowledge)
+            knowledge_ref = p.relative_to(campaign_dir).as_posix()
+    repo.save_campaign(
+        campaign_id, _slugify(campaign_dir.name), campaign_dir.name,
+        dungeon_voice_path=voice_ref, dungeon_knowledge_path=knowledge_ref,
+    )
+    repo.close()
+
+
+def _attach_window(tmp_path, save_name):
+    win = DungeonDaddyWindow.__new__(DungeonDaddyWindow)
+    win._play_view = MagicMock()
+    win._repo = MagicMock()
+    win._repo._dir = tmp_path
+    win._attach_rpg_context(save_name)
+    return win
+
+
+def test_attach_rpg_context_reads_persona_docs(tmp_path):
+    save_name = "The Crucible"
+    _build_campaign(
+        tmp_path / save_name,
+        voice="cold, ancient, watchful",
+        knowledge=["the heart still beats", "a way down"],
+    )
+
+    win = _attach_window(tmp_path, save_name)
+
+    win._play_view.set_dungeon_persona.assert_called_once_with(
+        "cold, ancient, watchful", ["the heart still beats", "a way down"],
+    )
+
+
+def test_attach_rpg_context_no_persona_refs(tmp_path):
+    save_name = "The Crucible"
+    _build_campaign(tmp_path / save_name)  # campaign row, no persona refs
+
+    win = _attach_window(tmp_path, save_name)
+
+    win._play_view.set_dungeon_persona.assert_called_once_with(None, [])
+
+
+# ---------------------------------------------------------------------------
 # extract_seed — loads campaign.json from save dir, saves to seed library
 # ---------------------------------------------------------------------------
 

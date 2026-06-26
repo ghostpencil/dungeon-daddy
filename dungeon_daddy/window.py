@@ -359,6 +359,35 @@ class DungeonDaddyWindow(arcade.Window):
                 backfill_exits_if_empty(mem_repo, dungeon_json)
                 refresh_exit_labels(mem_repo, dungeon_json)
         self._play_view.set_rpg_context(mem_repo, campaign_id, portraits_dir=portraits_dir)
+        if mem_repo is not None and campaign_id is not None:
+            voice, knowledge = self._read_dungeon_persona(mem_repo, campaign_id, campaign_dir)
+            self._play_view.set_dungeon_persona(voice, knowledge)
+
+    @staticmethod
+    def _read_dungeon_persona(
+        mem_repo, campaign_id: str, campaign_dir: Path
+    ) -> tuple[str | None, list[str]]:
+        """Resolve the campaign's seed persona Markdown refs into (voice, knowledge).
+
+        The DuckDB ``campaigns`` row holds save-relative path references (P2/P3);
+        read the docs via the P1 helpers. Missing refs/files → (None, []).
+        """
+        from dungeon_daddy.memory.dungeon_persona import (
+            read_dungeon_knowledge, read_dungeon_voice,
+        )
+
+        campaign = mem_repo.get_campaign(campaign_id)
+        if campaign is None:
+            return None, []
+        voice = None
+        knowledge: list[str] = []
+        voice_ref = campaign.get("dungeon_voice_path")
+        if voice_ref:
+            voice = read_dungeon_voice(campaign_dir / voice_ref)
+        knowledge_ref = campaign.get("dungeon_knowledge_path")
+        if knowledge_ref:
+            knowledge = read_dungeon_knowledge(campaign_dir / knowledge_ref)
+        return voice, knowledge
 
     def launch_test_drive(self, dungeon: Dungeon) -> None:
         self._play_view.load_dungeon(dungeon)
