@@ -23,37 +23,21 @@ Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 **Phase 51 — Talk to the Dungeon** is underway on branch `phase-51` (off `main`). The spec is
 **finalized** (`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions are locked (§3).
 
-**Slices 1–3 — DONE & committed.** S1 (`d4770a7`): three optional `CampaignManifest` fields. S2
-(recedable clock engine): `ClockState.monotonic: bool = True` (`rpg/models.py`) + signed
-`tick_clock(clock, delta) -> ClockState` (`rpg/clocks.py`, clamps `[0, segments]`; latches
-`completed` at full only when monotonic; non-monotonic recedes and never latches) +
-`advance_clock` unchanged (regression-guarded) + migration `016_clock_monotonic.sql`
-(`clocks.monotonic BOOLEAN DEFAULT true`). +7 tests (2 model, 5 engine). S3 (resonance archetype):
-`"resonance_point"` added to the `ObjectArchetype` Literal (`rpg/models.py`); `build_room_context`
-(`rpg/room_context.py`) now **derives** `resonance_point` — `True` when the room contains a
-`resonance_point` object (OR'd with the explicit param, which stays for callers). +3 tests (1 model,
-2 context). rpg+memory suites green (787). **Note:** repo `save_clock`/`get_clocks` do NOT yet
-persist `monotonic` (named SELECT, so the new column is harmless/default-true on read) — wire it in
-the seed slice when the intimacy clock needs `monotonic=False` persisted. The **manifest** object
-`archetype` Literal (`campaign/manifest.py:95`) was deliberately **left without** `resonance_point`
-(no seeding in this pure slice) — add it in the seed slice when authoring resonance rooms.
+**Slices 1–5 DONE & committed** (pure data/helper slices — no UI, no LLM, no live persistence yet).
+Per-slice detail is in the **Phase 51 history section below**; in brief: S1 (`d4770a7`) three optional
+`CampaignManifest` fields · S2 recedable clock engine (`ClockState.monotonic` + signed `tick_clock`;
+`advance_clock` unchanged; migration `016_clock_monotonic.sql`) · S3 `"resonance_point"`
+`ObjectArchetype` + `build_room_context` derives the flag · S4 intimacy gate
+`dungeon_channel_available` · S5 (`5767bf1`) knowledge filter `reveal_knowledge`. Both helpers live in
+`rpg/dungeon_channel.py` with **tunable band constants** (`INTIMACY_THRESHOLD=0.5`,
+`HIGH_INTIMACY_THRESHOLD=0.85`, `CRYPTIC_REVEAL_FRACTION=0.5`) pointing at §6 / BALANCE_NOTES.
+rpg+memory+campaign suites green (938).
 
-**Slices 1–4 DONE & committed.** S4 (intimacy gate): new pure helper module
-`rpg/dungeon_channel.py` → `dungeon_channel_available(room_context, intimacy_clock) -> (bool, reason)`
-— open only when `room_context["resonance_point"]` **AND** the intimacy clock's `filled/segments` ≥
-`INTIMACY_THRESHOLD` (0.5, a **tunable module constant** — the open §6 balance question; never a
-completion event). Closed returns `REASON_NOT_HERE` (not a resonance point; **takes precedence** when
-both gates fail) or `REASON_NOT_INTIMATE` (clock `None`/missing or below threshold). +6 tests
-(`tests/unit/rpg/test_dungeon_channel.py`). rpg+memory+campaign suites green (931).
-
-**Slices 1–5 DONE & committed.** S5 (`5767bf1`, knowledge filter): pure helper
-`reveal_knowledge(knowledge: list[str], filled: int, segments: int) -> list[str]` added to
-`rpg/dungeon_channel.py`. Bands on `filled/segments`: below `INTIMACY_THRESHOLD` (0.5) → `[]`;
-cryptic band `[0.5, HIGH_INTIMACY_THRESHOLD=0.85)` → head fragment (`CRYPTIC_REVEAL_FRACTION=0.5` of
-the list via `ceil`, **floored at 1** so a non-empty list always yields one fragment); `≥ 0.85` →
-full list. Guards `segments<=0` (no divide-by-zero) and empty `knowledge`. The two new band constants
-are **tunable module constants** pointing at §6 / BALANCE_NOTES (mirrors the Slice 4
-`INTIMACY_THRESHOLD` pattern). +7 tests. rpg+memory+campaign suites green (938).
+**Two deferred items to wire in the seed slice** (carried, don't forget): (1) repo
+`save_clock`/`get_clocks` do **not** yet persist `ClockState.monotonic` (named SELECT → new column is
+harmless/default-true on read) — wire it when the intimacy clock needs `monotonic=False` to survive a
+round-trip. (2) The **manifest** object `archetype` Literal (`campaign/manifest.py:95`) does **not**
+yet include `resonance_point` (no seeding in the pure slices) — add it when authoring resonance rooms.
 
 **Slice 6 next — dungeon-voice bundle + agent (spec §4.4 / §7.6).** Build the §4.4 input bundle
 (`mode: dungeon_voice`, `dungeon_voice` string, `intimacy_level` filled/segments, `dungeon_knowledge`
