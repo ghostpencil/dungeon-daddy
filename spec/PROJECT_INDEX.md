@@ -11,9 +11,9 @@ bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user c
 Phase **51 — Talk to the Dungeon: IN PROGRESS** on branch `phase-51` (started 2026-06-26).
 Decisions locked; **Slices 1–8 DONE & committed**. **Voice/knowledge-at-play-time decision made
 (2026-06-26): Markdown-backed, DB-referenced** — persona text lives in the save's `memory/` tree,
-DuckDB holds path references. **Persona Persistence: P1 DONE** (persona Markdown helpers); **P2 next**
-(DuckDB ref columns), then P3/P4, **then** Slice 9 (UI treatment) + the seeding step. See the START
-HERE section below.
+DuckDB holds path references. **Persona Persistence: P1–P2 DONE** (persona Markdown helpers +
+DuckDB ref columns); **P3 next** (seed-time writer), then P4, **then** Slice 9 (UI treatment) +
+the seeding step. See the START HERE section below.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -27,7 +27,7 @@ Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 **Phase 51 — Talk to the Dungeon** is underway on branch `phase-51` (off `main`). The spec is
 **finalized** (`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions are locked (§3).
 
-### ⮕ NEXT: Persona Persistence — **P1 DONE**, P2 next (resolves Slice 8 carried gap (c))
+### ⮕ NEXT: Persona Persistence — **P1–P2 DONE**, P3 next (resolves Slice 8 carried gap (c))
 
 **Decision (2026-06-26): voice/knowledge reach play time via Markdown-backed, DB-referenced
 storage.** This was the open "how do `dungeon_voice`/`dungeon_knowledge` reach play time" question
@@ -60,14 +60,14 @@ option) violates that pattern. Doc location (settled): **`‹save_dir›/memory/
   dir and stamp the house-standard front matter (`id`/`type`/`campaign_id`/`updated_at`) so the docs
   validate under `SyncReporter`. 6 tests in `tests/unit/memory/test_dungeon_persona.py` (voice
   round-trip + missing guard; knowledge multi-item / empty / punctuation / missing guard).
-- **P2 — DuckDB reference columns** *(migration + repo)*. Migration
+- **P2 — DuckDB reference columns — DONE** *(memory suite green 204)*. Migration
   `017_campaign_dungeon_persona_refs.sql`: `campaigns` gains nullable `dungeon_voice_path TEXT` +
-  `dungeon_knowledge_path TEXT` (backward-compatible; old saves reconstruct `None`). Extend
-  `save_campaign(..., dungeon_voice_path=None, dungeon_knowledge_path=None)` + `get_campaign` to carry
-  them; paths stored **relative to the save dir** (references, not text). Tests: ref round-trip;
-  defaults `None`; existing `save_campaign` callers unaffected (kw-only defaults). *(Honors the
-  "DB holds references" rule; paths are also derivable, so P2 is droppable for convention-only — kept
-  for `SyncReporter` integrity + relocation.)*
+  `dungeon_knowledge_path TEXT` (two `ALTER TABLE ADD COLUMN` stmts; backward-compatible; old saves
+  reconstruct `None`). `save_campaign` gained **kw-only** `dungeon_voice_path=None`/
+  `dungeon_knowledge_path=None` (after the existing positional `dungeon_slug`, so existing callers are
+  unaffected); `get_campaign` returns both keys. Paths are stored as-is (callers pass **relative to the
+  save dir** — references, not text). 2 tests in `tests/unit/memory/test_repository.py` (ref round-trip;
+  defaults `None`). *(Honors the "DB holds references" rule.)*
 - **P3 — Seed-time writer** *(publish wiring)*. New `publish._write_dungeon_persona(manifest,
   save_dir, campaign_id)` called from `_seed_duckdb`: when `manifest.dungeon_voice`/`dungeon_knowledge`
   are non-empty, write the two docs under `save_dir/memory/dungeon/` and pass their **relative** paths

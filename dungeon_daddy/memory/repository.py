@@ -723,26 +723,42 @@ class MemoryRepository:
         title: str,
         status: str = "active",
         dungeon_slug: str | None = None,
+        *,
+        dungeon_voice_path: str | None = None,
+        dungeon_knowledge_path: str | None = None,
     ) -> None:
         assert self._conn is not None
         self._conn.execute(
             """
-            INSERT INTO campaigns (campaign_id, slug, title, status, dungeon_slug)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO campaigns
+                (campaign_id, slug, title, status, dungeon_slug,
+                 dungeon_voice_path, dungeon_knowledge_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (campaign_id) DO UPDATE SET
-                slug         = excluded.slug,
-                title        = excluded.title,
-                status       = excluded.status,
-                dungeon_slug = excluded.dungeon_slug
+                slug                   = excluded.slug,
+                title                  = excluded.title,
+                status                 = excluded.status,
+                dungeon_slug           = excluded.dungeon_slug,
+                dungeon_voice_path     = excluded.dungeon_voice_path,
+                dungeon_knowledge_path = excluded.dungeon_knowledge_path
             """,
-            [campaign_id, slug, title, status, dungeon_slug],
+            [
+                campaign_id,
+                slug,
+                title,
+                status,
+                dungeon_slug,
+                dungeon_voice_path,
+                dungeon_knowledge_path,
+            ],
         )
 
     def get_campaign(self, campaign_id: str) -> dict | None:
         assert self._conn is not None
         row = self._conn.execute(
             """
-            SELECT campaign_id, slug, title, status, dungeon_slug
+            SELECT campaign_id, slug, title, status, dungeon_slug,
+                   dungeon_voice_path, dungeon_knowledge_path
             FROM campaigns WHERE campaign_id = ?
             """,
             [campaign_id],
@@ -755,6 +771,8 @@ class MemoryRepository:
             "title": row[2],
             "status": row[3],
             "dungeon_slug": row[4],
+            "dungeon_voice_path": row[5],
+            "dungeon_knowledge_path": row[6],
         }
 
     # ------------------------------------------------------------------
