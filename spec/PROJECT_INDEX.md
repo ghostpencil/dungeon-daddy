@@ -9,9 +9,11 @@ All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds;
 tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
 bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
 Phase **51 — Talk to the Dungeon: IN PROGRESS** on branch `phase-51` (started 2026-06-26).
-Decisions locked; **Slices 1–8 DONE & committed**; Slice 9 (UI treatment — distinct dungeon
-input/bubble styling + the D2b resonance-point entry affordance that calls `_begin_dungeon_dialogue`)
-next.
+Decisions locked; **Slices 1–8 DONE & committed**. **Voice/knowledge-at-play-time decision made
+(2026-06-26): Markdown-backed, DB-referenced** — persona text lives in the save's `memory/` tree,
+DuckDB holds path references. **Persona Persistence: P1 DONE** (persona Markdown helpers); **P2 next**
+(DuckDB ref columns), then P3/P4, **then** Slice 9 (UI treatment) + the seeding step. See the START
+HERE section below.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -20,10 +22,70 @@ Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 
 ---
 
-## START HERE next session — Phase 51 in progress; Slice 9 next
+## START HERE next session — Phase 51; Persona Persistence (P1–P4) next, then Slice 9
 
 **Phase 51 — Talk to the Dungeon** is underway on branch `phase-51` (off `main`). The spec is
 **finalized** (`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions are locked (§3).
+
+### ⮕ NEXT: Persona Persistence — **P1 DONE**, P2 next (resolves Slice 8 carried gap (c))
+
+**Decision (2026-06-26): voice/knowledge reach play time via Markdown-backed, DB-referenced
+storage.** This was the open "how do `dungeon_voice`/`dungeon_knowledge` reach play time" question
+(Slice 8 carried gap (c)). Rationale: it matches the **established house pattern** — `memory_entries`
+already stores structured fields + a `markdown_path` reference + `checksum`, with the narrative body
+in a YAML-front-matter Markdown file (`memory/markdown_store.py`, validated by `memory/sync.py`'s
+`SyncReporter`). Cramming narrative text into a DB column (the rejected "campaigns table columns"
+option) violates that pattern. Doc location (settled): **`‹save_dir›/memory/dungeon/voice.md` +
+`…/knowledge.md`** (`memory/` is already a recognized save-internal dir — `data/repository.py:162`).
+
+**Key framing (don't lose this):**
+- `dungeon_voice` is a **static persona prompt** — injected verbatim into the LLM system prompt under
+  `# Your Voice` (`llm/agents/dungeon_voice_agent.py:55-57`); authored in the seed, never mutated at
+  play time (a future D5 corruption shift is the one case a rewritable file future-proofs).
+- `dungeon_knowledge` is **authored seed lore only** (hidden secrets, intimacy-gated by
+  `reveal_knowledge`). The **dynamic "the dungeon knows what happened" half is already wired** —
+  `recent_memories` via `MemoryRetriever` (`play_view.py:1463-1470`, a second agent channel
+  `# Recent Memories`). **Do NOT** build `dungeon_knowledge` into a growing store — that would
+  duplicate the memory system.
+
+**Plan (TDD — read `spec/TESTING.md` first, use the TDD skill; suite green before each next):**
+
+- **P1 — Persona Markdown helpers — DONE** *(pure, memory layer; memory suite green 194)*. New
+  `dungeon_daddy/memory/dungeon_persona.py` on top of `markdown_store.write_memory`/`read_memory`:
+  `write_dungeon_voice(dungeon_dir, campaign_id, voice) -> Path` (`voice.md`, front matter
+  `type: dungeon_voice`, body = text); `write_dungeon_knowledge(dungeon_dir, campaign_id,
+  knowledge: list[str]) -> Path` (`knowledge.md`, body = one `- secret` bullet per item);
+  `read_dungeon_voice(path) -> str | None`; `read_dungeon_knowledge(path) -> list[str]` (parse
+  bullets; missing file → `None`/`[]`). Both writers `mkdir(parents=True, exist_ok=True)` the dungeon
+  dir and stamp the house-standard front matter (`id`/`type`/`campaign_id`/`updated_at`) so the docs
+  validate under `SyncReporter`. 6 tests in `tests/unit/memory/test_dungeon_persona.py` (voice
+  round-trip + missing guard; knowledge multi-item / empty / punctuation / missing guard).
+- **P2 — DuckDB reference columns** *(migration + repo)*. Migration
+  `017_campaign_dungeon_persona_refs.sql`: `campaigns` gains nullable `dungeon_voice_path TEXT` +
+  `dungeon_knowledge_path TEXT` (backward-compatible; old saves reconstruct `None`). Extend
+  `save_campaign(..., dungeon_voice_path=None, dungeon_knowledge_path=None)` + `get_campaign` to carry
+  them; paths stored **relative to the save dir** (references, not text). Tests: ref round-trip;
+  defaults `None`; existing `save_campaign` callers unaffected (kw-only defaults). *(Honors the
+  "DB holds references" rule; paths are also derivable, so P2 is droppable for convention-only — kept
+  for `SyncReporter` integrity + relocation.)*
+- **P3 — Seed-time writer** *(publish wiring)*. New `publish._write_dungeon_persona(manifest,
+  save_dir, campaign_id)` called from `_seed_duckdb`: when `manifest.dungeon_voice`/`dungeon_knowledge`
+  are non-empty, write the two docs under `save_dir/memory/dungeon/` and pass their **relative** paths
+  into `save_campaign(...)`. Tests: publish w/ voice+knowledge → docs on disk + campaigns row carries
+  refs; manifest without → no docs, refs `None`.
+- **P4 — Attach-time reader** *(window → play_view)*. New
+  `play_view.set_dungeon_persona(voice: str | None, knowledge: list[str])` sets the `_dungeon_voice`/
+  `_dungeon_knowledge` attrs the agent inputs already read (`play_view.py:1484`/`1488`). In
+  `window._attach_rpg_context`: after `mem_repo`, `get_campaign(campaign_id)` → resolve refs relative
+  to `campaign_dir` → read docs via P1 → `set_dungeon_persona(...)`; missing → `(None, [])`. Tests:
+  play_view unit (persona feeds `_dungeon_agent_inputs` end-to-end) + attach test (docs present →
+  populated; absent → `None`/`[]`).
+
+**After P1–P4:** the **seeding step** (author the Crucible's persona docs + a `monotonic=False`
+`dungeon_intimacy` clock + a `resonance_point` object via `populate_crucible_level*.py`; **add
+`"resonance_point"` to the manifest `RoomObjectManifest.archetype` Literal** — carried Deferred item 2)
+makes the channel live. **Slice 9 (UI)** stays its own slice. P1–P4 may land before or after Slice 9
+(independent), but both gate a live playtest.
 
 **Slice 8 DONE — PlayView dialogue routing (spec §7.8; full unit suite green 3035).** Replaced the
 50.6 dialogue stub with real routing through an in-memory **`DialogueSession`** (`kind`
@@ -55,12 +117,12 @@ yet** — `_begin_dungeon_dialogue()` exists and is tested but nothing calls it;
 resonance-point overlay button** is Slice 9. (b) **Bubble styling** — the dungeon reply reuses the
 existing `"dm"` violet "◆ Dungeon" bubble (visually distinct from the player's "GM" bubble but shared
 with DM narration); a dedicated dungeon-voice role/treatment is Slice 9 (§4.6). (c) **Voice/knowledge
-sourcing is unresolved at play time** — there is **no manifest persistence in the save DB**, so
-`_dungeon_voice`/`_dungeon_knowledge` stay `None`/`[]` and the intimacy clock + `resonance_point`
-object are unseeded; the channel is therefore **locked in the live app** until the **seeding step**
-authors them (Crucible manifest/seed + `tools/populate_crucible_level*.py`, per the spec §7 seeding
-note). The routing reads those instance attrs, so seeding is the only thing between this and a live
-playable channel.
+sourcing at play time — DECIDED 2026-06-26, plan written** (Markdown-backed, DB-referenced; see the
+**Persona Persistence (P1–P4)** block at the top of START HERE). Today `_dungeon_voice`/
+`_dungeon_knowledge` still stay `None`/`[]` until P1–P4 land + the seeding step authors the docs +
+the intimacy clock + the `resonance_point` object; the channel stays **locked in the live app** until
+then. The routing already reads those instance attrs, so P1–P4 + seeding are the only things between
+this and a live playable channel.
 
 **Slices 1–7 DONE & committed** (pure data/helper slices + the LLM seam + the first engine
 side-effect service — still no UI). Per-slice detail is in the **Phase 51 history section below**; in brief: S1 (`d4770a7`) three
@@ -110,8 +172,9 @@ today the reply reuses the `"dm"` ◆ Dungeon violet bubble); (c) gated visibili
 per house practice; smoke test optional (50.6 precedent). **Then the seeding step** (spec §7 note) —
 author `dungeon_voice` + `dungeon_knowledge`, a `monotonic=False` `dungeon_intimacy` clock, and a
 `resonance_point` object into the Crucible (manifest/seed + `populate_crucible_level*.py`) so the
-channel is actually enterable; **decide how voice/knowledge reach play time** (no manifest persistence
-in the save DB yet — see Slice 8 carried gap (c)). Use the TDD skill (read `spec/TESTING.md` first).
+channel is actually enterable. **How voice/knowledge reach play time is now decided** (Markdown-backed,
+DB-referenced — see the Persona Persistence (P1–P4) block at the top of START HERE; the seeding step
+writes the persona docs via that mechanism). Use the TDD skill (read `spec/TESTING.md` first).
 
 Scope: a freeform **dungeon-voice** channel gated by **resonance points** (seed-marked rooms) + a
 **recedable dungeon-intimacy clock** (`monotonic=False`). The LLM plays the dungeon's voice (advisory
