@@ -540,6 +540,7 @@ class MemoryRepository:
         stakes: str | None = None,
         completion_effect: str | None = None,
         visible_to_player: bool = True,
+        monotonic: bool = True,
     ) -> None:
         assert self._conn is not None
         self._conn.execute(
@@ -548,9 +549,9 @@ class MemoryRepository:
                 clock_id, campaign_id, label, segments, filled, status,
                 scope_room_id, action_tags,
                 clock_level, category, level_id, owner_actor_id,
-                stakes, completion_effect, visible_to_player
+                stakes, completion_effect, visible_to_player, monotonic
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (clock_id) DO UPDATE SET
                 label             = excluded.label,
                 segments          = excluded.segments,
@@ -564,12 +565,13 @@ class MemoryRepository:
                 owner_actor_id    = excluded.owner_actor_id,
                 stakes            = excluded.stakes,
                 completion_effect = excluded.completion_effect,
-                visible_to_player = excluded.visible_to_player
+                visible_to_player = excluded.visible_to_player,
+                monotonic         = excluded.monotonic
             """,
             [clock_id, campaign_id, label, segments, filled, status,
              scope_room_id, json.dumps(action_tags or []),
              clock_level, category, level_id, owner_actor_id,
-             stakes, completion_effect, visible_to_player],
+             stakes, completion_effect, visible_to_player, monotonic],
         )
 
     def delete_clock(self, clock_id: str) -> None:
@@ -610,7 +612,7 @@ class MemoryRepository:
             SELECT clock_id, campaign_id, label, segments, filled, status,
                    scope_room_id, action_tags,
                    clock_level, category, level_id, owner_actor_id,
-                   stakes, completion_effect, visible_to_player
+                   stakes, completion_effect, visible_to_player, monotonic
             FROM clocks WHERE campaign_id = ?
             """,
             [campaign_id],
@@ -632,6 +634,7 @@ class MemoryRepository:
                 "stakes": r[12],
                 "completion_effect": r[13],
                 "visible_to_player": bool(r[14]) if r[14] is not None else True,
+                "monotonic": bool(r[15]) if r[15] is not None else True,
             }
             for r in rows
         ]

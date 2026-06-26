@@ -166,6 +166,17 @@ class TestClockPersistence:
         assert c["completion_effect"] == "Harder rolls."
         assert c["visible_to_player"] is False
 
+    def test_monotonic_defaults_true_on_round_trip(self, repo: MemoryRepository) -> None:
+        repo.save_clock("clk_mono", "camp_mono", "Ritual", 8, 0)
+        assert repo.get_clocks("camp_mono")[0]["monotonic"] is True
+
+    def test_non_monotonic_survives_round_trip(self, repo: MemoryRepository) -> None:
+        repo.save_clock(
+            "clk_intim", "camp_intim", "Dungeon Intimacy", 6, 3,
+            category="dungeon_intimacy", monotonic=False,
+        )
+        assert repo.get_clocks("camp_intim")[0]["monotonic"] is False
+
     def test_save_clock_persists_level_id(self, repo: MemoryRepository) -> None:
         repo.save_clock(
             "clk_li", "camp_li", "Factory Alert", 8, 0,
