@@ -29,15 +29,20 @@ Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
    free-text input hidden in builder mode, the mini-card now stacks directly on the band via new
    `chat_panel._card_bot_off` + `_BUILDER_BOTTOM_PAD`; `_input_area_h` no longer reserves the hidden
    ~70px input row, so the message area reclaims it.
-3. **Short-window collapsible fallback — DONE (committed; pieces 1–2 GUI-verified, piece 3 toggle-fix
-   pending re-verify).** Builder band has a full-width **ACTION … ▾ show / ▴ hide header bar** (the
-   **whole bar** is the click target — a first pass used a tiny 18px corner caret that was unhittable
-   when collapsed at the bottom edge, so the user "could collapse but not reopen"; fixed). `InChat
-   ActionBuilder.is_collapsed()`/`toggle_collapsed()`/`apply_auto_collapse(bool)` (manual toggle latches
-   `_user_toggled` so it overrides auto). `chat_panel._apply_builder_auto_collapse()` (called first in
-   `draw()`) auto-collapses when panel height < **`_BUILDER_AUTOCOLLAPSE_H = 620`** (user-chosen
-   "auto-collapse below threshold", 2026-06-26 — tune in GUI). Collapsed band = header bar only
-   (`content_height` returns `_HEADER_H=26`).
+3. **Short-window collapsible fallback — DONE (committed; pieces 1–2 GUI-verified, piece 3 + bottom-
+   click fix pending re-verify).** Builder band has a full-width **ACTION … ▾ show / ▴ hide header bar**
+   (whole bar is the click target). `InChatActionBuilder.is_collapsed()`/`toggle_collapsed()`/
+   `apply_auto_collapse(bool)` (manual toggle latches `_user_toggled` so it overrides auto). `chat_panel.
+   _apply_builder_auto_collapse()` (called first in `draw()`) auto-collapses when panel height <
+   **`_BUILDER_AUTOCOLLAPSE_H = 620`** (user-chosen "auto-collapse below threshold", 2026-06-26 — tune
+   in GUI). Collapsed band = header bar only (`content_height` returns `_HEADER_H=26`).
+   **BOTTOM-CLICK BUG FIXED (root cause of "can collapse but not reopen" AND a dead action button):**
+   the reclaim (piece 2) moved the builder's button/toggle into the bottom ~62px where the **hidden
+   free-text `UIInputText`/`UIFlatButton` still intercepted clicks** (invisible-but-registered widgets
+   grab the press). Fix: `_apply_input_visibility` now **removes the free-text widgets from the
+   UIManager** when hidden (builder mode) and re-adds on dialogue; `chat_panel` tracks `_manager` +
+   `_free_text_in_manager`. Pre-Slice-11 this was masked because the band sat 76px up, above the input
+   row.
 4. **Smoke test — TODO** — `tools/smoke_test_phase*.py` (Strategy A/B per `spec/TESTING.md` — read the
    A-vs-B guidance first) + manual visual verify by the user.
 

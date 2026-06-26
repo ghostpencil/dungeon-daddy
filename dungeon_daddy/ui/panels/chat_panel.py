@@ -108,6 +108,12 @@ class ChatPanel:
         self._turn: int = 0
         self._input: arcade.gui.UIInputText | None = None
         self._send_btn: arcade.gui.UIFlatButton | None = None
+        # The UIManager the free-text widgets are registered with, and whether
+        # they are currently added. While hidden (builder mode) they are REMOVED
+        # from the manager — otherwise the invisible widgets still intercept
+        # clicks in the bottom of the column (Slice 11 fix).
+        self._manager: arcade.gui.UIManager | None = None
+        self._free_text_in_manager = False
         self._x = self._y = self._w = self._h = 0.0
         self._scroll_offset: float = 0.0
         self._chip_rects: list[tuple[float, float, float, float, str]] = []
@@ -140,6 +146,7 @@ class ChatPanel:
         x: float, y: float, w: float, h: float,
     ) -> None:
         """Create and register UIManager widgets for this panel."""
+        self._manager = manager
         self._x, self._y, self._w, self._h = x, y, w, h
         # input_w leaves room for: left-pad + gap + button + right-pad
         input_w = w - PAD_SM - 4 - 76 - PAD_SM
@@ -237,18 +244,23 @@ class ChatPanel:
             self._do_send()
 
         manager.add(self._send_btn)
+        self._free_text_in_manager = True
         # Play mode starts on the Action Builder, so the free-text SAY/ASK box is
         # hidden until dialogue begins (Slice 10). Design mode keeps it visible.
         self._apply_input_visibility()
 
     def teardown(self, manager: arcade.gui.UIManager) -> None:
         """Remove UIManager widgets on view hide or rebuild."""
-        if self._input is not None:
-            manager.remove(self._input)
-            self._input = None
-        if self._send_btn is not None:
-            manager.remove(self._send_btn)
-            self._send_btn = None
+        # Only remove from the manager if currently added — while the free-text
+        # box is hidden (builder mode) the widgets are already detached.
+        if self._free_text_in_manager:
+            if self._input is not None:
+                manager.remove(self._input)
+            if self._send_btn is not None:
+                manager.remove(self._send_btn)
+            self._free_text_in_manager = False
+        self._input = None
+        self._send_btn = None
         self._label_cache.clear()
 
     def resize(self, x: float, y: float, w: float, h: float) -> None:
@@ -349,11 +361,30 @@ class ChatPanel:
         )
 
     def _apply_input_visibility(self) -> None:
-        """Sync the free-text widgets' visibility to the current surface."""
+        """Sync the free-text widgets to the current surface.
+
+        Beyond toggling ``visible``, the widgets are ADDED to / REMOVED from the
+        UIManager so a hidden input does not intercept clicks in the bottom of
+        the column — an invisible-but-registered ``UIInputText`` still grabs the
+        press, which made the in-chat builder's button/toggle unclickable once
+        the band was reclaimed to the bottom (Slice 11 fix).
+        """
         visible = self._free_text_visible()
         for widget in (self._input, self._send_btn):
             if widget is not None:
                 widget.visible = visible
+        if self._manager is None:
+            return
+        if visible and not self._free_text_in_manager:
+            for widget in (self._input, self._send_btn):
+                if widget is not None:
+                    self._manager.add(widget)
+            self._free_text_in_manager = True
+        elif not visible and self._free_text_in_manager:
+            for widget in (self._input, self._send_btn):
+                if widget is not None:
+                    self._manager.remove(widget)
+            self._free_text_in_manager = False
 
     def add_action_card(
         self,
