@@ -108,6 +108,57 @@ def test_refresh_vna_panel_feeds_things_here_overlay(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Phase 51 Slice 9 — dungeon-channel entry affordance + gating
+# ---------------------------------------------------------------------------
+
+def _seed_intimacy_clock(repo, *, filled: int, segments: int = 6):
+    repo.save_clock(
+        clock_id="clk-intimacy", campaign_id="camp-1",
+        label="Regard", segments=segments, filled=filled,
+        category="dungeon_intimacy", clock_level="dungeon", monotonic=False,
+    )
+
+
+def test_push_overlay_opens_dungeon_channel_when_gates_pass(tmp_path):
+    view = _make_view(tmp_path)
+    view._map = MagicMock()
+    _seed_intimacy_clock(view._mem_repo, filled=3)
+    view._last_room_context = {"room_id": "r1", "resonance_point": True}
+    view._last_actor_dict = {"actor_id": "a1", "display_name": "Hero"}
+
+    view._push_things_here_overlay()
+
+    kwargs = view._map.set_things_here.call_args.kwargs
+    assert kwargs["dungeon_channel_open"] is True
+
+
+def test_push_overlay_keeps_channel_closed_off_resonance(tmp_path):
+    view = _make_view(tmp_path)
+    view._map = MagicMock()
+    _seed_intimacy_clock(view._mem_repo, filled=6)
+    view._last_room_context = {"room_id": "r1", "resonance_point": False}
+    view._last_actor_dict = {"actor_id": "a1", "display_name": "Hero"}
+
+    view._push_things_here_overlay()
+
+    kwargs = view._map.set_things_here.call_args.kwargs
+    assert kwargs["dungeon_channel_open"] is False
+
+
+def test_overlay_click_speak_opens_dungeon_dialogue(tmp_path):
+    from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import (
+        DUNGEON_SPEAK_NOUN_ID,
+    )
+    view = _make_view(tmp_path)
+    view._map = MagicMock()
+    view._begin_dungeon_dialogue = MagicMock()
+
+    view._on_overlay_noun_click(DUNGEON_SPEAK_NOUN_ID)
+
+    view._begin_dungeon_dialogue.assert_called_once_with()
+
+
+# ---------------------------------------------------------------------------
 # Phase 50.6 Slice 8 — overlay noun click feeds the builder
 # ---------------------------------------------------------------------------
 

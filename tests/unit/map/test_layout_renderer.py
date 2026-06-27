@@ -326,6 +326,50 @@ def test_play_mode_draws_status_chip_with_color() -> None:
     assert "teal" in colors
 
 
+def test_play_mode_dungeon_speak_records_clickable_rect() -> None:
+    from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import (
+        DUNGEON_SPEAK_NOUN_ID,
+    )
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+    rooms = {"R1": _room("R1")}
+    result = _result(rooms=rooms)
+    view_state = GraphViewState()
+    view_state.select_room("R1")
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.draw_chip"), \
+            patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
+        renderer.draw(
+            result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
+            mode="play", room_things=_room_things(), dungeon_channel_open=True,
+        )
+        all_text = " ".join(str(c) for c in mock_arcade.draw_text.call_args_list)
+
+    assert "Speak to the Dungeon" in all_text
+    assert DUNGEON_SPEAK_NOUN_ID in renderer.thing_rects()
+
+
+def test_play_mode_no_dungeon_speak_rect_when_channel_closed() -> None:
+    from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import (
+        DUNGEON_SPEAK_NOUN_ID,
+    )
+    from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+    rooms = {"R1": _room("R1")}
+    result = _result(rooms=rooms)
+    view_state = GraphViewState()
+    view_state.select_room("R1")
+    renderer = LayoutRenderer()
+
+    with patch("dungeon_daddy.map.layout_renderer.draw_chip"), \
+            patch("dungeon_daddy.map.layout_renderer.arcade"):
+        renderer.draw(
+            result, 0.0, 0.0, 1.0, view_state=view_state, level=_level(),
+            mode="play", room_things=_room_things(), dungeon_channel_open=False,
+        )
+
+    assert DUNGEON_SPEAK_NOUN_ID not in renderer.thing_rects()
+
+
 def test_graph_mode_default_still_uses_graph_metadata() -> None:
     """Regression: design/graph mode (the default) is untouched by the play branch."""
     from dungeon_daddy.data.models import Room

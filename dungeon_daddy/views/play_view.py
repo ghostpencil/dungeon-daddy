@@ -1119,6 +1119,7 @@ class PlayView(arcade.View):
         before the first refresh.
         """
         from dungeon_daddy.rpg.action_options import room_things
+        from dungeon_daddy.rpg.dungeon_channel import dungeon_channel_available
 
         map_panel = getattr(self, "_map", None)
         room_context = getattr(self, "_last_room_context", None)
@@ -1127,9 +1128,15 @@ class PlayView(arcade.View):
         actor_dict = getattr(self, "_last_actor_dict", {})
         selected = self._rpg_vna.selected_noun_option()
         selected_noun_id = selected.noun_id if selected is not None else None
+        # Phase 51 Slice 9 (§4.6c): the "Speak to the Dungeon" entry affordance is
+        # shown only when both gates pass — a resonance point with intimacy met.
+        available, _ = dungeon_channel_available(
+            room_context, self._dungeon_intimacy_clock()
+        )
         map_panel.set_things_here(
             room_things(room_context, actor_dict),
             selected_noun_id=selected_noun_id,
+            dungeon_channel_open=available,
         )
 
     def _on_overlay_noun_click(self, noun_id: str) -> None:
@@ -1143,9 +1150,18 @@ class PlayView(arcade.View):
         Selecting does **not** rebuild the panel context — the room is unchanged,
         and a full refresh would reset the selection back to the default noun.
         """
+        from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import (
+            DUNGEON_SPEAK_NOUN_ID,
+        )
         from dungeon_daddy.rpg.action_options import (
             SOURCE_EXIT, SOURCE_LOOSE_ITEM, VERB_MOVE, VERB_PICK_UP,
         )
+
+        # Phase 51 Slice 9: the synthetic "Speak to the Dungeon" row opens the
+        # freeform dungeon channel instead of selecting a noun (D2b).
+        if noun_id == DUNGEON_SPEAK_NOUN_ID:
+            self._begin_dungeon_dialogue()
+            return
 
         _AUTO_VERB = {SOURCE_EXIT: VERB_MOVE, SOURCE_LOOSE_ITEM: VERB_PICK_UP}
         clicked = next(
@@ -1516,7 +1532,7 @@ class PlayView(arcade.View):
         """
         from dungeon_daddy.memory.dungeon_exchange import record_dungeon_exchange
 
-        self._chat.add_message("dm", reply)
+        self._chat.add_message("dungeon", reply)
         session = self._dialogue
         if session is not None:
             session.turns.append(("dungeon", reply))

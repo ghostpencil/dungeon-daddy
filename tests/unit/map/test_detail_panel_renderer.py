@@ -223,6 +223,35 @@ def test_no_footer_lines_rendered():
     assert "feeds the action builder" not in all_text
 
 
+def test_dungeon_speak_affordance_appended_when_channel_open():
+    # Phase 51 Slice 9 (D2b): at a resonance point with intimacy met, the overlay
+    # shows a distinct "Speak to the Dungeon" entry row carrying a synthetic noun id.
+    from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import (
+        DUNGEON_SPEAK_NOUN_ID,
+    )
+
+    lines = format_things_here(
+        _things(sections=[_exits_section()]), dungeon_channel_open=True
+    )
+    speak = [ln for ln in lines if ln.kind == "dungeon_speak"]
+    assert len(speak) == 1
+    assert speak[0].noun_id == DUNGEON_SPEAK_NOUN_ID
+    assert "dungeon" in speak[0].text.lower()
+
+
+def test_no_dungeon_speak_affordance_when_channel_closed():
+    lines = format_things_here(
+        _things(sections=[_exits_section()]), dungeon_channel_open=False
+    )
+    assert not any(ln.kind == "dungeon_speak" for ln in lines)
+
+
+def test_dungeon_speak_affordance_shows_even_in_empty_room():
+    # The channel entry must appear regardless of room contents.
+    lines = format_things_here(_things(sections=[]), dungeon_channel_open=True)
+    assert any(ln.kind == "dungeon_speak" for ln in lines)
+
+
 def test_room_id_folded_into_header():
     # Room code lives in the header to save a vertical row ("R1: THINGS HERE").
     lines = format_things_here(_things(room_id="R1", sections=[_exits_section()]))

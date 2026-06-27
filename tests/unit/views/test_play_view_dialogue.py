@@ -253,8 +253,9 @@ def test_apply_dungeon_reply_posts_bubble_and_records_exchange(tmp_path):
 
     view._apply_dungeon_reply("who are you?", "I am the deep.")
 
-    # The reply lands in the distinct (non-player) dungeon bubble.
-    view._chat.add_message.assert_any_call("dm", "I am the deep.")
+    # The reply lands in the dedicated dungeon-voice bubble (§4.6) — a distinct
+    # role from ordinary DM narration ("dm").
+    view._chat.add_message.assert_any_call("dungeon", "I am the deep.")
     # Engine tick (D4/§4.7): intimacy advances by the default per-exchange delta.
     clock = view._dungeon_intimacy_clock()
     assert clock.filled == 4
