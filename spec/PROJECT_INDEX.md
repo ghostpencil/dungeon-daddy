@@ -41,7 +41,7 @@ Phase 51.5 spec: `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`.
 
 ---
 
-## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slice 1 DONE → next: commit, then Slice 2
+## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slices 1–2 DONE & committed → next: Slice 3 (completion predicate)
 
 **Phase 51.5** is on branch `phase-51` (off `main`), extending the now feature-complete Phase 51
 channel. The 2026-06-27 playtest found the channel **hollow**: good dialogue, but the dungeon has no
@@ -58,20 +58,30 @@ memory). New first-class **`Objective` model** + `018_objectives.sql` + a **comp
 (`advance_objectives`, evaluated by querying world state after each command — no event bus; ticks
 intimacy as the single source of truth). Designed to also seed **Phase 52 Milestones** (§10).
 
-**Slice 1 — DONE (2026-06-27), NOT yet committed (in the working tree).** `Objective` +
-`ObjectiveCompletion` Pydantic models in `rpg/models.py` (validators: `object_state` completion
-requires `required_state`; `tier_index` non-negative) and `ObjectiveManifest` +
-`ObjectiveCompletionManifest` + `CampaignManifest.dungeon_objectives` in `campaign/manifest.py`. 11
-new tests (8 `test_models.py` → `TestObjectiveCompletion`/`TestObjective`; 3
-`test_campaign_manifest.py`); rpg-models + full campaign suite green (217). Purely additive.
-**Next-session step 0: commit Slice 1** (suggested: `feat(rpg): Phase 51.5 Slice 1 — first-class
-Objective model + manifest field`). Uncommitted files: `dungeon_daddy/rpg/models.py`,
-`dungeon_daddy/campaign/manifest.py`, `tests/unit/rpg/test_models.py`,
-`tests/unit/campaign/test_campaign_manifest.py`, plus this index + the new spec file.
+**Slice 1 — DONE & committed (`f67d829`).** `Objective` + `ObjectiveCompletion` Pydantic models in
+`rpg/models.py` (validators: `object_state` completion requires `required_state`; `tier_index`
+non-negative) and `ObjectiveManifest` + `ObjectiveCompletionManifest` +
+`CampaignManifest.dungeon_objectives` in `campaign/manifest.py`. 11 new tests (8 `test_models.py` →
+`TestObjectiveCompletion`/`TestObjective`; 3 `test_campaign_manifest.py`). Purely additive.
 
-**⮕ NEXT: Slice 2 (TDD) — migration `018_objectives.sql` + repo `save_objective`/`get_objectives`/
-`update_objective_status` (round-trip incl. `completion` + `reveals_knowledge`).** Then the §7 plan: 2 migration+repo →
-3 completion predicate → 4 objective service → 5 drop chat intimacy tick → 6 systems-status helper →
+**Slice 2 — DONE & committed.** Migration **`018_objectives.sql`** (`objectives` table with
+`completion` flattened 1:1 into `completion_kind`/`completion_target_slug`/`completion_required_state`
+columns + `advances_clock_slug`, `UNIQUE(campaign_id, slug)`; child table
+`objective_knowledge(objective_id, ordinal, secret)` for the ordered `reveals_knowledge` list —
+mirrors the `room_objects`/`object_transitions` house pattern). Repo (`memory/repository.py`):
+`save_objective` (upsert + replace knowledge rows), `get_objectives(campaign_id)` (ordered by
+`tier_index, slug`; reconstructs nested `completion` dict + `reveals_knowledge` list),
+`update_objective_status(objective_id, status)`. Returns `list[dict]` matching the
+`get_objects_by_room` style. 9 new tests in `tests/unit/memory/test_objective_repository.py`
+(basic round-trip, completion round-trip, knowledge ordered/empty, status update, campaign filter,
+tier ordering, unknown-campaign empty, upsert-no-dup + replaces knowledge). memory + rpg-models +
+campaign suites green (424).
+
+**⮕ NEXT: Slice 3 (TDD) — completion predicate.** Pure
+`completion_satisfied(completion, world_state) -> bool` (proposed home `dungeon_daddy/rpg/objectives.py`)
+for `object_state` (the target object's `current_state == required_state`); extensible to
+`item_obtained`/`room_reached`. Unit-tested without a repo (pure helper). Then the §7 plan:
+4 objective service (`advance_objectives`) → 5 drop chat intimacy tick → 6 systems-status helper →
 7 tier-knowledge/active-objective helpers → 8 agent context → 9 PlayView wiring → 10 seed the full
 ladder → 11 (optional) tier HUD. Use the TDD skill (read `spec/TESTING.md` first).
 
