@@ -16,9 +16,10 @@ DuckDB ref columns + seed-time writer + attach-time reader). **Seeding step DONE
 manifest `resonance_point` archetype + `tools/populate_crucible_dungeon_channel.py` — live Crucible
 save now has forge-mind persona docs, the adopted recedable `dungeon_intimacy` clock (3/6,
 `monotonic=False`), and a `resonance_point` in r04; channel verified available at r04. **Slice 9 (UI
-treatment): code + tests DONE (2026-06-26); awaiting manual GUI verify** — distinct dungeon-voice
-bubble + "Speak to the Dungeon" overlay entry affordance (gated to resonance+intimacy). After GUI
-verify, a live playtest at r04 is unblocked. See the START HERE section below.
+treatment): DONE & GUI-verified (2026-06-26)** — distinct dungeon-voice bubble + "Speak to the Dungeon"
+overlay entry affordance (gated to resonance+intimacy); GUI-verify caught a bug (the VNA room context
+lacked the derived `resonance_point` flag — fixed in `build_room_noun_context`). **The dungeon channel
+is now live & playable at r04.** See the START HERE section below.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -32,9 +33,9 @@ Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 **Phase 51 — Talk to the Dungeon** is underway on branch `phase-51` (off `main`). The spec is
 **finalized** (`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions are locked (§3).
 
-### ⮕ NEXT: manual GUI verify of Slice 9, then live playtest (Persona Persistence **P1–P4 DONE**; **seeding step DONE**; **Slice 9 code+tests DONE**)
+### ⮕ NEXT: live playtest of the dungeon channel, then Slice 10 (optional corruption scaffold) / phase wrap (Persona Persistence **P1–P4 DONE**; **seeding step DONE**; **Slice 9 DONE & GUI-verified**)
 
-**Slice 9 — UI treatment — code + tests DONE (2026-06-26); awaiting manual GUI verify.** Three parts,
+**Slice 9 — UI treatment — DONE & GUI-verified (2026-06-26).** Three parts,
 all TDD (suite green). **(b) Distinct dungeon bubble:** `chat_panel._bubble_style(role)` extracted as a
 pure helper (testable headlessly); new `"dungeon"` chat role (added to `ChatMessage.role` Literal) gets
 an uncanny treatment — darkest `BG_1` fill + violet stroke + `◆ THE CRUCIBLE` label — to read apart from
@@ -49,12 +50,14 @@ click plumbing (it registers a `thing_rect`), and `_on_overlay_noun_click` **int
 3 view-model (`format_things_here`), 2 renderer (rect recorded/not), 1 MapPanel forward, 3 play_view
 (gate-open / off-resonance / speak-click); plus the dialogue test retargeted to the `"dungeon"` role.
 
-**Manual GUI verify (house practice — user drives, not computer-use):** `python -m dungeon_daddy` → load
-**The Crucible** → take the Great Lift down to **Level 2, r04 (Arcane Power Room)**. Expect: the map room
-overlay shows a violet **"◆ Speak to the Dungeon"** row (it should NOT appear in non-resonance rooms);
-clicking it swaps the chat input to the SAY box; typing gets an in-voice reply in the distinct
-**◆ THE CRUCIBLE** bubble (darker than DM narration); `/leave` or leaving r04 closes it. (Requires the
-app's LLM key for live replies.) Smoke test optional (50.6 precedent).
+**GUI-verified (2026-06-26, user-driven per house practice).** At **Level 2, r04 (Arcane Power Room)**
+the overlay shows the violet **"◆ Speak to the Dungeon"** row (absent in non-resonance rooms); clicking
+it swaps to the SAY box; typing returns an in-voice reply in the distinct **◆ THE CRUCIBLE** bubble.
+**Bug found & fixed during verify** (`f1dc2f9`): `_refresh_vna_panel` builds `_last_room_context` via
+`build_room_noun_context`, which carried the resonance *object* but not the derived `resonance_point`
+*flag* the gate reads — so the row never appeared. Fix: derive the flag in `build_room_noun_context`
+(matches `rpg.room_context.build_room_context`). Smoke test skipped (50.6 precedent — manual verify
+sufficient).
 
 ### (history) the seeding step + Slice 9
 
