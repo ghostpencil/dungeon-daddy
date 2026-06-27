@@ -92,7 +92,10 @@ class RoomObjectManifest(BaseModel):
     display_name: str
     room_id: str
     level_id: str
-    archetype: Literal["container", "door", "mechanism", "structure", "trap", "lore_fixture", "resource"]
+    archetype: Literal[
+        "container", "door", "mechanism", "structure", "trap", "lore_fixture",
+        "resource", "resonance_point",
+    ]
     description: str
     initial_state: str
     transitions: list[ObjectTransitionManifest] = Field(default_factory=list)

@@ -12,8 +12,12 @@ Phase **51 — Talk to the Dungeon: IN PROGRESS** on branch `phase-51` (started 
 Decisions locked; **Slices 1–8 DONE & committed**. **Voice/knowledge-at-play-time decision made
 (2026-06-26): Markdown-backed, DB-referenced** — persona text lives in the save's `memory/` tree,
 DuckDB holds path references. **Persona Persistence: P1–P4 DONE** (persona Markdown helpers +
-DuckDB ref columns + seed-time writer + attach-time reader); **next** = the seeding step + Slice 9
-(UI treatment) — both gate a live playtest. See the START HERE section below.
+DuckDB ref columns + seed-time writer + attach-time reader). **Seeding step DONE** (2026-06-26):
+manifest `resonance_point` archetype + `tools/populate_crucible_dungeon_channel.py` — live Crucible
+save now has forge-mind persona docs, the adopted recedable `dungeon_intimacy` clock (3/6,
+`monotonic=False`), and a `resonance_point` in r04; channel verified available at r04. **Next** =
+Slice 9 (UI treatment) — the channel still has **no GUI entry**, so the live playtest waits on it.
+See the START HERE section below.
 
 Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index:
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
@@ -27,7 +31,28 @@ Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 **Phase 51 — Talk to the Dungeon** is underway on branch `phase-51` (off `main`). The spec is
 **finalized** (`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions are locked (§3).
 
-### ⮕ NEXT: the seeding step + Slice 9 (Persona Persistence **P1–P4 DONE** — Slice 8 carried gap (c) resolved)
+### ⮕ NEXT: Slice 9 — UI treatment (Persona Persistence **P1–P4 DONE**; **seeding step DONE** — Slice 8 carried gap (c) resolved)
+
+**Seeding step — DONE (2026-06-26).** Two parts: (1) **Deferred item 2 resolved** — `"resonance_point"`
+added to the manifest `RoomObjectManifest.archetype` Literal (`campaign/manifest.py`) + test. (2) New
+**`tools/populate_crucible_dungeon_channel.py`** (`seed_dungeon_channel(repo, save_dir, campaign_id)`;
+idempotent, importable + testable) seeds the channel into the Crucible: forge-mind `dungeon_voice` +
+5 `dungeon_knowledge` secrets written via the P1 helpers under `memory/dungeon/` with save-relative
+refs on the `campaigns` row; the recedable `dungeon_intimacy` clock; and a `resonance_point` object in
+**r04 (Arcane Power Room, L2)**. **Key gotcha (captured):** the canonical RPG seed (`rpg_seed.json` →
+`SeedClock`, which has **no `monotonic` field**) already authors a `dungeon_intimacy` clock
+(`the-dungeon-learns-you`, `monotonic=True`) — so the channel seed **adopts** that existing clock
+(flips `monotonic=False`, raises fill to the cryptic threshold, preserves earned progress) rather than
+minting a second one (`play_view._dungeon_intimacy_clock()` returns the **first** category match, so a
+duplicate would shadow it). 7 tests in `tests/unit/tools/test_populate_crucible_dungeon_channel.py`
+(persona refs, preserve campaign fields, recedable clock, adopt-existing, channel-opens-at-r04 via real
+`build_room_context`+`dungeon_channel_available`, idempotent, preserve-progress). **Live save seeded &
+verified** (backup `campaign.duckdb.bak-phase51-channel-*`): one intimacy clock (3/6, `monotonic=False`),
+`dungeon_channel_available` → `(True, None)` at r04, locked elsewhere. **Possible follow-up:** add
+`monotonic` to `SeedClock` + `monotonic:false` on the rpg_seed clock so a fresh *publish* is correct
+without the channel-seed flip (today the channel seed is the only thing that makes it recedable).
+
+### (history) the seeding step + Slice 9
 
 **Decision (2026-06-26): voice/knowledge reach play time via Markdown-backed, DB-referenced
 storage.** This was the open "how do `dungeon_voice`/`dungeon_knowledge` reach play time" question

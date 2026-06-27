@@ -282,6 +282,21 @@ def test_room_object_manifest_accepts_transitions():
     assert obj.transitions[0].requires_item_slug is None
 
 
+def test_room_object_manifest_accepts_resonance_point_archetype():
+    # Phase 51: a resonance_point object marks the room where the dungeon channel
+    # may open. The manifest archetype Literal must accept it (Deferred item 2).
+    obj = RoomObjectManifest(
+        slug="forge-heart",
+        display_name="Forge Heart",
+        room_id="r04",
+        level_id="level:2",
+        archetype="resonance_point",
+        description="A node where the citadel's mind is close enough to hear.",
+        initial_state="dormant",
+    )
+    assert obj.archetype == "resonance_point"
+
+
 def test_campaign_manifest_room_objects_defaults_to_empty():
     campaign = CampaignManifest(slug="x", title="X", dungeon_slug="x")
     assert campaign.room_objects == []
