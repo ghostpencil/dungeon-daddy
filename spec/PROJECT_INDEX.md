@@ -8,7 +8,19 @@ Phase **50.6 — Chat Action Cockpit: COMPLETE, GUI-verified & merged to `main`*
 All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds; Slice 9 retired ACTION
 tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
 bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
-Phase **51 — Talk to the Dungeon: IN PROGRESS** on branch `phase-51` (started 2026-06-26).
+Phase **51.5 — Dungeon Objectives & Intimacy Tiers: SPEC FINALIZED, STARTING** on branch `phase-51`
+(2026-06-27). Extension of Phase 51 — **no merge to `main` until 51.5 is built** (owner decision).
+Driven by the 2026-06-27 playtest: the channel is hollow (no grounded facts). Spec
+`spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`, all decisions locked (D1–D8). Thesis: gate intimacy on
+completing deterministic in-engine **objectives** (restore dungeon **subsystems**) instead of
+per-chat-exchange; author a **tiered intimacy ladder** (3–4 tiers) with per-tier knowledge; make the
+dungeon **react to who is speaking** (the Artificer) + give a **truthful systems assessment**. New
+first-class `Objective` model + `018_objectives.sql` + completion service (designed to also seed
+Phase 52 Milestones). 10-slice TDD plan (§7), pure-models-first; **starting Slice 1** (Objective
+model + manifest field). Chat stops ticking intimacy (still drafts memory); `dungeon_intimacy`
+becomes a latching tier index.
+
+Phase **51 — Talk to the Dungeon: FEATURE-COMPLETE & GUI-verified** on branch `phase-51` (2026-06-26).
 Decisions locked; **Slices 1–8 DONE & committed**. **Voice/knowledge-at-play-time decision made
 (2026-06-26): Markdown-backed, DB-referenced** — persona text lives in the save's `memory/` tree,
 DuckDB holds path references. **Persona Persistence: P1–P4 DONE** (persona Markdown helpers +
@@ -25,29 +37,48 @@ Specs: current/future phases in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (inde
 `spec/IMPLEMENTATION_PHASES.md`). Phase 50.5 spec: `spec/PHASE_50_5_USE_ON_GRAMMAR.md`.
 Phase 50.6 spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`.
 Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
+Phase 51.5 spec: `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`.
 
 ---
 
-## START HERE next session — Phase 51; channel LIVE & GUI-verified → decide: playtest / Slice 10 / wrap & merge
+## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slice 1 DONE → next: commit, then Slice 2
 
-**Phase 51 — Talk to the Dungeon** is on branch `phase-51` (off `main`). The spec is **finalized**
-(`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions locked (§3). **Slices 1–9 +
-Persona Persistence (P1–P4) + the seeding step are ALL DONE**, and the dungeon channel is **live &
-GUI-verified at r04** (Arcade Power Room, L2). Working tree clean; latest commit `ce4b092`.
+**Phase 51.5** is on branch `phase-51` (off `main`), extending the now feature-complete Phase 51
+channel. The 2026-06-27 playtest found the channel **hollow**: good dialogue, but the dungeon has no
+concrete facts (no systems state, no character awareness, no objectives — it demanded "authorization"
+with no way to provide it). Spec `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` is **finalized, all decisions
+locked (D1–D8)**.
 
-**⮕ DECISION FOR NEXT SESSION — pick one (all three are valid stopping points):**
-1. **Playtest** the live channel at r04 for feel/balance (intimacy starts 3/6 cryptic; each exchange
-   `+1` toward the high band where the full 5 secrets unlock). Tune constants in `BALANCE_NOTES.md`
-   / `rpg/dungeon_channel.py` if needed (§6 open balance questions).
-2. **Slice 10 (optional, D5)** — the corruption-clock **scaffold only**: `dungeon_corruption_clock`
-   flag (already on `CampaignManifest`, Slice 1) + a threshold read; **no proposal emission** (mark the
-   seam). Spec §7.10. This is the last roadmap item for the phase.
-3. **Wrap Phase 51 → merge to `main`** — if Slice 10 is skipped (it's optional), the phase is feature-
-   complete. Prep the PR. (The docs-only `docs/index-50.6-merged` correction is already folded into
-   this index — no separate merge needed.)
+**Design in one breath:** intimacy becomes a **ladder climbed by doing** — completing deterministic
+in-engine **objectives** (restore dungeon **subsystems**, modeled as `RoomObject`s) advances a
+**latching** `dungeon_intimacy` tier index; each tier unlocks authored **knowledge/secrets**; the
+dungeon is fed **who is speaking** (reacts to the Artificer), a **truthful systems status**, and the
+**active objective as a "what I want next" hint**. Chat no longer ticks intimacy (still drafts
+memory). New first-class **`Objective` model** + `018_objectives.sql` + a **completion service**
+(`advance_objectives`, evaluated by querying world state after each command — no event bus; ticks
+intimacy as the single source of truth). Designed to also seed **Phase 52 Milestones** (§10).
 
-Recommendation: if no appetite for the corruption scaffold, **playtest then wrap/merge**. Slice 10 can
-be a later add-on (it's explicitly optional in the spec).
+**Slice 1 — DONE (2026-06-27), NOT yet committed (in the working tree).** `Objective` +
+`ObjectiveCompletion` Pydantic models in `rpg/models.py` (validators: `object_state` completion
+requires `required_state`; `tier_index` non-negative) and `ObjectiveManifest` +
+`ObjectiveCompletionManifest` + `CampaignManifest.dungeon_objectives` in `campaign/manifest.py`. 11
+new tests (8 `test_models.py` → `TestObjectiveCompletion`/`TestObjective`; 3
+`test_campaign_manifest.py`); rpg-models + full campaign suite green (217). Purely additive.
+**Next-session step 0: commit Slice 1** (suggested: `feat(rpg): Phase 51.5 Slice 1 — first-class
+Objective model + manifest field`). Uncommitted files: `dungeon_daddy/rpg/models.py`,
+`dungeon_daddy/campaign/manifest.py`, `tests/unit/rpg/test_models.py`,
+`tests/unit/campaign/test_campaign_manifest.py`, plus this index + the new spec file.
+
+**⮕ NEXT: Slice 2 (TDD) — migration `018_objectives.sql` + repo `save_objective`/`get_objectives`/
+`update_objective_status` (round-trip incl. `completion` + `reveals_knowledge`).** Then the §7 plan: 2 migration+repo →
+3 completion predicate → 4 objective service → 5 drop chat intimacy tick → 6 systems-status helper →
+7 tier-knowledge/active-objective helpers → 8 agent context → 9 PlayView wiring → 10 seed the full
+ladder → 11 (optional) tier HUD. Use the TDD skill (read `spec/TESTING.md` first).
+
+**Carried from Phase 51 (now superseded by 51.5 where noted):** the per-exchange `+1` intimacy tick
+(Slice 7 `record_dungeon_exchange`) is **removed** in 51.5 Slice 5; the `monotonic=False` flip on the
+seeded `dungeon_intimacy` clock is **reverted** (D6 — it latches now); the flat `dungeon_knowledge` +
+`reveal_knowledge` slice is **replaced** by per-tier `reveals_knowledge` (D7, kept for back-compat).
 
 ### Reference — completed Slice 9 detail (history)
 

@@ -8,6 +8,8 @@ from dungeon_daddy.campaign.manifest import (
     FactionManifest,
     ItemFeatureManifest,
     ItemManifest,
+    ObjectiveCompletionManifest,
+    ObjectiveManifest,
     ObjectTransitionManifest,
     RoomExitSeed,
     RoomObjectManifest,
@@ -172,6 +174,54 @@ def test_campaign_manifest_dungeon_voice_fields_round_trip():
         "the lift hides a vault",
     ]
     assert restored.dungeon_corruption_clock is True
+
+
+def test_campaign_manifest_dungeon_objectives_default_empty():
+    campaign = CampaignManifest(slug="x", title="X", dungeon_slug="x")
+    assert campaign.dungeon_objectives == []
+
+
+def test_objective_manifest_round_trip_through_campaign():
+    original = CampaignManifest(
+        slug="x",
+        title="X",
+        dungeon_slug="x",
+        dungeon_objectives=[
+            ObjectiveManifest(
+                slug="restore-coolant",
+                title="Restore the Coolant Loop",
+                description="The Crucible wants its coolant loop online again.",
+                tier_index=0,
+                completion=ObjectiveCompletionManifest(
+                    kind="object_state",
+                    target_slug="coolant-loop",
+                    required_state="restored",
+                ),
+                reveals_knowledge=["The coolant loop hides a sealed conduit."],
+            ),
+        ],
+    )
+    restored = CampaignManifest.model_validate_json(original.model_dump_json())
+    assert isinstance(restored.dungeon_objectives[0], ObjectiveManifest)
+    obj = restored.dungeon_objectives[0]
+    assert obj.slug == "restore-coolant"
+    assert obj.tier_index == 0
+    assert obj.completion.target_slug == "coolant-loop"
+    assert obj.completion.required_state == "restored"
+    assert obj.reveals_knowledge == ["The coolant loop hides a sealed conduit."]
+
+
+def test_objective_manifest_object_state_requires_required_state():
+    with pytest.raises(ValidationError):
+        ObjectiveManifest(
+            slug="restore-coolant",
+            title="Restore the Coolant Loop",
+            description="...",
+            tier_index=0,
+            completion=ObjectiveCompletionManifest(
+                kind="object_state", target_slug="coolant-loop"
+            ),
+        )
 
 
 def test_item_manifest_parses_minimal_fields():

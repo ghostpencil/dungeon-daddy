@@ -267,6 +267,52 @@ class RoomObject(BaseModel):
         return v
 
 
+class ObjectiveCompletion(BaseModel):
+    """Deterministic condition that completes an Objective (Phase 51.5 §4.3.1).
+
+    Keyed to existing world state — the engine evaluates it by querying state, no
+    LLM involvement (D4). ``object_state`` is the primary kind (a subsystem
+    ``RoomObject`` reaching ``required_state``); item/room kinds are extensible.
+    """
+
+    kind: Literal["object_state", "item_obtained", "room_reached"]
+    target_slug: str
+    required_state: str | None = None
+
+    @model_validator(mode="after")
+    def object_state_requires_required_state(self) -> "ObjectiveCompletion":
+        if self.kind == "object_state" and not self.required_state:
+            raise ValueError("object_state completion requires required_state")
+        return self
+
+
+class Objective(BaseModel):
+    """A tracked, deterministically-completable goal (Phase 51.5 §4.3.1, D2).
+
+    Completing the tier's objective advances the latching ``dungeon_intimacy``
+    clock and unlocks that tier's ``reveals_knowledge``. Designed to also serve
+    as the foundation for Phase 52 milestones (§10).
+    """
+
+    objective_id: str
+    campaign_id: str
+    slug: str
+    title: str
+    description: str
+    tier_index: int
+    status: Literal["locked", "active", "completed"] = "locked"
+    completion: ObjectiveCompletion
+    advances_clock_slug: str | None = None
+    reveals_knowledge: list[str] = Field(default_factory=list)
+
+    @field_validator("tier_index")
+    @classmethod
+    def tier_index_not_negative(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError("tier_index cannot be negative")
+        return v
+
+
 class ActorAbility(BaseModel):
     actor_id: str
     ability_slug: str

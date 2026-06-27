@@ -10,6 +10,8 @@ from dungeon_daddy.rpg.models import (
     FalloutRecord,
     Item,
     ItemFeature,
+    Objective,
+    ObjectiveCompletion,
     ObjectTransition,
     ReactionClockLine,
     ReactionStressLine,
@@ -696,3 +698,91 @@ class TestRoomExit:
             connector_type="stair_down",
         )
         assert exit_.connector_type == "stair_down"
+
+
+class TestObjectiveCompletion:
+    def test_object_state_completion_constructs(self) -> None:
+        c = ObjectiveCompletion(
+            kind="object_state",
+            target_slug="coolant-loop",
+            required_state="restored",
+        )
+        assert c.kind == "object_state"
+        assert c.target_slug == "coolant-loop"
+        assert c.required_state == "restored"
+
+    def test_object_state_requires_required_state(self) -> None:
+        with pytest.raises(ValidationError):
+            ObjectiveCompletion(kind="object_state", target_slug="coolant-loop")
+
+    def test_item_obtained_completion_needs_no_required_state(self) -> None:
+        c = ObjectiveCompletion(kind="item_obtained", target_slug="resonance-key")
+        assert c.required_state is None
+
+    def test_unknown_kind_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            ObjectiveCompletion(kind="vibes_aligned", target_slug="x")
+
+
+class TestObjective:
+    def _completion(self) -> ObjectiveCompletion:
+        return ObjectiveCompletion(
+            kind="object_state", target_slug="coolant-loop", required_state="restored"
+        )
+
+    def test_constructs_with_required_fields_and_defaults(self) -> None:
+        obj = Objective(
+            objective_id="obj:camp-1:restore-coolant",
+            campaign_id="camp-1",
+            slug="restore-coolant",
+            title="Restore the Coolant Loop",
+            description="The Crucible wants its coolant loop online again.",
+            tier_index=0,
+            completion=self._completion(),
+        )
+        assert obj.status == "locked"
+        assert obj.advances_clock_slug is None
+        assert obj.reveals_knowledge == []
+        assert obj.completion.target_slug == "coolant-loop"
+
+    def test_full_fields_stored(self) -> None:
+        obj = Objective(
+            objective_id="obj:camp-1:restore-core",
+            campaign_id="camp-1",
+            slug="restore-core",
+            title="Restore the Memory Core",
+            description="Bring the core back so the dungeon can remember.",
+            tier_index=2,
+            status="active",
+            completion=self._completion(),
+            advances_clock_slug="dungeon_intimacy",
+            reveals_knowledge=["The core holds the forge-mind's true name."],
+        )
+        assert obj.status == "active"
+        assert obj.advances_clock_slug == "dungeon_intimacy"
+        assert obj.reveals_knowledge == ["The core holds the forge-mind's true name."]
+
+    def test_unknown_status_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            Objective(
+                objective_id="o",
+                campaign_id="c",
+                slug="s",
+                title="T",
+                description="D",
+                tier_index=0,
+                status="smitten",
+                completion=self._completion(),
+            )
+
+    def test_negative_tier_index_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            Objective(
+                objective_id="o",
+                campaign_id="c",
+                slug="s",
+                title="T",
+                description="D",
+                tier_index=-1,
+                completion=self._completion(),
+            )

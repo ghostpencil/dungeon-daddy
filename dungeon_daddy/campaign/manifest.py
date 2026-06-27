@@ -101,6 +101,35 @@ class RoomObjectManifest(BaseModel):
     transitions: list[ObjectTransitionManifest] = Field(default_factory=list)
 
 
+class ObjectiveCompletionManifest(BaseModel):
+    kind: Literal["object_state", "item_obtained", "room_reached"]
+    target_slug: str
+    required_state: str | None = None
+
+    @model_validator(mode="after")
+    def object_state_requires_required_state(self) -> "ObjectiveCompletionManifest":
+        if self.kind == "object_state" and not self.required_state:
+            raise ValueError("object_state completion requires required_state")
+        return self
+
+
+class ObjectiveManifest(BaseModel):
+    slug: str
+    title: str
+    description: str
+    tier_index: int
+    completion: ObjectiveCompletionManifest
+    advances_clock_slug: str | None = None
+    reveals_knowledge: list[str] = Field(default_factory=list)
+
+    @field_validator("tier_index")
+    @classmethod
+    def tier_index_not_negative(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError("tier_index cannot be negative")
+        return v
+
+
 class RoomExitSeed(BaseModel):
     from_room_id: str
     to_room_id: str
@@ -135,3 +164,4 @@ class CampaignManifest(BaseModel):
     dungeon_voice: str | None = None
     dungeon_knowledge: list[str] = Field(default_factory=list)
     dungeon_corruption_clock: bool = False
+    dungeon_objectives: list[ObjectiveManifest] = Field(default_factory=list)
