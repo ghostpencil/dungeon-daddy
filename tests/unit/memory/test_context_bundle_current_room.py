@@ -128,6 +128,39 @@ class TestContextBundleCurrentRoomBuilder:
         assert obj["description"] == "A heavy iron chest."
         assert "transitions" not in obj
 
+    def test_resonance_point_object_sets_room_flag(
+        self, repo: MemoryRepository
+    ) -> None:
+        # Phase 51: build_room_noun_context derives the resonance_point flag so the
+        # Play-mode dungeon-channel gate (dungeon_channel_available) can read it
+        # from the same context the VNA panel uses.
+        from dungeon_daddy.memory.context_bundle import build_room_noun_context
+
+        room_id = "room:level-01:antechamber"
+        repo.save_room_object(RoomObject(
+            object_id="obj:c1:node",
+            campaign_id="camp_001",
+            room_id=room_id,
+            level_id="level-01",
+            slug="resonance-node",
+            display_name="Resonance Node",
+            archetype="resonance_point",
+            description="A node where the dungeon's mind presses close.",
+            current_state="attuned",
+            transitions=[],
+        ))
+
+        ctx = build_room_noun_context(repo, "camp_001", room_id)
+        assert ctx["resonance_point"] is True
+
+    def test_no_resonance_point_object_leaves_flag_false(
+        self, repo: MemoryRepository
+    ) -> None:
+        from dungeon_daddy.memory.context_bundle import build_room_noun_context
+
+        ctx = build_room_noun_context(repo, "camp_001", "room:level-01:antechamber")
+        assert ctx["resonance_point"] is False
+
     def test_room_id_with_no_contents_returns_empty_lists(
         self, repo: MemoryRepository
     ) -> None:
@@ -141,6 +174,7 @@ class TestContextBundleCurrentRoomBuilder:
         ).build(repo)
         assert bundle.current_room == {
             "room_id": "room:level-01:antechamber",
+            "resonance_point": False,
             "objects": [],
             "loose_items": [],
             "npcs": [],

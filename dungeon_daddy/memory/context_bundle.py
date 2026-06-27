@@ -206,6 +206,10 @@ def build_room_noun_context(
     exits = repo.get_exits_by_room(campaign_id, room_id)
     return {
         "room_id": room_id,
+        # Phase 51: derive the resonance flag so the dungeon-channel gate
+        # (dungeon_channel_available) reads it from this shared context (matches
+        # rpg.room_context.build_room_context).
+        "resonance_point": any(o["archetype"] == "resonance_point" for o in objects),
         "objects": [
             {
                 "object_id": o["object_id"],
