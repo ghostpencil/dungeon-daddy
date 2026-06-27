@@ -28,12 +28,28 @@ Phase 51 spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 
 ---
 
-## START HERE next session — Phase 51; Persona Persistence P1–P4 DONE → seeding step + Slice 9 next
+## START HERE next session — Phase 51; channel LIVE & GUI-verified → decide: playtest / Slice 10 / wrap & merge
 
-**Phase 51 — Talk to the Dungeon** is underway on branch `phase-51` (off `main`). The spec is
-**finalized** (`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions are locked (§3).
+**Phase 51 — Talk to the Dungeon** is on branch `phase-51` (off `main`). The spec is **finalized**
+(`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`, commit `7a36905`); decisions locked (§3). **Slices 1–9 +
+Persona Persistence (P1–P4) + the seeding step are ALL DONE**, and the dungeon channel is **live &
+GUI-verified at r04** (Arcade Power Room, L2). Working tree clean; latest commit `ce4b092`.
 
-### ⮕ NEXT: live playtest of the dungeon channel, then Slice 10 (optional corruption scaffold) / phase wrap (Persona Persistence **P1–P4 DONE**; **seeding step DONE**; **Slice 9 DONE & GUI-verified**)
+**⮕ DECISION FOR NEXT SESSION — pick one (all three are valid stopping points):**
+1. **Playtest** the live channel at r04 for feel/balance (intimacy starts 3/6 cryptic; each exchange
+   `+1` toward the high band where the full 5 secrets unlock). Tune constants in `BALANCE_NOTES.md`
+   / `rpg/dungeon_channel.py` if needed (§6 open balance questions).
+2. **Slice 10 (optional, D5)** — the corruption-clock **scaffold only**: `dungeon_corruption_clock`
+   flag (already on `CampaignManifest`, Slice 1) + a threshold read; **no proposal emission** (mark the
+   seam). Spec §7.10. This is the last roadmap item for the phase.
+3. **Wrap Phase 51 → merge to `main`** — if Slice 10 is skipped (it's optional), the phase is feature-
+   complete. Prep the PR. (The docs-only `docs/index-50.6-merged` correction is already folded into
+   this index — no separate merge needed.)
+
+Recommendation: if no appetite for the corruption scaffold, **playtest then wrap/merge**. Slice 10 can
+be a later add-on (it's explicitly optional in the spec).
+
+### Reference — completed Slice 9 detail (history)
 
 **Slice 9 — UI treatment — DONE & GUI-verified (2026-06-26).** Three parts,
 all TDD (suite green). **(b) Distinct dungeon bubble:** `chat_panel._bubble_style(role)` extracted as a
