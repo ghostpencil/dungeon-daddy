@@ -20,6 +20,25 @@ CRYPTIC_REVEAL_FRACTION = 0.5
 REASON_NOT_HERE = "You are not standing where the dungeon can hear you."
 REASON_NOT_INTIMATE = "The dungeon does not yet know you well enough to speak."
 
+# Object archetypes the dungeon models as restorable *subsystems* (spec §4.2).
+SUBSYSTEM_ARCHETYPES = ("mechanism", "structure")
+
+
+def dungeon_systems_status(room_objects: list[dict]) -> list[tuple[str, str]]:
+    """Return a deterministic snapshot of the dungeon's subsystems (spec §4.2).
+
+    ``room_objects`` are repo dicts (the ``get_objects_for_campaign`` shape, each
+    with ``display_name``/``archetype``/``current_state``). Only subsystem-tagged
+    objects (archetype ``mechanism``/``structure``) are reported, as
+    ``(display_name, current_state)`` pairs, in input order — so the dungeon can
+    give a *truthful* systems assessment.
+    """
+    return [
+        (obj["display_name"], obj["current_state"])
+        for obj in room_objects
+        if obj.get("archetype") in SUBSYSTEM_ARCHETYPES
+    ]
+
 
 def dungeon_channel_available(
     room_context: dict,

@@ -2,6 +2,7 @@ from dungeon_daddy.rpg.dungeon_channel import (
     REASON_NOT_HERE,
     REASON_NOT_INTIMATE,
     dungeon_channel_available,
+    dungeon_systems_status,
     reveal_knowledge,
 )
 from dungeon_daddy.rpg.models import ClockState
@@ -101,3 +102,52 @@ def test_reveal_cryptic_band_yields_at_least_one_fragment() -> None:
 def test_reveal_full_list_at_exact_high_threshold_boundary() -> None:
     # 17/20 == 0.85 == HIGH_INTIMACY_THRESHOLD — at the boundary counts as high (>=).
     assert reveal_knowledge(_KNOWLEDGE, filled=17, segments=20) == _KNOWLEDGE
+
+
+# --- dungeon_systems_status (Slice 6) -------------------------------------
+
+
+def _obj(archetype: str, display_name: str, current_state: str) -> dict:
+    # The repo dict shape (get_objects_for_campaign / get_objects_by_room).
+    return {
+        "object_id": f"o-{display_name}",
+        "slug": display_name.lower().replace(" ", "-"),
+        "display_name": display_name,
+        "archetype": archetype,
+        "current_state": current_state,
+    }
+
+
+def test_systems_status_reports_subsystem_name_and_state() -> None:
+    objs = [_obj("mechanism", "Coolant Loop", "offline")]
+    assert dungeon_systems_status(objs) == [("Coolant Loop", "offline")]
+
+
+def test_systems_status_excludes_non_subsystem_archetypes() -> None:
+    # Doors, containers, resonance points etc. are not subsystems.
+    objs = [
+        _obj("door", "North Gate", "locked"),
+        _obj("structure", "Support Pillar", "damaged"),
+        _obj("resonance_point", "Resonance Node", "active"),
+        _obj("container", "Supply Crate", "closed"),
+    ]
+    assert dungeon_systems_status(objs) == [("Support Pillar", "damaged")]
+
+
+def test_systems_status_preserves_input_order() -> None:
+    # The caller orders room_objects (e.g. repo by slug); the helper is faithful.
+    objs = [
+        _obj("mechanism", "Coolant Loop", "offline"),
+        _obj("door", "Blast Door", "sealed"),
+        _obj("structure", "Forge Vault", "restored"),
+        _obj("mechanism", "Arc Reactor", "online"),
+    ]
+    assert dungeon_systems_status(objs) == [
+        ("Coolant Loop", "offline"),
+        ("Forge Vault", "restored"),
+        ("Arc Reactor", "online"),
+    ]
+
+
+def test_systems_status_empty_input_returns_empty() -> None:
+    assert dungeon_systems_status([]) == []
