@@ -8,17 +8,20 @@ Phase **50.6 — Chat Action Cockpit: COMPLETE, GUI-verified & merged to `main`*
 All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds; Slice 9 retired ACTION
 tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
 bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
-Phase **51.5 — Dungeon Objectives & Intimacy Tiers: SPEC FINALIZED, STARTING** on branch `phase-51`
-(2026-06-27). Extension of Phase 51 — **no merge to `main` until 51.5 is built** (owner decision).
-Driven by the 2026-06-27 playtest: the channel is hollow (no grounded facts). Spec
+Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS — Slices 1–4 DONE & committed**
+on branch `phase-51` (2026-06-27). Extension of Phase 51 — **no merge to `main` until 51.5 is built**
+(owner decision). Driven by the 2026-06-27 playtest: the channel is hollow (no grounded facts). Spec
 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`, all decisions locked (D1–D8). Thesis: gate intimacy on
 completing deterministic in-engine **objectives** (restore dungeon **subsystems**) instead of
 per-chat-exchange; author a **tiered intimacy ladder** (3–4 tiers) with per-tier knowledge; make the
 dungeon **react to who is speaking** (the Artificer) + give a **truthful systems assessment**. New
 first-class `Objective` model + `018_objectives.sql` + completion service (designed to also seed
-Phase 52 Milestones). 10-slice TDD plan (§7), pure-models-first; **starting Slice 1** (Objective
-model + manifest field). Chat stops ticking intimacy (still drafts memory); `dungeon_intimacy`
-becomes a latching tier index.
+Phase 52 Milestones). 11-slice TDD plan (§7), pure-models-first. **Done:** S1 Objective model +
+manifest field · S2 migration + repo round-trip · S3 pure `completion_satisfied` · S4
+`advance_objectives` service (latching intimacy tick, next-tier activation, draft memory). **Next:
+Slice 5** — drop the per-exchange chat intimacy tick (chat stops ticking intimacy, still drafts
+memory; `advance_objectives` is now the single tick source). `dungeon_intimacy` becomes a latching
+tier index.
 
 Phase **51 — Talk to the Dungeon: FEATURE-COMPLETE & GUI-verified** on branch `phase-51` (2026-06-26).
 Decisions locked; **Slices 1–8 DONE & committed**. **Voice/knowledge-at-play-time decision made
