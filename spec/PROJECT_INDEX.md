@@ -41,7 +41,7 @@ Phase 51.5 spec: `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`.
 
 ---
 
-## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slices 1–3 DONE & committed → next: Slice 4 (objective service)
+## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slices 1–4 DONE & committed → next: Slice 5 (drop chat intimacy tick)
 
 **Phase 51.5** is on branch `phase-51` (off `main`), extending the now feature-complete Phase 51
 channel. The 2026-06-27 playtest found the channel **hollow**: good dialogue, but the dungeon has no
@@ -87,14 +87,27 @@ a Slice 4 bug. No repo/LLM (D4). 5 tests in `tests/unit/rpg/test_objectives.py` 
 wrong-state / absent / empty-state / unsupported-kind). rpg + objective-repo + manifest suites green
 (668).
 
-**⮕ NEXT: Slice 4 (TDD) — objective service.** `advance_objectives(repo, campaign_id) ->
-list[ObjectiveResult]` (home `dungeon_daddy/rpg/objectives.py`): for each **active** objective, gather
-world state (room objects) and call the Slice 3 `completion_satisfied`; on satisfaction (1) mark
-`completed` via `update_objective_status`, (2) `tick_clock(intimacy, +1)` + persist — the **single**
-intimacy-tick source (D5), (3) flip the next tier's objective `locked → active`, (4) draft a
-`MemoryEntry` (type `dungeon_state`, status `draft`, reusing the Phase 51 D4 engine-draft path). Assert
-clock persisted, next tier activated, memory drafted, **no LLM path touched**. Then the §7 plan:
-5 drop chat intimacy tick → 6 systems-status helper → 7 tier-knowledge/active-objective helpers →
+**Slice 4 — DONE & committed.** Objective service in **`dungeon_daddy/rpg/objectives.py`**:
+`advance_objectives(repo, campaign_id) -> list[ObjectiveResult]`. For each **active** objective it
+builds world state from **new repo `get_objects_for_campaign(campaign_id)`** (all campaign room
+objects → `{"objects": [...]}`), calls the Slice 3 `completion_satisfied`, and on satisfaction:
+(1) `update_objective_status(..., "completed")`; (2) ticks + persists the intimacy clock via private
+`_tick_intimacy` — finds the clock whose **`category` == the objective's `advances_clock_slug`**
+(matches `play_view._dungeon_intimacy_clock`), `tick_clock(+OBJECTIVE_INTIMACY_DELTA=1)` (latching,
+the **single** intimacy-tick source, D5), updating the in-memory snapshot so multiple completions in
+one pass tick from the fresh fill; (3) `_activate_next_tier` flips locked objective(s) at
+`tier_index+1` → `active`; (4) drafts a `dungeon_state` `MemoryEntry` (status `draft`, D4 engine path).
+Returns a frozen `ObjectiveResult` (objective_id/slug/tier_index/clock/memory_id/
+activated_objective_ids) per completion. **No LLM**: the module takes only the repo (no provider) — the
+authority boundary is structural. 6 new tests in `tests/unit/rpg/test_objectives.py`
+(`TestAdvanceObjectives`: completed / clock-persisted / next-tier-activated / draft-memory /
+unsatisfied-untouched + only-active-evaluated / completes-without-clock). rpg + memory suites green (844).
+
+**⮕ NEXT: Slice 5 (TDD) — drop chat intimacy tick.** Remove the per-exchange intimacy tick from
+`memory/dungeon_exchange.py:record_dungeon_exchange` (the `tick_clock`/`update_clock_progress` half) —
+chat no longer advances intimacy (D1); **keep the memory draft**. `advance_objectives` (Slice 4) is now
+the single intimacy-tick source (D5). Update/retarget the Slice 7 exchange tests; keep all clock/seed
+tests green. Then the §7 plan: 6 systems-status helper → 7 tier-knowledge/active-objective helpers →
 8 agent context → 9 PlayView wiring → 10 seed the full ladder → 11 (optional) tier HUD. Use the TDD
 skill (read `spec/TESTING.md` first).
 

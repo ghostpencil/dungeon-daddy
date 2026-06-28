@@ -1203,6 +1203,21 @@ class MemoryRepository:
         ).fetchall()
         return [self._room_object_row_to_dict(r) for r in rows]
 
+    def get_objects_for_campaign(self, campaign_id: str) -> list[dict]:
+        """All room objects in a campaign (the world-state snapshot for objectives)."""
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT object_id, campaign_id, room_id, level_id, slug,
+                   display_name, archetype, description, current_state
+            FROM room_objects
+            WHERE campaign_id = ?
+            ORDER BY slug
+            """,
+            [campaign_id],
+        ).fetchall()
+        return [self._room_object_row_to_dict(r) for r in rows]
+
     def update_object_state(self, object_id: str, new_state: str) -> None:
         assert self._conn is not None
         self._conn.execute(
