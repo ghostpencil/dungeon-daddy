@@ -1,9 +1,11 @@
 from dungeon_daddy.rpg.dungeon_channel import (
     REASON_NOT_HERE,
     REASON_NOT_INTIMATE,
+    active_objective,
     dungeon_channel_available,
     dungeon_systems_status,
     reveal_knowledge,
+    unlocked_knowledge,
 )
 from dungeon_daddy.rpg.models import ClockState
 
@@ -151,3 +153,101 @@ def test_systems_status_preserves_input_order() -> None:
 
 def test_systems_status_empty_input_returns_empty() -> None:
     assert dungeon_systems_status([]) == []
+
+
+# --- tier knowledge / active objective (Slice 7) --------------------------
+
+
+def _objective(
+    *,
+    slug: str,
+    tier_index: int,
+    status: str,
+    reveals_knowledge: list[str] | None = None,
+    description: str = "",
+) -> dict:
+    # The repo dict shape (get_objectives), ordered by tier_index, slug.
+    return {
+        "objective_id": f"obj-{slug}",
+        "campaign_id": "c1",
+        "slug": slug,
+        "title": slug.replace("-", " ").title(),
+        "description": description,
+        "tier_index": tier_index,
+        "status": status,
+        "completion": {"kind": "object_state", "target_slug": slug, "required_state": "restored"},
+        "advances_clock_slug": "dungeon_intimacy",
+        "reveals_knowledge": reveals_knowledge or [],
+    }
+
+
+def test_unlocked_knowledge_unions_completed_tiers() -> None:
+    objectives = [
+        _objective(slug="coolant", tier_index=0, status="completed",
+                   reveals_knowledge=["secret-a", "secret-b"]),
+        _objective(slug="reactor", tier_index=1, status="completed",
+                   reveals_knowledge=["secret-c"]),
+    ]
+    assert unlocked_knowledge(objectives) == ["secret-a", "secret-b", "secret-c"]
+
+
+def test_unlocked_knowledge_excludes_locked_and_active() -> None:
+    objectives = [
+        _objective(slug="coolant", tier_index=0, status="completed",
+                   reveals_knowledge=["known"]),
+        _objective(slug="reactor", tier_index=1, status="active",
+                   reveals_knowledge=["not-yet"]),
+        _objective(slug="vault", tier_index=2, status="locked",
+                   reveals_knowledge=["hidden"]),
+    ]
+    assert unlocked_knowledge(objectives) == ["known"]
+
+
+def test_unlocked_knowledge_preserves_tier_order_and_dedupes() -> None:
+    objectives = [
+        _objective(slug="coolant", tier_index=0, status="completed",
+                   reveals_knowledge=["shared", "first"]),
+        _objective(slug="reactor", tier_index=1, status="completed",
+                   reveals_knowledge=["second", "shared"]),
+    ]
+    assert unlocked_knowledge(objectives) == ["shared", "first", "second"]
+
+
+def test_unlocked_knowledge_empty_when_nothing_completed() -> None:
+    objectives = [
+        _objective(slug="coolant", tier_index=0, status="active",
+                   reveals_knowledge=["nope"]),
+    ]
+    assert unlocked_knowledge(objectives) == []
+
+
+def test_active_objective_returns_the_active_one() -> None:
+    objectives = [
+        _objective(slug="coolant", tier_index=0, status="completed"),
+        _objective(slug="reactor", tier_index=1, status="active",
+                   description="Restore the arc reactor."),
+        _objective(slug="vault", tier_index=2, status="locked"),
+    ]
+    found = active_objective(objectives)
+    assert found is not None
+    assert found["slug"] == "reactor"
+    assert found["description"] == "Restore the arc reactor."
+
+
+def test_active_objective_none_when_no_active() -> None:
+    objectives = [
+        _objective(slug="coolant", tier_index=0, status="completed"),
+        _objective(slug="reactor", tier_index=1, status="locked"),
+    ]
+    assert active_objective(objectives) is None
+
+
+def test_active_objective_returns_first_when_multiple_active() -> None:
+    # The ladder activates one tier at a time, but be deterministic regardless.
+    objectives = [
+        _objective(slug="coolant", tier_index=0, status="active"),
+        _objective(slug="reactor", tier_index=1, status="active"),
+    ]
+    found = active_objective(objectives)
+    assert found is not None
+    assert found["slug"] == "coolant"

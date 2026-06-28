@@ -40,6 +40,40 @@ def dungeon_systems_status(room_objects: list[dict]) -> list[tuple[str, str]]:
     ]
 
 
+def unlocked_knowledge(objectives: list[dict]) -> list[str]:
+    """Return the secrets the dungeon may draw on now (spec §4.3.4 / D7).
+
+    ``objectives`` are repo dicts (the ``get_objectives`` shape, ordered by
+    ``tier_index, slug``). The unlocked knowledge at the current tier is the
+    union of ``reveals_knowledge`` across all **completed** objectives, in tier
+    order, de-duplicated (first occurrence wins). Locked/active tiers contribute
+    nothing — their secrets are still gated.
+    """
+    unlocked: list[str] = []
+    for obj in objectives:
+        if obj.get("status") != "completed":
+            continue
+        for secret in obj.get("reveals_knowledge", []):
+            if secret not in unlocked:
+                unlocked.append(secret)
+    return unlocked
+
+
+def active_objective(objectives: list[dict]) -> dict | None:
+    """Return the active objective — the dungeon's "what I want next" (spec §4.3.4).
+
+    ``objectives`` are repo dicts (the ``get_objectives`` shape, ordered by
+    ``tier_index, slug``). The ladder activates one tier at a time, so the first
+    objective whose ``status`` is ``active`` is the dangled next objective; its
+    ``description`` is fed to the dungeon as the next-objective hint. Returns
+    ``None`` when no objective is active.
+    """
+    for obj in objectives:
+        if obj.get("status") == "active":
+            return obj
+    return None
+
+
 def dungeon_channel_available(
     room_context: dict,
     intimacy_clock: ClockState | None,
