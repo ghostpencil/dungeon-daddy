@@ -177,12 +177,22 @@ save load (`window.py:355` `initialize_schema`), creating it empty, so `get_obje
 (D6 latching) are Slice 10's job. The pre-existing subsystems are general room objects, **not** the
 authored ladder.
 
-**⮕ NEXT: Slice 9 (TDD) — PlayView wiring** (spec §7.9). Call `advance_objectives(repo, campaign_id)`
-after command resolution (the orchestration seam where `object.transitioned` already lands) so
-restoring a subsystem ticks intimacy + activates the next tier; the §4.4 inputs are already fed by
-`_dungeon_agent_inputs` (Slice 8). Then: 10 seed the full ladder (subsystems + objectives +
-re-segmented latching clock + per-tier knowledge) → 11 (optional) tier HUD. Use the TDD skill (read
-`spec/TESTING.md` first).
+**⮕ NEXT SESSION — Slice 9 (TDD) — PlayView wiring** (spec §7.9). Call
+`advance_objectives(repo, campaign_id)` after command resolution so restoring a subsystem ticks
+intimacy + activates the next tier; the §4.4 inputs are already fed by `_dungeon_agent_inputs`
+(Slice 8). **Precise seam (located 2026-06-28):** `play_view._apply_vna_command`
+(`views/play_view.py:1691`) — right after the successful
+`apply_command(command, validation, self._mem_repo, self._rpg_campaign_id)` at **line 1708** (around
+the `_refresh_vna_panel()` call), call `advance_objectives(self._mem_repo, self._rpg_campaign_id)`
+(guard on repo+campaign_id). That's where an object-state mutation (a subsystem `restore` transition)
+lands, so it's the natural single place to re-evaluate active objectives. Surface any resulting
+tier-up to the player (e.g. a `system` chat line per returned `ObjectiveResult`). **Check:** the
+contested branch routes through `_resolve_vna_roll` (line ~1661) — confirm whether it also flows
+through `_apply_vna_command` or needs its own `advance_objectives` call. `advance_objectives` already
+exists (Slice 4, `rpg/objectives.py`) and is the single intimacy-tick source (D5). Then: 10 seed the
+full ladder (subsystems + objectives + re-segmented latching clock + per-tier knowledge; PCs already
+carry playbooks in the live save, Mira = `artificer`) → 11 (optional) tier HUD. Use the TDD skill
+(read `spec/TESTING.md` first).
 
 **Carried from Phase 51 (now superseded by 51.5 where noted):** the per-exchange `+1` intimacy tick
 (Slice 7 `record_dungeon_exchange`) is **removed** in 51.5 Slice 5; the `monotonic=False` flip on the
