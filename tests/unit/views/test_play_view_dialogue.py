@@ -256,10 +256,11 @@ def test_apply_dungeon_reply_posts_bubble_and_records_exchange(tmp_path):
     # The reply lands in the dedicated dungeon-voice bubble (§4.6) — a distinct
     # role from ordinary DM narration ("dm").
     view._chat.add_message.assert_any_call("dungeon", "I am the deep.")
-    # Engine tick (D4/§4.7): intimacy advances by the default per-exchange delta.
+    # Phase 51.5 (D1/D5): chat no longer ticks intimacy — the clock is left
+    # untouched; the objective service is now the single intimacy-tick source.
     clock = view._dungeon_intimacy_clock()
-    assert clock.filled == 4
-    # A draft memory of the exchange is written (engine-authored, never the LLM).
+    assert clock.filled == 3
+    # A draft memory of the exchange is still written (engine-authored, never the LLM).
     assert view._mem_repo.count_by_status("camp-1") == {"draft": 1}
     # The dungeon turn is recorded on the session.
     assert ("dungeon", "I am the deep.") in view._dialogue.turns

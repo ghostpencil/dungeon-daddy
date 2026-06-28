@@ -1523,12 +1523,13 @@ class PlayView(arcade.View):
         }
 
     def _apply_dungeon_reply(self, player_message: str, reply: str) -> None:
-        """Post the dungeon's reply and apply the engine side-effects (§4.7).
+        """Post the dungeon's reply and apply the engine side-effect (§4.7).
 
         Runs on the main thread (DuckDB single-writer): posts the distinct
-        dungeon bubble, then the **engine** ticks the intimacy clock and drafts a
-        memory of the exchange via ``record_dungeon_exchange`` — never the LLM
-        (authority boundary / D6).
+        dungeon bubble, then the **engine** drafts a memory of the exchange via
+        ``record_dungeon_exchange`` — never the LLM (authority boundary / D6).
+        Phase 51.5 (D1/D5): chat no longer ticks intimacy; the objective service
+        is the single intimacy-tick source.
         """
         from dungeon_daddy.memory.dungeon_exchange import record_dungeon_exchange
 
@@ -1536,13 +1537,12 @@ class PlayView(arcade.View):
         session = self._dialogue
         if session is not None:
             session.turns.append(("dungeon", reply))
-        clock = self._dungeon_intimacy_clock()
-        if clock is None or self._mem_repo is None:
+        if self._mem_repo is None or self._rpg_campaign_id is None:
             return
         actor = self._acting_actor()
         record_dungeon_exchange(
             self._mem_repo,
-            intimacy_clock=clock,
+            campaign_id=self._rpg_campaign_id,
             actor=actor.slug if actor else "",
             player_message=player_message,
             dungeon_reply=reply,

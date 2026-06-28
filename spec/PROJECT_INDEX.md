@@ -8,7 +8,7 @@ Phase **50.6 — Chat Action Cockpit: COMPLETE, GUI-verified & merged to `main`*
 All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds; Slice 9 retired ACTION
 tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
 bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
-Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS — Slices 1–4 DONE & committed**
+Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS — Slices 1–5 DONE & committed**
 on branch `phase-51` (2026-06-27). Extension of Phase 51 — **no merge to `main` until 51.5 is built**
 (owner decision). Driven by the 2026-06-27 playtest: the channel is hollow (no grounded facts). Spec
 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`, all decisions locked (D1–D8). Thesis: gate intimacy on
@@ -18,10 +18,10 @@ dungeon **react to who is speaking** (the Artificer) + give a **truthful systems
 first-class `Objective` model + `018_objectives.sql` + completion service (designed to also seed
 Phase 52 Milestones). 11-slice TDD plan (§7), pure-models-first. **Done:** S1 Objective model +
 manifest field · S2 migration + repo round-trip · S3 pure `completion_satisfied` · S4
-`advance_objectives` service (latching intimacy tick, next-tier activation, draft memory). **Next:
-Slice 5** — drop the per-exchange chat intimacy tick (chat stops ticking intimacy, still drafts
-memory; `advance_objectives` is now the single tick source). `dungeon_intimacy` becomes a latching
-tier index.
+`advance_objectives` service (latching intimacy tick, next-tier activation, draft memory) · S5 chat
+intimacy tick dropped (`record_dungeon_exchange` now only drafts memory — `advance_objectives` is the
+single tick source, D1/D5). `dungeon_intimacy` becomes a latching tier index. **Next: Slice 6** —
+pure `dungeon_systems_status(room_objects)` helper.
 
 Phase **51 — Talk to the Dungeon: FEATURE-COMPLETE & GUI-verified** on branch `phase-51` (2026-06-26).
 Decisions locked; **Slices 1–8 DONE & committed**. **Voice/knowledge-at-play-time decision made
@@ -44,7 +44,7 @@ Phase 51.5 spec: `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`.
 
 ---
 
-## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slices 1–4 DONE & committed → next: Slice 5 (drop chat intimacy tick)
+## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slices 1–5 DONE & committed → next: Slice 6 (systems-status helper)
 
 **Phase 51.5** is on branch `phase-51` (off `main`), extending the now feature-complete Phase 51
 channel. The 2026-06-27 playtest found the channel **hollow**: good dialogue, but the dungeon has no
@@ -106,13 +106,24 @@ authority boundary is structural. 6 new tests in `tests/unit/rpg/test_objectives
 (`TestAdvanceObjectives`: completed / clock-persisted / next-tier-activated / draft-memory /
 unsatisfied-untouched + only-active-evaluated / completes-without-clock). rpg + memory suites green (844).
 
-**⮕ NEXT: Slice 5 (TDD) — drop chat intimacy tick.** Remove the per-exchange intimacy tick from
-`memory/dungeon_exchange.py:record_dungeon_exchange` (the `tick_clock`/`update_clock_progress` half) —
-chat no longer advances intimacy (D1); **keep the memory draft**. `advance_objectives` (Slice 4) is now
-the single intimacy-tick source (D5). Update/retarget the Slice 7 exchange tests; keep all clock/seed
-tests green. Then the §7 plan: 6 systems-status helper → 7 tier-knowledge/active-objective helpers →
-8 agent context → 9 PlayView wiring → 10 seed the full ladder → 11 (optional) tier HUD. Use the TDD
-skill (read `spec/TESTING.md` first).
+**Slice 5 — DONE & committed.** Dropped the per-exchange chat intimacy tick (D1/D5).
+`memory/dungeon_exchange.py:record_dungeon_exchange` no longer ticks/persists the intimacy clock —
+its signature changed from `intimacy_clock: ClockState` to **`campaign_id: str`** (kw-only), the
+`DUNGEON_EXCHANGE_INTIMACY_DELTA` constant + `tick_clock`/`ClockState` imports are gone, and
+`DungeonExchangeResult` is now just `memory_id` (no `clock`). It **still drafts** the `relationship`
+`MemoryEntry` (status `draft`, D6). `advance_objectives` (Slice 4) is the single intimacy-tick source.
+`play_view._apply_dungeon_reply` updated: no longer looks up the intimacy clock; drafts via
+`record_dungeon_exchange(self._mem_repo, campaign_id=self._rpg_campaign_id, …)` (guards on `_mem_repo`
++ `_rpg_campaign_id`). Tests: `tests/unit/memory/test_dungeon_exchange.py` rewritten (draft round-trip,
+drafts-only D6 guard, **new** `test_does_not_advance_the_intimacy_clock`); play_view
+`test_apply_dungeon_reply_posts_bubble_and_records_exchange` retargeted (clock unchanged at 3, draft
+still written). memory + views + rpg suites green (1172); tools + campaign green (209).
+
+**⮕ NEXT: Slice 6 (TDD) — systems-status helper.** Pure `dungeon_systems_status(room_objects) ->
+[(subsystem, state), …]` (spec §4.2 / §7.6). Then the §7 plan: 7 tier-knowledge/active-objective
+helpers → 8 agent context (`# Who Is Speaking` / `# Systems Status` / `# What You Want Next`) →
+9 PlayView wiring (call `advance_objectives` after command resolution) → 10 seed the full ladder →
+11 (optional) tier HUD. Use the TDD skill (read `spec/TESTING.md` first).
 
 **Carried from Phase 51 (now superseded by 51.5 where noted):** the per-exchange `+1` intimacy tick
 (Slice 7 `record_dungeon_exchange`) is **removed** in 51.5 Slice 5; the `monotonic=False` flip on the
