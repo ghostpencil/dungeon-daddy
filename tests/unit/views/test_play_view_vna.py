@@ -627,6 +627,80 @@ def test_submit_activate_with_required_item_missing_posts_error(tmp_path):
     assert updated["current_state"] == "idle"
 
 
+# ---------------------------------------------------------------------------
+# Phase 51.5 Slice 9 — advance_objectives wired into command resolution
+# ---------------------------------------------------------------------------
+
+def _save_objective(repo, **kw):
+    from dungeon_daddy.rpg.models import Objective, ObjectiveCompletion
+
+    completion = kw.pop("completion", None) or ObjectiveCompletion(
+        kind="object_state", target_slug="gearworks", required_state="restored",
+    )
+    defaults = dict(
+        objective_id="obj-1", campaign_id="camp-1", slug="restore-gearworks",
+        title="Restore the Gearworks", description="Repair the sand-choked gearworks.",
+        tier_index=0, status="active", advances_clock_slug="dungeon_intimacy",
+        reveals_knowledge=["The forge remembers its first fire."],
+    )
+    defaults.update(kw)
+    objective = Objective(completion=completion, **defaults)
+    repo.save_objective(objective)
+    return objective
+
+
+def test_apply_vna_command_completes_objective_and_surfaces_tier_up(tmp_path):
+    # Restoring a subsystem to the objective's required state completes it
+    # (advance_objectives runs post-command) and surfaces a dungeon line.
+    from dungeon_daddy.rpg.action_options import ActionCard
+    from dungeon_daddy.rpg.models import ObjectTransition, RoomObject
+
+    view = _make_view(tmp_path)
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-gears", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="gearworks", display_name="Sand-Choked Gearworks", archetype="mechanism",
+        description="A jammed mass of gears.", current_state="jammed",
+        transitions=[ObjectTransition(
+            transition_id="tr-fix", object_id="obj-gears",
+            from_state="jammed", to_state="restored", trigger="repair", contested=False,
+        )],
+    ))
+    _save_objective(view._mem_repo)
+
+    view._on_vna_submit(ActionCard(verb="activate", noun_id="obj-gears", adverb="carefully"))
+
+    assert view._mem_repo.get_objectives("camp-1")[0]["status"] == "completed"
+    posted = [c.args[1] for c in view._chat.add_message.call_args_list]
+    assert any("deepens" in m for m in posted)
+
+
+def test_apply_vna_command_no_tier_up_when_nothing_completes(tmp_path):
+    # A successful command that does not satisfy any objective posts no dungeon line.
+    from dungeon_daddy.rpg.action_options import ActionCard
+    from dungeon_daddy.rpg.models import ObjectTransition, RoomObject
+
+    view = _make_view(tmp_path)
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-gears", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="gearworks", display_name="Sand-Choked Gearworks", archetype="mechanism",
+        description="A jammed mass of gears.", current_state="jammed",
+        transitions=[ObjectTransition(
+            transition_id="tr-fix", object_id="obj-gears",
+            from_state="jammed", to_state="loosened", trigger="repair", contested=False,
+        )],
+    ))
+    # Objective needs "restored" — "loosened" does not satisfy it.
+    _save_objective(view._mem_repo)
+
+    view._on_vna_submit(ActionCard(verb="activate", noun_id="obj-gears", adverb="carefully"))
+
+    assert view._mem_repo.get_objectives("camp-1")[0]["status"] == "active"
+    posted = [c.args[1] for c in view._chat.add_message.call_args_list]
+    assert not any("deepens" in m for m in posted)
+
+
 def test_submit_activate_with_required_item_held_transitions_and_consumes(tmp_path):
     # transition.requires_item_slug set and actor holds it → state changes + item consumed
     from dungeon_daddy.rpg.action_options import ActionCard

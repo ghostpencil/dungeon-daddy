@@ -1706,8 +1706,25 @@ class PlayView(arcade.View):
             self._chat.add_message("system", f"⚠ Can't do that: {validation.rejection_reason}")
             return False
         apply_command(command, validation, self._mem_repo, self._rpg_campaign_id)
+        self._advance_objectives()
         self._refresh_vna_panel()
         return True
+
+    def _advance_objectives(self) -> None:
+        """Re-evaluate active objectives after a world-state mutation (§7.9).
+
+        A subsystem reaching its required state completes the tier's objective,
+        ticking the latching intimacy clock (the single tick source, D5) and
+        activating the next tier. Each completion surfaces a dungeon line.
+        """
+        from dungeon_daddy.rpg.objectives import advance_objectives
+
+        if self._mem_repo is None or self._rpg_campaign_id is None:
+            return
+        for _ in advance_objectives(self._mem_repo, self._rpg_campaign_id):
+            self._chat.add_message(
+                "dungeon", "◆ The Crucible stirs — its bond with you deepens."
+            )
 
     def _resolve_vna_roll(self, card, actor) -> None:
         """Resolve a skill-verb Card as an action roll and narrate the outcome."""

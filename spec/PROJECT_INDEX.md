@@ -8,8 +8,9 @@ Phase **50.6 — Chat Action Cockpit: COMPLETE, GUI-verified & merged to `main`*
 All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds; Slice 9 retired ACTION
 tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
 bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
-Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS — Slices 1–8 DONE & committed**
-(S8 `f264816`, GUI-verified at Crucible r04) on branch `phase-51` (2026-06-28). Extension of Phase 51 —
+Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS — Slices 1–9 DONE** (S1–8 committed;
+S9 done & green, commit pending) (S8 `f264816`, GUI-verified at Crucible r04) on branch `phase-51`
+(2026-06-28). Extension of Phase 51 —
 **no merge to `main` until 51.5 is built**
 (owner decision). Driven by the 2026-06-27 playtest: the channel is hollow (no grounded facts). Spec
 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`, all decisions locked (D1–D8). Thesis: gate intimacy on
@@ -29,8 +30,10 @@ the "what you want next" hint). S8 agent context — `DungeonVoiceAgent` gains `
 `# Systems Status` / `# What You Want Next` + `# This Conversation So Far` sections (+ react-to-speaker
 prompt instruction); `_dungeon_agent_inputs` assembles them (actor name/playbook/tags, systems via
 `dungeon_systems_status`, tier knowledge via `unlocked_knowledge` with flat `reveal_knowledge`
-fallback, active objective, in-session `DialogueSession.turns`). **Next: Slice 9** — PlayView wiring
-(call `advance_objectives` after command resolution + feed the new inputs).
+fallback, active objective, in-session `DialogueSession.turns`). S9 PlayView wiring — `_apply_vna_command`
+calls new `_advance_objectives()` (runs `advance_objectives` post-`apply_command`, surfaces a `"dungeon"`
+bubble per tier-up). **Next: Slice 10** — seed the full ladder (subsystems + objectives + re-segmented
+latching clock + per-tier knowledge).
 
 Phase **51 — Talk to the Dungeon: FEATURE-COMPLETE & GUI-verified** on branch `phase-51` (2026-06-26).
 Decisions locked; **Slices 1–8 DONE & committed**. **Voice/knowledge-at-play-time decision made
@@ -53,7 +56,7 @@ Phase 51.5 spec: `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`.
 
 ---
 
-## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slices 1–8 DONE & committed → next: Slice 9 (PlayView wiring: call advance_objectives post-command + feed the new agent inputs)
+## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slices 1–9 DONE (S9 commit pending) → next: Slice 10 (seed the full Crucible ladder: subsystems + objectives + re-segmented latching clock + per-tier knowledge)
 
 **Phase 51.5** is on branch `phase-51` (off `main`), extending the now feature-complete Phase 51
 channel. The 2026-06-27 playtest found the channel **hollow**: good dialogue, but the dungeon has no
@@ -177,22 +180,34 @@ save load (`window.py:355` `initialize_schema`), creating it empty, so `get_obje
 (D6 latching) are Slice 10's job. The pre-existing subsystems are general room objects, **not** the
 authored ladder.
 
-**⮕ NEXT SESSION — Slice 9 (TDD) — PlayView wiring** (spec §7.9). Call
-`advance_objectives(repo, campaign_id)` after command resolution so restoring a subsystem ticks
-intimacy + activates the next tier; the §4.4 inputs are already fed by `_dungeon_agent_inputs`
-(Slice 8). **Precise seam (located 2026-06-28):** `play_view._apply_vna_command`
-(`views/play_view.py:1691`) — right after the successful
-`apply_command(command, validation, self._mem_repo, self._rpg_campaign_id)` at **line 1708** (around
-the `_refresh_vna_panel()` call), call `advance_objectives(self._mem_repo, self._rpg_campaign_id)`
-(guard on repo+campaign_id). That's where an object-state mutation (a subsystem `restore` transition)
-lands, so it's the natural single place to re-evaluate active objectives. Surface any resulting
-tier-up to the player (e.g. a `system` chat line per returned `ObjectiveResult`). **Check:** the
-contested branch routes through `_resolve_vna_roll` (line ~1661) — confirm whether it also flows
-through `_apply_vna_command` or needs its own `advance_objectives` call. `advance_objectives` already
-exists (Slice 4, `rpg/objectives.py`) and is the single intimacy-tick source (D5). Then: 10 seed the
-full ladder (subsystems + objectives + re-segmented latching clock + per-tier knowledge; PCs already
-carry playbooks in the live save, Mira = `artificer`) → 11 (optional) tier HUD. Use the TDD skill
-(read `spec/TESTING.md` first).
+**Slice 9 — DONE (TDD, green; commit pending; spec §7.9).** PlayView wiring.
+`play_view._apply_vna_command` (`dungeon_daddy/views/play_view.py`) now calls new
+**`_advance_objectives()`** immediately after the successful `apply_command(...)` (before
+`_refresh_vna_panel()`) — that's where an object-state mutation (a subsystem transition) lands, so it's
+the single re-evaluation point. `_advance_objectives()` runs `advance_objectives(repo, campaign_id)`
+(Slice 4 service, the single intimacy-tick source D5; guarded on repo+campaign_id) and posts one
+**`"dungeon"`-role** chat line per returned `ObjectiveResult` (`◆ The Crucible stirs — its bond with
+you deepens.`) so a tier-up reads in the distinct dungeon-voice bubble. The §4.4 inputs were already fed
+by `_dungeon_agent_inputs` (Slice 8). **Contested-branch check RESOLVED:** the contested path
+(`_resolve_vna_roll` → `_run_proposal_pipeline` → `apply_low_risk_proposals`) only mutates
+clocks/actors/stress, **never `object_state`** (the existing contested-roll test asserts object state
+stays unchanged after a roll), so `object_state` objectives can only complete via the deterministic
+`_apply_vna_command` path — **no separate call needed**. 2 new tests in
+`tests/unit/views/test_play_view_vna.py` (completes-objective-and-surfaces-tier-up / no-tier-up-when-
+nothing-completes). views+rpg+memory unit suites green (1193). **Not GUI-verifiable yet:** the live
+Crucible save still has an **empty `objectives` table** (no seeded ladder) so no real tier-up fires
+in-app until Slice 10 — the wiring is exercised by the unit tests.
+
+**⮕ NEXT SESSION — Slice 10 (TDD) — seed the full Crucible ladder** (spec §7 step 10 / D3). Author the
+Crucible's 3–4 subsystems (`RoomObject`s) + their `Objective`s (per-tier, `object_state` completion +
+`reveals_knowledge` + `advances_clock_slug="dungeon_intimacy"`) + a **re-segmented latching**
+`dungeon_intimacy` clock (segments = #tiers; D6 — revert the Phase 51 `monotonic=False` wide-open hack to
+a true latching tier index) + per-tier knowledge. Extend `tools/populate_crucible_dungeon_channel.py`
+(idempotent, importable + tested) — note the live save's pre-existing subsystem objects (Sand-Choked
+Gearworks `jammed`, Great Lift `powered`/`ready`, Trap Control Lever `active`) are **general room
+objects, not the authored ladder**; decide whether to adopt or re-author them. PCs already carry
+playbooks (Mira = `artificer`). Then 11 (optional) tier/objective HUD. Use the TDD skill (read
+`spec/TESTING.md` first).
 
 **Carried from Phase 51 (now superseded by 51.5 where noted):** the per-exchange `+1` intimacy tick
 (Slice 7 `record_dungeon_exchange`) is **removed** in 51.5 Slice 5; the `monotonic=False` flip on the
