@@ -1500,17 +1500,27 @@ class PlayView(arcade.View):
     def _dungeon_agent_inputs(self, text: str) -> dict:
         """Assemble the §4.4 ``DungeonVoiceAgent.respond`` kwargs for ``text``.
 
-        The caller (engine) computes the knowledge slice via ``reveal_knowledge``
-        and pulls recent memories — the agent itself does no gating (D6).
+        Knowledge is the union of completed tiers' ``reveals_knowledge`` (D7); with
+        no objectives authored it falls back to the deprecated flat
+        ``reveal_knowledge`` band. The agent itself does no gating (D6).
         """
-        from dungeon_daddy.rpg.dungeon_channel import reveal_knowledge
+        from dungeon_daddy.rpg.dungeon_channel import (
+            active_objective,
+            reveal_knowledge,
+            unlocked_knowledge,
+        )
 
         clock = self._dungeon_intimacy_clock()
         filled = clock.filled if clock else 0
         segments = clock.segments if clock else 0
-        knowledge = reveal_knowledge(
-            getattr(self, "_dungeon_knowledge", []) or [], filled, segments
-        )
+        objectives = self._dungeon_objectives()
+        if objectives:
+            knowledge = unlocked_knowledge(objectives)
+        else:
+            knowledge = reveal_knowledge(
+                getattr(self, "_dungeon_knowledge", []) or [], filled, segments
+            )
+        active = active_objective(objectives)
         actor = self._acting_actor()
         return {
             "dungeon_voice": getattr(self, "_dungeon_voice", None) or "",
@@ -1520,7 +1530,40 @@ class PlayView(arcade.View):
             "player_message": text,
             "actor": actor.slug if actor else "",
             "recent_memories": self._recent_dungeon_memories(),
+            "actor_name": actor.display_name if actor else "",
+            "actor_playbook": self._actor_playbook_name(actor),
+            "actor_tags": list(actor.tags) if actor else [],
+            "systems_status": self._dungeon_systems_status(),
+            "next_objective": active["description"] if active else None,
+            "session_turns": list(self._dialogue.turns) if self._dialogue else [],
         }
+
+    def _dungeon_objectives(self) -> list[dict]:
+        if self._mem_repo is None or self._rpg_campaign_id is None:
+            return []
+        return self._mem_repo.get_objectives(self._rpg_campaign_id)
+
+    def _dungeon_systems_status(self) -> list[tuple[str, str]]:
+        """Truthful subsystem snapshot for the dungeon-voice context (§4.2)."""
+        if self._mem_repo is None or self._rpg_campaign_id is None:
+            return []
+        from dungeon_daddy.rpg.dungeon_channel import dungeon_systems_status
+
+        objects = self._mem_repo.get_objects_for_campaign(self._rpg_campaign_id)
+        return dungeon_systems_status(objects)
+
+    @staticmethod
+    def _actor_playbook_name(actor) -> str | None:
+        """Resolve the acting actor's playbook display name for the dungeon (§4.1)."""
+        slug = getattr(actor, "playbook_slug", None)
+        if not slug:
+            return None
+        from dungeon_daddy.rpg.playbook import PlaybookLibrary
+
+        try:
+            return PlaybookLibrary().get(slug).display_name
+        except KeyError:
+            return None
 
     def _apply_dungeon_reply(self, player_message: str, reply: str) -> None:
         """Post the dungeon's reply and apply the engine side-effect (§4.7).

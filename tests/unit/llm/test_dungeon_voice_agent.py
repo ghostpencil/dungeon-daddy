@@ -177,3 +177,113 @@ def test_respond_propagates_llm_error():
     agent = DungeonVoiceAgent(provider=_FailingProvider())
     with pytest.raises(LLMError):
         _respond(agent)
+
+
+# ---------------------------------------------------------------------------
+# Phase 51.5 Slice 8 — agent context (§4.4)
+# ---------------------------------------------------------------------------
+
+# Cycle 8: # Who Is Speaking carries the actor's name, playbook and tags
+
+def test_prompt_carries_who_is_speaking():
+    from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
+
+    provider = _MockProvider()
+    agent = DungeonVoiceAgent(provider=provider)
+    _respond(
+        agent,
+        actor_name="Kira Vale",
+        actor_playbook="Artificer",
+        actor_tags=["machine-touched", "exiled"],
+    )
+    assert "# Who Is Speaking" in provider.last_system
+    assert "Kira Vale" in provider.last_system
+    assert "Artificer" in provider.last_system
+    assert "machine-touched" in provider.last_system
+
+
+def test_prompt_omits_who_is_speaking_when_no_name():
+    from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
+
+    provider = _MockProvider()
+    agent = DungeonVoiceAgent(provider=provider)
+    _respond(agent)
+    assert "# Who Is Speaking" not in provider.last_system
+
+
+# Cycle 9: # Systems Status carries the (subsystem, state) pairs
+
+def test_prompt_carries_systems_status():
+    from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
+
+    provider = _MockProvider()
+    agent = DungeonVoiceAgent(provider=provider)
+    _respond(
+        agent,
+        systems_status=[("Coolant Loop", "damaged"), ("Forge Core", "online")],
+    )
+    assert "# Systems Status" in provider.last_system
+    assert "Coolant Loop" in provider.last_system
+    assert "damaged" in provider.last_system
+    assert "Forge Core" in provider.last_system
+    assert "online" in provider.last_system
+
+
+def test_prompt_omits_systems_status_when_empty():
+    from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
+
+    provider = _MockProvider()
+    agent = DungeonVoiceAgent(provider=provider)
+    _respond(agent)
+    assert "# Systems Status" not in provider.last_system
+
+
+# Cycle 10: # What You Want Next carries the active objective hint
+
+def test_prompt_carries_what_you_want_next():
+    from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
+
+    provider = _MockProvider()
+    agent = DungeonVoiceAgent(provider=provider)
+    _respond(
+        agent,
+        next_objective="Restore the coolant loop and I will grant the next authorization.",
+    )
+    assert "# What You Want Next" in provider.last_system
+    assert "Restore the coolant loop" in provider.last_system
+
+
+def test_prompt_omits_what_you_want_next_when_none():
+    from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
+
+    provider = _MockProvider()
+    agent = DungeonVoiceAgent(provider=provider)
+    _respond(agent)
+    assert "# What You Want Next" not in provider.last_system
+
+
+# Cycle 11: in-session dialogue turns are carried so the dungeon has no amnesia
+
+def test_prompt_carries_session_turns():
+    from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
+
+    provider = _MockProvider()
+    agent = DungeonVoiceAgent(provider=provider)
+    _respond(
+        agent,
+        session_turns=[
+            ("kira", "Who built you?"),
+            ("dungeon", "Hands long since rusted."),
+        ],
+    )
+    assert "Who built you?" in provider.last_system
+    assert "Hands long since rusted." in provider.last_system
+
+
+def test_prompt_omits_session_turns_section_when_empty():
+    from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
+
+    provider = _MockProvider()
+    agent = DungeonVoiceAgent(provider=provider)
+    _respond(agent, session_turns=[])
+    assert "# This Conversation" not in provider.last_system

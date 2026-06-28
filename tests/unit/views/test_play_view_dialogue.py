@@ -340,3 +340,141 @@ def test_dialogue_stays_open_in_same_room(tmp_path):
 
     assert view._dialogue is not None
     view._chat.set_dialogue_mode.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Phase 51.5 Slice 8 — _dungeon_agent_inputs assembles the §4.4 context
+# ---------------------------------------------------------------------------
+
+def _save_subsystem(repo, *, slug, name, archetype, state, campaign_id="camp-1"):
+    from dungeon_daddy.rpg.models import RoomObject
+
+    repo.save_room_object(
+        RoomObject(
+            object_id=f"obj-{slug}", campaign_id=campaign_id, room_id="r1",
+            level_id="l1", slug=slug, display_name=name, archetype=archetype,
+            description="A dungeon subsystem.", current_state=state,
+        )
+    )
+
+
+def _save_objective(repo, *, slug, tier, status, knowledge=None,
+                    description="Restore the loop.", campaign_id="camp-1"):
+    from dungeon_daddy.rpg.models import Objective, ObjectiveCompletion
+
+    repo.save_objective(
+        Objective(
+            objective_id=f"obj:{slug}", campaign_id=campaign_id, slug=slug,
+            title=slug.replace("-", " ").title(), description=description,
+            tier_index=tier, status=status,
+            completion=ObjectiveCompletion(
+                kind="object_state", target_slug="x", required_state="restored",
+            ),
+            advances_clock_slug="dungeon_intimacy",
+            reveals_knowledge=knowledge or [],
+        )
+    )
+
+
+def test_dungeon_agent_inputs_carries_actor_identity(tmp_path):
+    actor = _actor(display_name="Kira Vale", playbook_slug="artificer",
+                   tags=["machine-touched", "exiled"])
+    view = _make_view(tmp_path, actor=actor)
+    _seed_intimacy_clock(view._mem_repo, filled=6, segments=6)
+
+    inputs = view._dungeon_agent_inputs("what am I to you?")
+
+    assert inputs["actor_name"] == "Kira Vale"
+    assert inputs["actor_playbook"]  # playbook display name resolved
+    assert inputs["actor_tags"] == ["machine-touched", "exiled"]
+
+
+def test_dungeon_agent_inputs_carries_systems_status(tmp_path):
+    view = _make_view(tmp_path)
+    _seed_intimacy_clock(view._mem_repo, filled=6, segments=6)
+    _save_subsystem(view._mem_repo, slug="coolant", name="Coolant Loop",
+                    archetype="mechanism", state="damaged")
+    _save_subsystem(view._mem_repo, slug="altar", name="Altar",
+                    archetype="container", state="closed")  # not a subsystem
+
+    inputs = view._dungeon_agent_inputs("status report")
+
+    assert inputs["systems_status"] == [("Coolant Loop", "damaged")]
+
+
+def test_dungeon_agent_inputs_carries_next_objective(tmp_path):
+    view = _make_view(tmp_path)
+    _seed_intimacy_clock(view._mem_repo, filled=6, segments=6)
+    _save_objective(view._mem_repo, slug="tier0", tier=0, status="completed")
+    _save_objective(view._mem_repo, slug="tier1", tier=1, status="active",
+                    description="Restore the coolant loop and I shall trust you.")
+
+    inputs = view._dungeon_agent_inputs("what do you want?")
+
+    assert inputs["next_objective"] == "Restore the coolant loop and I shall trust you."
+
+
+def test_dungeon_agent_inputs_next_objective_none_when_no_active(tmp_path):
+    view = _make_view(tmp_path)
+    _seed_intimacy_clock(view._mem_repo, filled=6, segments=6)
+
+    inputs = view._dungeon_agent_inputs("what do you want?")
+
+    assert inputs["next_objective"] is None
+
+
+def test_dungeon_agent_inputs_carries_session_turns(tmp_path):
+    from dungeon_daddy.views.play_view import DialogueSession
+
+    view = _make_view(tmp_path)
+    _seed_intimacy_clock(view._mem_repo, filled=6, segments=6)
+    view._dialogue = DialogueSession(kind="dungeon", room_id="r1")
+    view._dialogue.turns.append(("player", "Who built you?"))
+    view._dialogue.turns.append(("dungeon", "Hands long since rusted."))
+
+    inputs = view._dungeon_agent_inputs("and where are they now?")
+
+    assert inputs["session_turns"] == [
+        ("player", "Who built you?"),
+        ("dungeon", "Hands long since rusted."),
+    ]
+
+
+def test_dungeon_agent_inputs_session_turns_empty_without_session(tmp_path):
+    view = _make_view(tmp_path)
+    _seed_intimacy_clock(view._mem_repo, filled=6, segments=6)
+    view._dialogue = None
+
+    inputs = view._dungeon_agent_inputs("hello?")
+
+    assert inputs["session_turns"] == []
+
+
+def test_dungeon_agent_inputs_knowledge_from_completed_tiers(tmp_path):
+    # D7: tier knowledge (union over completed objectives) replaces the flat
+    # reveal_knowledge band when objectives exist.
+    view = _make_view(tmp_path)
+    view._dungeon_knowledge = ["a flat back-compat secret"]
+    _seed_intimacy_clock(view._mem_repo, filled=1, segments=3)
+    _save_objective(view._mem_repo, slug="tier0", tier=0, status="completed",
+                    knowledge=["the core is dying", "the warden is a copy"])
+    _save_objective(view._mem_repo, slug="tier1", tier=1, status="active",
+                    knowledge=["a way down"])  # active tier stays gated
+
+    inputs = view._dungeon_agent_inputs("what do you know?")
+
+    assert inputs["dungeon_knowledge"] == ["the core is dying", "the warden is a copy"]
+
+
+def test_dungeon_agent_inputs_knowledge_falls_back_to_flat_when_no_objectives(tmp_path):
+    # Back-compat: with no objectives authored, the old reveal_knowledge band path
+    # still drives dungeon_knowledge.
+    view = _make_view(tmp_path)
+    view._dungeon_knowledge = ["the heart still beats", "the warden lied", "a way down"]
+    _seed_intimacy_clock(view._mem_repo, filled=6, segments=6)  # full → all flat knowledge
+
+    inputs = view._dungeon_agent_inputs("who built you?")
+
+    assert inputs["dungeon_knowledge"] == [
+        "the heart still beats", "the warden lied", "a way down",
+    ]
