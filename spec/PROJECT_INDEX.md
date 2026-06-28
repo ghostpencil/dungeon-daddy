@@ -8,8 +8,9 @@ Phase **50.6 — Chat Action Cockpit: COMPLETE, GUI-verified & merged to `main`*
 All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds; Slice 9 retired ACTION
 tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
 bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
-Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS — Slices 1–7 DONE & committed**
-on branch `phase-51` (2026-06-28). Extension of Phase 51 — **no merge to `main` until 51.5 is built**
+Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS — Slices 1–8 DONE & committed**
+(S8 `f264816`, GUI-verified at Crucible r04) on branch `phase-51` (2026-06-28). Extension of Phase 51 —
+**no merge to `main` until 51.5 is built**
 (owner decision). Driven by the 2026-06-27 playtest: the channel is hollow (no grounded facts). Spec
 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`, all decisions locked (D1–D8). Thesis: gate intimacy on
 completing deterministic in-engine **objectives** (restore dungeon **subsystems**) instead of
@@ -24,8 +25,12 @@ single tick source, D1/D5). `dungeon_intimacy` becomes a latching tier index. S6
 `dungeon_systems_status(room_objects)` helper (filters subsystem archetypes →
 `(name, state)` pairs, truthful systems assessment). S7 pure tier-knowledge / active-objective
 helpers (`unlocked_knowledge` union over completed tiers, de-duped, D7; `active_objective` lookup →
-the "what you want next" hint). **Next: Slice 8** — agent context (`# Who Is Speaking` / `# Systems
-Status` / `# What You Want Next`) on `DungeonVoiceAgent` + `_dungeon_agent_inputs`.
+the "what you want next" hint). S8 agent context — `DungeonVoiceAgent` gains `# Who Is Speaking` /
+`# Systems Status` / `# What You Want Next` + `# This Conversation So Far` sections (+ react-to-speaker
+prompt instruction); `_dungeon_agent_inputs` assembles them (actor name/playbook/tags, systems via
+`dungeon_systems_status`, tier knowledge via `unlocked_knowledge` with flat `reveal_knowledge`
+fallback, active objective, in-session `DialogueSession.turns`). **Next: Slice 9** — PlayView wiring
+(call `advance_objectives` after command resolution + feed the new inputs).
 
 Phase **51 — Talk to the Dungeon: FEATURE-COMPLETE & GUI-verified** on branch `phase-51` (2026-06-26).
 Decisions locked; **Slices 1–8 DONE & committed**. **Voice/knowledge-at-play-time decision made
@@ -48,7 +53,7 @@ Phase 51.5 spec: `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`.
 
 ---
 
-## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slices 1–7 DONE & committed → next: Slice 8 (agent context: Who Is Speaking / Systems Status / What You Want Next)
+## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slices 1–8 DONE & committed → next: Slice 9 (PlayView wiring: call advance_objectives post-command + feed the new agent inputs)
 
 **Phase 51.5** is on branch `phase-51` (off `main`), extending the now feature-complete Phase 51
 channel. The 2026-06-27 playtest found the channel **hollow**: good dialogue, but the dungeon has no
@@ -143,14 +148,41 @@ with `status == "active"` (the ladder activates one tier at a time) — its `des
 empty-when-none-completed / returns-active / none-when-no-active / first-when-multiple-active). rpg
 suite green (648).
 
-**⮕ NEXT: Slice 8 (TDD) — agent context** (spec §4.4 / §7.8). `DungeonVoiceAgent` gains
-`# Who Is Speaking` (actor_name + playbook/tags), `# Systems Status` (from `dungeon_systems_status`),
-and `# What You Want Next` (the `active_objective` description) sections; `_dungeon_agent_inputs`
-assembles them (playbook via `PlaybookLibrary`, systems from campaign room objects, knowledge via
-`unlocked_knowledge`, active objective, in-session `DialogueSession.turns`). Test with a fake provider
-— assert the assembled prompt carries the new sections. Then: 9 PlayView wiring (call
-`advance_objectives` after command resolution + feed the new inputs) → 10 seed the full ladder →
-11 (optional) tier HUD. Use the TDD skill (read `spec/TESTING.md` first).
+**Slice 8 — DONE & committed (`f264816`; spec §4.4 / §7.8).** Agent context, two layers (TDD, 13 new tests).
+**Agent** (`llm/agents/dungeon_voice_agent.py`, +9 tests): `respond`/`_build_system` gain optional
+kwargs `actor_name`/`actor_playbook`/`actor_tags` → **`# Who Is Speaking`**; `systems_status` →
+**`# Systems Status`** (`- name: state` lines); `next_objective` → **`# What You Want Next`** (placed
+after Knowledge, before Recent Memories per §4.4); `session_turns` → **`# This Conversation So Far`**
+(in-session amnesia fix, §4.1). Each section omitted when its input is empty/None (back-compat — the
+Phase 51 tests are untouched). `prompts/dungeon_voice_system.txt` gains the **react-to-speaker**
+instruction (playbook/tags salient; ground systems answers in the status; name the want).
+**View** (`views/play_view.py:_dungeon_agent_inputs`, +4 tests): assembles `actor_name`
+(`actor.display_name`), `actor_playbook` (new static `_actor_playbook_name` → `PlaybookLibrary().get`
+display name, KeyError-guarded), `actor_tags`, `systems_status` (new `_dungeon_systems_status` →
+`dungeon_systems_status(repo.get_objects_for_campaign)`), `next_objective`
+(`active_objective(objectives)["description"]`), `session_turns` (`self._dialogue.turns`).
+**Knowledge (D7):** `dungeon_knowledge` now = `unlocked_knowledge(objectives)` when objectives exist,
+else falls back to the deprecated flat `reveal_knowledge` band (new `_dungeon_objectives` helper;
+back-compat keeps the two old knowledge-band tests green). Full views/llm/rpg/memory unit suites green
+(1374). **GUI-verified at Crucible r04 (2026-06-28, user-driven):** much better experience already —
+the channel now reacts to who is speaking and gives a truthful systems assessment. **Live-save facts
+captured** (`saves/The Crucible/campaign.duckdb`): PCs already carry playbooks (**Mira Coldwell =
+`artificer`** → lands the §4.1 machine-mind hook; Kira=fighter, Talvas=thief; **tags are empty** in the
+save so Who-Is-Speaking shows name+playbook only); four subsystem objects already exist (Sand-Choked
+Gearworks `jammed`, The Great Lift `powered`, Great Lift upper `ready`, Trap Control Lever `active`) so
+`# Systems Status` populates **now**; intimacy clock 6/6 `monotonic=False` (channel wide open).
+**Carried to Slice 10:** the live save has **no `objectives` table** yet — migration 018 auto-applies on
+save load (`window.py:355` `initialize_schema`), creating it empty, so `get_objectives` returns `[]`
+(no crash, knowledge falls back to the flat band); the seed ladder + per-tier knowledge + clock reseg
+(D6 latching) are Slice 10's job. The pre-existing subsystems are general room objects, **not** the
+authored ladder.
+
+**⮕ NEXT: Slice 9 (TDD) — PlayView wiring** (spec §7.9). Call `advance_objectives(repo, campaign_id)`
+after command resolution (the orchestration seam where `object.transitioned` already lands) so
+restoring a subsystem ticks intimacy + activates the next tier; the §4.4 inputs are already fed by
+`_dungeon_agent_inputs` (Slice 8). Then: 10 seed the full ladder (subsystems + objectives +
+re-segmented latching clock + per-tier knowledge) → 11 (optional) tier HUD. Use the TDD skill (read
+`spec/TESTING.md` first).
 
 **Carried from Phase 51 (now superseded by 51.5 where noted):** the per-exchange `+1` intimacy tick
 (Slice 7 `record_dungeon_exchange`) is **removed** in 51.5 Slice 5; the `monotonic=False` flip on the
