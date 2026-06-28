@@ -8,7 +8,7 @@ Phase **50.6 — Chat Action Cockpit: COMPLETE, GUI-verified & merged to `main`*
 All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds; Slice 9 retired ACTION
 tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
 bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
-Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS — Slices 1–6 DONE & committed**
+Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS — Slices 1–7 DONE & committed**
 on branch `phase-51` (2026-06-28). Extension of Phase 51 — **no merge to `main` until 51.5 is built**
 (owner decision). Driven by the 2026-06-27 playtest: the channel is hollow (no grounded facts). Spec
 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`, all decisions locked (D1–D8). Thesis: gate intimacy on
@@ -22,8 +22,10 @@ manifest field · S2 migration + repo round-trip · S3 pure `completion_satisfie
 intimacy tick dropped (`record_dungeon_exchange` now only drafts memory — `advance_objectives` is the
 single tick source, D1/D5). `dungeon_intimacy` becomes a latching tier index. S6 pure
 `dungeon_systems_status(room_objects)` helper (filters subsystem archetypes →
-`(name, state)` pairs, truthful systems assessment). **Next: Slice 7** — tier-knowledge /
-active-objective helpers.
+`(name, state)` pairs, truthful systems assessment). S7 pure tier-knowledge / active-objective
+helpers (`unlocked_knowledge` union over completed tiers, de-duped, D7; `active_objective` lookup →
+the "what you want next" hint). **Next: Slice 8** — agent context (`# Who Is Speaking` / `# Systems
+Status` / `# What You Want Next`) on `DungeonVoiceAgent` + `_dungeon_agent_inputs`.
 
 Phase **51 — Talk to the Dungeon: FEATURE-COMPLETE & GUI-verified** on branch `phase-51` (2026-06-26).
 Decisions locked; **Slices 1–8 DONE & committed**. **Voice/knowledge-at-play-time decision made
@@ -46,7 +48,7 @@ Phase 51.5 spec: `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`.
 
 ---
 
-## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slices 1–6 DONE & committed → next: Slice 7 (tier-knowledge / active-objective helpers)
+## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slices 1–7 DONE & committed → next: Slice 8 (agent context: Who Is Speaking / Systems Status / What You Want Next)
 
 **Phase 51.5** is on branch `phase-51` (off `main`), extending the now feature-complete Phase 51
 channel. The 2026-06-27 playtest found the channel **hollow**: good dialogue, but the dungeon has no
@@ -129,13 +131,26 @@ order, so the dungeon can give a **truthful** systems assessment. No repo/LLM. 4
 `tests/unit/rpg/test_dungeon_channel.py` (reports name+state / excludes non-subsystem archetypes /
 preserves input order / empty input). rpg suite green (641).
 
-**⮕ NEXT: Slice 7 (TDD) — tier-knowledge / active-objective helpers** (spec §4.3.4 / §7.7). Pure
-helpers over `get_objectives(campaign_id)`: the unlocked-knowledge **union of completed tiers'
-`reveals_knowledge`** (replaces the `reveal_knowledge` banding slice) + the **active objective's
-`description`** as the next-objective hint. Then the §7 plan: 8 agent context (`# Who Is Speaking` /
-`# Systems Status` / `# What You Want Next`) → 9 PlayView wiring (call `advance_objectives` after
-command resolution) → 10 seed the full ladder → 11 (optional) tier HUD. Use the TDD skill (read
-`spec/TESTING.md` first).
+**Slice 7 — DONE & committed (`c953eca`).** Two pure helpers in
+**`dungeon_daddy/rpg/dungeon_channel.py`** over the `get_objectives(campaign_id)` dict shape (spec
+§4.3.4 / §7.7). `unlocked_knowledge(objectives) -> list[str]`: the union of `reveals_knowledge` across
+all **completed** objectives, in tier order (`get_objectives` is ordered by `tier_index, slug`),
+de-duplicated (first occurrence wins) — locked/active tiers stay gated (D7; replaces the
+`reveal_knowledge` banding path). `active_objective(objectives) -> dict | None`: the first objective
+with `status == "active"` (the ladder activates one tier at a time) — its `description` is the
+"what I want next" hint; `None` when nothing is active. No repo/LLM (pure). 7 tests in
+`tests/unit/rpg/test_dungeon_channel.py` (union / excludes locked+active / preserves-order+dedupes /
+empty-when-none-completed / returns-active / none-when-no-active / first-when-multiple-active). rpg
+suite green (648).
+
+**⮕ NEXT: Slice 8 (TDD) — agent context** (spec §4.4 / §7.8). `DungeonVoiceAgent` gains
+`# Who Is Speaking` (actor_name + playbook/tags), `# Systems Status` (from `dungeon_systems_status`),
+and `# What You Want Next` (the `active_objective` description) sections; `_dungeon_agent_inputs`
+assembles them (playbook via `PlaybookLibrary`, systems from campaign room objects, knowledge via
+`unlocked_knowledge`, active objective, in-session `DialogueSession.turns`). Test with a fake provider
+— assert the assembled prompt carries the new sections. Then: 9 PlayView wiring (call
+`advance_objectives` after command resolution + feed the new inputs) → 10 seed the full ladder →
+11 (optional) tier HUD. Use the TDD skill (read `spec/TESTING.md` first).
 
 **Carried from Phase 51 (now superseded by 51.5 where noted):** the per-exchange `+1` intimacy tick
 (Slice 7 `record_dungeon_exchange`) is **removed** in 51.5 Slice 5; the `monotonic=False` flip on the
