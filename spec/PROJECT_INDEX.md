@@ -8,8 +8,8 @@ Phase **50.6 — Chat Action Cockpit: COMPLETE, GUI-verified & merged to `main`*
 All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds; Slice 9 retired ACTION
 tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
 bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
-Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS — Slices 1–5 DONE & committed**
-on branch `phase-51` (2026-06-27). Extension of Phase 51 — **no merge to `main` until 51.5 is built**
+Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS — Slices 1–6 DONE & committed**
+on branch `phase-51` (2026-06-28). Extension of Phase 51 — **no merge to `main` until 51.5 is built**
 (owner decision). Driven by the 2026-06-27 playtest: the channel is hollow (no grounded facts). Spec
 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`, all decisions locked (D1–D8). Thesis: gate intimacy on
 completing deterministic in-engine **objectives** (restore dungeon **subsystems**) instead of
@@ -20,8 +20,10 @@ Phase 52 Milestones). 11-slice TDD plan (§7), pure-models-first. **Done:** S1 O
 manifest field · S2 migration + repo round-trip · S3 pure `completion_satisfied` · S4
 `advance_objectives` service (latching intimacy tick, next-tier activation, draft memory) · S5 chat
 intimacy tick dropped (`record_dungeon_exchange` now only drafts memory — `advance_objectives` is the
-single tick source, D1/D5). `dungeon_intimacy` becomes a latching tier index. **Next: Slice 6** —
-pure `dungeon_systems_status(room_objects)` helper.
+single tick source, D1/D5). `dungeon_intimacy` becomes a latching tier index. S6 pure
+`dungeon_systems_status(room_objects)` helper (filters subsystem archetypes →
+`(name, state)` pairs, truthful systems assessment). **Next: Slice 7** — tier-knowledge /
+active-objective helpers.
 
 Phase **51 — Talk to the Dungeon: FEATURE-COMPLETE & GUI-verified** on branch `phase-51` (2026-06-26).
 Decisions locked; **Slices 1–8 DONE & committed**. **Voice/knowledge-at-play-time decision made
@@ -44,7 +46,7 @@ Phase 51.5 spec: `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`.
 
 ---
 
-## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slices 1–5 DONE & committed → next: Slice 6 (systems-status helper)
+## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slices 1–6 DONE & committed → next: Slice 7 (tier-knowledge / active-objective helpers)
 
 **Phase 51.5** is on branch `phase-51` (off `main`), extending the now feature-complete Phase 51
 channel. The 2026-06-27 playtest found the channel **hollow**: good dialogue, but the dungeon has no
@@ -119,11 +121,21 @@ drafts-only D6 guard, **new** `test_does_not_advance_the_intimacy_clock`); play_
 `test_apply_dungeon_reply_posts_bubble_and_records_exchange` retargeted (clock unchanged at 3, draft
 still written). memory + views + rpg suites green (1172); tools + campaign green (209).
 
-**⮕ NEXT: Slice 6 (TDD) — systems-status helper.** Pure `dungeon_systems_status(room_objects) ->
-[(subsystem, state), …]` (spec §4.2 / §7.6). Then the §7 plan: 7 tier-knowledge/active-objective
-helpers → 8 agent context (`# Who Is Speaking` / `# Systems Status` / `# What You Want Next`) →
-9 PlayView wiring (call `advance_objectives` after command resolution) → 10 seed the full ladder →
-11 (optional) tier HUD. Use the TDD skill (read `spec/TESTING.md` first).
+**Slice 6 — DONE & committed (`4e84adf`).** Pure `dungeon_systems_status(room_objects) ->
+list[(name, state)]` in **`dungeon_daddy/rpg/dungeon_channel.py`** (spec §4.2 / §7.6). Filters
+subsystem-tagged objects (`SUBSYSTEM_ARCHETYPES = ("mechanism", "structure")`) from the repo-dict
+world snapshot (`get_objects_for_campaign` shape) → `(display_name, current_state)` pairs in input
+order, so the dungeon can give a **truthful** systems assessment. No repo/LLM. 4 tests in
+`tests/unit/rpg/test_dungeon_channel.py` (reports name+state / excludes non-subsystem archetypes /
+preserves input order / empty input). rpg suite green (641).
+
+**⮕ NEXT: Slice 7 (TDD) — tier-knowledge / active-objective helpers** (spec §4.3.4 / §7.7). Pure
+helpers over `get_objectives(campaign_id)`: the unlocked-knowledge **union of completed tiers'
+`reveals_knowledge`** (replaces the `reveal_knowledge` banding slice) + the **active objective's
+`description`** as the next-objective hint. Then the §7 plan: 8 agent context (`# Who Is Speaking` /
+`# Systems Status` / `# What You Want Next`) → 9 PlayView wiring (call `advance_objectives` after
+command resolution) → 10 seed the full ladder → 11 (optional) tier HUD. Use the TDD skill (read
+`spec/TESTING.md` first).
 
 **Carried from Phase 51 (now superseded by 51.5 where noted):** the per-exchange `+1` intimacy tick
 (Slice 7 `record_dungeon_exchange`) is **removed** in 51.5 Slice 5; the `monotonic=False` flip on the
