@@ -41,7 +41,7 @@ Phase 51.5 spec: `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`.
 
 ---
 
-## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slices 1–2 DONE & committed → next: Slice 3 (completion predicate)
+## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slices 1–3 DONE & committed → next: Slice 4 (objective service)
 
 **Phase 51.5** is on branch `phase-51` (off `main`), extending the now feature-complete Phase 51
 channel. The 2026-06-27 playtest found the channel **hollow**: good dialogue, but the dungeon has no
@@ -77,13 +77,26 @@ mirrors the `room_objects`/`object_transitions` house pattern). Repo (`memory/re
 tier ordering, unknown-campaign empty, upsert-no-dup + replaces knowledge). memory + rpg-models +
 campaign suites green (424).
 
-**⮕ NEXT: Slice 3 (TDD) — completion predicate.** Pure
-`completion_satisfied(completion, world_state) -> bool` (proposed home `dungeon_daddy/rpg/objectives.py`)
-for `object_state` (the target object's `current_state == required_state`); extensible to
-`item_obtained`/`room_reached`. Unit-tested without a repo (pure helper). Then the §7 plan:
-4 objective service (`advance_objectives`) → 5 drop chat intimacy tick → 6 systems-status helper →
-7 tier-knowledge/active-objective helpers → 8 agent context → 9 PlayView wiring → 10 seed the full
-ladder → 11 (optional) tier HUD. Use the TDD skill (read `spec/TESTING.md` first).
+**Slice 3 — DONE & committed (`9cdc6ba`).** Pure
+`completion_satisfied(completion, world_state) -> bool` in **`dungeon_daddy/rpg/objectives.py`** (new;
+spec §4.3.2). `object_state` iterates `world_state["objects"]` (the `repo.get_objects_by_room` dict
+shape — each with `slug`/`current_state`) and holds when the target slug is at `required_state`;
+absent target / wrong state / empty world → `False`. Unsupported kinds (`item_obtained`/`room_reached`)
+**raise `NotImplementedError`** — an honest "not built yet" signal vs. a silent `False` that would mask
+a Slice 4 bug. No repo/LLM (D4). 5 tests in `tests/unit/rpg/test_objectives.py` (satisfied /
+wrong-state / absent / empty-state / unsupported-kind). rpg + objective-repo + manifest suites green
+(668).
+
+**⮕ NEXT: Slice 4 (TDD) — objective service.** `advance_objectives(repo, campaign_id) ->
+list[ObjectiveResult]` (home `dungeon_daddy/rpg/objectives.py`): for each **active** objective, gather
+world state (room objects) and call the Slice 3 `completion_satisfied`; on satisfaction (1) mark
+`completed` via `update_objective_status`, (2) `tick_clock(intimacy, +1)` + persist — the **single**
+intimacy-tick source (D5), (3) flip the next tier's objective `locked → active`, (4) draft a
+`MemoryEntry` (type `dungeon_state`, status `draft`, reusing the Phase 51 D4 engine-draft path). Assert
+clock persisted, next tier activated, memory drafted, **no LLM path touched**. Then the §7 plan:
+5 drop chat intimacy tick → 6 systems-status helper → 7 tier-knowledge/active-objective helpers →
+8 agent context → 9 PlayView wiring → 10 seed the full ladder → 11 (optional) tier HUD. Use the TDD
+skill (read `spec/TESTING.md` first).
 
 **Carried from Phase 51 (now superseded by 51.5 where noted):** the per-exchange `+1` intimacy tick
 (Slice 7 `record_dungeon_exchange`) is **removed** in 51.5 Slice 5; the `monotonic=False` flip on the
