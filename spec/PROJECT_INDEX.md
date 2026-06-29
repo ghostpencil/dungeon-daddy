@@ -13,22 +13,24 @@ persona persistence, and resonance points are all built. Spec
 Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS** on branch `phase-51` (extends 51;
 **no merge to `main` until 51.5 is built** — owner decision). Driven by the 2026-06-27 playtest: the
 channel was hollow. Spec `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`, decisions locked D1–D8.
-**Slices 1–10 DONE & committed** (the full intimacy ladder is built and seeded into the live Crucible),
-plus a run of post-Slice-10 fixes now **GUI-verified** (truthful systems status, dungeon names its want,
-lift modeled as one object, no memory review queue, dungeon states object/objective locations).
-**Next session: the puzzle-obstacle / multi-approach feature (#1+#2) — plan in START HERE.**
+**Slices 1–10 DONE & GUI-verified** (the full intimacy ladder is built and seeded into the live
+Crucible). Now building the **puzzle-obstacle / multi-approach feature (#1+#2)**: **Part A Slices 1–2
+DONE & committed** (engine win — a class-flavored approach roll can resolve an obstacle and complete its
+objective). **Next session: Part A Slice 3** (surface approach verbs in the Action Builder) — plan in
+START HERE.
 
 Specs: 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` · 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` ·
 current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index `spec/IMPLEMENTATION_PHASES.md`).
 
 ---
 
-## START HERE — next session: puzzle-style objective solving (#1 + #2)
+## START HERE — next session: puzzle-style objective solving, Part A Slice 3
 
-The 2026-06-28/29 playtest issues are all resolved & **GUI-verified** (approved memories / no review
-queue, truthful systems status, lift-as-one-object, dungeon states locations — see Session state).
-**#1 + #2 (multi-approach objective solving) are planned and greenlit but not yet built** — that is
-next session's work. Outcome→success mapping is now **LOCKED** (below).
+Multi-approach objective solving (#1 + #2) is **in progress**. **Part A Slices 1–2 are DONE & committed**
+(`5e3c0d2`, `4c34b16`): the pure obstacle helpers + the locked outcome mapping are built, and a
+successful class-flavored approach roll now resolves an obstacle's state and completes its objective.
+**Next: Part A Slice 3** (surface approach verbs in the Action Builder), then Slice 4 (re-author the
+Crucible + seed), then Part B (the LLM authority expansion). Full unit suite green (3163).
 
 ### The feature (decisions locked)
 
@@ -46,32 +48,26 @@ next session's work. Outcome→success mapping is now **LOCKED** (below).
 - **Outcome→success mapping — LOCKED (owner, 2026-06-29):** full/critical → resolves; **partial →
   resolves with a complication**; miss → fails.
 
-### The seam
+### The seam (Slices 1–2 wired here)
 
-`play_view._resolve_vna_roll` (around `dungeon_daddy/views/play_view.py:1729`) computes a roll
-`resolution` (`.outcome`), applies a world reaction, runs the LLM proposal pipeline, and narrates —
-but **never touches `object_state`**. That is where the new mechanic plugs in. `_on_activate_submit`
-(~`:1631`) routes contested transitions to `_resolve_vna_roll`; `_apply_vna_command` (~:1691) is the
-deterministic path that already calls `_advance_objectives()` (~:1713).
+`play_view._resolve_vna_roll` now calls `_maybe_resolve_obstacle(card, actor, resolution.outcome)`:
+on a resolving roll whose verb matches a contested approach, it routes the matched transition through
+the deterministic `ActivateObject` pipeline (`_apply_vna_command`), which applies `update_object_state`
++ side-effects and re-runs `_advance_objectives()`. Pure decision logic lives in `rpg/obstacles.py`.
+`_on_activate_submit` still routes contested transitions to `_resolve_vna_roll`.
 
 ### Slice plan (TDD; sequenced so Part A is a verifiable win on its own)
 
 **Part A — authored class approaches (engine-deterministic, no authority change):**
-1. ✅ **DONE** Pure helper + validation: an obstacle's approaches all converge to one resolved state.
-   New module `rpg/obstacles.py` (`obstacle_approaches` = contested transitions out of `current_state`,
-   each tagged `action_verb`; `obstacle_resolved_state` = single shared `to_state`, `None` if not an
-   obstacle, `ValueError` on divergence). Tests `tests/unit/rpg/test_obstacles.py` (4, green); full unit
-   suite 3155 green.
-2. ✅ **DONE** Extend the roll path: on a **successful** roll whose verb matches a contested transition
-   on the target, the engine applies `update_object_state` + side-effects (spawns_item / advances_clock),
-   then re-runs `_advance_objectives()`. Pure decision `resolve_obstacle_with_roll` +
-   `ObstacleRollResolution` (locked mapping: crit/full clean · partial w/ complication · miss fails);
-   `play_view._maybe_resolve_obstacle` routes the matched transition through the deterministic
-   `ActivateObject` pipeline (`_apply_vna_command`) — DRY side-effects + `_advance_objectives`; surfaced
-   in DM narration. Tests `test_play_view_obstacle.py` (3) + obstacle units (9); relaxed one VNA test
-   whose old assertion encoded the now-changed "contested roll never alters state" invariant. Full unit
-   suite 3163 green.
-3. Surface the obstacle's approach verbs as suggested actions in the builder.
+1. ✅ **DONE** (`5e3c0d2`) Pure helpers + validation in new `rpg/obstacles.py`: `obstacle_approaches`
+   (contested transitions out of `current_state`, each tagged `action_verb`) + `obstacle_resolved_state`
+   (single shared `to_state`; `None` if not an obstacle; `ValueError` on divergence).
+2. ✅ **DONE** (`4c34b16`) Roll path resolves obstacle state: pure `resolve_obstacle_with_roll` +
+   `ObstacleRollResolution` (locked mapping); `play_view._maybe_resolve_obstacle` (called from
+   `_resolve_vna_roll`) routes the matched transition through the `ActivateObject` pipeline so
+   side-effects apply and `_advance_objectives()` re-runs. Tests: `test_play_view_obstacle.py` (3) +
+   obstacle units (9).
+3. **← NEXT** Surface the obstacle's approach verbs as suggested actions in the builder.
 4. Re-author the 4 Crucible obstacles with class-flavored approaches → one resolved state; update the
    seed **additively** (preserve the adopted `gearworks` state — don't reset it to jammed).
 
@@ -82,45 +78,22 @@ deterministic path that already calls `_advance_objectives()` (~:1713).
 7. Update `docs/LLM_AUTHORITY_BOUNDARY.md` + the Phase 51.5 spec to record the constrained
    object-state authority.
 
-### Session state (2026-06-29)
+### Session state
 
-- **GUI-verify done this session:** systems-status truthfulness confirmed against the **live DB**
-  (every reported state matched). Found + fixed one data bug: the **Great Lift** was two `room_objects`
-  rows with divergent states (L1 `powered` / L2 `ready`) — the L2 row (`great-lift-upper`, inert, gated
-  nothing) showed as a 2nd subsystem and the LLM collapsed the duplicate. Per owner decision (*demote the
-  duplicate*), `great-lift-upper` re-archetyped `mechanism → lore_fixture` (state→`present`, deferring
-  description); the L1 `great-lift` mechanism stays the single canonical lift that gates the vertical
-  exit. Seed `tools/populate_crucible_level2.py` + new regression test
-  `tests/unit/tools/test_populate_crucible_level2.py`; **live save re-seeded** (backup
-  `campaign.duckdb.bak-lift-demote-*`). Systems status now reports a coherent 6 subsystems.
-- **No review queue (owner decision):** approving AI changes is work, not gameplay — the AI impacts the
-  world directly; we tune/limit behavior, not gate it. `apply_low_risk_proposals` was the last play-time
-  writer still persisting `draft` (the rest already wrote `approved`); now writes `approved`
-  (`e042dfd`). Drafts are inert anyway (retrieval reads only `approved`).
-- **Dungeon knows object locations (new):** the dungeon-voice context now carries each subsystem's and
-  the active objective's **`Level N — Room Name`** location, so it can answer "which room is X" and name
-  *where* the task it wants is. New pure helpers `located_systems_status` / `object_location`
-  (`rpg/dungeon_channel.py`); agent renders `(located in …)` + a `Location:` line + a system-prompt rule
-  to state locations plainly (no deflecting); `play_view._room_labels` resolves room_id→label from the
-  dungeon model and feeds `_dungeon_systems_status` / new `next_objective_location`.
-- **Housekeeping:** deleted all inert `draft` memories from the live Crucible save across two passes
-  (backups `campaign.duckdb.bak-predelete-drafts-*` and `…-drafts2-*`). Live now **0 drafts / 18
-  approved**; with the no-review-queue fix in place, new play no longer creates drafts.
-- **Committed (this session):** lift one-object fix (`ee27a72`), auto-approve memories (`e042dfd`),
-  dungeon-location feature (`69e4303`). Earlier: Slice 9 (`4ed5bfe`), Slice 10 (`4ba27e1`),
-  dungeon-channel fixes (`27be4f9`). Full unit suite green.
-- **GUI-verify ALL DONE this session** (owner confirmed "Fixes verified. The Dungeon dialogue is
-  accurate."): (a) systems assessment lists all subsystems truthfully (also checked vs live DB; lift
-  reports once); (b) the dungeon no longer claims unreal state and names its want; (c) memories are
-  approved (no review queue) and feed back. The new **location** feature is built + unit-verified and
-  was sanity-checked against the live save; a quick in-app "which room is X in?" check is a nice-to-have
-  but not blocking.
-- **Live Crucible state (current, 2026-06-29):** tier 0 `clear-the-gearworks` **completed** (`gearworks`
+- **This session (puzzle-obstacle Part A Slices 1–2):** built `rpg/obstacles.py` + the roll-path
+  resolution and committed (`5e3c0d2`, `4c34b16`). Full unit suite green (3163). No GUI verify yet for
+  the new mechanic (Slice 4 reseeds the Crucible obstacles first, then verify in-app).
+- **Live Crucible state (2026-06-29):** tier 0 `clear-the-gearworks` **completed** (`gearworks`
   cleared); tier 1 `restore-the-coolant-loop` **active** (`coolant-loop` still **ruptured** → needs
   `restored`); tier 2 `recharge-the-arcane-conduits` **locked** but `arcane-conduits` already **charged**
   (banked — **cascade-completes** once tier 1 finishes); tier 3 `stabilize-the-core-containment`
   **locked** (`core-containment` failing). Intimacy clock **1/4 latching**. `great-lift` powered,
-  `trap-lever` active. Backups incl. `campaign.duckdb.bak-slice10-applied-*` / `…-lift-demote-*`.
+  `trap-lever` active. Live save 0 drafts / 18 approved. Backups incl.
+  `campaign.duckdb.bak-slice10-applied-*` / `…-lift-demote-*`.
+- **Slices 1–10 GUI-verify (DONE, prior session):** owner confirmed "Fixes verified. The Dungeon
+  dialogue is accurate." — truthful systems status (vs live DB), dungeon names its want, lift modeled as
+  one object, no memory review queue (`apply_low_risk_proposals` writes `approved`), dungeon states
+  object/objective locations. Commits `ee27a72` / `e042dfd` / `69e4303` (and `27be4f9`).
 
 ### Phase 51.5 — what's built (Slices 1–10, condensed)
 
