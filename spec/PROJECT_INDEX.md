@@ -14,8 +14,9 @@ Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS** on branch `p
 **no merge to `main` until 51.5 is built** — owner decision). Driven by the 2026-06-27 playtest: the
 channel was hollow. Spec `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`, decisions locked D1–D8.
 **Slices 1–10 DONE & committed** (the full intimacy ladder is built and seeded into the live Crucible),
-plus three post-Slice-10 fixes this session. **Next session: the puzzle-obstacle / multi-approach
-feature (#1+#2) — plan in START HERE.**
+plus a run of post-Slice-10 fixes now **GUI-verified** (truthful systems status, dungeon names its want,
+lift modeled as one object, no memory review queue, dungeon states object/objective locations).
+**Next session: the puzzle-obstacle / multi-approach feature (#1+#2) — plan in START HERE.**
 
 Specs: 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` · 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` ·
 current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index `spec/IMPLEMENTATION_PHASES.md`).
@@ -24,9 +25,10 @@ current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index `spec/IMPLEMENT
 
 ## START HERE — next session: puzzle-style objective solving (#1 + #2)
 
-Three playtest issues were raised 2026-06-28/29. **#3 (approved memories)** and the **systems-status
-prompt fix** are DONE & committed (`27be4f9`) — GUI-verification of both is pending. **#1 + #2 are
-planned and greenlit but not yet built** — that is next session's work.
+The 2026-06-28/29 playtest issues are all resolved & **GUI-verified** (approved memories / no review
+queue, truthful systems status, lift-as-one-object, dungeon states locations — see Session state).
+**#1 + #2 (multi-approach objective solving) are planned and greenlit but not yet built** — that is
+next session's work. Outcome→success mapping is now **LOCKED** (below).
 
 ### The feature (decisions locked)
 
@@ -41,8 +43,8 @@ planned and greenlit but not yet built** — that is next session's work.
   resolved state** (e.g. `gearworks: jammed ──{tinker|fight|finesse}──▶ cleared`). The objective
   completes when the object reaches that state — `completion_satisfied`/`advance_objectives` are
   already agnostic to *how* it changed — so the objective stays uniformly `completed`.
-- **Outcome→success mapping (proposed, confirm before building):** full/critical → resolves; partial
-  → resolves **with a complication**; miss → fails. (Owner may prefer partial = fail.)
+- **Outcome→success mapping — LOCKED (owner, 2026-06-29):** full/critical → resolves; **partial →
+  resolves with a complication**; miss → fails.
 
 ### The seam
 
@@ -91,20 +93,24 @@ deterministic path that already calls `_advance_objectives()` (~:1713).
   (`rpg/dungeon_channel.py`); agent renders `(located in …)` + a `Location:` line + a system-prompt rule
   to state locations plainly (no deflecting); `play_view._room_labels` resolves room_id→label from the
   dungeon model and feeds `_dungeon_systems_status` / new `next_objective_location`.
-- **Housekeeping:** deleted 32 inert `draft` memories from the live Crucible save (backup
-  `campaign.duckdb.bak-predelete-drafts-*`); 14 approved memories intact.
-- **Committed:** Slice 9 (`4ed5bfe`), Slice 10 (`4ba27e1`), dungeon-channel fixes (`27be4f9`), lift
-  one-object fix (`ee27a72`), auto-approve memories (`e042dfd`); dungeon-location feature pending commit.
-- **Live Crucible save IS seeded** with the ladder (backup `campaign.duckdb.bak-slice10-applied-*`).
-  Current live state: `gearworks` **jammed** (tier 0 active — to complete it now, go to **R4** and
-  **Activate** it; the multi-approach work is what makes tinker/smash/finesse also work);
-  `arcane-conduits` **charged** out of order (tier 2 locked → banked; it will **cascade-complete** once
-  tiers 0 and 1 are done, since `advance_objectives` re-evaluates a freshly-activated tier in the same
-  pass); `coolant-loop` ruptured, `core-containment` failing; intimacy clock **0/4 latching**.
-- **Pending GUI-verify (next launch — prompt loads fresh, no save mutation needed):** (a) ✅ done —
-  systems assessment lists all subsystems truthfully (verified vs live DB; lift now reports once); (b)
-  the dungeon no longer claims state that isn't real and names its want instead of re-asking; (c)
-  dungeon memories are approved (no curation queue) and feed back across sittings.
+- **Housekeeping:** deleted all inert `draft` memories from the live Crucible save across two passes
+  (backups `campaign.duckdb.bak-predelete-drafts-*` and `…-drafts2-*`). Live now **0 drafts / 18
+  approved**; with the no-review-queue fix in place, new play no longer creates drafts.
+- **Committed (this session):** lift one-object fix (`ee27a72`), auto-approve memories (`e042dfd`),
+  dungeon-location feature (`69e4303`). Earlier: Slice 9 (`4ed5bfe`), Slice 10 (`4ba27e1`),
+  dungeon-channel fixes (`27be4f9`). Full unit suite green.
+- **GUI-verify ALL DONE this session** (owner confirmed "Fixes verified. The Dungeon dialogue is
+  accurate."): (a) systems assessment lists all subsystems truthfully (also checked vs live DB; lift
+  reports once); (b) the dungeon no longer claims unreal state and names its want; (c) memories are
+  approved (no review queue) and feed back. The new **location** feature is built + unit-verified and
+  was sanity-checked against the live save; a quick in-app "which room is X in?" check is a nice-to-have
+  but not blocking.
+- **Live Crucible state (current, 2026-06-29):** tier 0 `clear-the-gearworks` **completed** (`gearworks`
+  cleared); tier 1 `restore-the-coolant-loop` **active** (`coolant-loop` still **ruptured** → needs
+  `restored`); tier 2 `recharge-the-arcane-conduits` **locked** but `arcane-conduits` already **charged**
+  (banked — **cascade-completes** once tier 1 finishes); tier 3 `stabilize-the-core-containment`
+  **locked** (`core-containment` failing). Intimacy clock **1/4 latching**. `great-lift` powered,
+  `trap-lever` active. Backups incl. `campaign.duckdb.bak-slice10-applied-*` / `…-lift-demote-*`.
 
 ### Phase 51.5 — what's built (Slices 1–10, condensed)
 
@@ -132,6 +138,11 @@ Models/helpers first, then service, context/LLM, wiring, seed:
   channel cryptic at tier 0 (resolves §6; `INTIMACY_THRESHOLD` left for the deprecated flat band).
   Seed (`tools/populate_crucible_dungeon_channel.py`) is idempotent + preserves play progress.
 - **Post-S10 fixes** (`27be4f9`): faithful systems-status prompt; dungeon memories written `approved`.
+- **Post-S10 fixes (2026-06-29):** Great Lift modeled as one object — L2 `great-lift-upper` demoted to
+  `lore_fixture` so the lift reports once (`ee27a72`); `apply_low_risk_proposals` writes `approved` so
+  no AI memory hits a review queue (`e042dfd`); dungeon-voice context carries subsystem + objective
+  **locations** (`located_systems_status`/`object_location`, agent + prompt + `play_view._room_labels`
+  / `next_objective_location`) so it can say where the task is and answer "which room is X" (`69e4303`).
 
 ### Phase 51.5 — locked decisions (D1–D8)
 
