@@ -27,7 +27,11 @@ def _repo(tmp_path: Path) -> MemoryRepository:
 
 
 class TestCreateMemoryAutoApplied:
-    def test_create_memory_saved_with_draft_status(self, tmp_path):
+    def test_create_memory_saved_with_approved_status(self, tmp_path):
+        # Auto-applied low-risk memories must not require player review: the AI
+        # impacts the world directly (owner decision 2026-06-29). Approving here
+        # keeps them out of the curation/draft queue and lets them feed back
+        # through MemoryRetriever (which only reads `approved`).
         repo = _repo(tmp_path)
         change = CreateMemoryChange(
             title="Mara found the sigil",
@@ -40,7 +44,7 @@ class TestCreateMemoryAutoApplied:
         apply_low_risk_proposals(result, repo=repo, campaign_id="campaign_1")
 
         entries = repo.get_memory_entries_by_campaign("campaign_1")
-        assert entries[0]["status"] == "draft"
+        assert entries[0]["status"] == "approved"
 
     def test_create_memory_entry_saved_to_repo(self, tmp_path):
         repo = _repo(tmp_path)
