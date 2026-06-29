@@ -72,6 +72,17 @@ deterministic path that already calls `_advance_objectives()` (~:1713).
 
 ### Session state (2026-06-29)
 
+- **GUI-verify done this session:** systems-status truthfulness confirmed against the **live DB**
+  (every reported state matched). Found + fixed one data bug: the **Great Lift** was two `room_objects`
+  rows with divergent states (L1 `powered` / L2 `ready`) — the L2 row (`great-lift-upper`, inert, gated
+  nothing) showed as a 2nd subsystem and the LLM collapsed the duplicate. Per owner decision (*demote the
+  duplicate*), `great-lift-upper` re-archetyped `mechanism → lore_fixture` (state→`present`, deferring
+  description); the L1 `great-lift` mechanism stays the single canonical lift that gates the vertical
+  exit. Seed `tools/populate_crucible_level2.py` + new regression test
+  `tests/unit/tools/test_populate_crucible_level2.py`; **live save re-seeded** (backup
+  `campaign.duckdb.bak-lift-demote-*`). Systems status now reports a coherent 6 subsystems.
+- **Housekeeping:** deleted 32 inert `draft` memories (retrieval only reads `approved`) from the live
+  Crucible save (backup `campaign.duckdb.bak-predelete-drafts-*`); 14 approved memories intact.
 - **Committed:** Slice 9 (`4ed5bfe`), Slice 10 (`4ba27e1`), dungeon-channel fixes (`27be4f9`).
 - **Live Crucible save IS seeded** with the ladder (backup `campaign.duckdb.bak-slice10-applied-*`).
   Current live state: `gearworks` **jammed** (tier 0 active — to complete it now, go to **R4** and
@@ -79,10 +90,10 @@ deterministic path that already calls `_advance_objectives()` (~:1713).
   `arcane-conduits` **charged** out of order (tier 2 locked → banked; it will **cascade-complete** once
   tiers 0 and 1 are done, since `advance_objectives` re-evaluates a freshly-activated tier in the same
   pass); `coolant-loop` ruptured, `core-containment` failing; intimacy clock **0/4 latching**.
-- **Pending GUI-verify (next launch — prompt loads fresh, no save mutation needed):** (a) systems
-  assessment now lists **all** subsystems truthfully; (b) the dungeon no longer claims state that
-  isn't real and names its want instead of re-asking; (c) dungeon memories are approved (no curation
-  queue) and feed back across sittings.
+- **Pending GUI-verify (next launch — prompt loads fresh, no save mutation needed):** (a) ✅ done —
+  systems assessment lists all subsystems truthfully (verified vs live DB; lift now reports once); (b)
+  the dungeon no longer claims state that isn't real and names its want instead of re-asking; (c)
+  dungeon memories are approved (no curation queue) and feed back across sittings.
 
 ### Phase 51.5 — what's built (Slices 1–10, condensed)
 
