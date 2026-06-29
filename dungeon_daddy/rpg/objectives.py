@@ -23,8 +23,10 @@ if TYPE_CHECKING:  # avoid a hard import cycle; the service only needs the repo 
 # service is the *single* source of the intimacy tick (D5).
 OBJECTIVE_INTIMACY_DELTA = 1
 
-# Completing an objective restores a dungeon subsystem; the engine drafts a
-# ``dungeon_state`` memory (status ``draft``) reusing the Phase 51 D4 path.
+# Completing an objective restores a dungeon subsystem; the engine records a
+# ``dungeon_state`` memory. Owner override (2026-06-28): written **approved**
+# (not draft) so the milestone is not queued for curation and feeds back through
+# MemoryRetriever — the engine composes it; the LLM never authors memory.
 OBJECTIVE_MEMORY_TYPE = "dungeon_state"
 
 
@@ -103,7 +105,7 @@ def advance_objectives(
                 f"The dungeon registered the completion of {obj['title']!r} "
                 f"(tier {obj['tier_index']})."
             ),
-            status="draft",
+            status="approved",
         )
 
         results.append(

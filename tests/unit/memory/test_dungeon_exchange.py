@@ -19,7 +19,7 @@ def _intimacy_clock(filled: int = 3, segments: int = 6) -> ClockState:
 
 
 class TestRecordDungeonExchange:
-    def test_drafts_a_memory_summarizing_the_exchange(
+    def test_records_an_approved_memory_summarizing_the_exchange(
         self, repo: MemoryRepository
     ) -> None:
         result = record_dungeon_exchange(
@@ -33,17 +33,17 @@ class TestRecordDungeonExchange:
         entry = repo.get_memory_entry(result.memory_id)
         assert entry is not None
         assert entry["campaign_id"] == "camp_001"
-        assert entry["status"] == "draft"
+        assert entry["status"] == "approved"
         assert entry["type"] in ("dungeon_state", "relationship")
         assert "Who built you?" in entry["summary"]
         assert "I remember hands, but not faces." in entry["summary"]
 
-    def test_writes_only_drafts_never_an_authoritative_entry(
+    def test_records_an_approved_entry_no_curation_queue(
         self, repo: MemoryRepository
     ) -> None:
-        # D6 / authority boundary: the engine may only draft memory for an
-        # exchange — approval flows through the curation path, never a direct
-        # authoritative write.
+        # Owner override (2026-06-28): the dungeon's recollections are written
+        # approved, not queued as drafts for the player to curate. The engine
+        # still composes the record — the LLM never authors memory.
         record_dungeon_exchange(
             repo,
             campaign_id="camp_001",
@@ -53,7 +53,7 @@ class TestRecordDungeonExchange:
         )
 
         counts = repo.count_by_status("camp_001")
-        assert counts == {"draft": 1}
+        assert counts == {"approved": 1}
 
     def test_does_not_advance_the_intimacy_clock(
         self, repo: MemoryRepository

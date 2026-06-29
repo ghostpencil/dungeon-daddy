@@ -177,7 +177,11 @@ class TestAdvanceObjectives:
         by_id = {o["objective_id"]: o for o in repo.get_objectives(CAMPAIGN)}
         assert by_id["obj:tier1"]["status"] == "active"
 
-    def test_drafts_a_dungeon_state_memory(self, repo: MemoryRepository) -> None:
+    def test_records_an_approved_dungeon_state_memory(
+        self, repo: MemoryRepository
+    ) -> None:
+        # Owner override (2026-06-28): objective-completion memories are written
+        # approved (not draft) — no curation queue; feeds back via MemoryRetriever.
         repo.save_objective(_objective())
         repo.save_room_object(_subsystem(current_state="restored"))
 
@@ -186,7 +190,7 @@ class TestAdvanceObjectives:
         entry = repo.get_memory_entry(results[0].memory_id)
         assert entry is not None
         assert entry["type"] == "dungeon_state"
-        assert entry["status"] == "draft"
+        assert entry["status"] == "approved"
 
     def test_unsatisfied_objective_is_left_untouched(
         self, repo: MemoryRepository

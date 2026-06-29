@@ -262,8 +262,9 @@ def test_apply_dungeon_reply_posts_bubble_and_records_exchange(tmp_path):
     # untouched; the objective service is now the single intimacy-tick source.
     clock = view._dungeon_intimacy_clock()
     assert clock.filled == 3
-    # A draft memory of the exchange is still written (engine-authored, never the LLM).
-    assert view._mem_repo.count_by_status("camp-1") == {"draft": 1}
+    # An approved memory of the exchange is written (owner override 2026-06-28):
+    # engine-authored, no curation queue, feeds back via MemoryRetriever.
+    assert view._mem_repo.count_by_status("camp-1") == {"approved": 1}
     # The dungeon turn is recorded on the session.
     assert ("dungeon", "I am the deep.") in view._dialogue.turns
 

@@ -287,3 +287,20 @@ def test_prompt_omits_session_turns_section_when_empty():
     agent = DungeonVoiceAgent(provider=provider)
     _respond(agent, session_turns=[])
     assert "# This Conversation" not in provider.last_system
+
+
+# Phase 51.5 fix: the dungeon must report its systems status truthfully (§9
+# acceptance) and name its want — the lying license is confined to lore/secrets.
+
+
+def test_system_prompt_demands_faithful_systems_status_and_wants():
+    from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
+
+    # Normalise wrapping so phrase assertions don't depend on line breaks.
+    prompt = " ".join(DungeonVoiceAgent.SYSTEM_PROMPT.split())
+    # Systems status must be reported truthfully (no omitting / contradicting).
+    assert "never misstate or omit a subsystem's state" in prompt
+    # The dungeon names its want rather than re-asking the speaker's intention.
+    assert "Do not ask the speaker what they intend" in prompt
+    # The lying license is scoped to hidden knowledge only.
+    assert "hidden knowledge alone" in prompt
