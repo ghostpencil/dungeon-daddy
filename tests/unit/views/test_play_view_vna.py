@@ -573,9 +573,12 @@ def test_submit_activate_card_posts_roll_bubble_for_contested_transition(tmp_pat
     assert view._chat.add_message.called
     msg = view._chat.add_message.call_args.args[1]
     assert "rolls" in msg  # mechanical roll bubble, not "not wired" message
-    # Roll path → object state unchanged
+    # Roll path taken (vs the deterministic activate). Object state now changes
+    # only on a resolving outcome (Phase 51.5 Part A) — the random roll leaves it
+    # either unchanged (miss) or at the resolved state (crit/full/partial).
+    # Deterministic outcome→state coverage is in test_play_view_obstacle.py.
     updated = view._mem_repo.get_room_object("obj-trap")
-    assert updated["current_state"] == "armed"
+    assert updated["current_state"] in ("armed", "triggered")
 
 
 def test_submit_activate_card_posts_error_when_no_valid_transition(tmp_path):

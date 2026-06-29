@@ -11,7 +11,11 @@ from __future__ import annotations
 import pytest
 
 from dungeon_daddy.rpg.models import ObjectTransition, RoomObject
-from dungeon_daddy.rpg.obstacles import obstacle_approaches, obstacle_resolved_state
+from dungeon_daddy.rpg.obstacles import (
+    obstacle_approaches,
+    obstacle_resolved_state,
+    resolve_obstacle_with_roll,
+)
 
 
 def _obstacle(*transitions: ObjectTransition, current_state: str = "jammed") -> RoomObject:
@@ -94,3 +98,44 @@ class TestObstacleResolvedState:
         obj = _obstacle(deterministic)
 
         assert obstacle_resolved_state(obj) is None
+
+
+class TestResolveObstacleWithRoll:
+    """Locked outcome mapping: crit/full resolve; partial resolves with a
+    complication; miss fails."""
+
+    def test_full_success_matching_verb_resolves_without_complication(self) -> None:
+        obj = _obstacle(_approach("tinker"), _approach("fight"))
+
+        res = resolve_obstacle_with_roll(obj, verb="tinker", outcome="full")
+
+        assert res is not None
+        assert res.transition.action_verb == "tinker"
+        assert res.transition.to_state == "cleared"
+        assert res.complication is False
+
+    def test_critical_matching_verb_resolves_without_complication(self) -> None:
+        obj = _obstacle(_approach("tinker"))
+
+        res = resolve_obstacle_with_roll(obj, verb="tinker", outcome="critical")
+
+        assert res is not None and res.complication is False
+
+    def test_partial_matching_verb_resolves_with_complication(self) -> None:
+        obj = _obstacle(_approach("fight"))
+
+        res = resolve_obstacle_with_roll(obj, verb="fight", outcome="partial")
+
+        assert res is not None
+        assert res.transition.action_verb == "fight"
+        assert res.complication is True
+
+    def test_miss_does_not_resolve(self) -> None:
+        obj = _obstacle(_approach("fight"))
+
+        assert resolve_obstacle_with_roll(obj, verb="fight", outcome="miss") is None
+
+    def test_verb_not_an_approach_does_not_resolve(self) -> None:
+        obj = _obstacle(_approach("tinker"), _approach("fight"))
+
+        assert resolve_obstacle_with_roll(obj, verb="finesse", outcome="full") is None

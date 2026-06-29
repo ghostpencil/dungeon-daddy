@@ -11,7 +11,15 @@ These are pure helpers over the model — no repo, no LLM.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+from dungeon_daddy.rpg.dice import Outcome
 from dungeon_daddy.rpg.models import ObjectTransition, RoomObject
+
+# Locked outcome→success mapping (owner, 2026-06-29): a critical or full success
+# resolves the obstacle cleanly; a partial resolves it but with a complication;
+# a miss fails (no state change).
+_RESOLVING_OUTCOMES: frozenset[Outcome] = frozenset({"critical", "full", "partial"})
 
 
 def obstacle_approaches(obj: RoomObject) -> list[ObjectTransition]:
@@ -45,3 +53,30 @@ def obstacle_resolved_state(obj: RoomObject) -> str | None:
             "all approaches must converge on one resolved state"
         )
     return target_states.pop()
+
+
+@dataclass(frozen=True)
+class ObstacleRollResolution:
+    """A roll that overcomes an obstacle: which approach applied, at what cost."""
+
+    transition: ObjectTransition
+    complication: bool
+
+
+def resolve_obstacle_with_roll(
+    obj: RoomObject, verb: str, outcome: Outcome
+) -> ObstacleRollResolution | None:
+    """Decide whether an action roll overcomes the obstacle.
+
+    Returns the matched approach (and whether it carries a complication) when
+    ``verb`` matches one of the obstacle's contested approaches **and** the roll
+    ``outcome`` resolves it per the locked mapping (crit/full clean, partial with
+    a complication). Returns ``None`` on a miss or when ``verb`` is not an
+    approach — the engine then leaves object state unchanged.
+    """
+    if outcome not in _RESOLVING_OUTCOMES:
+        return None
+    for t in obstacle_approaches(obj):
+        if t.action_verb == verb:
+            return ObstacleRollResolution(transition=t, complication=outcome == "partial")
+    return None

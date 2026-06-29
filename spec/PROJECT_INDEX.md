@@ -62,9 +62,15 @@ deterministic path that already calls `_advance_objectives()` (~:1713).
    each tagged `action_verb`; `obstacle_resolved_state` = single shared `to_state`, `None` if not an
    obstacle, `ValueError` on divergence). Tests `tests/unit/rpg/test_obstacles.py` (4, green); full unit
    suite 3155 green.
-2. Extend the roll path: on a **successful** roll whose verb matches a contested transition on the
-   target, the engine applies `update_object_state` + side-effects (spawns_item / advances_clock),
-   then re-runs `_advance_objectives()`.
+2. ✅ **DONE** Extend the roll path: on a **successful** roll whose verb matches a contested transition
+   on the target, the engine applies `update_object_state` + side-effects (spawns_item / advances_clock),
+   then re-runs `_advance_objectives()`. Pure decision `resolve_obstacle_with_roll` +
+   `ObstacleRollResolution` (locked mapping: crit/full clean · partial w/ complication · miss fails);
+   `play_view._maybe_resolve_obstacle` routes the matched transition through the deterministic
+   `ActivateObject` pipeline (`_apply_vna_command`) — DRY side-effects + `_advance_objectives`; surfaced
+   in DM narration. Tests `test_play_view_obstacle.py` (3) + obstacle units (9); relaxed one VNA test
+   whose old assertion encoded the now-changed "contested roll never alters state" invariant. Full unit
+   suite 3163 green.
 3. Surface the obstacle's approach verbs as suggested actions in the builder.
 4. Re-author the 4 Crucible obstacles with class-flavored approaches → one resolved state; update the
    seed **additively** (preserve the adopted `gearworks` state — don't reset it to jammed).

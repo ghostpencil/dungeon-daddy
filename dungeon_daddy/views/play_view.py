@@ -1771,6 +1771,7 @@ class PlayView(arcade.View):
             actor={"actor_id": actor.actor_id, "actions": actor.actions},
         )
         resolution = card_roll.resolution
+        obstacle = self._maybe_resolve_obstacle(card, actor, resolution.outcome)
         reaction = self._apply_world_reaction(resolution)
         self._run_proposal_pipeline(resolution, campaign_id)
         self._chat.add_message(
@@ -1786,11 +1787,49 @@ class PlayView(arcade.View):
                     f"{actor.display_name} [{card.verb.upper()}] {noun_label}"
                     f" ({card.adverb}) — {resolution.outcome.upper()}"
                 )
+                if obstacle is not None:
+                    t = obstacle.transition
+                    msg += f" [{noun_label}: {t.from_state} → {t.to_state}]"
+                    if obstacle.complication:
+                        msg += " (resolved, but with a complication)"
                 self._compact_history()
                 self._dm_history.append(LLMMessage(role="user", content=msg))
                 self._chat.set_busy(True)
                 self._spawn_dm_thread(room, level)
         self._refresh_right_panel_from_actors(actor.actor_id)
+
+    def _maybe_resolve_obstacle(self, card, actor, outcome):
+        """Apply a successful contested-approach roll to the target's state (Phase 51.5 Part A).
+
+        When ``card.verb`` matches one of the target object's contested approaches
+        and ``outcome`` resolves it (crit/full clean, partial with a complication;
+        miss fails — locked mapping), route the matched transition through the
+        deterministic ``ActivateObject`` pipeline so its state change + side-effects
+        apply and objectives re-advance. Returns the
+        :class:`ObstacleRollResolution` applied, or ``None`` if nothing changed.
+        """
+        from dungeon_daddy.rpg.command import ActivateObject
+        from dungeon_daddy.rpg.models import RoomObject
+        from dungeon_daddy.rpg.obstacles import resolve_obstacle_with_roll
+
+        if self._mem_repo is None or self._rpg_campaign_id is None:
+            return None
+        obj_dict = self._mem_repo.get_room_object(card.noun_id)
+        if obj_dict is None:
+            return None
+        resolved = resolve_obstacle_with_roll(
+            RoomObject(**obj_dict), verb=card.verb, outcome=outcome
+        )
+        if resolved is None:
+            return None
+        command = ActivateObject(
+            actor_id=actor.actor_id,
+            object_id=card.noun_id,
+            trigger=resolved.transition.trigger,
+        )
+        if self._apply_vna_command(command):
+            return resolved
+        return None
 
     def _on_exit_move(self, exit_id: str, how: str, *, item_slug: str | None = None) -> None:
         """Apply an engine-validated party move, then narrate the result."""
