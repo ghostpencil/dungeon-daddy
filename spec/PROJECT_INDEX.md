@@ -81,9 +81,20 @@ deterministic path that already calls `_advance_objectives()` (~:1713).
   exit. Seed `tools/populate_crucible_level2.py` + new regression test
   `tests/unit/tools/test_populate_crucible_level2.py`; **live save re-seeded** (backup
   `campaign.duckdb.bak-lift-demote-*`). Systems status now reports a coherent 6 subsystems.
-- **Housekeeping:** deleted 32 inert `draft` memories (retrieval only reads `approved`) from the live
-  Crucible save (backup `campaign.duckdb.bak-predelete-drafts-*`); 14 approved memories intact.
-- **Committed:** Slice 9 (`4ed5bfe`), Slice 10 (`4ba27e1`), dungeon-channel fixes (`27be4f9`).
+- **No review queue (owner decision):** approving AI changes is work, not gameplay — the AI impacts the
+  world directly; we tune/limit behavior, not gate it. `apply_low_risk_proposals` was the last play-time
+  writer still persisting `draft` (the rest already wrote `approved`); now writes `approved`
+  (`e042dfd`). Drafts are inert anyway (retrieval reads only `approved`).
+- **Dungeon knows object locations (new):** the dungeon-voice context now carries each subsystem's and
+  the active objective's **`Level N — Room Name`** location, so it can answer "which room is X" and name
+  *where* the task it wants is. New pure helpers `located_systems_status` / `object_location`
+  (`rpg/dungeon_channel.py`); agent renders `(located in …)` + a `Location:` line + a system-prompt rule
+  to state locations plainly (no deflecting); `play_view._room_labels` resolves room_id→label from the
+  dungeon model and feeds `_dungeon_systems_status` / new `next_objective_location`.
+- **Housekeeping:** deleted 32 inert `draft` memories from the live Crucible save (backup
+  `campaign.duckdb.bak-predelete-drafts-*`); 14 approved memories intact.
+- **Committed:** Slice 9 (`4ed5bfe`), Slice 10 (`4ba27e1`), dungeon-channel fixes (`27be4f9`), lift
+  one-object fix (`ee27a72`), auto-approve memories (`e042dfd`); dungeon-location feature pending commit.
 - **Live Crucible save IS seeded** with the ladder (backup `campaign.duckdb.bak-slice10-applied-*`).
   Current live state: `gearworks` **jammed** (tier 0 active — to complete it now, go to **R4** and
   **Activate** it; the multi-approach work is what makes tinker/smash/finesse also work);

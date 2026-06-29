@@ -1535,6 +1535,7 @@ class PlayView(arcade.View):
             "actor_tags": list(actor.tags) if actor else [],
             "systems_status": self._dungeon_systems_status(),
             "next_objective": active["description"] if active else None,
+            "next_objective_location": self._dungeon_objective_location(active),
             "session_turns": list(self._dialogue.turns) if self._dialogue else [],
         }
 
@@ -1543,14 +1544,45 @@ class PlayView(arcade.View):
             return []
         return self._mem_repo.get_objectives(self._rpg_campaign_id)
 
-    def _dungeon_systems_status(self) -> list[tuple[str, str]]:
-        """Truthful subsystem snapshot for the dungeon-voice context (§4.2)."""
+    def _room_labels(self) -> dict[str, str]:
+        """Map each ``room_id`` to a human ``"Level N — Room Name"`` label.
+
+        Resolved from the loaded dungeon model so the dungeon voice can cite a
+        subsystem's (or objective's) location. Empty when no dungeon is loaded.
+        """
+        dungeon = getattr(self, "_dungeon", None)
+        if dungeon is None:
+            return {}
+        labels: dict[str, str] = {}
+        for level in dungeon.levels:
+            for room in level.rooms:
+                labels[room.id] = f"Level {level.id} — {room.name}"
+        return labels
+
+    def _dungeon_systems_status(self) -> list[tuple[str, str, str]]:
+        """Truthful subsystem snapshot + location for the dungeon-voice context.
+
+        Each tuple is ``(display_name, current_state, location)`` (§4.2) so the
+        dungeon can both report state and say where a subsystem sits.
+        """
         if self._mem_repo is None or self._rpg_campaign_id is None:
             return []
-        from dungeon_daddy.rpg.dungeon_channel import dungeon_systems_status
+        from dungeon_daddy.rpg.dungeon_channel import located_systems_status
 
         objects = self._mem_repo.get_objects_for_campaign(self._rpg_campaign_id)
-        return dungeon_systems_status(objects)
+        return located_systems_status(objects, self._room_labels())
+
+    def _dungeon_objective_location(self, active: dict | None) -> str | None:
+        """Resolve the active objective's target object to a room label (or None)."""
+        if not active or self._mem_repo is None or self._rpg_campaign_id is None:
+            return None
+        target_slug = (active.get("completion") or {}).get("target_slug")
+        if not target_slug:
+            return None
+        from dungeon_daddy.rpg.dungeon_channel import object_location
+
+        objects = self._mem_repo.get_objects_for_campaign(self._rpg_campaign_id)
+        return object_location(target_slug, objects, self._room_labels())
 
     @staticmethod
     def _actor_playbook_name(actor) -> str | None:

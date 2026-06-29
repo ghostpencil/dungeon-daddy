@@ -33,6 +33,7 @@ class DungeonVoiceAgent:
         actor_tags: list[str] | None = None,
         systems_status: list[tuple[str, str]] | None = None,
         next_objective: str | None = None,
+        next_objective_location: str | None = None,
         session_turns: list[tuple[str, str]] | None = None,
     ) -> str:
         system = self._build_system(
@@ -46,6 +47,7 @@ class DungeonVoiceAgent:
             actor_tags=actor_tags or [],
             systems_status=systems_status or [],
             next_objective=next_objective,
+            next_objective_location=next_objective_location,
             session_turns=session_turns or [],
         )
         user = f"{actor} says: {player_message}"
@@ -68,6 +70,7 @@ class DungeonVoiceAgent:
         actor_tags=None,
         systems_status=None,
         next_objective: str | None = None,
+        next_objective_location: str | None = None,
         session_turns=None,
     ) -> str:
         lines = [self.SYSTEM_PROMPT]
@@ -83,8 +86,13 @@ class DungeonVoiceAgent:
                 lines.append("Tags: " + ", ".join(actor_tags))
         if systems_status:
             lines.append("\n# Systems Status")
-            for name, state in systems_status:
-                lines.append(f"- {name}: {state}")
+            for entry in systems_status:
+                name, state = entry[0], entry[1]
+                location = entry[2] if len(entry) > 2 else ""
+                line = f"- {name}: {state}"
+                if location:
+                    line += f" (located in {location})"
+                lines.append(line)
         lines.append("\n# Intimacy")
         lines.append(f"{intimacy_filled}/{intimacy_segments}")
         if dungeon_knowledge:
@@ -94,6 +102,8 @@ class DungeonVoiceAgent:
         if next_objective:
             lines.append("\n# What You Want Next")
             lines.append(next_objective)
+            if next_objective_location:
+                lines.append(f"Location: {next_objective_location}")
         if recent_memories:
             lines.append("\n# Recent Memories")
             for mem in recent_memories:

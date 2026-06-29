@@ -4,10 +4,52 @@ from dungeon_daddy.rpg.dungeon_channel import (
     active_objective,
     dungeon_channel_available,
     dungeon_systems_status,
+    located_systems_status,
+    object_location,
     reveal_knowledge,
     unlocked_knowledge,
 )
 from dungeon_daddy.rpg.models import ClockState
+
+
+def _located_obj(slug, name, archetype, state, room_id):
+    return {
+        "slug": slug,
+        "display_name": name,
+        "archetype": archetype,
+        "current_state": state,
+        "room_id": room_id,
+    }
+
+
+_ROOM_LABELS = {"r02": "Level 2 — Central Hub", "R4": "Level 1 — Elevator Shaft"}
+
+
+def test_located_systems_status_appends_location_for_subsystems():
+    objs = [
+        _located_obj("coolant-loop", "Coolant Loop Manifold", "structure", "ruptured", "r02"),
+        _located_obj("great-lift", "The Great Lift", "mechanism", "powered", "R4"),
+        _located_obj("crate", "Cargo Crate", "container", "sealed", "r02"),  # not a subsystem
+    ]
+    assert located_systems_status(objs, _ROOM_LABELS) == [
+        ("Coolant Loop Manifold", "ruptured", "Level 2 — Central Hub"),
+        ("The Great Lift", "powered", "Level 1 — Elevator Shaft"),
+    ]
+
+
+def test_located_systems_status_blank_location_when_room_unknown():
+    objs = [_located_obj("x", "Mystery Engine", "mechanism", "idle", "r99")]
+    assert located_systems_status(objs, _ROOM_LABELS) == [("Mystery Engine", "idle", "")]
+
+
+def test_object_location_resolves_target_slug_to_room_label():
+    objs = [_located_obj("coolant-loop", "Coolant Loop Manifold", "structure", "ruptured", "r02")]
+    assert object_location("coolant-loop", objs, _ROOM_LABELS) == "Level 2 — Central Hub"
+
+
+def test_object_location_none_when_slug_absent():
+    objs = [_located_obj("coolant-loop", "Coolant Loop Manifold", "structure", "ruptured", "r02")]
+    assert object_location("missing", objs, _ROOM_LABELS) is None
 
 
 def _intimacy(**kwargs) -> ClockState:  # type: ignore[no-untyped-def]

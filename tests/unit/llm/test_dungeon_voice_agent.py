@@ -238,6 +238,22 @@ def test_prompt_omits_systems_status_when_empty():
     assert "# Systems Status" not in provider.last_system
 
 
+def test_prompt_carries_subsystem_location_when_provided():
+    # The dungeon must be able to say *where* a subsystem is (level + room) so it
+    # can answer "which room is X in" and direct the player to the objective.
+    from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
+
+    provider = _MockProvider()
+    agent = DungeonVoiceAgent(provider=provider)
+    _respond(
+        agent,
+        systems_status=[("Coolant Loop Manifold", "ruptured", "Level 2 — Central Hub")],
+    )
+    assert "Coolant Loop Manifold" in provider.last_system
+    assert "ruptured" in provider.last_system
+    assert "Level 2 — Central Hub" in provider.last_system
+
+
 # Cycle 10: # What You Want Next carries the active objective hint
 
 def test_prompt_carries_what_you_want_next():
@@ -260,6 +276,33 @@ def test_prompt_omits_what_you_want_next_when_none():
     agent = DungeonVoiceAgent(provider=provider)
     _respond(agent)
     assert "# What You Want Next" not in provider.last_system
+
+
+def test_prompt_carries_next_objective_location():
+    # When the dungeon names the task it wants done, it should also state where —
+    # level and room — so the player knows where to go.
+    from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
+
+    provider = _MockProvider()
+    agent = DungeonVoiceAgent(provider=provider)
+    _respond(
+        agent,
+        next_objective="Restore the coolant loop.",
+        next_objective_location="Level 2 — Central Hub",
+    )
+    assert "# What You Want Next" in provider.last_system
+    assert "Restore the coolant loop." in provider.last_system
+    assert "Level 2 — Central Hub" in provider.last_system
+
+
+def test_prompt_omits_objective_location_when_absent():
+    from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
+
+    provider = _MockProvider()
+    agent = DungeonVoiceAgent(provider=provider)
+    _respond(agent, next_objective="Restore the coolant loop.")
+    assert "# What You Want Next" in provider.last_system
+    assert "Restore the coolant loop." in provider.last_system
 
 
 # Cycle 11: in-session dialogue turns are carried so the dungeon has no amnesia
@@ -304,3 +347,13 @@ def test_system_prompt_demands_faithful_systems_status_and_wants():
     assert "Do not ask the speaker what they intend" in prompt
     # The lying license is scoped to hidden knowledge only.
     assert "hidden knowledge alone" in prompt
+
+
+def test_system_prompt_directs_dungeon_to_state_locations():
+    # Subsystem/objective locations are facts, not hidden lore — the dungeon must
+    # state the level and room plainly, never deflect when asked where something is.
+    from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
+
+    prompt = " ".join(DungeonVoiceAgent.SYSTEM_PROMPT.split())
+    assert "location" in prompt.lower()
+    assert "level and room" in prompt.lower()

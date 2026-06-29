@@ -392,6 +392,22 @@ def test_dungeon_agent_inputs_carries_actor_identity(tmp_path):
     assert inputs["actor_tags"] == ["machine-touched", "exiled"]
 
 
+def _dungeon_model(room_labels):
+    """Minimal dungeon model (levels→rooms) for room-label resolution.
+
+    ``room_labels`` maps room_id -> (level_id, room_name).
+    """
+    from types import SimpleNamespace
+
+    by_level: dict = {}
+    for room_id, (level_id, room_name) in room_labels.items():
+        by_level.setdefault(level_id, []).append(
+            SimpleNamespace(id=room_id, name=room_name)
+        )
+    levels = [SimpleNamespace(id=lid, rooms=rooms) for lid, rooms in by_level.items()]
+    return SimpleNamespace(levels=levels)
+
+
 def test_dungeon_agent_inputs_carries_systems_status(tmp_path):
     view = _make_view(tmp_path)
     _seed_intimacy_clock(view._mem_repo, filled=6, segments=6)
@@ -402,7 +418,49 @@ def test_dungeon_agent_inputs_carries_systems_status(tmp_path):
 
     inputs = view._dungeon_agent_inputs("status report")
 
-    assert inputs["systems_status"] == [("Coolant Loop", "damaged")]
+    # No dungeon model loaded → location is blank but state is still reported.
+    assert inputs["systems_status"] == [("Coolant Loop", "damaged", "")]
+
+
+def test_dungeon_agent_inputs_systems_status_carries_location(tmp_path):
+    view = _make_view(tmp_path)
+    view._dungeon = _dungeon_model({"r1": (2, "Central Hub")})
+    _seed_intimacy_clock(view._mem_repo, filled=6, segments=6)
+    _save_subsystem(view._mem_repo, slug="coolant", name="Coolant Loop",
+                    archetype="mechanism", state="damaged")
+
+    inputs = view._dungeon_agent_inputs("status report")
+
+    assert inputs["systems_status"] == [("Coolant Loop", "damaged", "Level 2 — Central Hub")]
+
+
+def test_dungeon_agent_inputs_carries_next_objective_location(tmp_path):
+    view = _make_view(tmp_path)
+    view._dungeon = _dungeon_model({"r1": (2, "Central Hub")})
+    _seed_intimacy_clock(view._mem_repo, filled=6, segments=6)
+    # The objective's target object lives in r1 (the subsystem saved below).
+    _save_subsystem(view._mem_repo, slug="coolant", name="Coolant Loop",
+                    archetype="mechanism", state="damaged")
+    _save_objective(view._mem_repo, slug="tier0", tier=0, status="active",
+                    description="Restore the coolant loop.")
+    # point the active objective at the coolant subsystem
+    view._mem_repo._conn.execute(
+        "UPDATE objectives SET completion_target_slug = 'coolant' WHERE slug = 'tier0'"
+    )
+
+    inputs = view._dungeon_agent_inputs("where do you want me?")
+
+    assert inputs["next_objective_location"] == "Level 2 — Central Hub"
+
+
+def test_dungeon_agent_inputs_objective_location_none_when_no_active(tmp_path):
+    view = _make_view(tmp_path)
+    view._dungeon = _dungeon_model({"r1": (2, "Central Hub")})
+    _seed_intimacy_clock(view._mem_repo, filled=6, segments=6)
+
+    inputs = view._dungeon_agent_inputs("where do you want me?")
+
+    assert inputs["next_objective_location"] is None
 
 
 def test_dungeon_agent_inputs_carries_next_objective(tmp_path):

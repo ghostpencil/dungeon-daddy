@@ -47,6 +47,38 @@ def dungeon_systems_status(room_objects: list[dict]) -> list[tuple[str, str]]:
     ]
 
 
+def located_systems_status(
+    room_objects: list[dict], room_labels: dict[str, str]
+) -> list[tuple[str, str, str]]:
+    """Like :func:`dungeon_systems_status`, but each tuple also carries the
+    subsystem's human location so the dungeon can tell the player where to go.
+
+    ``room_labels`` maps a ``room_id`` to a display label (e.g. ``"Level 2 —
+    Central Hub"``). A subsystem in an unmapped room gets an empty location
+    rather than being dropped — the dungeon still reports its state truthfully.
+    """
+    return [
+        (obj["display_name"], obj["current_state"], room_labels.get(obj.get("room_id"), ""))
+        for obj in room_objects
+        if obj.get("archetype") in SUBSYSTEM_ARCHETYPES
+    ]
+
+
+def object_location(
+    target_slug: str, room_objects: list[dict], room_labels: dict[str, str]
+) -> str | None:
+    """Resolve a room object's ``slug`` to its human location label.
+
+    Used to tell the dungeon where the active objective's target sits (so it can
+    name the level and room). Returns ``None`` when the slug is unknown or its
+    room is unmapped.
+    """
+    for obj in room_objects:
+        if obj.get("slug") == target_slug:
+            return room_labels.get(obj.get("room_id")) or None
+    return None
+
+
 def unlocked_knowledge(objectives: list[dict]) -> list[str]:
     """Return the secrets the dungeon may draw on now (spec §4.3.4 / D7).
 
