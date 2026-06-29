@@ -57,7 +57,11 @@ deterministic path that already calls `_advance_objectives()` (~:1713).
 ### Slice plan (TDD; sequenced so Part A is a verifiable win on its own)
 
 **Part A — authored class approaches (engine-deterministic, no authority change):**
-1. Pure helper + validation: an obstacle's approaches all converge to one resolved state.
+1. ✅ **DONE** Pure helper + validation: an obstacle's approaches all converge to one resolved state.
+   New module `rpg/obstacles.py` (`obstacle_approaches` = contested transitions out of `current_state`,
+   each tagged `action_verb`; `obstacle_resolved_state` = single shared `to_state`, `None` if not an
+   obstacle, `ValueError` on divergence). Tests `tests/unit/rpg/test_obstacles.py` (4, green); full unit
+   suite 3155 green.
 2. Extend the roll path: on a **successful** roll whose verb matches a contested transition on the
    target, the engine applies `update_object_state` + side-effects (spawns_item / advances_clock),
    then re-runs `_advance_objectives()`.
