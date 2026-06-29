@@ -9,6 +9,13 @@ from dungeon_daddy.rpg.models import ClockState
 # BALANCE_NOTES.md when tuning the band boundaries.
 INTIMACY_THRESHOLD = 0.5
 
+# Fraction of the latching tier-index clock that must be filled for the channel
+# to open *at all* (Phase 51.5 D6 / §4.3.3, resolves the §6 open question). Zero
+# so the channel opens cryptic at tier 0 (filled=0); the *tiers* gate content
+# (per-tier knowledge), not access. Kept separate from INTIMACY_THRESHOLD, which
+# still bands the deprecated flat reveal_knowledge path.
+CHANNEL_OPEN_THRESHOLD = 0.0
+
 # Knowledge-revelation banding (spec §4.5; tunable — see §6 / BALANCE_NOTES.md).
 # At/above HIGH_INTIMACY_THRESHOLD the dungeon draws on its full knowledge;
 # in the cryptic band [INTIMACY_THRESHOLD, HIGH_INTIMACY_THRESHOLD) it reveals
@@ -92,7 +99,7 @@ def dungeon_channel_available(
         return (False, REASON_NOT_HERE)
     if intimacy_clock is None or intimacy_clock.segments <= 0:
         return (False, REASON_NOT_INTIMATE)
-    if intimacy_clock.filled / intimacy_clock.segments < INTIMACY_THRESHOLD:
+    if intimacy_clock.filled / intimacy_clock.segments < CHANNEL_OPEN_THRESHOLD:
         return (False, REASON_NOT_INTIMATE)
     return (True, None)
 

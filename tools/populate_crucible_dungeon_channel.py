@@ -20,6 +20,7 @@ Run:  python -m tools.populate_crucible_dungeon_channel
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 from dungeon_daddy.memory.dungeon_persona import (
@@ -27,7 +28,12 @@ from dungeon_daddy.memory.dungeon_persona import (
     write_dungeon_voice,
 )
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.rpg.models import RoomObject
+from dungeon_daddy.rpg.models import (
+    Objective,
+    ObjectiveCompletion,
+    ObjectTransition,
+    RoomObject,
+)
 
 CAMPAIGN_ID = "campaign:the-crucible"
 
@@ -37,8 +43,11 @@ RESONANCE_LEVEL_ID = "level:2"
 RESONANCE_OBJECT_ID = "object:the-crucible:r04:arcane-resonance-node"
 
 INTIMACY_CLOCK_ID = "clock:the-crucible:dungeon-intimacy"
-INTIMACY_SEGMENTS = 6
-INTIMACY_START_FILLED = 3  # cryptic band — channel opens immediately
+# Phase 51.5 D6: the intimacy clock is now a latching tier index —
+# ``segments`` = number of ladder tiers, ``filled`` = number of completed
+# objectives. (Reverts the Phase 51 ``monotonic=False`` wide-open hack.)
+INTIMACY_SEGMENTS = 4
+INTIMACY_CATEGORY = "dungeon_intimacy"
 
 # --- The dungeon's voice (static persona prompt, injected verbatim) ----------
 DUNGEON_VOICE = (
@@ -77,6 +86,182 @@ DUNGEON_KNOWLEDGE = [
 ]
 
 
+# --- The intimacy ladder (Phase 51.5 D3) -------------------------------------
+# Four tiers climbed by *doing*: restoring a dungeon subsystem completes that
+# tier's objective, which (via the objective service, the single intimacy-tick
+# source — D5) advances the latching clock one tier and unlocks the tier's
+# secrets. Tier 0 **adopts** the Crucible's existing Sand-Choked Gearworks; tiers
+# 1-3 are fresh subsystems authored across Level 2, near the resonance node.
+
+
+@dataclass(frozen=True)
+class _Rung:
+    """One tier of the ladder: a subsystem to restore + the objective that tracks it."""
+
+    tier: int
+    objective_slug: str
+    title: str
+    description: str  # the dungeon's "what I want next" hint (machine voice)
+    subsystem_slug: str
+    required_state: str
+    reveals_knowledge: list[str]
+    # Fresh subsystems authored by this seed (tier 0 adopts an existing object,
+    # so its subsystem fields are None — we never re-author/clobber it).
+    room_id: str | None = None
+    level_id: str | None = None
+    display_name: str | None = None
+    archetype: str | None = None
+    broken_state: str | None = None
+    broken_description: str | None = None
+    restore_trigger: str = "activate"
+    transition_id_suffix: str = "restore"
+
+
+LADDER: list[_Rung] = [
+    _Rung(
+        tier=0,
+        objective_slug="clear-the-gearworks",
+        title="Clear the Sand-Choked Gearworks",
+        description=(
+            "Primary intake is fouled. Clear the sand-choked gearworks in the "
+            "assembly hall above; I cannot draw breath until the works turn."
+        ),
+        subsystem_slug="gearworks",  # adopts the existing R4 structure
+        required_state="cleared",
+        reveals_knowledge=[
+            "The red sand choking these halls is ground bone and rusted iron — the "
+            "dust of everyone who tried to leave after the sealing."
+        ],
+    ),
+    _Rung(
+        tier=1,
+        objective_slug="restore-the-coolant-loop",
+        title="Restore the Coolant Loop",
+        description=(
+            "Thermal margin is failing. Seal the ruptured coolant loop near the "
+            "node, or I will burn through what little of myself remains."
+        ),
+        subsystem_slug="coolant-loop",
+        required_state="restored",
+        reveals_knowledge=[
+            "The golems never malfunctioned. Warden Brakkus gave the order to seal "
+            "the citadel and put down everyone inside, his own wardens included, "
+            "rather than let the power core be carried out."
+        ],
+        room_id="r02",
+        level_id=RESONANCE_LEVEL_ID,
+        display_name="Coolant Loop Manifold",
+        archetype="structure",
+        broken_state="ruptured",
+        broken_description=(
+            "A burst ring of arcane coolant piping, weeping frost and steam. "
+            "Resealed, it would carry the dungeon's heat away once more."
+        ),
+    ),
+    _Rung(
+        tier=2,
+        objective_slug="recharge-the-arcane-conduits",
+        title="Recharge the Arcane Conduits",
+        description=(
+            "Half my pathways are dark. Recharge the dormant arcane conduits and "
+            "I will open more of myself to you."
+        ),
+        subsystem_slug="arcane-conduits",
+        required_state="charged",
+        reveals_knowledge=[
+            "The Great Lift does not only descend. It can be made to fall, on "
+            "command — and it has been, more than once, with cargo still aboard."
+        ],
+        room_id="r03",
+        level_id=RESONANCE_LEVEL_ID,
+        display_name="Arcane Conduit Array",
+        archetype="mechanism",
+        broken_state="dormant",
+        broken_description=(
+            "A lattice of cold arcane conduits, their runes faded to grey. "
+            "Recharged, they would carry power back into the citadel's mind."
+        ),
+    ),
+    _Rung(
+        tier=3,
+        objective_slug="stabilize-the-core-containment",
+        title="Stabilize the Core Containment",
+        description=(
+            "The heart of me is slipping its bindings. Stabilize the core "
+            "containment in the deep vault, and you will know what I am."
+        ),
+        subsystem_slug="core-containment",
+        required_state="stabilized",
+        reveals_knowledge=[
+            "The power core in the lower vault is no machine. It is a bound "
+            "elemental heart, and it is the wellspring of the mind now speaking "
+            "to you.",
+            "The Crucible is going cold. Before the core dies it means to fold a "
+            "living mind into its own — and it is measuring yours for fitness.",
+        ],
+        room_id="r05",
+        level_id=RESONANCE_LEVEL_ID,
+        display_name="Core Containment Ring",
+        archetype="structure",
+        broken_state="failing",
+        broken_description=(
+            "The containment ring around the dungeon's bound heart, its wards "
+            "guttering. Stabilized, it would hold the core together a while longer."
+        ),
+    ),
+]
+
+
+def _objective_id(rung: _Rung) -> str:
+    return f"objective:the-crucible:{rung.objective_slug}"
+
+
+def _subsystem_object(rung: _Rung) -> RoomObject:
+    """The fresh subsystem RoomObject for a tier (tiers 1-3 only)."""
+    assert rung.room_id and rung.level_id and rung.archetype and rung.broken_state
+    object_id = f"object:the-crucible:{rung.room_id}:{rung.subsystem_slug}"
+    return RoomObject(
+        object_id=object_id,
+        campaign_id=CAMPAIGN_ID,
+        room_id=rung.room_id,
+        level_id=rung.level_id,
+        slug=rung.subsystem_slug,
+        display_name=rung.display_name or rung.subsystem_slug,
+        archetype=rung.archetype,
+        description=rung.broken_description or "",
+        current_state=rung.broken_state,
+        transitions=[
+            ObjectTransition(
+                transition_id=f"{object_id}:{rung.transition_id_suffix}",
+                object_id=object_id,
+                from_state=rung.broken_state,
+                to_state=rung.required_state,
+                trigger=rung.restore_trigger,
+                advances_clock_slug=None,  # D5: the objective service ticks intimacy
+            )
+        ],
+    )
+
+
+def _objective(rung: _Rung, status: str) -> Objective:
+    return Objective(
+        objective_id=_objective_id(rung),
+        campaign_id=CAMPAIGN_ID,
+        slug=rung.objective_slug,
+        title=rung.title,
+        description=rung.description,
+        tier_index=rung.tier,
+        status=status,
+        completion=ObjectiveCompletion(
+            kind="object_state",
+            target_slug=rung.subsystem_slug,
+            required_state=rung.required_state,
+        ),
+        advances_clock_slug=INTIMACY_CATEGORY,
+        reveals_knowledge=list(rung.reveals_knowledge),
+    )
+
+
 def _resonance_object() -> RoomObject:
     return RoomObject(
         object_id=RESONANCE_OBJECT_ID,
@@ -101,10 +286,11 @@ def seed_dungeon_channel(
     save_dir: Path,
     campaign_id: str = CAMPAIGN_ID,
 ) -> tuple[str | None, str | None]:
-    """Seed the dungeon-voice channel into ``campaign_id``; return persona refs.
+    """Seed the dungeon-voice channel + intimacy ladder into ``campaign_id``.
 
-    Idempotent: persona docs and the resonance object are rewritten each run, but
-    an existing intimacy clock keeps its earned ``filled`` (play progress).
+    Returns the persona refs. Idempotent: persona docs, fresh subsystems, and
+    objectives are upserted; an objective's earned ``status`` (e.g. ``completed``)
+    and a player-restored subsystem's state are **preserved** across re-runs.
     """
     dungeon_dir = save_dir / "memory" / "dungeon"
     voice_path = write_dungeon_voice(dungeon_dir, campaign_id, DUNGEON_VOICE)
@@ -124,13 +310,56 @@ def seed_dungeon_channel(
         dungeon_knowledge_path=knowledge_ref,
     )
 
-    # Recedable intimacy clock. The canonical RPG seed already authors a
-    # ``dungeon_intimacy`` clock (monotonic by default) — adopt it: flip it to
-    # ``monotonic=False`` (D3) and ensure it opens the channel, preserving any
-    # earned fill above the cryptic threshold. Only when none exists do we mint a
-    # fresh clock. (Adopting avoids a duplicate; play_view reads the first match.)
+    _seed_subsystems(repo, campaign_id)
+    _seed_objectives(repo, campaign_id)
+    _seed_intimacy_clock(repo, campaign_id)
+
+    repo.save_room_object(_resonance_object())
+
+    return voice_ref, knowledge_ref
+
+
+def _seed_subsystems(repo: MemoryRepository, campaign_id: str) -> None:
+    """Author the fresh subsystem objects (tiers 1-3), preserving play state.
+
+    Tier 0 adopts the existing Sand-Choked Gearworks, so it is never authored
+    here. A fresh subsystem already present is left untouched — re-running the
+    seed must not reset a subsystem the party has already restored.
+    """
+    present = {o["slug"] for o in repo.get_objects_for_campaign(campaign_id)}
+    for rung in LADDER:
+        if rung.room_id is None or rung.subsystem_slug in present:
+            continue
+        repo.save_room_object(_subsystem_object(rung))
+
+
+def _seed_objectives(repo: MemoryRepository, campaign_id: str) -> None:
+    """Author the four ladder objectives; preserve any earned ``status``.
+
+    Fresh: tier 0 ``active``, tiers 1-3 ``locked`` (the ladder activates one tier
+    at a time). On re-run an objective keeps its current status so completed
+    tiers stay completed.
+    """
+    prior = {o["slug"]: o["status"] for o in repo.get_objectives(campaign_id)}
+    for rung in LADDER:
+        status = prior.get(
+            rung.objective_slug, "active" if rung.tier == 0 else "locked"
+        )
+        repo.save_objective(_objective(rung, status))
+
+
+def _seed_intimacy_clock(repo: MemoryRepository, campaign_id: str) -> None:
+    """Re-segment the ``dungeon_intimacy`` clock as a latching tier index (D6).
+
+    ``segments`` = number of tiers; ``filled`` = number of completed objectives;
+    ``monotonic=True`` (latching — reverts the Phase 51 wide-open hack). Adopts an
+    existing ``dungeon_intimacy`` clock so play_view's first-match read is stable.
+    """
+    completed = sum(
+        1 for o in repo.get_objectives(campaign_id) if o["status"] == "completed"
+    )
     existing = next(
-        (c for c in repo.get_clocks(campaign_id) if c["category"] == "dungeon_intimacy"),
+        (c for c in repo.get_clocks(campaign_id) if c["category"] == INTIMACY_CATEGORY),
         None,
     )
     if existing is not None:
@@ -138,8 +367,8 @@ def seed_dungeon_channel(
             clock_id=existing["clock_id"],
             campaign_id=campaign_id,
             label=existing["label"],
-            segments=existing["segments"],
-            filled=max(existing["filled"], INTIMACY_START_FILLED),
+            segments=INTIMACY_SEGMENTS,
+            filled=completed,
             status=existing["status"],
             scope_room_id=existing["scope_room_id"],
             action_tags=existing["action_tags"],
@@ -150,7 +379,7 @@ def seed_dungeon_channel(
             stakes=existing["stakes"],
             completion_effect=existing["completion_effect"],
             visible_to_player=existing["visible_to_player"],
-            monotonic=False,
+            monotonic=True,
         )
     else:
         repo.save_clock(
@@ -158,17 +387,13 @@ def seed_dungeon_channel(
             campaign_id=campaign_id,
             label="The Crucible's Regard",
             segments=INTIMACY_SEGMENTS,
-            filled=INTIMACY_START_FILLED,
-            category="dungeon_intimacy",
+            filled=completed,
+            category=INTIMACY_CATEGORY,
             clock_level="dungeon",
             stakes="How well the dungeon knows you — and how much it will say.",
             visible_to_player=True,
-            monotonic=False,
+            monotonic=True,
         )
-
-    repo.save_room_object(_resonance_object())
-
-    return voice_ref, knowledge_ref
 
 
 def _save_path() -> Path:
@@ -187,13 +412,17 @@ def main() -> None:
         clock = next(
             c for c in repo.get_clocks(CAMPAIGN_ID) if c["category"] == "dungeon_intimacy"
         )
+        objectives = repo.get_objectives(CAMPAIGN_ID)
         print(f"Seeded the dungeon channel into The Crucible at {db}")
         print(f"  voice:     {voice_ref}")
         print(f"  knowledge: {knowledge_ref} ({len(DUNGEON_KNOWLEDGE)} secrets)")
         print(
             f"  intimacy:  {clock['filled']}/{clock['segments']} "
-            f"(category=dungeon_intimacy, monotonic=False)"
+            f"(category=dungeon_intimacy, latching tier index)"
         )
+        print(f"  ladder:    {len(objectives)} objectives across {INTIMACY_SEGMENTS} tiers")
+        for o in objectives:
+            print(f"    tier {o['tier_index']} [{o['status']:>9}] {o['title']}")
         print(
             f"  resonance: {RESONANCE_OBJECT_ID} in {RESONANCE_ROOM_ID} "
             f"(Arcane Power Room, Level 2)"

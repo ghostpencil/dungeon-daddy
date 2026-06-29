@@ -41,10 +41,15 @@ def test_closed_when_not_a_resonance_point() -> None:
     assert reason == REASON_NOT_HERE
 
 
-def test_closed_when_intimacy_below_threshold() -> None:
-    available, reason = dungeon_channel_available(_room(True), _intimacy(filled=2))
-    assert available is False
-    assert reason == REASON_NOT_INTIMATE
+def test_open_at_tier_zero_with_latching_clock() -> None:
+    # Phase 51.5 D6: the intimacy clock is a latching tier index (segments=#tiers,
+    # filled=#completed). The channel opens cryptic at tier 0 (filled=0) — intimacy
+    # gates *content* (per-tier knowledge), not access.
+    available, reason = dungeon_channel_available(
+        _room(True), _intimacy(segments=4, filled=0, monotonic=True)
+    )
+    assert available is True
+    assert reason is None
 
 
 def test_closed_when_intimacy_clock_absent() -> None:

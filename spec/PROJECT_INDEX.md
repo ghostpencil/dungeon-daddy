@@ -8,9 +8,9 @@ Phase **50.6 — Chat Action Cockpit: COMPLETE, GUI-verified & merged to `main`*
 All 11 slices done/user-verified (+ CP-1…CP-7 polish; Slice 8 three UX rounds; Slice 9 retired ACTION
 tab; EXITS/Move tab also retired); Slice 11 (dynamic band height + reclaim + collapsible toggle +
 bottom-click UIManager fix) DONE & GUI-verified — smoke test skipped by user choice.
-Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS — Slices 1–9 DONE** (S1–8 committed;
-S9 done & green, commit pending) (S8 `f264816`, GUI-verified at Crucible r04) on branch `phase-51`
-(2026-06-28). Extension of Phase 51 —
+Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS — Slices 1–10 DONE & committed**
+(S9 `4ed5bfe`; S10 green, commit pending) (S8 `f264816`, GUI-verified at Crucible r04) on branch
+`phase-51` (2026-06-28). Extension of Phase 51 —
 **no merge to `main` until 51.5 is built**
 (owner decision). Driven by the 2026-06-27 playtest: the channel is hollow (no grounded facts). Spec
 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`, all decisions locked (D1–D8). Thesis: gate intimacy on
@@ -32,8 +32,18 @@ prompt instruction); `_dungeon_agent_inputs` assembles them (actor name/playbook
 `dungeon_systems_status`, tier knowledge via `unlocked_knowledge` with flat `reveal_knowledge`
 fallback, active objective, in-session `DialogueSession.turns`). S9 PlayView wiring — `_apply_vna_command`
 calls new `_advance_objectives()` (runs `advance_objectives` post-`apply_command`, surfaces a `"dungeon"`
-bubble per tier-up). **Next: Slice 10** — seed the full ladder (subsystems + objectives + re-segmented
-latching clock + per-tier knowledge).
+bubble per tier-up). S10 seed the full Crucible ladder — **hybrid** sourcing + **4 tiers, channel
+opens at tier 0** (owner decisions 2026-06-28): tier 0 adopts the existing `gearworks`
+(jammed→cleared); tiers 1–3 author fresh L2 subsystems (`coolant-loop` r02 ruptured→restored,
+`arcane-conduits` r03 dormant→charged, `core-containment` r05 failing→stabilized) + 4 `Objective`s
+(tier 0 `active`, rest `locked`; `advances_clock_slug="dungeon_intimacy"`) + per-tier
+`reveals_knowledge` (the 5 forge-mind secrets distributed across tiers) + the `dungeon_intimacy` clock
+**re-segmented latching** (`segments=4`, `filled=#completed`, `monotonic=True` — Phase 51 wide-open
+hack reverted). New gate constant `CHANNEL_OPEN_THRESHOLD=0.0` in `dungeon_channel.py` (resolves §6 —
+channel opens cryptic at tier 0; `INTIMACY_THRESHOLD` left for the deprecated flat band). Seed is
+idempotent + **preserves play progress** (completed objective status + restored subsystem state
+survive re-runs). **Next: Slice 11 (optional tier/objective HUD) + run the live-save seed & GUI-verify
+the full ladder.**
 
 Phase **51 — Talk to the Dungeon: FEATURE-COMPLETE & GUI-verified** on branch `phase-51` (2026-06-26).
 Decisions locked; **Slices 1–8 DONE & committed**. **Voice/knowledge-at-play-time decision made
@@ -56,7 +66,7 @@ Phase 51.5 spec: `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`.
 
 ---
 
-## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slices 1–9 DONE (S9 commit pending) → next: Slice 10 (seed the full Crucible ladder: subsystems + objectives + re-segmented latching clock + per-tier knowledge)
+## START HERE — Phase 51.5 Dungeon Objectives & Intimacy Tiers — Slices 1–10 DONE (S10 commit pending) → next: run the live-save seed & GUI-verify the full ladder, then optional Slice 11 (tier/objective HUD)
 
 **Phase 51.5** is on branch `phase-51` (off `main`), extending the now feature-complete Phase 51
 channel. The 2026-06-27 playtest found the channel **hollow**: good dialogue, but the dungeon has no
@@ -198,16 +208,42 @@ nothing-completes). views+rpg+memory unit suites green (1193). **Not GUI-verifia
 Crucible save still has an **empty `objectives` table** (no seeded ladder) so no real tier-up fires
 in-app until Slice 10 — the wiring is exercised by the unit tests.
 
-**⮕ NEXT SESSION — Slice 10 (TDD) — seed the full Crucible ladder** (spec §7 step 10 / D3). Author the
-Crucible's 3–4 subsystems (`RoomObject`s) + their `Objective`s (per-tier, `object_state` completion +
-`reveals_knowledge` + `advances_clock_slug="dungeon_intimacy"`) + a **re-segmented latching**
-`dungeon_intimacy` clock (segments = #tiers; D6 — revert the Phase 51 `monotonic=False` wide-open hack to
-a true latching tier index) + per-tier knowledge. Extend `tools/populate_crucible_dungeon_channel.py`
-(idempotent, importable + tested) — note the live save's pre-existing subsystem objects (Sand-Choked
-Gearworks `jammed`, Great Lift `powered`/`ready`, Trap Control Lever `active`) are **general room
-objects, not the authored ladder**; decide whether to adopt or re-author them. PCs already carry
-playbooks (Mira = `artificer`). Then 11 (optional) tier/objective HUD. Use the TDD skill (read
-`spec/TESTING.md` first).
+**Slice 10 — DONE (TDD, green; commit pending; spec §7 step 10 / D3).** Seeded the full Crucible
+ladder. **Owner decisions (2026-06-28):** **hybrid** subsystem sourcing + **4 tiers, channel opens at
+tier 0.** Extended `tools/populate_crucible_dungeon_channel.py` (idempotent, importable, tested):
+- **Gate (`dungeon_daddy/rpg/dungeon_channel.py`):** new `CHANNEL_OPEN_THRESHOLD = 0.0` used by
+  `dungeon_channel_available` (resolves the §6 open question — channel opens cryptic at tier 0,
+  `filled=0`; *tiers* gate content, not access). `INTIMACY_THRESHOLD` left untouched for the deprecated
+  flat `reveal_knowledge` band. (1 new dungeon-channel test; 1 Phase-51 gate test repurposed —
+  low-intimacy no longer closes the channel.)
+- **Ladder (`_Rung`/`LADDER`):** tier 0 **adopts** the existing `gearworks` (jammed→cleared, **not**
+  re-authored — preserve-existing); tiers 1–3 author **fresh L2 subsystems** — `coolant-loop` (r02,
+  structure, ruptured→restored), `arcane-conduits` (r03, mechanism, dormant→charged),
+  `core-containment` (r05, structure, failing→stabilized), each with a `trigger="activate"` restore
+  transition (`advances_clock_slug=None` — D5: the objective service ticks intimacy). 4 `Objective`s
+  (tier 0 `active`, 1–3 `locked`; `advances_clock_slug="dungeon_intimacy"`; per-tier `reveals_knowledge`
+  distributing the 5 forge-mind secrets across tiers, tier 3 gets 2).
+- **Clock:** `_seed_intimacy_clock` re-segments `dungeon_intimacy` to **latching** (`segments=4`,
+  `filled=#completed objectives`, `monotonic=True` — reverts the Phase 51 wide-open hack; adopts an
+  existing clock so play_view's first-match read is stable).
+- **Idempotent + preserves progress:** `_seed_objectives` keeps an objective's earned `status`
+  (completed tiers stay completed); `_seed_subsystems` skips an already-present subsystem (a player-
+  restored one is never reset to broken).
+- **Tests** (`tests/unit/tools/test_populate_crucible_dungeon_channel.py`): rewrote the 3 clock tests
+  for the latching model; +6 new (four-objectives / fresh-subsystems / adopts-gearworks-for-tier-0 /
+  reseed-preserves-completed-objective / reseed-doesn't-reset-restored-subsystem / **end-to-end:**
+  restore tier-0 subsystem → `advance_objectives` completes it, ticks clock 0→1, activates tier 1,
+  unlocks the tier-0 secret while deep tiers stay gated). rpg+tools+memory+campaign (1069) + views
+  (338) + dungeon-channel (24) + dialogue (25) green.
+
+**⮕ NEXT SESSION — run the live-save seed & GUI-verify the full ladder.** The seed code is committed
+but **not yet applied to the live Crucible save** (a real mutation — back up `campaign.duckdb` first,
+close the app, then `python -m tools.populate_crucible_dungeon_channel`). It will re-segment the live
+clock (6/6 → latching 4, `filled=0`) and author the 4 objectives + 3 fresh L2 subsystems; the live
+`gearworks` is `jammed` so tier 0 is genuinely completable. Live PCs already carry playbooks (Mira =
+`artificer`). Then walk the ladder in-app (restore a subsystem → tier-up bubble → unlocked knowledge).
+**Then optional Slice 11** — a small tier/objective HUD in the dungeon channel header. Use the TDD
+skill (read `spec/TESTING.md` first).
 
 **Carried from Phase 51 (now superseded by 51.5 where noted):** the per-exchange `+1` intimacy tick
 (Slice 7 `record_dungeon_exchange`) is **removed** in 51.5 Slice 5; the `monotonic=False` flip on the

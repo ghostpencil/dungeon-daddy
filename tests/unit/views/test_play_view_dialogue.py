@@ -160,17 +160,19 @@ def test_begin_dungeon_dialogue_opens_when_gated_available(tmp_path):
 
 
 def test_begin_dungeon_dialogue_blocked_posts_lock_reason(tmp_path):
-    from dungeon_daddy.rpg.dungeon_channel import REASON_NOT_INTIMATE
+    # Phase 51.5 D6: low intimacy no longer closes the channel (it opens cryptic
+    # at tier 0); the still-closed case is standing off a resonance point.
+    from dungeon_daddy.rpg.dungeon_channel import REASON_NOT_HERE
 
     view = _make_view(tmp_path)
-    view._last_room_context = {"resonance_point": True}
-    _seed_intimacy_clock(view._mem_repo, filled=1, segments=6)  # 0.16 < 0.5
+    view._last_room_context = {"resonance_point": False}
+    _seed_intimacy_clock(view._mem_repo, filled=1, segments=4)
 
     view._begin_dungeon_dialogue()
 
     assert view._dialogue is None
     view._chat.set_dialogue_mode.assert_not_called()
-    view._chat.add_message.assert_called_once_with("system", REASON_NOT_INTIMATE)
+    view._chat.add_message.assert_called_once_with("system", REASON_NOT_HERE)
 
 
 # ---------------------------------------------------------------------------
