@@ -22,6 +22,30 @@ from dungeon_daddy.rpg.models import ObjectTransition, RoomObject
 _RESOLVING_OUTCOMES: frozenset[Outcome] = frozenset({"critical", "full", "partial"})
 
 
+def is_resolving_outcome(outcome: Outcome) -> bool:
+    """Return whether a roll ``outcome`` resolves an obstacle (locked mapping).
+
+    Crit/full/partial resolve (partial with a complication); a miss fails. Shared
+    gate for both the contested-approach path (:func:`resolve_obstacle_with_roll`)
+    and the DM-ruled proposal path (Part B).
+    """
+    return outcome in _RESOLVING_OUTCOMES
+
+
+def resolving_trigger(obj: RoomObject, to_state: str) -> str | None:
+    """Return the trigger of a transition from ``obj``'s current state to ``to_state``.
+
+    Used by the DM-ruled path to route an accepted ``ResolveObstacleChange`` through
+    the deterministic ``ActivateObject`` pipeline: the LLM names the resolved state,
+    this finds a converging transition's trigger to actually apply it. Returns
+    ``None`` when no such transition exists.
+    """
+    for t in obj.transitions:
+        if t.from_state == obj.current_state and t.to_state == to_state:
+            return t.trigger
+    return None
+
+
 def obstacle_approaches(obj: RoomObject) -> list[ObjectTransition]:
     """Return the contested transitions out of the object's current state.
 

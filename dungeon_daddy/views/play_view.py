@@ -1947,6 +1947,7 @@ class PlayView(arcade.View):
                 known_clock_ids=set(known_clock_ids),
                 known_actor_ids=set(known_actor_ids),
                 player_actor_ids=set(player_actor_ids),
+                obstacle_resolved_states=self._obstacle_resolved_states(campaign_id),
             )
             apply_result = apply_low_risk_proposals(
                 validation_result,
@@ -1955,10 +1956,76 @@ class PlayView(arcade.View):
                 action_key=resolution.action_key,
                 intent=resolution.intent,
             )
+            # A validated ResolveObstacleChange is applied through the deterministic
+            # ActivateObject seam (not apply_low_risk_proposals, which skips it), gated
+            # on a resolving roll outcome — the constrained Part B object-state authority.
+            actor_id = player_actor_ids[0] if player_actor_ids else (
+                known_actor_ids[0] if known_actor_ids else None
+            )
+            self._apply_obstacle_proposals(validation_result, resolution.outcome, actor_id)
         else:
             validation_result = ValidationResult()
             apply_result = ApplyResult()
         self._rpg_debug.set_proposal_result(validation_result, apply_result)
+
+    def _obstacle_resolved_states(self, campaign_id: str) -> dict[str, str]:
+        """Map ``{obstacle slug: authored resolved state}`` for the current room.
+
+        Bounds the DM-ruled ResolveObstacleChange authority to obstacles present in
+        the party's room, each only to its single canonical resolved state.
+        """
+        from dungeon_daddy.rpg.models import RoomObject
+        from dungeon_daddy.rpg.obstacles import obstacle_resolved_state
+
+        if self._mem_repo is None or self._state is None or not self._state.current_room_id:
+            return {}
+        states: dict[str, str] = {}
+        for od in self._mem_repo.get_objects_by_room(campaign_id, self._state.current_room_id):
+            resolved = obstacle_resolved_state(RoomObject(**od))
+            if resolved is not None:
+                states[od["slug"]] = resolved
+        return states
+
+    def _apply_obstacle_proposals(self, validation_result, outcome, actor_id) -> None:
+        """Apply accepted DM-ruled obstacle resolutions (Phase 51.5 Part B Slice 6).
+
+        For each accepted :class:`ResolveObstacleChange`, on a resolving roll outcome
+        (locked mapping), route the obstacle to its authored resolved state through
+        the deterministic ``ActivateObject`` pipeline so ``update_object_state`` +
+        side-effects fire and objectives re-advance. The validator already guarantees
+        ``to_state`` is the obstacle's authored resolved state.
+        """
+        from dungeon_daddy.rpg.command import ActivateObject
+        from dungeon_daddy.rpg.models import RoomObject
+        from dungeon_daddy.rpg.obstacles import is_resolving_outcome, resolving_trigger
+        from dungeon_daddy.rpg.proposal import ResolveObstacleChange
+
+        if self._mem_repo is None or actor_id is None or self._state is None:
+            return
+        if not is_resolving_outcome(outcome):
+            return
+        room_id = self._state.current_room_id
+        if not room_id:
+            return
+        campaign_id = self._rpg_campaign_id
+        by_slug = {
+            od["slug"]: RoomObject(**od)
+            for od in self._mem_repo.get_objects_by_room(campaign_id, room_id)
+        }
+        for change in validation_result.accepted:
+            if not isinstance(change, ResolveObstacleChange):
+                continue
+            obj = by_slug.get(change.object_slug)
+            if obj is None:
+                continue
+            trigger = resolving_trigger(obj, change.to_state)
+            if trigger is None:
+                continue
+            self._apply_vna_command(
+                ActivateObject(
+                    actor_id=actor_id, object_id=obj.object_id, trigger=trigger,
+                )
+            )
 
     def _apply_world_reaction(self, resolution):
         if self._rpg_service is None or self._mem_repo is None:
