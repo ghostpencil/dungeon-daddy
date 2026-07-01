@@ -18,15 +18,15 @@ Crucible). Building the **puzzle-obstacle / multi-approach feature (#1+#2)**: **
 & committed** (engine win: a class-flavored approach roll resolves an obstacle and completes its
 objective; the builder suggests the obstacle's approach verbs; the 4 Crucible obstacles author thematic
 contested approaches; both seeds reseed additively). Since then, a **container-loot** feature +
-**builder hit-test fix** landed (see START HERE). **Next: (confirm-gated) reseed the live Crucible,
-then Part B** (LLM authority expansion) — plan in START HERE.
+**builder hit-test fix** landed, GUI-verified, and the live Crucible was reseeded + new-game-reset
+(see START HERE). **Next: Part B** (LLM authority expansion, Slices 5–7) — plan in START HERE.
 
 Specs: 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` · 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` ·
 current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index `spec/IMPLEMENTATION_PHASES.md`).
 
 ---
 
-## START HERE — next session: reseed live Crucible, then Part B
+## START HERE — next session: Part B (LLM authority expansion)
 
 Multi-approach objective solving (#1 + #2): **Part A Slices 1–4 are DONE & committed**
 (`5e3c0d2` / `4c34b16` / `e5c01d4` / `2455bc4`): the pure obstacle helpers + locked outcome mapping,
@@ -34,15 +34,18 @@ a successful class-flavored approach roll resolves an obstacle's state and compl
 the in-chat Action Builder suggests the obstacle's approach verbs, and the 4 Crucible obstacles are
 authored with **thematic contested approaches** converging on one resolved state.
 
-**Since then (this session — committed):** a **container-loot** feature — a container transition can
+**Container-loot feature — DONE, committed (`11e7eb6`) & GUI-verified:** a container transition can
 carry `spawns_item_slug` to reveal an unplaced/inert item into the room on open (L1 travel-journal now
 lives inside the supply locker; `describe_spawned_loot` in `play_view` names it for the narrator; the
-new-game reset tool restores authored item placement). Plus a **builder hit-test fix** (an open popup
-overlapping the header is now tested before the collapse toggle).
+new-game reset tool restores authored item placement). Also a **builder hit-test fix** (an open popup
+overlapping the header is now tested before the collapse toggle). **Live Crucible reseeded** (both
+seeds, additive) **+ new-game reset** applied so the container-loot flow is coherent (locker `closed`,
+journal inert/unplaced) — see Live Crucible state below.
 
-**Next: (1) confirm-gated — reseed the live Crucible additively (`python -m
-tools.populate_crucible_level1` + `-m tools.populate_crucible_dungeon_channel`, app closed, back up
-first); (2) Part B (LLM authority expansion).** Full unit suite green.
+**Next: Part B — the LLM authority expansion (Slices 5–7, TDD).** (5) new constrained
+`ResolveObstacleChange` proposal type — validator permits pushing an obstacle only to its **authored**
+resolved state; (6) feed obstacle context into the proposal pipeline; (7) update
+`docs/LLM_AUTHORITY_BOUNDARY.md` + the 51.5 spec. Full unit suite green.
 
 ### The feature (decisions locked)
 
@@ -113,13 +116,12 @@ the deterministic `ActivateObject` pipeline (`_apply_vna_command`), which applie
   (preserve already-played object state, upgrade legacy single-transition subsystems). Full unit suite
   green (3179). **Code uncommitted; live-save reseed not yet run** (confirm-gated). No GUI verify yet —
   after committing + reseeding the live Crucible, verify the class-approach TRY row in-app.
-- **Live Crucible state (2026-06-29):** tier 0 `clear-the-gearworks` **completed** (`gearworks`
-  cleared); tier 1 `restore-the-coolant-loop` **active** (`coolant-loop` still **ruptured** → needs
-  `restored`); tier 2 `recharge-the-arcane-conduits` **locked** but `arcane-conduits` already **charged**
-  (banked — **cascade-completes** once tier 1 finishes); tier 3 `stabilize-the-core-containment`
-  **locked** (`core-containment` failing). Intimacy clock **1/4 latching**. `great-lift` powered,
-  `trap-lever` active. Live save 0 drafts / 18 approved. Backups incl.
-  `campaign.duckdb.bak-slice10-applied-*` / `…-lift-demote-*`.
+- **Live Crucible state (2026-07-01, post container-loot reseed + new-game reset):** fresh new-game —
+  party in **R1/L1**, only R1 visited, empty transcript; ladder at **tier 0 `clear-the-gearworks`
+  active**, tiers 1–3 locked; all clocks **0** (intimacy 0/4). Container-loot coherent: `supply-locker`
+  **closed** with `open|force → spawns travel-journal`; `travel-journal` **inert/unplaced**. Backups:
+  `campaign.duckdb.bak-containerloot-reseed-20260701-133213` (pre-reseed) +
+  `…bak-newgame-20260701-133542` (pre-reset).
 - **Slices 1–10 GUI-verify (DONE, prior session):** owner confirmed "Fixes verified. The Dungeon
   dialogue is accurate." — truthful systems status (vs live DB), dungeon names its want, lift modeled as
   one object, no memory review queue (`apply_low_risk_proposals` writes `approved`), dungeon states
