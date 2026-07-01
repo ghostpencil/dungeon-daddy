@@ -36,6 +36,16 @@ def obstacle_approaches(obj: RoomObject) -> list[ObjectTransition]:
     ]
 
 
+def obstacle_approach_verbs(obj: RoomObject) -> list[str]:
+    """Return the ``action_verb``s of the obstacle's current approaches, in order.
+
+    These are the class-flavored verbs (tinker / fight / finesse / …) offered as
+    *suggested actions* for the obstacle in the builder. Empty when the object is
+    not an obstacle (no contested approaches out of ``current_state``).
+    """
+    return [t.action_verb for t in obstacle_approaches(obj) if t.action_verb]
+
+
 def obstacle_resolved_state(obj: RoomObject) -> str | None:
     """Return the single canonical resolved state all approaches converge on.
 

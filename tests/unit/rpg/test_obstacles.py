@@ -12,6 +12,7 @@ import pytest
 
 from dungeon_daddy.rpg.models import ObjectTransition, RoomObject
 from dungeon_daddy.rpg.obstacles import (
+    obstacle_approach_verbs,
     obstacle_approaches,
     obstacle_resolved_state,
     resolve_obstacle_with_roll,
@@ -65,6 +66,25 @@ class TestObstacleApproaches:
         approaches = obstacle_approaches(obj)
 
         assert [t.action_verb for t in approaches] == ["tinker", "fight"]
+
+
+class TestObstacleApproachVerbs:
+    def test_returns_action_verbs_of_current_approaches_in_order(self) -> None:
+        obj = _obstacle(_approach("tinker"), _approach("fight"))
+
+        assert obstacle_approach_verbs(obj) == ["tinker", "fight"]
+
+    def test_empty_when_not_an_obstacle(self) -> None:
+        deterministic = ObjectTransition(
+            transition_id="tr:open",
+            object_id="obj:c:gearworks",
+            from_state="jammed",
+            to_state="open",
+            trigger="open",
+        )
+        obj = _obstacle(deterministic)
+
+        assert obstacle_approach_verbs(obj) == []
 
 
 class TestObstacleResolvedState:

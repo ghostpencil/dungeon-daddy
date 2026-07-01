@@ -107,6 +107,45 @@ class TestSetContextNouns:
 
 
 # ---------------------------------------------------------------------------
+# Obstacle approaches — the selected obstacle's suggested approach verbs (Slice 3)
+# ---------------------------------------------------------------------------
+
+class TestSelectedNounApproachVerbs:
+    def _obstacle_panel(self):
+        panel = _panel()
+        panel.set_context(
+            actor_abilities=[],
+            room_context=_room_context(objects=[
+                {"object_id": "gearworks", "slug": "gearworks",
+                 "display_name": "Seized Gearworks", "archetype": "mechanism",
+                 "current_state": "jammed", "description": "Jammed gears.",
+                 "approach_verbs": ["tinker", "fight"]},
+                {"object_id": "lever", "slug": "lever", "display_name": "Lever",
+                 "archetype": "mechanism", "current_state": "up",
+                 "description": "A lever.", "approach_verbs": []},
+            ]),
+            actor=_actor(),
+            playbook_slug="artificer",
+            world_flags=[],
+        )
+        return panel
+
+    def test_returns_approach_verbs_for_selected_obstacle(self):
+        panel = self._obstacle_panel()
+        panel.select_noun("gearworks")
+        assert panel.selected_noun_approach_verbs() == ["tinker", "fight"]
+
+    def test_empty_for_non_obstacle_noun(self):
+        panel = self._obstacle_panel()
+        panel.select_noun("lever")
+        assert panel.selected_noun_approach_verbs() == []
+
+    def test_empty_when_no_noun_selected(self):
+        panel = _panel()
+        assert panel.selected_noun_approach_verbs() == []
+
+
+# ---------------------------------------------------------------------------
 # Acting-actor header — the panel reports whose action the Card builds
 # ---------------------------------------------------------------------------
 

@@ -14,23 +14,24 @@ Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS** on branch `p
 **no merge to `main` until 51.5 is built** — owner decision). Driven by the 2026-06-27 playtest: the
 channel was hollow. Spec `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`, decisions locked D1–D8.
 **Slices 1–10 DONE & GUI-verified** (the full intimacy ladder is built and seeded into the live
-Crucible). Now building the **puzzle-obstacle / multi-approach feature (#1+#2)**: **Part A Slices 1–2
+Crucible). Now building the **puzzle-obstacle / multi-approach feature (#1+#2)**: **Part A Slices 1–3
 DONE & committed** (engine win — a class-flavored approach roll can resolve an obstacle and complete its
-objective). **Next session: Part A Slice 3** (surface approach verbs in the Action Builder) — plan in
-START HERE.
+objective; the builder now suggests the obstacle's approach verbs). **Next session: Part A Slice 4**
+(re-author + reseed the Crucible obstacles) — plan in START HERE.
 
 Specs: 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` · 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` ·
 current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index `spec/IMPLEMENTATION_PHASES.md`).
 
 ---
 
-## START HERE — next session: puzzle-style objective solving, Part A Slice 3
+## START HERE — next session: puzzle-style objective solving, Part A Slice 4
 
-Multi-approach objective solving (#1 + #2) is **in progress**. **Part A Slices 1–2 are DONE & committed**
-(`5e3c0d2`, `4c34b16`): the pure obstacle helpers + the locked outcome mapping are built, and a
-successful class-flavored approach roll now resolves an obstacle's state and completes its objective.
-**Next: Part A Slice 3** (surface approach verbs in the Action Builder), then Slice 4 (re-author the
-Crucible + seed), then Part B (the LLM authority expansion). Full unit suite green (3163).
+Multi-approach objective solving (#1 + #2) is **in progress**. **Part A Slices 1–3 are DONE & committed**
+(`5e3c0d2`, `4c34b16`, + this session): the pure obstacle helpers + the locked outcome mapping are built,
+a successful class-flavored approach roll now resolves an obstacle's state and completes its objective,
+and the in-chat Action Builder now suggests the selected obstacle's approach verbs (filtered to what the
+acting actor can attempt). **Next: Part A Slice 4** (re-author the Crucible obstacles + reseed
+**additively**), then Part B (the LLM authority expansion). Full unit suite green (3175).
 
 ### The feature (decisions locked)
 
@@ -67,9 +68,13 @@ the deterministic `ActivateObject` pipeline (`_apply_vna_command`), which applie
    `_resolve_vna_roll`) routes the matched transition through the `ActivateObject` pipeline so
    side-effects apply and `_advance_objectives()` re-runs. Tests: `test_play_view_obstacle.py` (3) +
    obstacle units (9).
-3. **← NEXT** Surface the obstacle's approach verbs as suggested actions in the builder.
-4. Re-author the 4 Crucible obstacles with class-flavored approaches → one resolved state; update the
-   seed **additively** (preserve the adopted `gearworks` state — don't reset it to jammed).
+3. ✅ **DONE** (this session) Surface the obstacle's approach verbs as suggested actions in the builder:
+   `obstacle_approach_verbs` (obstacles.py) + `approach_verbs` on each object in `build_room_noun_context`
+   (thin view-model — no raw transitions) + `VnaActionPanel.selected_noun_approach_verbs()` +
+   `InChatActionBuilder` clickable **TRY** row (approaches ∩ actor's offered verbs; click fills the Verb
+   slot, keeps the obstacle noun). Tests: builder (+5), panel (+3), context (+2), obstacles (+2).
+4. **← NEXT** Re-author the 4 Crucible obstacles with class-flavored approaches → one resolved state;
+   update the seed **additively** (preserve the adopted `gearworks` state — don't reset it to jammed).
 
 **Part B — DM ruling for off-script plausible actions (the authority expansion):**
 5. New constrained `ResolveObstacleChange` proposal type — validator permits pushing an obstacle only
@@ -80,9 +85,12 @@ the deterministic `ActivateObject` pipeline (`_apply_vna_command`), which applie
 
 ### Session state
 
-- **This session (puzzle-obstacle Part A Slices 1–2):** built `rpg/obstacles.py` + the roll-path
-  resolution and committed (`5e3c0d2`, `4c34b16`). Full unit suite green (3163). No GUI verify yet for
-  the new mechanic (Slice 4 reseeds the Crucible obstacles first, then verify in-app).
+- **Prior session (puzzle-obstacle Part A Slices 1–2):** built `rpg/obstacles.py` + the roll-path
+  resolution and committed (`5e3c0d2`, `4c34b16`).
+- **This session (Part A Slice 3):** surfaced the obstacle's approach verbs as clickable suggested
+  actions in the in-chat builder (obstacles helper → context enrichment → panel accessor → builder TRY
+  row). Full unit suite green (3175). No GUI verify yet for the new mechanic (Slice 4 reseeds the
+  Crucible obstacles first, then verify in-app).
 - **Live Crucible state (2026-06-29):** tier 0 `clear-the-gearworks` **completed** (`gearworks`
   cleared); tier 1 `restore-the-coolant-loop` **active** (`coolant-loop` still **ruptured** → needs
   `restored`); tier 2 `recharge-the-arcane-conduits` **locked** but `arcane-conduits` already **charged**

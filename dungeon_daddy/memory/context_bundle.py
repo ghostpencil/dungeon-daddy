@@ -6,6 +6,8 @@ from typing import Literal
 from dungeon_daddy.memory.models import ContextBundle, MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.memory.retrieval import MemoryRetriever
+from dungeon_daddy.rpg.models import RoomObject
+from dungeon_daddy.rpg.obstacles import obstacle_approach_verbs
 from dungeon_daddy.rpg.service import compute_effective_ratings
 
 
@@ -218,6 +220,10 @@ def build_room_noun_context(
                 "archetype": o["archetype"],
                 "current_state": o["current_state"],
                 "description": o["description"],
+                # Phase 51.5 Part A Slice 3: the obstacle's class-flavored
+                # approaches, surfaced as suggested actions in the builder. Raw
+                # transitions stay off the thin view-model.
+                "approach_verbs": obstacle_approach_verbs(RoomObject(**o)),
             }
             for o in objects
         ],

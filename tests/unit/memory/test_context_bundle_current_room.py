@@ -128,6 +128,76 @@ class TestContextBundleCurrentRoomBuilder:
         assert obj["description"] == "A heavy iron chest."
         assert "transitions" not in obj
 
+    def test_obstacle_object_carries_approach_verbs(
+        self, repo: MemoryRepository
+    ) -> None:
+        # Phase 51.5 Part A Slice 3: an obstacle's contested approaches surface as
+        # `approach_verbs` on its context object dict so the builder can suggest
+        # them; raw transitions stay off the thin view-model.
+        from dungeon_daddy.memory.context_bundle import build_room_noun_context
+
+        room_id = "room:level-01:antechamber"
+        repo.save_room_object(RoomObject(
+            object_id="obj:c1:gearworks",
+            campaign_id="camp_001",
+            room_id=room_id,
+            level_id="level-01",
+            slug="gearworks",
+            display_name="Seized Gearworks",
+            archetype="mechanism",
+            description="A jammed tangle of brass gears.",
+            current_state="jammed",
+            transitions=[
+                ObjectTransition(
+                    transition_id="tr:c1:gearworks:tinker",
+                    object_id="obj:c1:gearworks",
+                    from_state="jammed", to_state="cleared", trigger="tinker",
+                    contested=True, action_verb="tinker",
+                ),
+                ObjectTransition(
+                    transition_id="tr:c1:gearworks:fight",
+                    object_id="obj:c1:gearworks",
+                    from_state="jammed", to_state="cleared", trigger="fight",
+                    contested=True, action_verb="fight",
+                ),
+            ],
+        ))
+
+        ctx = build_room_noun_context(repo, "camp_001", room_id)
+        obj = ctx["objects"][0]
+        # Order follows the repo's transition_id sort (fight < tinker), which the
+        # seed controls via authored ids.
+        assert obj["approach_verbs"] == ["fight", "tinker"]
+        assert "transitions" not in obj
+
+    def test_non_obstacle_object_has_empty_approach_verbs(
+        self, repo: MemoryRepository
+    ) -> None:
+        from dungeon_daddy.memory.context_bundle import build_room_noun_context
+
+        room_id = "room:level-01:antechamber"
+        repo.save_room_object(RoomObject(
+            object_id="obj:c1:iron-chest",
+            campaign_id="camp_001",
+            room_id=room_id,
+            level_id="level-01",
+            slug="iron-chest",
+            display_name="Iron Chest",
+            archetype="container",
+            description="A heavy iron chest.",
+            current_state="sealed",
+            transitions=[
+                ObjectTransition(
+                    transition_id="tr:c1:iron-chest:0",
+                    object_id="obj:c1:iron-chest",
+                    from_state="sealed", to_state="opened", trigger="open",
+                )
+            ],
+        ))
+
+        ctx = build_room_noun_context(repo, "camp_001", room_id)
+        assert ctx["objects"][0]["approach_verbs"] == []
+
     def test_resonance_point_object_sets_room_flag(
         self, repo: MemoryRepository
     ) -> None:

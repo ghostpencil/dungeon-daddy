@@ -251,6 +251,20 @@ class VnaActionPanel:
         """The currently-selected noun option, or ``None`` when no noun is set."""
         return self._selected_noun()
 
+    def selected_noun_approach_verbs(self) -> list[str]:
+        """The suggested approach verbs for the selected obstacle noun (Slice 3).
+
+        Reads the ``approach_verbs`` the room context carries on the selected
+        object (see :func:`build_room_noun_context`). Empty when no noun is
+        selected or the selection is not an obstacle.
+        """
+        if self._noun_id is None:
+            return []
+        for obj in self._room_context.get("objects", []):
+            if obj.get("object_id") == self._noun_id:
+                return list(obj.get("approach_verbs", []))
+        return []
+
     def selected_noun_is_speakable(self) -> bool:
         """True when the selected noun is a creature the party can talk to (§6).
 
