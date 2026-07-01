@@ -130,7 +130,7 @@ but only to its authored resolved state — see START HERE.)*
 
 ## Known Failures
 
-**None.** Full unit/integration suite green (3192). The previously-flaky generator eval is resolved
+**None.** Full unit/integration suite green (3195). The previously-flaky generator eval is resolved
 (`26e95a3`, 2026-06-23): evals are excluded from the default run (`addopts = "-m 'not eval'"` —
 run with `pytest -m eval`), and `test_generator_level_passes_validation` mirrors production's
 3-retry regenerate-with-errors budget instead of asserting one-shot validity.
