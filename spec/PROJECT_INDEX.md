@@ -19,7 +19,9 @@ Crucible). Building the **puzzle-obstacle / multi-approach feature (#1+#2)**: **
 objective; the builder suggests the obstacle's approach verbs; the 4 Crucible obstacles author thematic
 contested approaches; both seeds reseed additively). Since then, a **container-loot** feature +
 **builder hit-test fix** landed, GUI-verified, and the live Crucible was reseeded + new-game-reset
-(see START HERE). **Next: Part B** (LLM authority expansion, Slices 5–7) — plan in START HERE.
+(see START HERE). **Part B IN PROGRESS** (LLM authority expansion, Slices 5–7): **Slice 5 DONE & committed** (`8daece5`)
+— the constrained `ResolveObstacleChange` proposal type + validator gate. **Next: Slice 6** (feed
+obstacle context into the proposal pipeline + apply on a successful roll). Plan in START HERE.
 
 Specs: 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` · 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` ·
 current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index `spec/IMPLEMENTATION_PHASES.md`).
@@ -42,10 +44,13 @@ overlapping the header is now tested before the collapse toggle). **Live Crucibl
 seeds, additive) **+ new-game reset** applied so the container-loot flow is coherent (locker `closed`,
 journal inert/unplaced) — see Live Crucible state below.
 
-**Next: Part B — the LLM authority expansion (Slices 5–7, TDD).** (5) new constrained
+**Part B — the LLM authority expansion (Slices 5–7, TDD):** (5) ✅ **DONE** (`8daece5`) constrained
 `ResolveObstacleChange` proposal type — validator permits pushing an obstacle only to its **authored**
-resolved state; (6) feed obstacle context into the proposal pipeline; (7) update
-`docs/LLM_AUTHORITY_BOUNDARY.md` + the 51.5 spec. Full unit suite green.
+resolved state via a new `obstacle_resolved_states` map (the LLM can't invent states; unknown-obstacle
+and non-authored-`to_state` rejected). `test_proposal_obstacle.py` (+4). **Next: (6)** feed obstacle
+context into the proposal pipeline (`play_view`) + apply a validated `ResolveObstacleChange` through the
+deterministic `ActivateObject` pipeline on a successful roll; (7) update
+`docs/LLM_AUTHORITY_BOUNDARY.md` + the 51.5 spec. Full unit suite green (3192).
 
 ### The feature (decisions locked)
 
