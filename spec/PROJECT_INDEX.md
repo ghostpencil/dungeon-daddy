@@ -3,175 +3,115 @@
 ## Phase
 
 Phase **50 / 50.5 / 50.6 — COMPLETE & merged to `main`** (Hybrid Action Model · Use-Noun-on-Noun
-grammar · Chat Action Cockpit). Per-slice detail is in git history.
+grammar · Chat Action Cockpit). Detail in git history + Phase History table below.
 
-Phase **51 — Talk to the Dungeon: FEATURE-COMPLETE & GUI-verified** on branch `phase-51`. The live
-dungeon-voice channel, the intimacy clock, `DungeonVoiceAgent`, Markdown-backed / DB-referenced
-persona persistence, and resonance points are all built. Spec
-`spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
+Phase **51 — Talk to the Dungeon: FEATURE-COMPLETE & GUI-verified** on branch `phase-51` (live
+dungeon-voice channel, intimacy clock, `DungeonVoiceAgent`, persona persistence, resonance points).
+Spec `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 
 Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS** on branch `phase-51` (extends 51;
-**no merge to `main` until 51.5 is built** — owner decision). Driven by the 2026-06-27 playtest: the
-channel was hollow. Spec `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`, decisions locked D1–D8.
-**Slices 1–10 DONE & GUI-verified** (the full intimacy ladder is built and seeded into the live
-Crucible). Building the **puzzle-obstacle / multi-approach feature (#1+#2)**: **Part A Slices 1–4 DONE
-& committed** (engine win: a class-flavored approach roll resolves an obstacle and completes its
-objective; the builder suggests the obstacle's approach verbs; the 4 Crucible obstacles author thematic
-contested approaches; both seeds reseed additively). Since then, a **container-loot** feature +
-**builder hit-test fix** landed, GUI-verified, and the live Crucible was reseeded + new-game-reset
-(see START HERE). **Part B IN PROGRESS** (LLM authority expansion, Slices 5–7): **Slice 5 DONE & committed** (`8daece5`)
-— the constrained `ResolveObstacleChange` proposal type + validator gate. **Next: Slice 6** (feed
-obstacle context into the proposal pipeline + apply on a successful roll). Plan in START HERE.
+**no merge to `main` until 51.5 is built** — owner decision). Spec `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`,
+decisions locked D1–D8 (below). Built & GUI-verified so far:
+- **Slices 1–10 DONE & GUI-verified** — the full intimacy ladder (objectives → latching intimacy tier
+  index → per-tier knowledge), seeded into the live Crucible. Condensed architecture below.
+- **Puzzle-obstacle / multi-approach feature (#1+#2), Part A (Slices 1–4) DONE & committed + GUI-verified**
+  — a class-flavored approach roll resolves an obstacle and completes its objective; the builder suggests
+  the obstacle's approach verbs; the 4 Crucible obstacles author thematic contested approaches; both seeds
+  reseed additively.
+- **Container-loot feature + builder hit-test fix DONE, committed (`11e7eb6`) & GUI-verified**; live
+  Crucible reseeded + new-game-reset (state below).
+- **Part B (LLM authority expansion, Slices 5–7) IN PROGRESS** — **Slice 5 DONE & committed** (`8daece5`).
+  **Next: Slice 6.** See START HERE.
 
 Specs: 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` · 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` ·
 current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index `spec/IMPLEMENTATION_PHASES.md`).
 
 ---
 
-## START HERE — next session: Part B (LLM authority expansion)
+## START HERE — next session: Part B Slice 6 (feed obstacle context into the proposal pipeline)
 
-Multi-approach objective solving (#1 + #2): **Part A Slices 1–4 are DONE & committed**
-(`5e3c0d2` / `4c34b16` / `e5c01d4` / `2455bc4`): the pure obstacle helpers + locked outcome mapping,
-a successful class-flavored approach roll resolves an obstacle's state and completes its objective,
-the in-chat Action Builder suggests the obstacle's approach verbs, and the 4 Crucible obstacles are
-authored with **thematic contested approaches** converging on one resolved state.
+**Part B = the DM-ruling authority expansion**: let the DM rule that an *off-script but plausibly-
+described* action resolves an obstacle — the one narrowly-constrained exception to "the LLM never mutates
+object state." It may push an obstacle only to its **authored** resolved state.
 
-**Container-loot feature — DONE, committed (`11e7eb6`) & GUI-verified:** a container transition can
-carry `spawns_item_slug` to reveal an unplaced/inert item into the room on open (L1 travel-journal now
-lives inside the supply locker; `describe_spawned_loot` in `play_view` names it for the narrator; the
-new-game reset tool restores authored item placement). Also a **builder hit-test fix** (an open popup
-overlapping the header is now tested before the collapse toggle). **Live Crucible reseeded** (both
-seeds, additive) **+ new-game reset** applied so the container-loot flow is coherent (locker `closed`,
-journal inert/unplaced) — see Live Crucible state below.
+### Done — Slice 5 (`8daece5`)
+Constrained `ResolveObstacleChange` proposal type (`rpg/proposal.py`: `kind="resolve_obstacle"`,
+`object_slug`, `to_state`, `reason`) + validator gate (`rpg/proposal_validator.py`): new optional
+`obstacle_resolved_states: dict[slug→authored_state]` param; rejects unknown-obstacle refs and any
+`to_state` ≠ the obstacle's authored resolved state (LLM can't invent states). Tests
+`test_proposal_obstacle.py` (+4). Full unit suite green (3192).
 
-**Part B — the LLM authority expansion (Slices 5–7, TDD):** (5) ✅ **DONE** (`8daece5`) constrained
-`ResolveObstacleChange` proposal type — validator permits pushing an obstacle only to its **authored**
-resolved state via a new `obstacle_resolved_states` map (the LLM can't invent states; unknown-obstacle
-and non-authored-`to_state` rejected). `test_proposal_obstacle.py` (+4). **Next: (6)** feed obstacle
-context into the proposal pipeline (`play_view`) + apply a validated `ResolveObstacleChange` through the
-deterministic `ActivateObject` pipeline on a successful roll; (7) update
-`docs/LLM_AUTHORITY_BOUNDARY.md` + the 51.5 spec. Full unit suite green (3192).
+### Next — Slice 6 (TDD): wire it into `play_view`'s proposal pipeline
+1. **Build the map**: from the current room's `RoomObject`s, compute
+   `{obj.slug: obstacle_resolved_state(obj)}` (skip `None`) and pass it as `obstacle_resolved_states`
+   to `validate_proposal`. (Find the `validate_proposal` call site in `play_view` — not yet located;
+   that's the first discovery step.)
+2. **Apply on a successful roll**: for a validated (accepted) `ResolveObstacleChange`, route it through
+   the deterministic `ActivateObject` pipeline (`_apply_vna_command`) — the *same* seam Part A's
+   `_maybe_resolve_obstacle` already uses — so `update_object_state` + side-effects fire and
+   `_advance_objectives()` re-runs. Do **not** apply obstacle changes via the generic
+   `apply_low_risk_proposals` (it currently `skip`s `ResolveObstacleChange`, which is correct).
+3. **Gate on outcome**: only apply on a resolving roll (reuse the locked mapping — crit/full clean,
+   partial with complication, miss fails).
+
+### Then — Slice 7 (docs)
+Update `docs/LLM_AUTHORITY_BOUNDARY.md` + `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` to record the
+constrained object-state authority (the DM may resolve an obstacle, but only to its authored state).
 
 ### The feature (decisions locked)
 
-- **#2 — multiple ways to solve an objective (Hybrid).** Today a room object's `current_state` only
-  changes via the deterministic `activate` verb (fires the first transition matching `current_state`);
-  **action rolls cannot change object state** (no object-state proposal type; the authority boundary
-  forbids the LLM from touching object state). We want: an obstacle solvable by class-flavored
-  approaches (Artificer **tinker**, Fighter **strong blow**, Thief **sleight/finesse**) *and* any
-  plausibly-described action.
-- **#1 — normalize completion (all paths → one COMPLETED objective).** An obstacle is a `RoomObject`
-  in a "blocked" state with **multiple contested transitions that all converge on one canonical
-  resolved state** (e.g. `gearworks: jammed ──{tinker|fight|finesse}──▶ cleared`). The objective
-  completes when the object reaches that state — `completion_satisfied`/`advance_objectives` are
-  already agnostic to *how* it changed — so the objective stays uniformly `completed`.
-- **Outcome→success mapping — LOCKED (owner, 2026-06-29):** full/critical → resolves; **partial →
-  resolves with a complication**; miss → fails.
+- **#2 — multiple ways to solve an objective (Hybrid).** A room object's `current_state` changes via the
+  deterministic `activate` verb; Part A added class-flavored **contested approaches** (Artificer *tinker*,
+  Fighter *fight*, Thief *finesse*). Part B adds the LLM-ruled path for *any plausibly-described action*.
+- **#1 — normalize completion (all paths → one COMPLETED objective).** An obstacle is a `RoomObject` in a
+  "blocked" state with **multiple contested transitions converging on one canonical resolved state** (e.g.
+  `gearworks: jammed ──{tinker|fight|endure}──▶ cleared`). The objective completes when the object reaches
+  that state — `completion_satisfied`/`advance_objectives` are agnostic to *how* it changed.
+- **Outcome→success mapping — LOCKED (owner, 2026-06-29):** full/critical → resolves; **partial → resolves
+  with a complication**; miss → fails. Encoded in `rpg/obstacles.py` (`_RESOLVING_OUTCOMES`).
 
-### The seam (Slices 1–2 wired here)
+### The seam (Part A wired here; Slice 6 reuses it)
 
-`play_view._resolve_vna_roll` now calls `_maybe_resolve_obstacle(card, actor, resolution.outcome)`:
-on a resolving roll whose verb matches a contested approach, it routes the matched transition through
-the deterministic `ActivateObject` pipeline (`_apply_vna_command`), which applies `update_object_state`
-+ side-effects and re-runs `_advance_objectives()`. Pure decision logic lives in `rpg/obstacles.py`.
-`_on_activate_submit` still routes contested transitions to `_resolve_vna_roll`.
+`play_view._resolve_vna_roll` calls `_maybe_resolve_obstacle(card, actor, resolution.outcome)`: on a
+resolving roll whose verb matches a contested approach, it routes the matched transition through the
+deterministic `ActivateObject` pipeline (`_apply_vna_command`), which applies `update_object_state` +
+side-effects and re-runs `_advance_objectives()`. Pure decision logic lives in `rpg/obstacles.py`
+(`obstacle_approaches`, `obstacle_approach_verbs`, `obstacle_resolved_state`, `resolve_obstacle_with_roll`).
 
-### Slice plan (TDD; sequenced so Part A is a verifiable win on its own)
+### Live Crucible state (2026-07-01, post container-loot reseed + new-game reset)
+Fresh new-game — party in **R1/L1**, only R1 visited, empty transcript; ladder at **tier 0
+`clear-the-gearworks` active**, tiers 1–3 locked; all clocks **0** (intimacy 0/4). Container-loot
+coherent: `supply-locker` **closed** with `open|force → spawns travel-journal`; `travel-journal`
+**inert/unplaced**. Backups: `campaign.duckdb.bak-containerloot-reseed-20260701-133213` (pre-reseed) +
+`…bak-newgame-20260701-133542` (pre-reset). Live saves at `C:\Users\ljfan\AppData\Local\DungeonDaddy\saves`.
 
-**Part A — authored class approaches (engine-deterministic, no authority change):**
-1. ✅ **DONE** (`5e3c0d2`) Pure helpers + validation in new `rpg/obstacles.py`: `obstacle_approaches`
-   (contested transitions out of `current_state`, each tagged `action_verb`) + `obstacle_resolved_state`
-   (single shared `to_state`; `None` if not an obstacle; `ValueError` on divergence).
-2. ✅ **DONE** (`4c34b16`) Roll path resolves obstacle state: pure `resolve_obstacle_with_roll` +
-   `ObstacleRollResolution` (locked mapping); `play_view._maybe_resolve_obstacle` (called from
-   `_resolve_vna_roll`) routes the matched transition through the `ActivateObject` pipeline so
-   side-effects apply and `_advance_objectives()` re-runs. Tests: `test_play_view_obstacle.py` (3) +
-   obstacle units (9).
-3. ✅ **DONE** (this session) Surface the obstacle's approach verbs as suggested actions in the builder:
-   `obstacle_approach_verbs` (obstacles.py) + `approach_verbs` on each object in `build_room_noun_context`
-   (thin view-model — no raw transitions) + `VnaActionPanel.selected_noun_approach_verbs()` +
-   `InChatActionBuilder` clickable **TRY** row (approaches ∩ actor's offered verbs; click fills the Verb
-   slot, keeps the obstacle noun). Tests: builder (+5), panel (+3), context (+2), obstacles (+2).
-4. ✅ **DONE** (code, uncommitted) Re-authored the 4 Crucible obstacles with **thematic** contested
-   approaches → one resolved state: `gearworks` jammed→cleared via **tinker|fight|endure** (Level-1
-   seed); `coolant-loop` ruptured→restored via **tinker|channel**; `arcane-conduits` dormant→charged
-   via **channel|study|tinker**; `core-containment` failing→stabilized via **channel|focus|endure**
-   (dungeon-channel seed). Both seeds now reseed **additively** — a new `save_objects_preserving_state`
-   (level1) + `_seed_subsystems` upsert preserve any already-played `current_state` while refreshing the
-   authored transitions (legacy single-transition subsystems get upgraded to approaches). Tests:
-   `test_populate_crucible_level1.py` (new, +2) + dungeon-channel seed (+2). Suite green (3179).
-   **Live reseed still pending** (confirm-gated).
+### Phase 51.5 — what's built (Slices 1–10, condensed architecture)
 
-**Part B — DM ruling for off-script plausible actions (the authority expansion):**
-5. New constrained `ResolveObstacleChange` proposal type — validator permits pushing an obstacle only
-   to its **authored** resolved state (the LLM can't invent states); applied on a successful roll.
-6. Feed obstacle context into the proposal pipeline so the DM can rule a described action resolves it.
-7. Update `docs/LLM_AUTHORITY_BOUNDARY.md` + the Phase 51.5 spec to record the constrained
-   object-state authority.
-
-### Session state
-
-- **Prior session (puzzle-obstacle Part A Slices 1–2):** built `rpg/obstacles.py` + the roll-path
-  resolution and committed (`5e3c0d2`, `4c34b16`).
-- **Prior session (Part A Slice 3):** surfaced the obstacle's approach verbs as clickable suggested
-  actions in the in-chat builder (obstacles helper → context enrichment → panel accessor → builder TRY
-  row).
-- **This session (Part A Slice 4):** re-authored the 4 Crucible obstacles with thematic contested
-  approaches converging on one resolved state, and made both Crucible seeds reseed **additively**
-  (preserve already-played object state, upgrade legacy single-transition subsystems). Full unit suite
-  green (3179). **Code uncommitted; live-save reseed not yet run** (confirm-gated). No GUI verify yet —
-  after committing + reseeding the live Crucible, verify the class-approach TRY row in-app.
-- **Live Crucible state (2026-07-01, post container-loot reseed + new-game reset):** fresh new-game —
-  party in **R1/L1**, only R1 visited, empty transcript; ladder at **tier 0 `clear-the-gearworks`
-  active**, tiers 1–3 locked; all clocks **0** (intimacy 0/4). Container-loot coherent: `supply-locker`
-  **closed** with `open|force → spawns travel-journal`; `travel-journal` **inert/unplaced**. Backups:
-  `campaign.duckdb.bak-containerloot-reseed-20260701-133213` (pre-reseed) +
-  `…bak-newgame-20260701-133542` (pre-reset).
-- **Slices 1–10 GUI-verify (DONE, prior session):** owner confirmed "Fixes verified. The Dungeon
-  dialogue is accurate." — truthful systems status (vs live DB), dungeon names its want, lift modeled as
-  one object, no memory review queue (`apply_low_risk_proposals` writes `approved`), dungeon states
-  object/objective locations. Commits `ee27a72` / `e042dfd` / `69e4303` (and `27be4f9`).
-
-### Phase 51.5 — what's built (Slices 1–10, condensed)
-
-Models/helpers first, then service, context/LLM, wiring, seed:
-- **S1–S2** `Objective`/`ObjectiveCompletion` models + `ObjectiveManifest` + migration `018_objectives.sql`
-  + repo (`save_objective`/`get_objectives`/`update_objective_status`).
-- **S3** pure `completion_satisfied(completion, world_state)`; **S4** `advance_objectives(repo,
-  campaign_id)` service (`rpg/objectives.py`) — completes satisfied active objectives, ticks the
-  latching intimacy clock (the **single** tick source, D5), activates the next tier, records a memory.
-- **S5** dropped the per-chat intimacy tick (`record_dungeon_exchange` now only records memory).
-- **S6** `dungeon_systems_status(room_objects)`; **S7** `unlocked_knowledge(objectives)` /
-  `active_objective(objectives)` (all in `rpg/dungeon_channel.py`).
-- **S8** `DungeonVoiceAgent` gains `# Who Is Speaking` / `# Systems Status` / `# What You Want Next` /
-  `# This Conversation So Far`; `play_view._dungeon_agent_inputs` assembles them (reads repo fresh
-  each turn).
-- **S9** (`4ed5bfe`) `play_view._apply_vna_command` → new `_advance_objectives()` after each command,
-  posts a `"dungeon"` bubble per tier-up.
-- **S10** (`4ba27e1`) seeded the full Crucible ladder — **hybrid sourcing, 4 tiers, channel opens at
-  tier 0** (owner decisions 2026-06-28). Tier 0 **adopts** the existing `gearworks` (jammed→cleared);
-  tiers 1–3 author fresh L2 subsystems (`coolant-loop` r02 ruptured→restored, `arcane-conduits` r03
-  dormant→charged, `core-containment` r05 failing→stabilized). 4 `Objective`s (tier 0 `active`, rest
-  `locked`; `advances_clock_slug="dungeon_intimacy"`) + per-tier `reveals_knowledge` (the 5 forge-mind
-  secrets across tiers). Intimacy clock re-segmented **latching** (`segments=4`, `filled=#completed`,
-  `monotonic=True`). New gate constant `CHANNEL_OPEN_THRESHOLD=0.0` in `dungeon_channel.py` opens the
-  channel cryptic at tier 0 (resolves §6; `INTIMACY_THRESHOLD` left for the deprecated flat band).
-  Seed (`tools/populate_crucible_dungeon_channel.py`) is idempotent + preserves play progress.
-- **Post-S10 fixes** (`27be4f9`): faithful systems-status prompt; dungeon memories written `approved`.
-- **Post-S10 fixes (2026-06-29):** Great Lift modeled as one object — L2 `great-lift-upper` demoted to
-  `lore_fixture` so the lift reports once (`ee27a72`); `apply_low_risk_proposals` writes `approved` so
-  no AI memory hits a review queue (`e042dfd`); dungeon-voice context carries subsystem + objective
-  **locations** (`located_systems_status`/`object_location`, agent + prompt + `play_view._room_labels`
-  / `next_objective_location`) so it can say where the task is and answer "which room is X" (`69e4303`).
+- **Models/repo:** `Objective`/`ObjectiveCompletion` (`rpg/models.py`) + `ObjectiveManifest` + migration
+  `018_objectives.sql` + repo (`save_objective`/`get_objectives`/`update_objective_status`).
+- **Service (`rpg/objectives.py`):** pure `completion_satisfied(completion, world_state)`; `advance_objectives(
+  repo, campaign_id)` — completes satisfied active objectives, ticks the **latching** intimacy clock (the
+  *single* tick source, D5), activates the next tier, drafts a memory. Chat no longer ticks intimacy.
+- **Channel helpers (`rpg/dungeon_channel.py`):** `dungeon_systems_status` / `located_systems_status`,
+  `unlocked_knowledge`, `active_objective`, `CHANNEL_OPEN_THRESHOLD=0.0` (channel opens cryptic at tier 0).
+- **Agent/LLM:** `DungeonVoiceAgent` gains `# Who Is Speaking` / `# Systems Status` / `# What You Want Next`
+  / `# This Conversation So Far` (+ object/objective **locations**); `play_view._dungeon_agent_inputs`
+  assembles them fresh each turn.
+- **Wiring:** `play_view._apply_vna_command` → `_advance_objectives()` after each command, posts a
+  `"dungeon"` bubble per tier-up. AI memories written `approved` (no review queue,
+  `apply_low_risk_proposals`).
+- **Seed:** `tools/populate_crucible_dungeon_channel.py` (+ level1 seed) — 4-tier ladder (`gearworks`,
+  `coolant-loop`, `arcane-conduits`, `core-containment`), per-tier `reveals_knowledge`, latching intimacy
+  clock; idempotent + preserves play progress.
 
 ### Phase 51.5 — locked decisions (D1–D8)
 
-D1 objectives-only intimacy (chat no longer ticks; tiers latch) · D2 first-class `Objective` model
-(also seeds Phase 52 Milestones) · D3 full 3–4-tier Crucible ladder · D4 deterministic completion
-keyed to world state, engine-evaluated after each command (no event bus) · D5 the objective service
-is the single intimacy-tick source · D6 the `dungeon_intimacy` clock is a latching tier index · D7
-per-tier `reveals_knowledge` (flat `reveal_knowledge` kept deprecated for back-compat) · D8 stays
-Phase 51.5 on `phase-51`; 51 + 51.5 merge to `main` together once built.
+D1 objectives-only intimacy (chat no longer ticks; tiers latch) · D2 first-class `Objective` model (also
+seeds Phase 52 Milestones) · D3 full 3–4-tier Crucible ladder · D4 deterministic completion keyed to world
+state, engine-evaluated after each command (no event bus) · D5 the objective service is the single
+intimacy-tick source · D6 the `dungeon_intimacy` clock is a latching tier index · D7 per-tier
+`reveals_knowledge` (flat `reveal_knowledge` kept deprecated) · D8 stays Phase 51.5 on `phase-51`; 51 +
+51.5 merge to `main` together once built.
 
 ---
 
@@ -183,17 +123,17 @@ Phase 51.5 on `phase-51`; 51 + 51.5 merge to `main` together once built.
 
 **Core authority rule:** The RPG engine and memory layer are authoritative. The LLM is
 advisory. It may narrate, frame choices, interpret tone, and propose structured world
-reactions. It must not directly mutate authoritative state. *(Phase 51.5 #2 Part B will add a
-narrowly-constrained exception: the DM may propose resolving an obstacle, but only to its
-authored resolved state — see START HERE.)*
+reactions. It must not directly mutate authoritative state. *(Phase 51.5 Part B adds one
+narrowly-constrained exception, gate built in Slice 5: the DM may propose resolving an obstacle,
+but only to its authored resolved state — see START HERE.)*
 
 ---
 
 ## Known Failures
 
-**None.** Full unit/integration suite green. The previously-flaky generator eval is resolved
+**None.** Full unit/integration suite green (3192). The previously-flaky generator eval is resolved
 (`26e95a3`, 2026-06-23): evals are excluded from the default run (`addopts = "-m 'not eval'"` —
-run with `pytest -m eval`), and `test_generator_level_passes_validation` now mirrors production's
+run with `pytest -m eval`), and `test_generator_level_passes_validation` mirrors production's
 3-retry regenerate-with-errors budget instead of asserting one-shot validity.
 
 ---
@@ -233,8 +173,7 @@ Per-session implementation logs are in git history and the auto-memory (`project
   Design: `spec/WORLD_REACTION_POLICY.md` (supersedes the miss behavior in
   `spec/PHASE_35_WORLD_REACTION_SERVICE.md`).
 - Reseed-a-save gotchas: `--campaigns-dir` for the saves dir; `PYTHONPATH=.` for the populate scripts;
-  close the app first (DuckDB is single-writer). Live saves at
-  `C:\Users\ljfan\AppData\Local\DungeonDaddy\saves`.
+  close the app first (DuckDB is single-writer).
 - New-game reset (dev/playtest): `python -m tools.reset_crucible_new_game` reverts play progress on the
   live Crucible (party→R1/L1, clocks→0, ladder→initial, objects→seed state, stress→0, items reseated,
   memories/events wiped) while keeping the authored campaign + dungeon persona docs. Auto-backs up
