@@ -216,4 +216,8 @@ Per-session implementation logs are in git history and the auto-memory (`project
 - Reseed-a-save gotchas: `--campaigns-dir` for the saves dir; `PYTHONPATH=.` for the populate scripts;
   close the app first (DuckDB is single-writer). Live saves at
   `C:\Users\ljfan\AppData\Local\DungeonDaddy\saves`.
+- New-game reset (dev/playtest): `python -m tools.reset_crucible_new_game` reverts play progress on the
+  live Crucible (party→R1/L1, clocks→0, ladder→initial, objects→seed state, stress→0, items reseated,
+  memories/events wiped) while keeping the authored campaign + dungeon persona docs. Auto-backs up
+  `campaign.duckdb` + `session.json` first; close the app first.
 - Evals: `pytest -m eval` (live API, paid, non-deterministic); baseline `python tools/run_evals.py`.
