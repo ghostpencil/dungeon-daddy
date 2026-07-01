@@ -20,41 +20,40 @@ decisions locked D1–D8 (below). Built & GUI-verified so far:
   reseed additively.
 - **Container-loot feature + builder hit-test fix DONE, committed (`11e7eb6`) & GUI-verified**; live
   Crucible reseeded + new-game-reset (state below).
-- **Part B (LLM authority expansion, Slices 5–7) IN PROGRESS** — **Slice 5 DONE & committed** (`8daece5`).
-  **Next: Slice 6.** See START HERE.
+- **Part B (LLM authority expansion, Slices 5–7) IN PROGRESS** — **Slices 5–6 DONE & committed**
+  (`8daece5`, `0665058`). **Next: Slice 7 (docs-only).** See START HERE.
 
 Specs: 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` · 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` ·
 current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index `spec/IMPLEMENTATION_PHASES.md`).
 
 ---
 
-## START HERE — next session: Part B Slice 6 (feed obstacle context into the proposal pipeline)
+## START HERE — next session: Part B Slice 7 (docs-only)
 
 **Part B = the DM-ruling authority expansion**: let the DM rule that an *off-script but plausibly-
 described* action resolves an obstacle — the one narrowly-constrained exception to "the LLM never mutates
-object state." It may push an obstacle only to its **authored** resolved state.
+object state." It may push an obstacle only to its **authored** resolved state. **Build is done (Slices
+5–6); only docs remain.**
 
 ### Done — Slice 5 (`8daece5`)
 Constrained `ResolveObstacleChange` proposal type (`rpg/proposal.py`: `kind="resolve_obstacle"`,
 `object_slug`, `to_state`, `reason`) + validator gate (`rpg/proposal_validator.py`): new optional
 `obstacle_resolved_states: dict[slug→authored_state]` param; rejects unknown-obstacle refs and any
 `to_state` ≠ the obstacle's authored resolved state (LLM can't invent states). Tests
-`test_proposal_obstacle.py` (+4). Full unit suite green (3192).
+`test_proposal_obstacle.py` (+4).
 
-### Next — Slice 6 (TDD): wire it into `play_view`'s proposal pipeline
-1. **Build the map**: from the current room's `RoomObject`s, compute
-   `{obj.slug: obstacle_resolved_state(obj)}` (skip `None`) and pass it as `obstacle_resolved_states`
-   to `validate_proposal`. (Find the `validate_proposal` call site in `play_view` — not yet located;
-   that's the first discovery step.)
-2. **Apply on a successful roll**: for a validated (accepted) `ResolveObstacleChange`, route it through
-   the deterministic `ActivateObject` pipeline (`_apply_vna_command`) — the *same* seam Part A's
-   `_maybe_resolve_obstacle` already uses — so `update_object_state` + side-effects fire and
-   `_advance_objectives()` re-runs. Do **not** apply obstacle changes via the generic
-   `apply_low_risk_proposals` (it currently `skip`s `ResolveObstacleChange`, which is correct).
-3. **Gate on outcome**: only apply on a resolving roll (reuse the locked mapping — crit/full clean,
-   partial with complication, miss fails).
+### Done — Slice 6 (`0665058`): wired into `play_view`'s proposal pipeline
+`_run_proposal_pipeline` builds the obstacle-state map via new `_obstacle_resolved_states(campaign_id)`
+(current room's `RoomObject`s → `{slug: obstacle_resolved_state(obj)}`, skip `None`) and passes it to
+`validate_proposal`. Accepted `ResolveObstacleChange`s are applied by new `_apply_obstacle_proposals(...)`
+through the deterministic `ActivateObject` seam (`_apply_vna_command`) — *not* `apply_low_risk_proposals`
+(which correctly skips the kind) — so side-effects fire and `_advance_objectives()` re-runs. Gated on a
+resolving outcome via new `rpg/obstacles.is_resolving_outcome`; `rpg/obstacles.resolving_trigger` maps the
+LLM-named resolved state back to a converging transition's trigger. Tests
+`test_play_view_obstacle_proposal.py` (+3, drive the real pipeline, mock only the LLM agent). Full unit
+suite green (3195).
 
-### Then — Slice 7 (docs)
+### Next — Slice 7 (docs)
 Update `docs/LLM_AUTHORITY_BOUNDARY.md` + `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` to record the
 constrained object-state authority (the DM may resolve an obstacle, but only to its authored state).
 
