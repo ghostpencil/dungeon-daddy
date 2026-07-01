@@ -14,29 +14,35 @@ Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS** on branch `p
 **no merge to `main` until 51.5 is built** — owner decision). Driven by the 2026-06-27 playtest: the
 channel was hollow. Spec `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`, decisions locked D1–D8.
 **Slices 1–10 DONE & GUI-verified** (the full intimacy ladder is built and seeded into the live
-Crucible). Now building the **puzzle-obstacle / multi-approach feature (#1+#2)**: **Part A Slices 1–4
-DONE** — Slices 1–3 committed (engine win: a class-flavored approach roll resolves an obstacle and
-completes its objective; the builder suggests the obstacle's approach verbs); **Slice 4 code-complete,
-uncommitted** (the 4 Crucible obstacles re-authored with thematic contested approaches; both seeds now
-reseed additively). **Next: commit Slice 4 + (confirm-gated) reseed the live Crucible, then Part B**
-(LLM authority expansion) — plan in START HERE.
+Crucible). Building the **puzzle-obstacle / multi-approach feature (#1+#2)**: **Part A Slices 1–4 DONE
+& committed** (engine win: a class-flavored approach roll resolves an obstacle and completes its
+objective; the builder suggests the obstacle's approach verbs; the 4 Crucible obstacles author thematic
+contested approaches; both seeds reseed additively). Since then, a **container-loot** feature +
+**builder hit-test fix** landed (see START HERE). **Next: (confirm-gated) reseed the live Crucible,
+then Part B** (LLM authority expansion) — plan in START HERE.
 
 Specs: 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` · 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` ·
 current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index `spec/IMPLEMENTATION_PHASES.md`).
 
 ---
 
-## START HERE — next session: commit Slice 4, reseed live Crucible, then Part B
+## START HERE — next session: reseed live Crucible, then Part B
 
-Multi-approach objective solving (#1 + #2) is **in progress**. **Part A Slices 1–4 are DONE**
-(Slices 1–3 committed `5e3c0d2` / `4c34b16` / `e5c01d4`; **Slice 4 code-complete but uncommitted**): the
-pure obstacle helpers + locked outcome mapping are built, a successful class-flavored approach roll
-resolves an obstacle's state and completes its objective, the in-chat Action Builder suggests the
-obstacle's approach verbs, and the 4 Crucible obstacles are now authored with **thematic contested
-approaches** converging on one resolved state. **Next: (1) commit Slice 4; (2) confirm-gated — reseed
-the live Crucible additively (`python -m tools.populate_crucible_level1` + `-m
-tools.populate_crucible_dungeon_channel`, app closed, back up first); (3) Part B (LLM authority
-expansion).** Full unit suite green (3179).
+Multi-approach objective solving (#1 + #2): **Part A Slices 1–4 are DONE & committed**
+(`5e3c0d2` / `4c34b16` / `e5c01d4` / `2455bc4`): the pure obstacle helpers + locked outcome mapping,
+a successful class-flavored approach roll resolves an obstacle's state and completes its objective,
+the in-chat Action Builder suggests the obstacle's approach verbs, and the 4 Crucible obstacles are
+authored with **thematic contested approaches** converging on one resolved state.
+
+**Since then (this session — committed):** a **container-loot** feature — a container transition can
+carry `spawns_item_slug` to reveal an unplaced/inert item into the room on open (L1 travel-journal now
+lives inside the supply locker; `describe_spawned_loot` in `play_view` names it for the narrator; the
+new-game reset tool restores authored item placement). Plus a **builder hit-test fix** (an open popup
+overlapping the header is now tested before the collapse toggle).
+
+**Next: (1) confirm-gated — reseed the live Crucible additively (`python -m
+tools.populate_crucible_level1` + `-m tools.populate_crucible_dungeon_channel`, app closed, back up
+first); (2) Part B (LLM authority expansion).** Full unit suite green.
 
 ### The feature (decisions locked)
 
@@ -213,6 +219,12 @@ Per-session implementation logs are in git history and the auto-memory (`project
   `IMPLEMENTATION_PHASES_33_ONWARDS.md`. A `spec/PHASE_NN_*.md` is written when each phase starts.
 - Phase 53 (Threat Behavior & Monster Reactions, planned): engine-bounded monster reactions, no enemy
   turn; bosses escalate via clock thresholds. Design: `spec/MONSTER_REACTION_DESIGN.md`.
+- World Reaction Policy (design settled, **unscheduled** — new feature, do NOT fold into 51.5): per-object
+  `reaction_policy` (`scripted`/`ambient`/`inert`) to replace the blunt "miss = every tagged clock +2"
+  fan-out. Fixes a real bug (a STUDY-miss on the R1 statue moved 3 campaign clocks incl. the
+  `dungeon_intimacy` clock, violating D5's single-source rule). Owner decisions locked 2026-07-01.
+  Design: `spec/WORLD_REACTION_POLICY.md` (supersedes the miss behavior in
+  `spec/PHASE_35_WORLD_REACTION_SERVICE.md`).
 - Reseed-a-save gotchas: `--campaigns-dir` for the saves dir; `PYTHONPATH=.` for the populate scripts;
   close the app first (DuckDB is single-writer). Live saves at
   `C:\Users\ljfan\AppData\Local\DungeonDaddy\saves`.

@@ -80,6 +80,25 @@ class DMResult:
     player_message: str | None = None
 
 
+def describe_spawned_loot(transition: dict, room_items: list[dict]) -> str:
+    """Deterministic note naming the item a transition reveals, for the narrator.
+
+    When a container transition carries ``spawns_item_slug`` and that item is now
+    present in the room, return ``"Name — description"`` so the DM narrator's
+    prose reflects reality (it actually finds the loot). Returns ``""`` when the
+    transition spawns nothing or the item isn't in the room.
+    """
+    slug = transition.get("spawns_item_slug")
+    if not slug:
+        return ""
+    item = next((i for i in room_items if i.get("slug") == slug), None)
+    if item is None:
+        return ""
+    name = item.get("display_name") or slug
+    desc = (item.get("description") or "").strip()
+    return f"{name} — {desc}" if desc else name
+
+
 @dataclass
 class DialogueSession:
     """In-memory state for an open dialogue channel (Phase 51 §4.3).
@@ -1709,14 +1728,19 @@ class PlayView(arcade.View):
         if room is None:
             return
         from dungeon_daddy.llm.agents.dm_agent import LLMMessage
+        content = (
+            f"{actor.display_name} {transition.get('trigger', 'activates')} the {noun_label}. "
+            f"[{noun_label}: {from_state} → {to_state}]"
+        )
+        # If the transition just revealed loot, name it so the narrator's prose
+        # matches reality (e.g. opening the locker actually finds the journal).
+        if self._mem_repo is not None and self._rpg_campaign_id is not None:
+            room_items = self._mem_repo.get_items_by_room(self._rpg_campaign_id, room.id)
+            loot = describe_spawned_loot(transition, room_items)
+            if loot:
+                content += f" [revealed inside: {loot}]"
         self._compact_history()
-        self._dm_history.append(LLMMessage(
-            role="user",
-            content=(
-                f"{actor.display_name} {transition.get('trigger', 'activates')} the {noun_label}. "
-                f"[{noun_label}: {from_state} → {to_state}]"
-            ),
-        ))
+        self._dm_history.append(LLMMessage(role="user", content=content))
         self._chat.set_busy(True)
         self._spawn_dm_thread(room, level)
 

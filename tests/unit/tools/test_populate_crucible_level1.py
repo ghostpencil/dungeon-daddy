@@ -17,6 +17,7 @@ from dungeon_daddy.rpg.obstacles import (
 )
 from tools.populate_crucible_level1 import (
     CAMPAIGN_ID,
+    _items,
     _objects,
     _oid,
     save_objects_preserving_state,
@@ -44,6 +45,32 @@ def test_gearworks_is_a_contested_obstacle_converging_on_cleared():
     assert set(verbs) <= _CORE_VERBS
     # All approaches converge on the one resolved state (#1 normalize completion).
     assert obstacle_resolved_state(gear) == "cleared"
+
+
+def _supply_locker():
+    return next(o for o in _objects() if o.slug == "supply-locker")
+
+
+def _travel_journal():
+    return next(i for i in _items() if i.slug == "travel-journal")
+
+
+def test_supply_locker_spawns_the_travel_journal_when_opened_or_forced():
+    # The journal is the locker's reward — opening OR forcing it reveals the item,
+    # rewarding the player's curiosity rather than leaving it loose in R1.
+    locker = _supply_locker()
+    triggers = {t.trigger for t in locker.transitions}
+    assert triggers == {"open", "force"}
+    assert all(t.spawns_item_slug == "travel-journal" for t in locker.transitions)
+
+
+def test_travel_journal_starts_unplaced_inert_inside_the_locker():
+    # Not loose in the room: it must be an unplaced, inert item so the locker's
+    # spawn (owner is None AND room_id is None) can place it on open.
+    journal = _travel_journal()
+    assert journal.room_id is None
+    assert journal.owner_actor_id is None
+    assert journal.status == "inert"
 
 
 @pytest.fixture

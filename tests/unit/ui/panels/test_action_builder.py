@@ -136,6 +136,22 @@ def test_click_outside_open_popup_dismisses_it():
     assert builder._open_slot is None
 
 
+def test_open_popup_row_wins_over_overlapping_toggle_rect():
+    # Regression: the popup is drawn on top of the header, and its rows can
+    # overlap the collapse toggle's Y-range. A click landing inside BOTH must
+    # select the popup row, not collapse the band (the popup owns the click).
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    target_label = builder._panel.verb_labels()[1]
+    builder._open_slot = "verb"
+    builder._toggle_rect = (0.0, 0.0, 100.0, 26.0)
+    builder._popup_row_rects = [(0.0, 8.0, 100.0, 18.0, target_label)]
+    result = builder.on_mouse_press(50.0, 12.0)  # inside both rects
+    assert result is True
+    assert builder._panel.selected_verb_label() == target_label
+    assert builder._open_slot is None
+    assert builder.is_collapsed() is False
+
+
 # ---------------------------------------------------------------------------
 # Action button — clicking it submits the current card
 # ---------------------------------------------------------------------------

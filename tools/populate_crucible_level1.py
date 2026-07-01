@@ -60,12 +60,19 @@ def _obj(room, slug, name, archetype, state, desc, transitions) -> RoomObject:
     )
 
 
-def _item(room, slug, name, desc) -> Item:
+def _item(room, slug, name, desc, *, placed: bool = True) -> Item:
+    """Author a Level-1 item.
+
+    ``placed`` (default) drops it loose in ``room``. Pass ``placed=False`` for
+    *container loot*: an unplaced, inert item (no room, no owner) that a
+    container's ``spawns_item_slug`` transition reveals into the room on open.
+    """
     iid = _iid(room, slug)
     return Item(
         item_id=iid, campaign_id=CAMPAIGN_ID, slug=slug, display_name=name,
-        item_type="dungeon_item", description=desc, room_id=room, level_id=LEVEL_ID,
-        status="active",
+        item_type="dungeon_item", description=desc,
+        room_id=room if placed else None, level_id=LEVEL_ID,
+        status="active" if placed else "inert",
     )
 
 
@@ -123,8 +130,10 @@ def _objects() -> list[RoomObject]:
         "R1", "supply-locker", "Half-Buried Supply Locker", "container", "closed",
         "A dented iron locker leans out of a sand drift near the entry arch, its latch "
         "crusted but workable.",
-        [_t(o, 1, "closed", "open", "open"),
-         _t(o, 2, "closed", "open", "force")],
+        # Opening or forcing it reveals the travel journal stowed inside (rewards
+        # curiosity — the journal is no longer loose in the room).
+        [_t(o, 1, "closed", "open", "open", spawns_item_slug="travel-journal"),
+         _t(o, 2, "closed", "open", "force", spawns_item_slug="travel-journal")],
     ))
 
     # --- R2 Marketplace ------------------------------------------------------
@@ -214,10 +223,12 @@ def _objects() -> list[RoomObject]:
 
 def _items() -> list[Item]:
     return [
-        # R1 — lore + a breadcrumb pointing at the Marketplace key.
+        # R1 — lore + a breadcrumb pointing at the Marketplace key. Stowed inside
+        # the Half-Buried Supply Locker (unplaced/inert), spawned into R1 on open.
         _item("R1", "travel-journal", "Sun-Bleached Travel Journal",
               "A dead scavenger's journal. The last entry: 'Lift's locked tight. "
-              "Warden's key never left the market stalls — but the scorpions own them now.'"),
+              "Warden's key never left the market stalls — but the scorpions own them now.'",
+              placed=False),
         # R2 — THE KEY (findable per request) + modest loot.
         _item("R2", "lift-warden-key", "Lift Warden's Iron Key",
               "A heavy iron key on a brass fob stamped with a descending-cage sigil. "

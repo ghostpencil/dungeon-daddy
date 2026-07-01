@@ -33,6 +33,7 @@ from pathlib import Path
 
 from dungeon_daddy.memory.repository import MemoryRepository
 from tools.populate_crucible_dungeon_channel import LADDER, RESONANCE_OBJECT_ID
+from tools.populate_crucible_level1 import _items as _level1_items
 from tools.populate_crucible_level1 import _objects as _level1_objects
 
 CAMPAIGN_ID = "campaign:the-crucible"
@@ -53,6 +54,17 @@ def _initial_object_states() -> dict[str, str]:
             states[oid] = rung.broken_state
     states[RESONANCE_OBJECT_ID] = "attuned"
     return states
+
+
+def _initial_item_placement() -> dict[str, tuple[str | None, str]]:
+    """Authored ``(room_id, status)`` for every Level-1 seed item, by item id.
+
+    Restores placement a reset must honor: container loot returns to its
+    unplaced/inert state (so its container re-spawns it on open), and loose items
+    return to their authored room — both of which the blanket unown/activate pass
+    can't express on its own.
+    """
+    return {i.item_id: (i.room_id, i.status) for i in _level1_items()}
 
 
 def _reset_session_json(save_dir: Path) -> None:
@@ -111,6 +123,14 @@ def reset_to_new_game(
         "UPDATE items SET owner_actor_id = NULL, status = 'active' WHERE campaign_id = ?",
         [campaign_id],
     )
+    # Restore authored placement for seed items the blanket pass above can't
+    # express: unplaced/inert container loot, and loose items dropped/moved
+    # during play. (Keyed by item_id so only seeded items are touched.)
+    for iid, (room_id, status) in _initial_item_placement().items():
+        con.execute(
+            "UPDATE items SET room_id = ?, status = ? WHERE item_id = ? AND campaign_id = ?",
+            [room_id, status, iid, campaign_id],
+        )
 
     memories = con.execute(
         "SELECT COUNT(*) FROM memory_entries WHERE campaign_id = ?", [campaign_id]

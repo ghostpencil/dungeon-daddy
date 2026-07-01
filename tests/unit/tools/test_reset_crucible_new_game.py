@@ -13,6 +13,7 @@ import pytest
 
 from dungeon_daddy.memory.repository import MemoryRepository
 from tools.populate_crucible_dungeon_channel import CAMPAIGN_ID, seed_dungeon_channel
+from tools.populate_crucible_level1 import _items as level1_items
 from tools.populate_crucible_level1 import _objects as level1_objects
 from tools.populate_crucible_level1 import save_objects_preserving_state
 from tools.reset_crucible_new_game import reset_to_new_game
@@ -122,6 +123,43 @@ def test_reset_reverts_all_progress_to_new_game(seeded):
     assert counts["memories_wiped"] == 1 and counts["events_wiped"] == 1
     assert not (save_dir / "memory" / "level_1.md").exists()
     assert (save_dir / "memory" / "dungeon" / "voice.md").exists()
+
+
+def test_reset_restores_authored_item_placement(seeded):
+    repo, save_dir = seeded
+    for it in level1_items():
+        repo.save_item(it)
+    con = repo._conn
+
+    # Play happened: the locker was opened (journal spawned loose into R1), and a
+    # normal loose item was picked up by a PC (owned, out of its room).
+    con.execute(
+        "UPDATE items SET room_id = 'R1', status = 'active' "
+        "WHERE campaign_id = ? AND slug = 'travel-journal'",
+        [CAMPAIGN_ID],
+    )
+    repo.save_actor(
+        "actor:the-crucible:pc:kira", CAMPAIGN_ID, "pc", "kira", "Kira",
+        status="active", room_id="R1",
+    )
+    con.execute(
+        "UPDATE items SET owner_actor_id = ?, room_id = NULL "
+        "WHERE campaign_id = ? AND slug = 'healing-draught'",
+        ["actor:the-crucible:pc:kira", CAMPAIGN_ID],
+    )
+
+    reset_to_new_game(repo, save_dir, CAMPAIGN_ID)
+
+    items = {i["slug"]: i for i in repo.get_items(CAMPAIGN_ID)}
+    # Container loot returns inside the locker: unplaced + inert, so opening the
+    # (reset-to-closed) locker re-spawns it.
+    assert items["travel-journal"]["room_id"] is None
+    assert items["travel-journal"]["status"] == "inert"
+    assert items["travel-journal"]["owner_actor_id"] is None
+    # A normal loose item returns to its authored room, active and unowned.
+    assert items["healing-draught"]["room_id"] == "R2"
+    assert items["healing-draught"]["status"] == "active"
+    assert items["healing-draught"]["owner_actor_id"] is None
 
 
 def test_reset_is_idempotent(seeded):

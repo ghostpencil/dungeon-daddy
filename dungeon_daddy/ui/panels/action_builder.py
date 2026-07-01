@@ -185,15 +185,10 @@ class InChatActionBuilder:
         """Route a click. Returns ``True`` when the builder consumed it.
 
         An open popup takes priority (it is drawn on top): a click on one of its
-        rows selects that option and closes the popup. The collapse toggle in the
-        header row is hit-tested before the slots/button.
+        rows selects that option and closes the popup. Its rows can overlap the
+        header, so the popup is hit-tested *before* the collapse toggle; the
+        toggle is then hit-tested before the slots/button.
         """
-        if self._toggle_rect is not None:
-            left, bottom, w, h = self._toggle_rect
-            if left <= x < left + w and bottom <= y < bottom + h:
-                self.toggle_collapsed()
-                self._open_slot = None
-                return True
         if self._open_slot is not None:
             for left, bottom, w, h, label in self._popup_row_rects:
                 if left <= x < left + w and bottom <= y < bottom + h:
@@ -203,6 +198,12 @@ class InChatActionBuilder:
             # A click anywhere else while a popup is open dismisses it.
             self._open_slot = None
             return True
+        if self._toggle_rect is not None:
+            left, bottom, w, h = self._toggle_rect
+            if left <= x < left + w and bottom <= y < bottom + h:
+                self.toggle_collapsed()
+                self._open_slot = None
+                return True
         for left, bottom, w, h, kind in self._slot_rects:
             if left <= x < left + w and bottom <= y < bottom + h:
                 self._open_slot = kind
