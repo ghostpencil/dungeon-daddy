@@ -175,9 +175,14 @@ def _objects() -> list[RoomObject]:
     o = _oid("R4", "gearworks")
     out.append(_obj(
         "R4", "gearworks", "Sand-Choked Gearworks", "structure", "jammed",
-        "The lift's drive gears, packed solid with red sand. Clearing them by hand "
-        "would be slow, loud work.",
-        [_t(o, 1, "jammed", "cleared", "force")],
+        "The lift's drive gears, packed solid with red sand. They can be freed by "
+        "careful mechanism-work, by brute force, or by slow, grinding hand-labor.",
+        # Obstacle: three class-flavored contested approaches converging on 'cleared'
+        # (Phase 51.5 Part A — Artificer/Thief tinker, Fighter strong blow, dogged
+        # endurance). All to the same state so the objective completes uniformly.
+        [_t(o, 1, "jammed", "cleared", "tinker", contested=True, action_verb="tinker"),
+         _t(o, 2, "jammed", "cleared", "fight", contested=True, action_verb="fight"),
+         _t(o, 3, "jammed", "cleared", "endure", contested=True, action_verb="endure")],
     ))
 
     # --- R5 Trap Room --------------------------------------------------------
@@ -235,6 +240,25 @@ def _items() -> list[Item]:
     ]
 
 
+def save_objects_preserving_state(
+    repo: MemoryRepository, objects: list[RoomObject]
+) -> None:
+    """Upsert authored objects, preserving any object's already-played state.
+
+    Reseeding is additive: it refreshes an object's authored definition (name,
+    description, transitions) but keeps a ``current_state`` the party has already
+    changed — so re-running never resets a cleared obstacle back to blocked.
+    """
+    existing = {
+        o["object_id"]: o for o in repo.get_objects_for_campaign(CAMPAIGN_ID)
+    }
+    for obj in objects:
+        prior = existing.get(obj.object_id)
+        if prior is not None:
+            obj = obj.model_copy(update={"current_state": prior["current_state"]})
+        repo.save_room_object(obj)
+
+
 def main() -> None:
     db = _save_path()
     if not db.exists():
@@ -243,8 +267,7 @@ def main() -> None:
     try:
         # Objects
         objects = _objects()
-        for obj in objects:
-            repo.save_room_object(obj)
+        save_objects_preserving_state(repo, objects)
         # Items
         items = _items()
         for it in items:

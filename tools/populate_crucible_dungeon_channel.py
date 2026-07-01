@@ -105,6 +105,11 @@ class _Rung:
     subsystem_slug: str
     required_state: str
     reveals_knowledge: list[str]
+    # Class-flavored, contested approaches that all converge on ``required_state``
+    # (Phase 51.5 Part A Slice 4). Each verb is one of the nine core action
+    # ratings so an actor can attempt it; thematic per obstacle. Empty for tier 0
+    # (its approaches are authored on the adopted gearworks by the Level-1 seed).
+    approaches: tuple[str, ...] = ()
     # Fresh subsystems authored by this seed (tier 0 adopts an existing object,
     # so its subsystem fields are None — we never re-author/clobber it).
     room_id: str | None = None
@@ -113,8 +118,6 @@ class _Rung:
     archetype: str | None = None
     broken_state: str | None = None
     broken_description: str | None = None
-    restore_trigger: str = "activate"
-    transition_id_suffix: str = "restore"
 
 
 LADDER: list[_Rung] = [
@@ -143,6 +146,9 @@ LADDER: list[_Rung] = [
         ),
         subsystem_slug="coolant-loop",
         required_state="restored",
+        # Delicate arcane piping — sealed by precise work or re-fluxed with power,
+        # never brute-forced (that would only burst it further).
+        approaches=("tinker", "channel"),
         reveals_knowledge=[
             "The golems never malfunctioned. Warden Brakkus gave the order to seal "
             "the citadel and put down everyone inside, his own wardens included, "
@@ -168,6 +174,9 @@ LADDER: list[_Rung] = [
         ),
         subsystem_slug="arcane-conduits",
         required_state="charged",
+        # An arcane/lore obstacle — pour power in, decipher the rune-lattice, or
+        # physically reconnect the conduits.
+        approaches=("channel", "study", "tinker"),
         reveals_knowledge=[
             "The Great Lift does not only descend. It can be made to fall, on "
             "command — and it has been, more than once, with cargo still aboard."
@@ -192,6 +201,9 @@ LADDER: list[_Rung] = [
         ),
         subsystem_slug="core-containment",
         required_state="stabilized",
+        # The climactic failing ward — reinforce it with power, hold it steady
+        # through focus, or brace the guttering ring by main strength.
+        approaches=("channel", "focus", "endure"),
         reveals_knowledge=[
             "The power core in the lower vault is no machine. It is a bound "
             "elemental heart, and it is the wellspring of the mind now speaking "
@@ -217,8 +229,14 @@ def _objective_id(rung: _Rung) -> str:
 
 
 def _subsystem_object(rung: _Rung) -> RoomObject:
-    """The fresh subsystem RoomObject for a tier (tiers 1-3 only)."""
+    """The fresh subsystem RoomObject for a tier (tiers 1-3 only).
+
+    The subsystem is an *obstacle*: one contested transition per class-flavored
+    approach, all from ``broken_state`` to ``required_state`` (the convergence
+    that lets any path complete the objective the same way — Part A Slice 4).
+    """
     assert rung.room_id and rung.level_id and rung.archetype and rung.broken_state
+    assert rung.approaches, f"tier {rung.tier} subsystem needs contested approaches"
     object_id = f"object:the-crucible:{rung.room_id}:{rung.subsystem_slug}"
     return RoomObject(
         object_id=object_id,
@@ -232,13 +250,16 @@ def _subsystem_object(rung: _Rung) -> RoomObject:
         current_state=rung.broken_state,
         transitions=[
             ObjectTransition(
-                transition_id=f"{object_id}:{rung.transition_id_suffix}",
+                transition_id=f"{object_id}:{verb}",
                 object_id=object_id,
                 from_state=rung.broken_state,
                 to_state=rung.required_state,
-                trigger=rung.restore_trigger,
+                trigger=verb,
+                contested=True,
+                action_verb=verb,
                 advances_clock_slug=None,  # D5: the objective service ticks intimacy
             )
+            for verb in rung.approaches
         ],
     )
 
@@ -323,14 +344,20 @@ def _seed_subsystems(repo: MemoryRepository, campaign_id: str) -> None:
     """Author the fresh subsystem objects (tiers 1-3), preserving play state.
 
     Tier 0 adopts the existing Sand-Choked Gearworks, so it is never authored
-    here. A fresh subsystem already present is left untouched — re-running the
-    seed must not reset a subsystem the party has already restored.
+    here. Reseeding is additive: an already-present subsystem is refreshed to the
+    current authored definition (so a legacy single-transition subsystem gains its
+    contested approaches) but keeps a ``current_state`` the party has already
+    changed — re-running must not reset a subsystem they have restored.
     """
-    present = {o["slug"] for o in repo.get_objects_for_campaign(campaign_id)}
+    present = {o["slug"]: o for o in repo.get_objects_for_campaign(campaign_id)}
     for rung in LADDER:
-        if rung.room_id is None or rung.subsystem_slug in present:
+        if rung.room_id is None:
             continue
-        repo.save_room_object(_subsystem_object(rung))
+        obj = _subsystem_object(rung)
+        prior = present.get(rung.subsystem_slug)
+        if prior is not None:
+            obj = obj.model_copy(update={"current_state": prior["current_state"]})
+        repo.save_room_object(obj)
 
 
 def _seed_objectives(repo: MemoryRepository, campaign_id: str) -> None:

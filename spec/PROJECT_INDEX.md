@@ -14,24 +14,29 @@ Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS** on branch `p
 **no merge to `main` until 51.5 is built** — owner decision). Driven by the 2026-06-27 playtest: the
 channel was hollow. Spec `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`, decisions locked D1–D8.
 **Slices 1–10 DONE & GUI-verified** (the full intimacy ladder is built and seeded into the live
-Crucible). Now building the **puzzle-obstacle / multi-approach feature (#1+#2)**: **Part A Slices 1–3
-DONE & committed** (engine win — a class-flavored approach roll can resolve an obstacle and complete its
-objective; the builder now suggests the obstacle's approach verbs). **Next session: Part A Slice 4**
-(re-author + reseed the Crucible obstacles) — plan in START HERE.
+Crucible). Now building the **puzzle-obstacle / multi-approach feature (#1+#2)**: **Part A Slices 1–4
+DONE** — Slices 1–3 committed (engine win: a class-flavored approach roll resolves an obstacle and
+completes its objective; the builder suggests the obstacle's approach verbs); **Slice 4 code-complete,
+uncommitted** (the 4 Crucible obstacles re-authored with thematic contested approaches; both seeds now
+reseed additively). **Next: commit Slice 4 + (confirm-gated) reseed the live Crucible, then Part B**
+(LLM authority expansion) — plan in START HERE.
 
 Specs: 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` · 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` ·
 current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index `spec/IMPLEMENTATION_PHASES.md`).
 
 ---
 
-## START HERE — next session: puzzle-style objective solving, Part A Slice 4
+## START HERE — next session: commit Slice 4, reseed live Crucible, then Part B
 
-Multi-approach objective solving (#1 + #2) is **in progress**. **Part A Slices 1–3 are DONE & committed**
-(`5e3c0d2`, `4c34b16`, + this session): the pure obstacle helpers + the locked outcome mapping are built,
-a successful class-flavored approach roll now resolves an obstacle's state and completes its objective,
-and the in-chat Action Builder now suggests the selected obstacle's approach verbs (filtered to what the
-acting actor can attempt). **Next: Part A Slice 4** (re-author the Crucible obstacles + reseed
-**additively**), then Part B (the LLM authority expansion). Full unit suite green (3175).
+Multi-approach objective solving (#1 + #2) is **in progress**. **Part A Slices 1–4 are DONE**
+(Slices 1–3 committed `5e3c0d2` / `4c34b16` / `e5c01d4`; **Slice 4 code-complete but uncommitted**): the
+pure obstacle helpers + locked outcome mapping are built, a successful class-flavored approach roll
+resolves an obstacle's state and completes its objective, the in-chat Action Builder suggests the
+obstacle's approach verbs, and the 4 Crucible obstacles are now authored with **thematic contested
+approaches** converging on one resolved state. **Next: (1) commit Slice 4; (2) confirm-gated — reseed
+the live Crucible additively (`python -m tools.populate_crucible_level1` + `-m
+tools.populate_crucible_dungeon_channel`, app closed, back up first); (3) Part B (LLM authority
+expansion).** Full unit suite green (3179).
 
 ### The feature (decisions locked)
 
@@ -73,8 +78,15 @@ the deterministic `ActivateObject` pipeline (`_apply_vna_command`), which applie
    (thin view-model — no raw transitions) + `VnaActionPanel.selected_noun_approach_verbs()` +
    `InChatActionBuilder` clickable **TRY** row (approaches ∩ actor's offered verbs; click fills the Verb
    slot, keeps the obstacle noun). Tests: builder (+5), panel (+3), context (+2), obstacles (+2).
-4. **← NEXT** Re-author the 4 Crucible obstacles with class-flavored approaches → one resolved state;
-   update the seed **additively** (preserve the adopted `gearworks` state — don't reset it to jammed).
+4. ✅ **DONE** (code, uncommitted) Re-authored the 4 Crucible obstacles with **thematic** contested
+   approaches → one resolved state: `gearworks` jammed→cleared via **tinker|fight|endure** (Level-1
+   seed); `coolant-loop` ruptured→restored via **tinker|channel**; `arcane-conduits` dormant→charged
+   via **channel|study|tinker**; `core-containment` failing→stabilized via **channel|focus|endure**
+   (dungeon-channel seed). Both seeds now reseed **additively** — a new `save_objects_preserving_state`
+   (level1) + `_seed_subsystems` upsert preserve any already-played `current_state` while refreshing the
+   authored transitions (legacy single-transition subsystems get upgraded to approaches). Tests:
+   `test_populate_crucible_level1.py` (new, +2) + dungeon-channel seed (+2). Suite green (3179).
+   **Live reseed still pending** (confirm-gated).
 
 **Part B — DM ruling for off-script plausible actions (the authority expansion):**
 5. New constrained `ResolveObstacleChange` proposal type — validator permits pushing an obstacle only
@@ -87,10 +99,14 @@ the deterministic `ActivateObject` pipeline (`_apply_vna_command`), which applie
 
 - **Prior session (puzzle-obstacle Part A Slices 1–2):** built `rpg/obstacles.py` + the roll-path
   resolution and committed (`5e3c0d2`, `4c34b16`).
-- **This session (Part A Slice 3):** surfaced the obstacle's approach verbs as clickable suggested
+- **Prior session (Part A Slice 3):** surfaced the obstacle's approach verbs as clickable suggested
   actions in the in-chat builder (obstacles helper → context enrichment → panel accessor → builder TRY
-  row). Full unit suite green (3175). No GUI verify yet for the new mechanic (Slice 4 reseeds the
-  Crucible obstacles first, then verify in-app).
+  row).
+- **This session (Part A Slice 4):** re-authored the 4 Crucible obstacles with thematic contested
+  approaches converging on one resolved state, and made both Crucible seeds reseed **additively**
+  (preserve already-played object state, upgrade legacy single-transition subsystems). Full unit suite
+  green (3179). **Code uncommitted; live-save reseed not yet run** (confirm-gated). No GUI verify yet —
+  after committing + reseeding the live Crucible, verify the class-approach TRY row in-app.
 - **Live Crucible state (2026-06-29):** tier 0 `clear-the-gearworks` **completed** (`gearworks`
   cleared); tier 1 `restore-the-coolant-loop` **active** (`coolant-loop` still **ruptured** → needs
   `restored`); tier 2 `recharge-the-arcane-conduits` **locked** but `arcane-conduits` already **charged**

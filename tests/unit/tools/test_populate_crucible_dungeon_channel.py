@@ -19,8 +19,12 @@ from dungeon_daddy.rpg.dungeon_channel import (
     dungeon_systems_status,
     unlocked_knowledge,
 )
-from dungeon_daddy.rpg.models import ClockState, RoomObject
+from dungeon_daddy.rpg.models import ClockState, ObjectTransition, RoomObject
 from dungeon_daddy.rpg.objectives import advance_objectives
+from dungeon_daddy.rpg.obstacles import (
+    obstacle_approach_verbs,
+    obstacle_resolved_state,
+)
 from dungeon_daddy.rpg.room_context import build_room_context
 from tools.populate_crucible_dungeon_channel import (
     CAMPAIGN_ID,
@@ -217,6 +221,66 @@ def test_seed_authors_fresh_subsystems(repo, tmp_path: Path):
     # They surface in the dungeon's truthful systems status.
     names = [n for n, _ in dungeon_systems_status(repo.get_objects_for_campaign(CAMPAIGN_ID))]
     assert "Coolant Loop Manifold" in names
+
+
+def test_seed_authors_contested_approaches_on_subsystems(repo, tmp_path: Path):
+    # Phase 51.5 Part A Slice 4: each fresh subsystem is an obstacle solvable by
+    # multiple class-flavored, contested approaches that converge on its resolved
+    # state (so any path completes the objective the same way).
+    seed_dungeon_channel(repo, tmp_path, CAMPAIGN_ID)
+    by_slug = {
+        o["slug"]: RoomObject(**o) for o in repo.get_objects_for_campaign(CAMPAIGN_ID)
+    }
+
+    loop = by_slug["coolant-loop"]
+    loop_verbs = obstacle_approach_verbs(loop)
+    assert len(loop_verbs) >= 2
+    assert obstacle_resolved_state(loop) == "restored"
+    assert "fight" not in loop_verbs  # thematic: no brute force on delicate piping
+
+    assert obstacle_resolved_state(by_slug["arcane-conduits"]) == "charged"
+    assert len(obstacle_approach_verbs(by_slug["arcane-conduits"])) >= 2
+    assert obstacle_resolved_state(by_slug["core-containment"]) == "stabilized"
+    assert len(obstacle_approach_verbs(by_slug["core-containment"])) >= 2
+
+
+def test_reseed_upgrades_legacy_subsystem_to_contested_approaches(repo, tmp_path: Path):
+    # A pre-Slice-4 subsystem (present with a single deterministic transition) is
+    # upgraded to contested approaches on reseed — additively: its played state is
+    # preserved, not reset.
+    object_id = "object:the-crucible:r02:coolant-loop"
+    repo.save_room_object(
+        RoomObject(
+            object_id=object_id,
+            campaign_id=CAMPAIGN_ID,
+            room_id="r02",
+            level_id="level:2",
+            slug="coolant-loop",
+            display_name="Coolant Loop Manifold",
+            archetype="structure",
+            description="A legacy, single-transition version.",
+            current_state="ruptured",
+            transitions=[
+                ObjectTransition(
+                    transition_id=f"{object_id}:restore",
+                    object_id=object_id,
+                    from_state="ruptured",
+                    to_state="restored",
+                    trigger="activate",
+                )
+            ],
+        )
+    )
+
+    seed_dungeon_channel(repo, tmp_path, CAMPAIGN_ID)
+
+    loop = next(
+        RoomObject(**o)
+        for o in repo.get_objects_for_campaign(CAMPAIGN_ID)
+        if o["slug"] == "coolant-loop"
+    )
+    assert loop.current_state == "ruptured"  # state preserved (additive)
+    assert len(obstacle_approach_verbs(loop)) >= 2  # upgraded to contested approaches
 
 
 def test_seed_adopts_existing_gearworks_for_tier_zero(repo, tmp_path: Path):
