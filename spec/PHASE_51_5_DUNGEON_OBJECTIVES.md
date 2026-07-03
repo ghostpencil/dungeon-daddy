@@ -15,6 +15,10 @@ reacts to who is speaking.*
 > completes objectives, ticks the intimacy clock, mutates subsystem state, or writes authoritative
 > memory. The **engine** completes objectives and ticks intimacy deterministically; the LLM just
 > talks about it.
+>
+> *(The Part B obstacle add-on, §11, introduces the **one** narrowly-constrained exception: the DM
+> may propose resolving an obstacle, but only to its authored resolved state, through the same
+> validator/deterministic-apply seam. It never invents state.)*
 
 ---
 
@@ -291,3 +295,56 @@ unlock* system for PCs. This phase's `Objective` model is the **same shape** (a 
 completion that unlocks something). Design `Objective` general enough that Phase 52 milestones can be
 modeled as objectives (or a shared base) rather than a parallel system. Flag this seam; do **not**
 build Phase 52 here.
+
+---
+
+## 11. Addendum — Puzzle-obstacle / multi-approach feature (post-spec add-on)
+
+A dynamic add-on layered on 51.5 (owner-approved 2026-06-29), not in the original slice plan. It gives
+an objective **multiple ways to be solved** while keeping completion normalized (all paths → one
+COMPLETED objective, §4.3.2 unchanged). An **obstacle** is a `RoomObject` in a "blocked" state with
+**multiple contested transitions converging on one canonical resolved state** (e.g.
+`gearworks: jammed ──{tinker|fight|endure}──▶ cleared`). `completion_satisfied`/`advance_objectives`
+stay agnostic to *how* the object reached that state.
+
+### 11.1 Part A — class-flavored contested approaches (deterministic)
+
+Pure decision logic lives in `rpg/obstacles.py` (`obstacle_approaches`, `obstacle_approach_verbs`,
+`obstacle_resolved_state`, `resolve_obstacle_with_roll`). `play_view._resolve_vna_roll` calls
+`_maybe_resolve_obstacle(card, actor, outcome)`: on a resolving roll whose verb matches a contested
+approach (Artificer *tinker*, Fighter *fight*, Thief *finesse*), it routes the matched transition
+through the deterministic `ActivateObject` pipeline (`_apply_vna_command`), which applies
+`update_object_state` + side-effects and re-runs `_advance_objectives()`.
+
+**Outcome → success mapping (LOCKED, owner 2026-06-29):** full/critical → resolves; **partial →
+resolves with a complication**; miss → fails. Encoded in `rpg/obstacles.py` (`_RESOLVING_OUTCOMES`).
+
+### 11.2 Part B — DM-ruled obstacle resolution (the constrained LLM authority)
+
+Part B adds the LLM-ruled path for *any plausibly-described action* — the **one** narrowly-constrained
+exception to "the LLM never mutates object state" (see `docs/LLM_AUTHORITY_BOUNDARY.md`). It is still a
+**proposal** through the standard validator + deterministic-apply seam; the LLM never writes state and
+never invents a target state.
+
+- **Proposal type (`rpg/proposal.py`):** `ResolveObstacleChange` — `kind="resolve_obstacle"`,
+  `object_slug`, `to_state`, `reason`. The DM ruling that a described action resolves an obstacle.
+- **Validator gate (`rpg/proposal_validator.py`):** `validate_proposal` gains an optional
+  `obstacle_resolved_states: dict[slug → authored_state]` param. A `ResolveObstacleChange` is
+  **rejected** if `object_slug` is unknown, or if `to_state` ≠ the obstacle's **authored** resolved
+  state. The LLM can only push an obstacle to a state the author already defined.
+- **Pipeline wiring (`views/play_view.py`):** `_run_proposal_pipeline` builds the obstacle-state map
+  via `_obstacle_resolved_states(campaign_id)` (the **current room's** `RoomObject`s →
+  `{slug: obstacle_resolved_state(obj)}`, skipping `None`) and passes it to `validate_proposal`.
+  Accepted `ResolveObstacleChange`s are applied by `_apply_obstacle_proposals(...)` through the
+  deterministic `ActivateObject` seam (`_apply_vna_command`) — *not* `apply_low_risk_proposals`
+  (which skips this kind) — so side-effects fire and `_advance_objectives()` re-runs. Gated on a
+  resolving outcome via `rpg/obstacles.is_resolving_outcome`; `rpg/obstacles.resolving_trigger` maps
+  the LLM-named resolved state back to a converging transition's trigger.
+
+The engine still disposes: the DM only chose *which authored transition* to take, and the objective
+completes through the same deterministic path as every other approach.
+
+### 11.3 Authority summary
+
+> The LLM may **propose** resolving an obstacle. The engine, via the validator and the deterministic
+> `ActivateObject` seam, disposes — and only ever to an **authored** resolved state.

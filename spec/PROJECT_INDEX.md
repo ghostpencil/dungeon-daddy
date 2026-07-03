@@ -20,20 +20,37 @@ decisions locked D1–D8 (below). Built & GUI-verified so far:
   reseed additively.
 - **Container-loot feature + builder hit-test fix DONE, committed (`11e7eb6`) & GUI-verified**; live
   Crucible reseeded + new-game-reset (state below).
-- **Part B (LLM authority expansion, Slices 5–7) IN PROGRESS** — **Slices 5–6 DONE & committed**
-  (`8daece5`, `0665058`). **Next: Slice 7 (docs-only).** See START HERE.
+- **Part B (LLM authority expansion, Slices 5–7) DONE** — Slices 5–6 committed (`8daece5`,
+  `0665058`); **Slice 7 (docs) done** (`docs/LLM_AUTHORITY_BOUNDARY.md` + `PHASE_51_5…§11` record the
+  constrained DM-ruled obstacle authority). Part B complete. See START HERE.
 
 Specs: 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` · 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` ·
 current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index `spec/IMPLEMENTATION_PHASES.md`).
 
 ---
 
-## START HERE — next session: Part B Slice 7 (docs-only)
+## START HERE — next session: Phase 51 + 51.5 are BUILD-COMPLETE → merge decision (D8)
 
-**Part B = the DM-ruling authority expansion**: let the DM rule that an *off-script but plausibly-
-described* action resolves an obstacle — the one narrowly-constrained exception to "the LLM never mutates
-object state." It may push an obstacle only to its **authored** resolved state. **Build is done (Slices
-5–6); only docs remain.**
+**Part B is done, and with it all of Phase 51.5.** The DM-ruling authority expansion (let the DM rule
+that an *off-script but plausibly-described* action resolves an obstacle — the one narrowly-constrained
+exception to "the LLM never mutates object state," bounded to an obstacle's **authored** resolved state)
+is built (Slices 5–6) and documented (Slice 7).
+
+**Next session — no more 51.5 build work remains.** Options, owner's call:
+1. **Merge to `main`** — per D8, Phase 51 + 51.5 merge to `main` together now that 51.5 is built. This
+   is the natural next step. (Open a PR from `phase-51`.)
+2. **World Reaction Policy** — the one settled-but-**unscheduled** design that fixes a real bug (see
+   Notes: a STUDY-miss moved 3 clocks incl. `dungeon_intimacy`, violating D5). Owner decisions locked
+   2026-07-01; spec `spec/WORLD_REACTION_POLICY.md`. Do **not** fold into 51.5 — it's a new feature.
+3. **Phase 52 (Milestone Advancement)** or **Phase 53 (Threat Behavior)** — next roadmap phases.
+
+Confirm with the owner which to start. The Part B build detail is retained below for reference.
+
+### Done — Slice 7 (docs)
+`docs/LLM_AUTHORITY_BOUNDARY.md` gains a "Constrained exception — DM-ruled obstacle resolution" section
++ a validation-example rule; `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` gains §11 (Part A + Part B addendum)
+and a top-of-file callout. Records: the `resolve_obstacle` proposal kind, the validator's
+`obstacle_resolved_states` gate, current-room scoping, and the deterministic `ActivateObject` apply seam.
 
 ### Done — Slice 5 (`8daece5`)
 Constrained `ResolveObstacleChange` proposal type (`rpg/proposal.py`: `kind="resolve_obstacle"`,
