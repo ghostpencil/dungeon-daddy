@@ -7,7 +7,10 @@ from dungeon_daddy.rpg.models import (
     ClockState,
     StressTrack,
 )
-from dungeon_daddy.rpg.world_reaction import compute_world_reaction
+from dungeon_daddy.rpg.world_reaction import (
+    compute_world_reaction,
+    select_ambient_clock,
+)
 
 
 def _resolution(outcome: str, actor_id: str = "a1") -> ActionResolution:
@@ -545,3 +548,90 @@ def test_level_and_room_filters_compose():
         current_room_id="other_room", current_level_id="level-2"
     )
     assert r3.clock_lines == []
+
+
+# ---------------------------------------------------------------------------
+# Phase 51.6 Slice 5 — select_ambient_clock (design §4)
+# ---------------------------------------------------------------------------
+
+def _adverse_room_clock(
+    clock_id: str, room_id: str, category: str = "danger", label: str = "Nest",
+) -> ClockState:
+    return ClockState(
+        clock_id=clock_id, campaign_id="c1", label=label, segments=6, filled=1,
+        clock_level="room", scope_room_id=room_id, category=category,
+    )
+
+
+def _adverse_level_clock(
+    clock_id: str, level_id: str, category: str = "danger", label: str = "Alarm",
+) -> ClockState:
+    return ClockState(
+        clock_id=clock_id, campaign_id="c1", label=label, segments=6, filled=1,
+        clock_level="level", level_id=level_id, category=category,
+    )
+
+
+def test_select_ambient_clock_picks_room_scoped_adverse():
+    # Worked example: STUDY-miss on the statue in R1 → "Scorpion Nest Agitated".
+    nest = _adverse_room_clock("scorpion-nest", "R1", label="Scorpion Nest Agitated")
+    result = select_ambient_clock([nest], room_id="R1", level_id="level-1")
+    assert result is nest
+
+
+def test_select_ambient_clock_none_when_no_local_adverse():
+    # Worked example: no local adverse clock → None (narration only).
+    elsewhere = _adverse_room_clock("nest", "R9")
+    result = select_ambient_clock([elsewhere], room_id="R1", level_id="level-1")
+    assert result is None
+
+
+def test_select_ambient_clock_prefers_room_over_level():
+    room = _adverse_room_clock("room-clock", "R1")
+    level = _adverse_level_clock("level-clock", "level-1")
+    result = select_ambient_clock([level, room], room_id="R1", level_id="level-1")
+    assert result is room
+
+
+def test_select_ambient_clock_ties_broken_by_lowest_id():
+    first = _adverse_room_clock("aaa", "R1")
+    second = _adverse_room_clock("bbb", "R1")
+    result = select_ambient_clock([second, first], room_id="R1", level_id="level-1")
+    assert result is first
+
+
+def test_select_ambient_clock_falls_to_level_when_no_room_clock():
+    level = _adverse_level_clock("level-clock", "level-1")
+    result = select_ambient_clock([level], room_id="R1", level_id="level-1")
+    assert result is level
+
+
+def test_select_ambient_clock_ignores_non_adverse_categories():
+    # objective / relationship / faction_pressure / dungeon_intimacy are firewalled.
+    objective = _adverse_room_clock("obj", "R1", category="objective")
+    intimacy = _adverse_room_clock("intim", "R1", category="dungeon_intimacy")
+    result = select_ambient_clock([objective, intimacy], room_id="R1", level_id="level-1")
+    assert result is None
+
+
+def test_select_ambient_clock_ignores_dungeon_scope():
+    dungeon = ClockState(
+        clock_id="overload", campaign_id="c1", label="Arcane Overload Building",
+        segments=8, filled=2, clock_level="dungeon", category="danger",
+    )
+    result = select_ambient_clock([dungeon], room_id="R1", level_id="level-1")
+    assert result is None
+
+
+def test_select_ambient_clock_ignores_inactive():
+    done = _adverse_room_clock("nest", "R1")
+    done.status = "completed"
+    result = select_ambient_clock([done], room_id="R1", level_id="level-1")
+    assert result is None
+
+
+def test_select_ambient_clock_recognizes_synonym_category_as_adverse():
+    # A pre-normalization "threat" clock is still adverse (→ danger).
+    threat = _adverse_room_clock("nest", "R1", category="threat")
+    result = select_ambient_clock([threat], room_id="R1", level_id="level-1")
+    assert result is threat

@@ -70,11 +70,22 @@ on branch `feat/phase-51.6-wrp`.**
      pre-019 rows. Tests: 019 applies on an `018`-head DB (old row reads `ambient`, bindings table
      present), column-present, round-trip incl. policy + bindings, default-when-unset, upsert
      replaces bindings. Full suite green (3412 passed).
-   - ⏭️ **NEXT: Slice 5 — ambient selection rule** (pure helper, phase spec §4.5, design §4):
-     `select_ambient_clock(active_clocks, room_id, level_id) -> ClockState | None` — single
-     tightest-scoped active **adverse** clock (room > level, ties by lowest id); ignores
-     `action_tags`. Worked example: statue-miss in R1 → "Scorpion Nest Agitated"; none → `None`.
-   - Slices 6–10 pending (see phase spec §4).
+   - ✅ **Slice 5 — ambient selection rule** (pure helper) (`rpg/world_reaction.py`,
+     `tests/unit/rpg/test_world_reaction.py`). `select_ambient_clock(active_clocks, room_id,
+     level_id) -> ClockState | None` — gathers active **adverse** clocks (`is_adverse` ∘
+     `normalize_clock_category`, so pre-normalization synonyms like `threat` still count) scoped
+     to the party's room/level, returns the single **tightest-scoped** one (room > level, ties by
+     lowest `clock_id`); firewalled categories (`objective`/`relationship`/`faction_pressure`/
+     `dungeon_intimacy`) and dungeon/quest scope are never eligible; ignores `action_tags`;
+     `None` → narration only. Both spec worked examples covered (statue-miss in R1 → "Scorpion
+     Nest Agitated"; none → `None`) + room-over-level, tie-break, firewall, dungeon-scope,
+     inactive-skip, synonym. Full suite green (3421 passed).
+   - ⏭️ **NEXT: Slice 6 — scripted binding resolution** (pure/service, phase spec §4.6, design
+     §5/§9): `resolve_scripted_bindings(bindings, verb, outcome) -> list[Consequence]` — match
+     verb (or `*` wildcard) × `outcome`; a `partial` with no authored row falls back to the
+     object's `miss` binding at **half magnitude, rounded down (min 1 if the miss binding is
+     nonzero)**. Assert verb/wildcard match, partial fallback math, empty → nothing.
+   - Slices 7–10 pending (see phase spec §4).
 2. **Then: Tag Hygiene → Narrator Lookup Tool** — new two-part spec
    `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` (draft 2026-07-04): Phase A unifies the tag
    taxonomy and fixes the broken tag pipeline (audit: actor tags dropped at seed time, three

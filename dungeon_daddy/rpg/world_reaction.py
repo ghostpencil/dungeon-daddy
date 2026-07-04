@@ -11,6 +11,8 @@ from dungeon_daddy.rpg.models import (
     ReactionStressLine,
     StressTrack,
     WorldReaction,
+    is_adverse,
+    normalize_clock_category,
 )
 from dungeon_daddy.rpg.stress_routing import choose_stress_track
 
@@ -27,6 +29,44 @@ _STRESS_AMOUNT: dict[str, int] = {
     "full": 0,
     "critical": 0,
 }
+
+
+def select_ambient_clock(
+    active_clocks: list[ClockState],
+    room_id: str | None,
+    level_id: str | None,
+) -> ClockState | None:
+    """Pick the single tightest-scoped active adverse clock local to the party.
+
+    Phase 51.6 ambient tier (design §4): gather active adverse
+    (danger/pursuit/ritual) clocks whose scope covers the party's current room
+    or level, then return the tightest-scoped one — room beats level, ties
+    broken by lowest ``clock_id``. Dungeon/quest/character/faction-scoped clocks
+    are not ambient-eligible (they move only via scripted bindings). Ignores
+    ``action_tags`` entirely; the caller advances the returned clock by +1.
+    Returns ``None`` when no local adverse clock exists — the caller then
+    applies no mechanical consequence (narration only).
+    """
+    room_scoped: list[ClockState] = []
+    level_scoped: list[ClockState] = []
+    for clock in active_clocks:
+        if clock.status != "active":
+            continue
+        if not is_adverse(normalize_clock_category(clock.category)):
+            continue
+        if (clock.clock_level == "room"
+                and clock.scope_room_id is not None
+                and clock.scope_room_id == room_id):
+            room_scoped.append(clock)
+        elif (clock.clock_level == "level"
+                and clock.level_id is not None
+                and clock.level_id == level_id):
+            level_scoped.append(clock)
+
+    pool = room_scoped or level_scoped
+    if not pool:
+        return None
+    return min(pool, key=lambda c: c.clock_id)
 
 
 def compute_world_reaction(
