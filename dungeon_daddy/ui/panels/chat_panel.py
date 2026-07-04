@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Callable
+from typing import NamedTuple
 
 import arcade
 import arcade.gui
@@ -67,6 +68,29 @@ _CHIPS_DESIGN = [
     "Generate next level",
 ]
 _ACTION_ORDER = ["fight", "move", "tinker", "study", "focus", "sway", "sense", "channel", "endure"]
+
+
+class _BubbleStyle(NamedTuple):
+    fill: tuple
+    stroke: tuple
+    label: str
+    label_color: tuple
+
+
+def _bubble_style(role: str) -> _BubbleStyle:
+    """Map a chat role to its bubble treatment (fill / stroke / label / colour).
+
+    Pure so the role → treatment mapping is testable headlessly. The Phase 51
+    dungeon-voice channel (``"dungeon"``) gets an uncanny treatment — the darkest
+    fill — to read apart from ordinary DM narration (``"dm"``), which keeps the
+    violet "◆ Dungeon" bubble (spec §4.6). ``"gm"`` is the teal player/GM bubble;
+    any other role falls back to the DM treatment.
+    """
+    if role == "gm":
+        return _BubbleStyle((20, 50, 55), TEAL, "GM", TEAL)
+    if role == "dungeon":
+        return _BubbleStyle(BG_1, VIOLET, "◆ THE CRUCIBLE", VIOLET)
+    return _BubbleStyle(BG_2, VIOLET, "◆ Dungeon", VIOLET)
 
 
 @dataclasses.dataclass
@@ -845,21 +869,18 @@ class ChatPanel:
                 if msg.role == "action_card":
                     self._draw_action_card(msg_index, bx, draw_y, bubble_w, b_h)
                 else:
-                    is_gm = msg.role == "gm"
-                    fill = (20, 50, 55) if is_gm else BG_2
-                    stroke = TEAL if is_gm else VIOLET
+                    style = _bubble_style(msg.role)
 
                     arcade.draw_rect_filled(
-                        arcade.XYWH(bx + bubble_w / 2, draw_y + b_h / 2, bubble_w, b_h), fill
+                        arcade.XYWH(bx + bubble_w / 2, draw_y + b_h / 2, bubble_w, b_h), style.fill
                     )
                     arcade.draw_rect_outline(
-                        arcade.XYWH(bx + bubble_w / 2, draw_y + b_h / 2, bubble_w, b_h), stroke, 1
+                        arcade.XYWH(bx + bubble_w / 2, draw_y + b_h / 2, bubble_w, b_h), style.stroke, 1
                     )
-                    label_color = TEAL if is_gm else VIOLET
                     arcade.draw_text(
-                        "GM" if is_gm else "◆ Dungeon",
+                        style.label,
                         bx + PAD_SM, draw_y + b_h - PAD_XS,
-                        label_color, font_size=TEXT_XS, font_name=FONT_MONO, anchor_y="top",
+                        style.label_color, font_size=TEXT_XS, font_name=FONT_MONO, anchor_y="top",
                     )
                     label = self._get_or_build_label(msg_index, msg, bubble_w)
                     label.update_position(bx + PAD_SM, draw_y + b_h - _LABEL_H)

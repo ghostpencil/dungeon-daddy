@@ -33,19 +33,23 @@ def _great_lift_upper() -> RoomObject:
         level_id=LEVEL_ID,
         slug="great-lift-upper",
         display_name="Great Lift",
-        archetype="mechanism",
+        # Scenery, not a subsystem: the Great Lift is one physical object, modelled
+        # once as the load-bearing mechanism on Level 1 (R4) that gates the vertical
+        # exit. This upper landing is only its presence at the top of the shaft, so it
+        # must not appear as a second reported subsystem in the dungeon's systems status.
+        archetype="lore_fixture",
         description=(
-            "The upper landing of the Great Lift — a brass cage of dwarven craft straddling "
-            "the shaft from below. The power cell is seated and the mechanism hums with stored "
-            "charge, ready to descend back to the first floor."
+            "The upper landing of the Great Lift — the same dwarven brass cage whose "
+            "control podium stands on the floor below. Whether it will carry you depends "
+            "on the lift's condition there."
         ),
-        current_state="ready",
+        current_state="present",
         transitions=[
             ObjectTransition(
                 transition_id="transition:the-crucible:great-lift-upper:1",
                 object_id=oid,
-                from_state="ready",
-                to_state="ready",
+                from_state="present",
+                to_state="present",
                 trigger="examine",
                 contested=False,
             ),
@@ -76,7 +80,7 @@ def main() -> None:
     repo.save_room_object(_great_lift_upper())
     repo.save_room_exit(_lift_return_exit())
     print(f"Populated Level 2 of The Crucible at {db}")
-    print("  objects: Great Lift upper landing in r01 (state=ready)")
+    print("  objects: Great Lift upper landing in r01 (lore_fixture scenery)")
     print("  exits:   r01->R4 Great Lift return (connector=vertical, open)")
 
 

@@ -60,12 +60,19 @@ def _obj(room, slug, name, archetype, state, desc, transitions) -> RoomObject:
     )
 
 
-def _item(room, slug, name, desc) -> Item:
+def _item(room, slug, name, desc, *, placed: bool = True) -> Item:
+    """Author a Level-1 item.
+
+    ``placed`` (default) drops it loose in ``room``. Pass ``placed=False`` for
+    *container loot*: an unplaced, inert item (no room, no owner) that a
+    container's ``spawns_item_slug`` transition reveals into the room on open.
+    """
     iid = _iid(room, slug)
     return Item(
         item_id=iid, campaign_id=CAMPAIGN_ID, slug=slug, display_name=name,
-        item_type="dungeon_item", description=desc, room_id=room, level_id=LEVEL_ID,
-        status="active",
+        item_type="dungeon_item", description=desc,
+        room_id=room if placed else None, level_id=LEVEL_ID,
+        status="active" if placed else "inert",
     )
 
 
@@ -123,8 +130,10 @@ def _objects() -> list[RoomObject]:
         "R1", "supply-locker", "Half-Buried Supply Locker", "container", "closed",
         "A dented iron locker leans out of a sand drift near the entry arch, its latch "
         "crusted but workable.",
-        [_t(o, 1, "closed", "open", "open"),
-         _t(o, 2, "closed", "open", "force")],
+        # Opening or forcing it reveals the travel journal stowed inside (rewards
+        # curiosity — the journal is no longer loose in the room).
+        [_t(o, 1, "closed", "open", "open", spawns_item_slug="travel-journal"),
+         _t(o, 2, "closed", "open", "force", spawns_item_slug="travel-journal")],
     ))
 
     # --- R2 Marketplace ------------------------------------------------------
@@ -175,9 +184,14 @@ def _objects() -> list[RoomObject]:
     o = _oid("R4", "gearworks")
     out.append(_obj(
         "R4", "gearworks", "Sand-Choked Gearworks", "structure", "jammed",
-        "The lift's drive gears, packed solid with red sand. Clearing them by hand "
-        "would be slow, loud work.",
-        [_t(o, 1, "jammed", "cleared", "force")],
+        "The lift's drive gears, packed solid with red sand. They can be freed by "
+        "careful mechanism-work, by brute force, or by slow, grinding hand-labor.",
+        # Obstacle: three class-flavored contested approaches converging on 'cleared'
+        # (Phase 51.5 Part A — Artificer/Thief tinker, Fighter strong blow, dogged
+        # endurance). All to the same state so the objective completes uniformly.
+        [_t(o, 1, "jammed", "cleared", "tinker", contested=True, action_verb="tinker"),
+         _t(o, 2, "jammed", "cleared", "fight", contested=True, action_verb="fight"),
+         _t(o, 3, "jammed", "cleared", "endure", contested=True, action_verb="endure")],
     ))
 
     # --- R5 Trap Room --------------------------------------------------------
@@ -209,10 +223,12 @@ def _objects() -> list[RoomObject]:
 
 def _items() -> list[Item]:
     return [
-        # R1 — lore + a breadcrumb pointing at the Marketplace key.
+        # R1 — lore + a breadcrumb pointing at the Marketplace key. Stowed inside
+        # the Half-Buried Supply Locker (unplaced/inert), spawned into R1 on open.
         _item("R1", "travel-journal", "Sun-Bleached Travel Journal",
               "A dead scavenger's journal. The last entry: 'Lift's locked tight. "
-              "Warden's key never left the market stalls — but the scorpions own them now.'"),
+              "Warden's key never left the market stalls — but the scorpions own them now.'",
+              placed=False),
         # R2 — THE KEY (findable per request) + modest loot.
         _item("R2", "lift-warden-key", "Lift Warden's Iron Key",
               "A heavy iron key on a brass fob stamped with a descending-cage sigil. "
@@ -235,6 +251,25 @@ def _items() -> list[Item]:
     ]
 
 
+def save_objects_preserving_state(
+    repo: MemoryRepository, objects: list[RoomObject]
+) -> None:
+    """Upsert authored objects, preserving any object's already-played state.
+
+    Reseeding is additive: it refreshes an object's authored definition (name,
+    description, transitions) but keeps a ``current_state`` the party has already
+    changed — so re-running never resets a cleared obstacle back to blocked.
+    """
+    existing = {
+        o["object_id"]: o for o in repo.get_objects_for_campaign(CAMPAIGN_ID)
+    }
+    for obj in objects:
+        prior = existing.get(obj.object_id)
+        if prior is not None:
+            obj = obj.model_copy(update={"current_state": prior["current_state"]})
+        repo.save_room_object(obj)
+
+
 def main() -> None:
     db = _save_path()
     if not db.exists():
@@ -243,8 +278,7 @@ def main() -> None:
     try:
         # Objects
         objects = _objects()
-        for obj in objects:
-            repo.save_room_object(obj)
+        save_objects_preserving_state(repo, objects)
         # Items
         items = _items()
         for it in items:

@@ -6,7 +6,15 @@ from pathlib import Path
 import duckdb
 
 from dungeon_daddy.memory.models import DomainEvent
-from dungeon_daddy.rpg.models import ActorAbility, FactionState, FalloutRecord, Item, RoomExit, RoomObject
+from dungeon_daddy.rpg.models import (
+    ActorAbility,
+    FactionState,
+    FalloutRecord,
+    Item,
+    Objective,
+    RoomExit,
+    RoomObject,
+)
 
 
 def _ensure_migration_table(conn: duckdb.DuckDBPyConnection) -> None:
@@ -540,6 +548,7 @@ class MemoryRepository:
         stakes: str | None = None,
         completion_effect: str | None = None,
         visible_to_player: bool = True,
+        monotonic: bool = True,
     ) -> None:
         assert self._conn is not None
         self._conn.execute(
@@ -548,9 +557,9 @@ class MemoryRepository:
                 clock_id, campaign_id, label, segments, filled, status,
                 scope_room_id, action_tags,
                 clock_level, category, level_id, owner_actor_id,
-                stakes, completion_effect, visible_to_player
+                stakes, completion_effect, visible_to_player, monotonic
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (clock_id) DO UPDATE SET
                 label             = excluded.label,
                 segments          = excluded.segments,
@@ -564,12 +573,13 @@ class MemoryRepository:
                 owner_actor_id    = excluded.owner_actor_id,
                 stakes            = excluded.stakes,
                 completion_effect = excluded.completion_effect,
-                visible_to_player = excluded.visible_to_player
+                visible_to_player = excluded.visible_to_player,
+                monotonic         = excluded.monotonic
             """,
             [clock_id, campaign_id, label, segments, filled, status,
              scope_room_id, json.dumps(action_tags or []),
              clock_level, category, level_id, owner_actor_id,
-             stakes, completion_effect, visible_to_player],
+             stakes, completion_effect, visible_to_player, monotonic],
         )
 
     def delete_clock(self, clock_id: str) -> None:
@@ -610,7 +620,7 @@ class MemoryRepository:
             SELECT clock_id, campaign_id, label, segments, filled, status,
                    scope_room_id, action_tags,
                    clock_level, category, level_id, owner_actor_id,
-                   stakes, completion_effect, visible_to_player
+                   stakes, completion_effect, visible_to_player, monotonic
             FROM clocks WHERE campaign_id = ?
             """,
             [campaign_id],
@@ -632,6 +642,7 @@ class MemoryRepository:
                 "stakes": r[12],
                 "completion_effect": r[13],
                 "visible_to_player": bool(r[14]) if r[14] is not None else True,
+                "monotonic": bool(r[15]) if r[15] is not None else True,
             }
             for r in rows
         ]
@@ -720,26 +731,42 @@ class MemoryRepository:
         title: str,
         status: str = "active",
         dungeon_slug: str | None = None,
+        *,
+        dungeon_voice_path: str | None = None,
+        dungeon_knowledge_path: str | None = None,
     ) -> None:
         assert self._conn is not None
         self._conn.execute(
             """
-            INSERT INTO campaigns (campaign_id, slug, title, status, dungeon_slug)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO campaigns
+                (campaign_id, slug, title, status, dungeon_slug,
+                 dungeon_voice_path, dungeon_knowledge_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (campaign_id) DO UPDATE SET
-                slug         = excluded.slug,
-                title        = excluded.title,
-                status       = excluded.status,
-                dungeon_slug = excluded.dungeon_slug
+                slug                   = excluded.slug,
+                title                  = excluded.title,
+                status                 = excluded.status,
+                dungeon_slug           = excluded.dungeon_slug,
+                dungeon_voice_path     = excluded.dungeon_voice_path,
+                dungeon_knowledge_path = excluded.dungeon_knowledge_path
             """,
-            [campaign_id, slug, title, status, dungeon_slug],
+            [
+                campaign_id,
+                slug,
+                title,
+                status,
+                dungeon_slug,
+                dungeon_voice_path,
+                dungeon_knowledge_path,
+            ],
         )
 
     def get_campaign(self, campaign_id: str) -> dict | None:
         assert self._conn is not None
         row = self._conn.execute(
             """
-            SELECT campaign_id, slug, title, status, dungeon_slug
+            SELECT campaign_id, slug, title, status, dungeon_slug,
+                   dungeon_voice_path, dungeon_knowledge_path
             FROM campaigns WHERE campaign_id = ?
             """,
             [campaign_id],
@@ -752,6 +779,8 @@ class MemoryRepository:
             "title": row[2],
             "status": row[3],
             "dungeon_slug": row[4],
+            "dungeon_voice_path": row[5],
+            "dungeon_knowledge_path": row[6],
         }
 
     # ------------------------------------------------------------------
@@ -1174,6 +1203,21 @@ class MemoryRepository:
         ).fetchall()
         return [self._room_object_row_to_dict(r) for r in rows]
 
+    def get_objects_for_campaign(self, campaign_id: str) -> list[dict]:
+        """All room objects in a campaign (the world-state snapshot for objectives)."""
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT object_id, campaign_id, room_id, level_id, slug,
+                   display_name, archetype, description, current_state
+            FROM room_objects
+            WHERE campaign_id = ?
+            ORDER BY slug
+            """,
+            [campaign_id],
+        ).fetchall()
+        return [self._room_object_row_to_dict(r) for r in rows]
+
     def update_object_state(self, object_id: str, new_state: str) -> None:
         assert self._conn is not None
         self._conn.execute(
@@ -1220,6 +1264,107 @@ class MemoryRepository:
             "description": r[7],
             "current_state": r[8],
             "transitions": transitions,
+        }
+
+    # ------------------------------------------------------------------
+    # Objectives (Phase 51.5)
+    # ------------------------------------------------------------------
+
+    def save_objective(self, obj: Objective) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO objectives (
+                objective_id, campaign_id, slug, title, description,
+                tier_index, status, completion_kind, completion_target_slug,
+                completion_required_state, advances_clock_slug
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (objective_id) DO UPDATE SET
+                campaign_id               = excluded.campaign_id,
+                slug                      = excluded.slug,
+                title                     = excluded.title,
+                description               = excluded.description,
+                tier_index                = excluded.tier_index,
+                status                    = excluded.status,
+                completion_kind           = excluded.completion_kind,
+                completion_target_slug    = excluded.completion_target_slug,
+                completion_required_state = excluded.completion_required_state,
+                advances_clock_slug       = excluded.advances_clock_slug
+            """,
+            [
+                obj.objective_id,
+                obj.campaign_id,
+                obj.slug,
+                obj.title,
+                obj.description,
+                obj.tier_index,
+                obj.status,
+                obj.completion.kind,
+                obj.completion.target_slug,
+                obj.completion.required_state,
+                obj.advances_clock_slug,
+            ],
+        )
+        self._conn.execute(
+            "DELETE FROM objective_knowledge WHERE objective_id = ?", [obj.objective_id]
+        )
+        for ordinal, secret in enumerate(obj.reveals_knowledge):
+            self._conn.execute(
+                """
+                INSERT INTO objective_knowledge (objective_id, ordinal, secret)
+                VALUES (?, ?, ?)
+                """,
+                [obj.objective_id, ordinal, secret],
+            )
+
+    def get_objectives(self, campaign_id: str) -> list[dict]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT objective_id, campaign_id, slug, title, description,
+                   tier_index, status, completion_kind, completion_target_slug,
+                   completion_required_state, advances_clock_slug
+            FROM objectives
+            WHERE campaign_id = ?
+            ORDER BY tier_index, slug
+            """,
+            [campaign_id],
+        ).fetchall()
+        return [self._objective_row_to_dict(r) for r in rows]
+
+    def update_objective_status(self, objective_id: str, status: str) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            "UPDATE objectives SET status = ? WHERE objective_id = ?",
+            [status, objective_id],
+        )
+
+    def _objective_row_to_dict(self, r: tuple) -> dict:
+        assert self._conn is not None
+        k_rows = self._conn.execute(
+            """
+            SELECT secret FROM objective_knowledge
+            WHERE objective_id = ?
+            ORDER BY ordinal
+            """,
+            [r[0]],
+        ).fetchall()
+        return {
+            "objective_id": r[0],
+            "campaign_id": r[1],
+            "slug": r[2],
+            "title": r[3],
+            "description": r[4],
+            "tier_index": r[5],
+            "status": r[6],
+            "completion": {
+                "kind": r[7],
+                "target_slug": r[8],
+                "required_state": r[9],
+            },
+            "advances_clock_slug": r[10],
+            "reveals_knowledge": [kr[0] for kr in k_rows],
         }
 
     # ------------------------------------------------------------------

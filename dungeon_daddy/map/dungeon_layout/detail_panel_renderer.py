@@ -16,6 +16,12 @@ _MAX_LINE_CHARS = 38
 _SEL_MARKER = "▸"
 _UNSEL_MARKER = "·"
 
+# Phase 51 Slice 9 (D2b): synthetic noun id for the "Speak to the Dungeon" overlay
+# entry row. It reuses the Things-Here click plumbing (thing_rects → on_noun_click);
+# play_view intercepts this id to open the dungeon channel instead of selecting a noun.
+DUNGEON_SPEAK_NOUN_ID = "__speak_to_dungeon__"
+_DUNGEON_SPEAK_LABEL = "◆ Speak to the Dungeon"
+
 
 @dataclass
 class PanelLine:
@@ -83,6 +89,7 @@ def format_detail_panel(
 def format_things_here(
     things: RoomThings,
     selected_noun_id: str | None = None,
+    dungeon_channel_open: bool = False,
 ) -> list[PanelLine]:
     """Render the play-mode "Things Here" overlay content (Phase 50.6 §5.1, §5.3).
 
@@ -100,8 +107,6 @@ def format_things_here(
 
     if not things.sections:
         lines.append(PanelLine("Nothing of note here.", "value"))
-        return lines
-
     for section in things.sections:
         lines.append(PanelLine(section.title, "section"))
         for thing in section.things:
@@ -115,5 +120,11 @@ def format_things_here(
                 selected=is_selected,
                 marker=_SEL_MARKER if is_selected else _UNSEL_MARKER,
             ))
+
+    if dungeon_channel_open:
+        # Distinct entry affordance — reuses the click plumbing via its noun id.
+        lines.append(PanelLine(
+            _DUNGEON_SPEAK_LABEL, "dungeon_speak", noun_id=DUNGEON_SPEAK_NOUN_ID,
+        ))
 
     return lines

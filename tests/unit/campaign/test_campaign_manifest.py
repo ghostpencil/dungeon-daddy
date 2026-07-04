@@ -8,6 +8,8 @@ from dungeon_daddy.campaign.manifest import (
     FactionManifest,
     ItemFeatureManifest,
     ItemManifest,
+    ObjectiveCompletionManifest,
+    ObjectiveManifest,
     ObjectTransitionManifest,
     RoomExitSeed,
     RoomObjectManifest,
@@ -149,6 +151,79 @@ def test_campaign_manifest_round_trips_to_json():
     assert restored.clocks[0].slug == "doom-clock"
 
 
+def test_campaign_manifest_dungeon_voice_fields_default():
+    campaign = CampaignManifest(slug="x", title="X", dungeon_slug="x")
+    assert campaign.dungeon_voice is None
+    assert campaign.dungeon_knowledge == []
+    assert campaign.dungeon_corruption_clock is False
+
+
+def test_campaign_manifest_dungeon_voice_fields_round_trip():
+    original = CampaignManifest(
+        slug="x",
+        title="X",
+        dungeon_slug="x",
+        dungeon_voice="cold, industrial, analytical — speaks in diagnostics",
+        dungeon_knowledge=["the warden was once human", "the lift hides a vault"],
+        dungeon_corruption_clock=True,
+    )
+    restored = CampaignManifest.model_validate_json(original.model_dump_json())
+    assert restored.dungeon_voice == "cold, industrial, analytical — speaks in diagnostics"
+    assert restored.dungeon_knowledge == [
+        "the warden was once human",
+        "the lift hides a vault",
+    ]
+    assert restored.dungeon_corruption_clock is True
+
+
+def test_campaign_manifest_dungeon_objectives_default_empty():
+    campaign = CampaignManifest(slug="x", title="X", dungeon_slug="x")
+    assert campaign.dungeon_objectives == []
+
+
+def test_objective_manifest_round_trip_through_campaign():
+    original = CampaignManifest(
+        slug="x",
+        title="X",
+        dungeon_slug="x",
+        dungeon_objectives=[
+            ObjectiveManifest(
+                slug="restore-coolant",
+                title="Restore the Coolant Loop",
+                description="The Crucible wants its coolant loop online again.",
+                tier_index=0,
+                completion=ObjectiveCompletionManifest(
+                    kind="object_state",
+                    target_slug="coolant-loop",
+                    required_state="restored",
+                ),
+                reveals_knowledge=["The coolant loop hides a sealed conduit."],
+            ),
+        ],
+    )
+    restored = CampaignManifest.model_validate_json(original.model_dump_json())
+    assert isinstance(restored.dungeon_objectives[0], ObjectiveManifest)
+    obj = restored.dungeon_objectives[0]
+    assert obj.slug == "restore-coolant"
+    assert obj.tier_index == 0
+    assert obj.completion.target_slug == "coolant-loop"
+    assert obj.completion.required_state == "restored"
+    assert obj.reveals_knowledge == ["The coolant loop hides a sealed conduit."]
+
+
+def test_objective_manifest_object_state_requires_required_state():
+    with pytest.raises(ValidationError):
+        ObjectiveManifest(
+            slug="restore-coolant",
+            title="Restore the Coolant Loop",
+            description="...",
+            tier_index=0,
+            completion=ObjectiveCompletionManifest(
+                kind="object_state", target_slug="coolant-loop"
+            ),
+        )
+
+
 def test_item_manifest_parses_minimal_fields():
     item = ItemManifest(
         slug="lockpick-kit",
@@ -255,6 +330,21 @@ def test_room_object_manifest_accepts_transitions():
     assert len(obj.transitions) == 1
     assert obj.transitions[0].spawns_item_slug == "gold-coin"
     assert obj.transitions[0].requires_item_slug is None
+
+
+def test_room_object_manifest_accepts_resonance_point_archetype():
+    # Phase 51: a resonance_point object marks the room where the dungeon channel
+    # may open. The manifest archetype Literal must accept it (Deferred item 2).
+    obj = RoomObjectManifest(
+        slug="forge-heart",
+        display_name="Forge Heart",
+        room_id="r04",
+        level_id="level:2",
+        archetype="resonance_point",
+        description="A node where the citadel's mind is close enough to hear.",
+        initial_state="dormant",
+    )
+    assert obj.archetype == "resonance_point"
 
 
 def test_campaign_manifest_room_objects_defaults_to_empty():

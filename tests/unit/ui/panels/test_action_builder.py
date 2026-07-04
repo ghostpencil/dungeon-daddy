@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+from dungeon_daddy.rpg.models import ActorAbility
 from dungeon_daddy.ui.panels.action_builder import InChatActionBuilder
 from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
 
@@ -133,6 +134,22 @@ def test_click_outside_open_popup_dismisses_it():
     result = builder.on_mouse_press(500.0, 500.0)
     assert result is True
     assert builder._open_slot is None
+
+
+def test_open_popup_row_wins_over_overlapping_toggle_rect():
+    # Regression: the popup is drawn on top of the header, and its rows can
+    # overlap the collapse toggle's Y-range. A click landing inside BOTH must
+    # select the popup row, not collapse the band (the popup owns the click).
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    target_label = builder._panel.verb_labels()[1]
+    builder._open_slot = "verb"
+    builder._toggle_rect = (0.0, 0.0, 100.0, 26.0)
+    builder._popup_row_rects = [(0.0, 8.0, 100.0, 18.0, target_label)]
+    result = builder.on_mouse_press(50.0, 12.0)  # inside both rects
+    assert result is True
+    assert builder._panel.selected_verb_label() == target_label
+    assert builder._open_slot is None
+    assert builder.is_collapsed() is False
 
 
 # ---------------------------------------------------------------------------
@@ -429,6 +446,75 @@ def test_draw_records_slot_and_button_rects(monkeypatch):
         builder.draw(0.0, 0.0, 440.0, 200.0)
     assert [r[4] for r in builder._slot_rects] == ["verb", "noun", "adverb"]
     assert builder._button_rect is not None
+
+
+# ---------------------------------------------------------------------------
+# Obstacle approaches (Phase 51.5 Part A Slice 3) — surface the selected
+# obstacle's class-flavored approach verbs as clickable suggested actions.
+# ---------------------------------------------------------------------------
+
+_GEARWORKS = {
+    "object_id": "gearworks", "slug": "gearworks",
+    "display_name": "Seized Gearworks", "archetype": "mechanism",
+    "current_state": "jammed", "description": "Jammed gears.",
+    "approach_verbs": ["fight", "tinker"],
+}
+
+
+def _obstacle_builder(actor_abilities=()) -> InChatActionBuilder:
+    panel = VnaActionPanel()
+    panel.set_context(
+        actor_abilities=list(actor_abilities),
+        room_context=_room_context(objects=[dict(_GEARWORKS)]),
+        actor=_actor(),
+        playbook_slug="fighter",
+        world_flags=[],
+    )
+    return InChatActionBuilder(panel)
+
+
+def test_suggested_approach_labels_for_selected_obstacle():
+    builder = _obstacle_builder()
+    builder._panel.select_noun("gearworks")
+    # fight and tinker are universal verbs, always offered → both suggested.
+    assert builder.suggested_approach_labels() == ["Fight", "Tinker"]
+
+
+def test_suggested_approach_labels_exclude_verbs_the_actor_lacks():
+    # An approach the acting actor can't attempt (a class verb they lack) is not
+    # suggested — every suggestion must be actionable.
+    builder = _obstacle_builder()
+    builder._panel._room_context["objects"][0]["approach_verbs"] = ["fight", "finesse"]
+    builder._panel.select_noun("gearworks")
+    assert builder.suggested_approach_labels() == ["Fight"]
+
+
+def test_suggested_approach_labels_empty_for_non_obstacle():
+    builder = _builder(monsters=[{"actor_id": "mon-1", "display_name": "Gnoll"}])
+    builder._panel.select_noun("mon-1")
+    assert builder.suggested_approach_labels() == []
+
+
+def test_click_suggested_approach_selects_verb_and_keeps_obstacle_noun():
+    builder = _obstacle_builder()
+    builder._panel.select_noun("gearworks")
+    builder._suggestion_rects = [(0.0, 0.0, 60.0, 20.0, "Tinker")]
+    consumed = builder.on_mouse_press(30.0, 10.0)
+    assert consumed is True
+    assert builder._panel.selected_verb_label() == "Tinker"
+    # Selecting the approach verb must not reset the obstacle noun.
+    assert builder._panel.selected_noun_option().noun_id == "gearworks"
+
+
+def test_draw_records_suggestion_rects_for_obstacle(monkeypatch):
+    builder = _obstacle_builder()
+    builder._panel.select_noun("gearworks")
+    with patch("dungeon_daddy.ui.theme.draw_rounded_rect"), \
+         patch("arcade.draw_rect_filled"), \
+         patch("arcade.draw_line"), \
+         patch("arcade.draw_text"):
+        builder.draw(0.0, 0.0, 440.0, builder.content_height(440.0))
+    assert [r[4] for r in builder._suggestion_rects] == ["Fight", "Tinker"]
 
 
 # ---------------------------------------------------------------------------

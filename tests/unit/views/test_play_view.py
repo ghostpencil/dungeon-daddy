@@ -14,7 +14,7 @@ from dungeon_daddy.data.models import (
     Room,
     SessionState,
 )
-from dungeon_daddy.views.play_view import DMResult
+from dungeon_daddy.views.play_view import DMResult, describe_spawned_loot
 from tests.unit.views._factories import _dungeon, _state
 
 # ---------------------------------------------------------------------------
@@ -81,6 +81,31 @@ def test_dm_error_result_clears_busy_flag(make_play_view):
     view.on_update(0)
 
     assert view._llm_busy is False
+
+
+# ---------------------------------------------------------------------------
+# describe_spawned_loot — feed the revealed item to the DM narrator so its
+# prose reflects reality (a container that spawns loot on open).
+# ---------------------------------------------------------------------------
+
+def test_describe_spawned_loot_empty_when_transition_spawns_nothing():
+    assert describe_spawned_loot({"trigger": "open"}, []) == ""
+
+
+def test_describe_spawned_loot_empty_when_item_not_in_room():
+    transition = {"spawns_item_slug": "travel-journal"}
+    assert describe_spawned_loot(transition, [{"slug": "other"}]) == ""
+
+
+def test_describe_spawned_loot_names_and_describes_the_revealed_item():
+    transition = {"spawns_item_slug": "travel-journal"}
+    room_items = [
+        {"slug": "travel-journal", "display_name": "Sun-Bleached Travel Journal",
+         "description": "A dead scavenger's journal."},
+    ]
+    note = describe_spawned_loot(transition, room_items)
+    assert "Sun-Bleached Travel Journal" in note
+    assert "dead scavenger's journal" in note
 
 
 # ---------------------------------------------------------------------------

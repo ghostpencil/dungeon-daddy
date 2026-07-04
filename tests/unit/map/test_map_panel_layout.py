@@ -440,6 +440,21 @@ def test_draw_forwards_things_here_in_play_mode() -> None:
     assert kwargs["room_things"] is things
 
 
+def test_draw_forwards_dungeon_channel_open_flag() -> None:
+    from dungeon_daddy.rpg.action_options import RoomThing, RoomThings, ThingsSection
+    p = _panel()
+    p.load(_level(["a", "b"], [_conn("a", "b")]), _state())
+    things = RoomThings(
+        room_id="a",
+        sections=[ThingsSection("EXITS", [RoomThing("b", "Hall", "→", "open", "teal")])],
+    )
+    p.set_things_here(things, dungeon_channel_open=True)
+
+    draw = _draw_with_mock_renderer(p)
+    _, kwargs = draw.call_args
+    assert kwargs["dungeon_channel_open"] is True
+
+
 def test_draw_stays_graph_mode_without_things_here() -> None:
     p = _panel()
     p.load(_level(["a", "b"], [_conn("a", "b")]), _state())

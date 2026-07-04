@@ -5,8 +5,9 @@ import logging
 import queue
 import re
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 
 import arcade
 import arcade.gui
@@ -14,6 +15,7 @@ import arcade.gui
 from dungeon_daddy.data.models import Dungeon, Level, Room, SessionState
 from dungeon_daddy.data.repository import DungeonRepository
 from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
 from dungeon_daddy.llm.provider import LLMMessage
 from dungeon_daddy.map.graph_renderer import GraphRenderer
 from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
@@ -23,7 +25,7 @@ from dungeon_daddy.rpg.actor_control import filter_player_actors
 from dungeon_daddy.rpg.classifier import classify_intent
 from dungeon_daddy.ui.actor_mini_card import build_actor_mini_card
 from dungeon_daddy.rpg.intent import PendingIntent
-from dungeon_daddy.rpg.models import ActorState, StressTrack
+from dungeon_daddy.rpg.models import ActorState, ClockState, StressTrack
 from dungeon_daddy.rpg.proposal import parse_proposal
 from dungeon_daddy.rpg.proposal_applier import ApplyResult, apply_low_risk_proposals
 from dungeon_daddy.rpg.proposal_validator import ValidationResult, validate_proposal
@@ -71,6 +73,47 @@ from dungeon_daddy.ui.theme import (
 class DMResult:
     content: str
     error: str | None = None
+    # Phase 51: a dungeon-channel reply (routed to _apply_dungeon_reply on drain,
+    # not the DM narration path). player_message carries the line for the memory
+    # summary written engine-side after the reply.
+    dungeon: bool = False
+    player_message: str | None = None
+
+
+def describe_spawned_loot(transition: dict, room_items: list[dict]) -> str:
+    """Deterministic note naming the item a transition reveals, for the narrator.
+
+    When a container transition carries ``spawns_item_slug`` and that item is now
+    present in the room, return ``"Name — description"`` so the DM narrator's
+    prose reflects reality (it actually finds the loot). Returns ``""`` when the
+    transition spawns nothing or the item isn't in the room.
+    """
+    slug = transition.get("spawns_item_slug")
+    if not slug:
+        return ""
+    item = next((i for i in room_items if i.get("slug") == slug), None)
+    if item is None:
+        return ""
+    name = item.get("display_name") or slug
+    desc = (item.get("description") or "").strip()
+    return f"{name} — {desc}" if desc else name
+
+
+@dataclass
+class DialogueSession:
+    """In-memory state for an open dialogue channel (Phase 51 §4.3).
+
+    Replaces the bare ``_dialogue_stub_active`` flag. ``kind`` dispatches the
+    routing: ``"dungeon"`` is the freeform Talk-to-the-Dungeon channel,
+    ``"npc"`` is the 50.6 ``sway→willing`` creature conversation folded onto the
+    same engine (decision D1). ``turns`` is the running exchange (LLM history +
+    memory summary).
+    """
+
+    kind: Literal["dungeon", "npc"]
+    room_id: str
+    target_id: str | None = None
+    turns: list[tuple[str, str]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -369,6 +412,16 @@ class PlayView(arcade.View):
         self._rpg_campaign_id: str | None = None
         self._action_state = PlayerActionState()
         self._chat.set_actor_switch_callback(self._on_actor_switch)
+        # Open dialogue channel, or None when the Action Builder is active.
+        self._dialogue: DialogueSession | None = None
+        # Phase 51 "Talk to the Dungeon": the voice agent reuses the DM agent's
+        # injected provider (no new dependency). Voice/knowledge are seed-authored
+        # and populated when a campaign is attached (the seed slice).
+        self._dungeon_voice_agent = (
+            DungeonVoiceAgent(dm_agent._provider) if dm_agent is not None else None
+        )
+        self._dungeon_voice: str | None = None
+        self._dungeon_knowledge: list[str] = []
 
     # ------------------------------------------------------------------
     # View lifecycle
@@ -418,12 +471,15 @@ class PlayView(arcade.View):
         self._chat.set_busy(False)
         if result.error:
             self._chat.add_message("system", f"⚠ The dungeon is silent. ({result.error})")
-        else:
-            remembered, display = self._extract_remember(result.content)
-            self._dm_history.append(LLMMessage(role="assistant", content=display))
-            self._chat.add_message("dm", display)
-            if remembered:
-                self._auto_remember(remembered)
+            return
+        if result.dungeon:
+            self._apply_dungeon_reply(result.player_message or "", result.content)
+            return
+        remembered, display = self._extract_remember(result.content)
+        self._dm_history.append(LLMMessage(role="assistant", content=display))
+        self._chat.add_message("dm", display)
+        if remembered:
+            self._auto_remember(remembered)
 
     def on_resize(self, width: int, height: int) -> None:
         self._reposition_panels(width, height)
@@ -1082,6 +1138,7 @@ class PlayView(arcade.View):
         before the first refresh.
         """
         from dungeon_daddy.rpg.action_options import room_things
+        from dungeon_daddy.rpg.dungeon_channel import dungeon_channel_available
 
         map_panel = getattr(self, "_map", None)
         room_context = getattr(self, "_last_room_context", None)
@@ -1090,9 +1147,15 @@ class PlayView(arcade.View):
         actor_dict = getattr(self, "_last_actor_dict", {})
         selected = self._rpg_vna.selected_noun_option()
         selected_noun_id = selected.noun_id if selected is not None else None
+        # Phase 51 Slice 9 (§4.6c): the "Speak to the Dungeon" entry affordance is
+        # shown only when both gates pass — a resonance point with intimacy met.
+        available, _ = dungeon_channel_available(
+            room_context, self._dungeon_intimacy_clock()
+        )
         map_panel.set_things_here(
             room_things(room_context, actor_dict),
             selected_noun_id=selected_noun_id,
+            dungeon_channel_open=available,
         )
 
     def _on_overlay_noun_click(self, noun_id: str) -> None:
@@ -1106,9 +1169,18 @@ class PlayView(arcade.View):
         Selecting does **not** rebuild the panel context — the room is unchanged,
         and a full refresh would reset the selection back to the default noun.
         """
+        from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import (
+            DUNGEON_SPEAK_NOUN_ID,
+        )
         from dungeon_daddy.rpg.action_options import (
             SOURCE_EXIT, SOURCE_LOOSE_ITEM, VERB_MOVE, VERB_PICK_UP,
         )
+
+        # Phase 51 Slice 9: the synthetic "Speak to the Dungeon" row opens the
+        # freeform dungeon channel instead of selecting a noun (D2b).
+        if noun_id == DUNGEON_SPEAK_NOUN_ID:
+            self._begin_dungeon_dialogue()
+            return
 
         _AUTO_VERB = {SOURCE_EXIT: VERB_MOVE, SOURCE_LOOSE_ITEM: VERB_PICK_UP}
         clicked = next(
@@ -1209,7 +1281,13 @@ class PlayView(arcade.View):
             )
             room_context = getattr(self, "_last_room_context", {})
             if noun is not None and is_speakable(noun, room_context):
-                self._begin_dialogue_stub(noun)
+                room_id = self._state.current_room_id if self._state else ""
+                self._begin_dialogue(
+                    kind="npc",
+                    room_id=room_id or "",
+                    target_id=noun.noun_id,
+                    opener=f"You open a conversation with {noun.label}.",
+                )
                 return
 
         if card.verb == VERB_LOOK:
@@ -1264,33 +1342,305 @@ class PlayView(arcade.View):
         else:
             self._apply_vna_command(command)
 
-    def _begin_dialogue_stub(self, noun) -> None:
-        """Open the contextual SAY/ASK box for a speakable target (Slice 10 stub).
+    def _begin_dialogue(
+        self,
+        *,
+        kind: Literal["dungeon", "npc"],
+        room_id: str,
+        target_id: str | None = None,
+        opener: str | None = None,
+    ) -> None:
+        """Open a dialogue channel and swap the chat input to the SAY box.
 
-        **Phase 51 extension point.** Phase 50.6 only carves the input seam: this
-        swaps the bottom of the chat column from the Action Builder to the
-        free-text SAY box and posts a placeholder line. The actual conversation
-        flow — routing what the player types, NPC memory, and DM responses — is
-        deferred to Phase 51 (Talk to the Dungeon).
+        Shared by both kinds (decision D1): ``"npc"`` from a ``sway`` on a
+        willing creature, ``"dungeon"`` from the resonance-point channel. The
+        per-line routing in :meth:`_on_dialogue_send` dispatches by ``kind``.
         """
-        self._dialogue_stub_active = True
+        self._dialogue = DialogueSession(kind=kind, room_id=room_id, target_id=target_id)
         self._chat.set_dialogue_mode(True)
-        self._chat.add_message(
-            "system",
-            f"You open a conversation with {noun.label}. (Dialogue — Phase 51)",
+        if opener:
+            self._chat.add_message("system", opener)
+
+    def _end_dialogue(self) -> None:
+        """Close the open channel and swap the input back to the Action Builder."""
+        self._dialogue = None
+        self._chat.set_dialogue_mode(False)
+
+    def _maybe_end_dialogue_on_room_change(self) -> None:
+        """Close an open channel when the party has left the room it opened in.
+
+        The dungeon channel is bound to its resonance room (spec §4.3); an NPC
+        conversation likewise ends when you walk away. A no-op while the party is
+        still in the session's room.
+        """
+        session = getattr(self, "_dialogue", None)
+        if session is None or self._state is None:
+            return
+        if self._state.current_room_id != session.room_id:
+            self._end_dialogue()
+
+    def _on_dialogue_send(self, text: str) -> None:
+        """Route a line typed into the SAY box, dispatched by session ``kind``.
+
+        ``/leave`` closes the channel from either kind. Otherwise the dungeon
+        kind runs the freeform voice pipeline; the npc kind is a thin binding
+        (D1a) that records the turn and keeps the conversation open.
+        """
+        session = self._dialogue
+        if session is None:
+            return
+        if text.strip() == "/leave":
+            self._end_dialogue()
+            return
+        if session.kind == "dungeon":
+            self._send_dungeon_line(text)
+        else:
+            self._send_npc_line(text)
+
+    def _send_npc_line(self, text: str) -> None:
+        """Thin NPC binding (D1a): post the line, record it, stay open.
+
+        Phase 51 fully implements only the dungeon channel; the NPC kind reuses
+        the shared session/surface plumbing without a dedicated reply agent.
+        """
+        session = self._dialogue
+        if session is None:
+            return
+        session.turns.append(("player", text))
+        self._chat.add_message("gm", text)
+
+    # ------------------------------------------------------------------
+    # Dungeon channel (Phase 51 "Talk to the Dungeon")
+    # ------------------------------------------------------------------
+
+    def _send_dungeon_line(self, text: str) -> None:
+        """Send a line to the dungeon voice (off-thread) and queue the reply.
+
+        Echoes/records the player's line immediately, then calls the
+        ``DungeonVoiceAgent`` on a worker thread (a network call). The reply is
+        queued as a dungeon-marked ``DMResult``; ``on_update`` drains it and
+        applies the engine side-effects on the main thread.
+        """
+        session = self._dialogue
+        if session is None:
+            return
+        session.turns.append(("player", text))
+        self._chat.add_message("gm", text)
+
+        agent = getattr(self, "_dungeon_voice_agent", None)
+        if agent is None:
+            self._chat.add_message(
+                "system", "The dungeon is silent. (voice agent unavailable)"
+            )
+            return
+        if self._llm_busy:
+            return
+        inputs = self._dungeon_agent_inputs(text)
+        self._llm_busy = True
+        self._chat.set_busy(True)
+
+        def _run() -> None:
+            try:
+                reply = agent.respond(**inputs)
+                self._result_queue.put(
+                    DMResult(content=reply, dungeon=True, player_message=text)
+                )
+            except Exception as exc:
+                self._result_queue.put(
+                    DMResult(content="", error=str(exc), dungeon=True, player_message=text)
+                )
+            finally:
+                self._llm_busy = False
+
+        t = threading.Thread(target=_run, daemon=True)
+        self._active_thread = t
+        t.start()
+
+    _INTIMACY_CATEGORY = "dungeon_intimacy"
+
+    def _dungeon_intimacy_clock(self) -> ClockState | None:
+        """Return the seed-authored non-monotonic intimacy clock, or ``None``.
+
+        Read live from the repo (D3: the clock must pre-exist in the seed; the
+        channel is locked when absent). Identified by ``category``.
+        """
+        if self._mem_repo is None or self._rpg_campaign_id is None:
+            return None
+        for row in self._mem_repo.get_clocks(self._rpg_campaign_id):
+            if row.get("category") == self._INTIMACY_CATEGORY:
+                return ClockState(**row)
+        return None
+
+    def _begin_dungeon_dialogue(self) -> None:
+        """Open the freeform dungeon channel if both gates pass, else lock it.
+
+        Gates (spec §2): the current room is a resonance point AND the intimacy
+        clock is at/above threshold. When closed, post the lock reason and leave
+        the Action Builder up.
+        """
+        from dungeon_daddy.rpg.dungeon_channel import dungeon_channel_available
+
+        room_context = getattr(self, "_last_room_context", {}) or {}
+        clock = self._dungeon_intimacy_clock()
+        available, reason = dungeon_channel_available(room_context, clock)
+        if not available:
+            self._chat.add_message("system", reason or "")
+            return
+        room_id = self._state.current_room_id if self._state else ""
+        self._begin_dialogue(
+            kind="dungeon",
+            room_id=room_id or "",
+            opener="The dungeon stirs, and turns its attention to you.",
         )
 
-    def _on_dialogue_send_stub(self, text: str) -> None:
-        """Handle a line typed into the SAY box during dialogue (Slice 10 stub).
+    def set_dungeon_persona(
+        self, voice: str | None, knowledge: list[str]
+    ) -> None:
+        """Attach the seed-authored dungeon persona (P4 attach-time reader).
 
-        **Phase 51 extension point.** For now the line is echoed and the
-        conversation ends immediately, swapping the input back to the Action
-        Builder. Phase 51 replaces this with real dialogue routing and replies.
+        ``window._attach_rpg_context`` resolves the campaign's persona Markdown
+        refs and calls this so the voice agent reads them at play time
+        (``_dungeon_agent_inputs``). Missing docs → ``(None, [])``.
         """
-        self._dialogue_stub_active = False
-        self._chat.add_message("gm", text)
-        self._chat.add_message("system", "(Conversation ends — dialogue is Phase 51.)")
-        self._chat.set_dialogue_mode(False)
+        self._dungeon_voice = voice
+        self._dungeon_knowledge = list(knowledge)
+
+    _RECENT_MEMORY_LIMIT = 3
+
+    def _recent_dungeon_memories(self) -> list:
+        """Last few approved memories, for the dungeon-voice context (§4.4)."""
+        if self._mem_repo is None or self._rpg_campaign_id is None:
+            return []
+        from dungeon_daddy.memory.retrieval import MemoryRetriever
+
+        retriever = MemoryRetriever(self._mem_repo, self._rpg_campaign_id)
+        return retriever.query()[: self._RECENT_MEMORY_LIMIT]
+
+    def _dungeon_agent_inputs(self, text: str) -> dict:
+        """Assemble the §4.4 ``DungeonVoiceAgent.respond`` kwargs for ``text``.
+
+        Knowledge is the union of completed tiers' ``reveals_knowledge`` (D7); with
+        no objectives authored it falls back to the deprecated flat
+        ``reveal_knowledge`` band. The agent itself does no gating (D6).
+        """
+        from dungeon_daddy.rpg.dungeon_channel import (
+            active_objective,
+            reveal_knowledge,
+            unlocked_knowledge,
+        )
+
+        clock = self._dungeon_intimacy_clock()
+        filled = clock.filled if clock else 0
+        segments = clock.segments if clock else 0
+        objectives = self._dungeon_objectives()
+        if objectives:
+            knowledge = unlocked_knowledge(objectives)
+        else:
+            knowledge = reveal_knowledge(
+                getattr(self, "_dungeon_knowledge", []) or [], filled, segments
+            )
+        active = active_objective(objectives)
+        actor = self._acting_actor()
+        return {
+            "dungeon_voice": getattr(self, "_dungeon_voice", None) or "",
+            "intimacy_filled": filled,
+            "intimacy_segments": segments,
+            "dungeon_knowledge": knowledge,
+            "player_message": text,
+            "actor": actor.slug if actor else "",
+            "recent_memories": self._recent_dungeon_memories(),
+            "actor_name": actor.display_name if actor else "",
+            "actor_playbook": self._actor_playbook_name(actor),
+            "actor_tags": list(actor.tags) if actor else [],
+            "systems_status": self._dungeon_systems_status(),
+            "next_objective": active["description"] if active else None,
+            "next_objective_location": self._dungeon_objective_location(active),
+            "session_turns": list(self._dialogue.turns) if self._dialogue else [],
+        }
+
+    def _dungeon_objectives(self) -> list[dict]:
+        if self._mem_repo is None or self._rpg_campaign_id is None:
+            return []
+        return self._mem_repo.get_objectives(self._rpg_campaign_id)
+
+    def _room_labels(self) -> dict[str, str]:
+        """Map each ``room_id`` to a human ``"Level N — Room Name"`` label.
+
+        Resolved from the loaded dungeon model so the dungeon voice can cite a
+        subsystem's (or objective's) location. Empty when no dungeon is loaded.
+        """
+        dungeon = getattr(self, "_dungeon", None)
+        if dungeon is None:
+            return {}
+        labels: dict[str, str] = {}
+        for level in dungeon.levels:
+            for room in level.rooms:
+                labels[room.id] = f"Level {level.id} — {room.name}"
+        return labels
+
+    def _dungeon_systems_status(self) -> list[tuple[str, str, str]]:
+        """Truthful subsystem snapshot + location for the dungeon-voice context.
+
+        Each tuple is ``(display_name, current_state, location)`` (§4.2) so the
+        dungeon can both report state and say where a subsystem sits.
+        """
+        if self._mem_repo is None or self._rpg_campaign_id is None:
+            return []
+        from dungeon_daddy.rpg.dungeon_channel import located_systems_status
+
+        objects = self._mem_repo.get_objects_for_campaign(self._rpg_campaign_id)
+        return located_systems_status(objects, self._room_labels())
+
+    def _dungeon_objective_location(self, active: dict | None) -> str | None:
+        """Resolve the active objective's target object to a room label (or None)."""
+        if not active or self._mem_repo is None or self._rpg_campaign_id is None:
+            return None
+        target_slug = (active.get("completion") or {}).get("target_slug")
+        if not target_slug:
+            return None
+        from dungeon_daddy.rpg.dungeon_channel import object_location
+
+        objects = self._mem_repo.get_objects_for_campaign(self._rpg_campaign_id)
+        return object_location(target_slug, objects, self._room_labels())
+
+    @staticmethod
+    def _actor_playbook_name(actor) -> str | None:
+        """Resolve the acting actor's playbook display name for the dungeon (§4.1)."""
+        slug = getattr(actor, "playbook_slug", None)
+        if not slug:
+            return None
+        from dungeon_daddy.rpg.playbook import PlaybookLibrary
+
+        try:
+            return PlaybookLibrary().get(slug).display_name
+        except KeyError:
+            return None
+
+    def _apply_dungeon_reply(self, player_message: str, reply: str) -> None:
+        """Post the dungeon's reply and apply the engine side-effect (§4.7).
+
+        Runs on the main thread (DuckDB single-writer): posts the distinct
+        dungeon bubble, then the **engine** drafts a memory of the exchange via
+        ``record_dungeon_exchange`` — never the LLM (authority boundary / D6).
+        Phase 51.5 (D1/D5): chat no longer ticks intimacy; the objective service
+        is the single intimacy-tick source.
+        """
+        from dungeon_daddy.memory.dungeon_exchange import record_dungeon_exchange
+
+        self._chat.add_message("dungeon", reply)
+        session = self._dialogue
+        if session is not None:
+            session.turns.append(("dungeon", reply))
+        if self._mem_repo is None or self._rpg_campaign_id is None:
+            return
+        actor = self._acting_actor()
+        record_dungeon_exchange(
+            self._mem_repo,
+            campaign_id=self._rpg_campaign_id,
+            actor=actor.slug if actor else "",
+            player_message=player_message,
+            dungeon_reply=reply,
+        )
 
     def _on_look_submit(self, card) -> None:
         """Read-only branch: fetch the noun's authoritative description and post it.
@@ -1378,14 +1728,19 @@ class PlayView(arcade.View):
         if room is None:
             return
         from dungeon_daddy.llm.agents.dm_agent import LLMMessage
+        content = (
+            f"{actor.display_name} {transition.get('trigger', 'activates')} the {noun_label}. "
+            f"[{noun_label}: {from_state} → {to_state}]"
+        )
+        # If the transition just revealed loot, name it so the narrator's prose
+        # matches reality (e.g. opening the locker actually finds the journal).
+        if self._mem_repo is not None and self._rpg_campaign_id is not None:
+            room_items = self._mem_repo.get_items_by_room(self._rpg_campaign_id, room.id)
+            loot = describe_spawned_loot(transition, room_items)
+            if loot:
+                content += f" [revealed inside: {loot}]"
         self._compact_history()
-        self._dm_history.append(LLMMessage(
-            role="user",
-            content=(
-                f"{actor.display_name} {transition.get('trigger', 'activates')} the {noun_label}. "
-                f"[{noun_label}: {from_state} → {to_state}]"
-            ),
-        ))
+        self._dm_history.append(LLMMessage(role="user", content=content))
         self._chat.set_busy(True)
         self._spawn_dm_thread(room, level)
 
@@ -1407,8 +1762,25 @@ class PlayView(arcade.View):
             self._chat.add_message("system", f"⚠ Can't do that: {validation.rejection_reason}")
             return False
         apply_command(command, validation, self._mem_repo, self._rpg_campaign_id)
+        self._advance_objectives()
         self._refresh_vna_panel()
         return True
+
+    def _advance_objectives(self) -> None:
+        """Re-evaluate active objectives after a world-state mutation (§7.9).
+
+        A subsystem reaching its required state completes the tier's objective,
+        ticking the latching intimacy clock (the single tick source, D5) and
+        activating the next tier. Each completion surfaces a dungeon line.
+        """
+        from dungeon_daddy.rpg.objectives import advance_objectives
+
+        if self._mem_repo is None or self._rpg_campaign_id is None:
+            return
+        for _ in advance_objectives(self._mem_repo, self._rpg_campaign_id):
+            self._chat.add_message(
+                "dungeon", "◆ The Crucible stirs — its bond with you deepens."
+            )
 
     def _resolve_vna_roll(self, card, actor) -> None:
         """Resolve a skill-verb Card as an action roll and narrate the outcome."""
@@ -1423,6 +1795,7 @@ class PlayView(arcade.View):
             actor={"actor_id": actor.actor_id, "actions": actor.actions},
         )
         resolution = card_roll.resolution
+        obstacle = self._maybe_resolve_obstacle(card, actor, resolution.outcome)
         reaction = self._apply_world_reaction(resolution)
         self._run_proposal_pipeline(resolution, campaign_id)
         self._chat.add_message(
@@ -1438,11 +1811,49 @@ class PlayView(arcade.View):
                     f"{actor.display_name} [{card.verb.upper()}] {noun_label}"
                     f" ({card.adverb}) — {resolution.outcome.upper()}"
                 )
+                if obstacle is not None:
+                    t = obstacle.transition
+                    msg += f" [{noun_label}: {t.from_state} → {t.to_state}]"
+                    if obstacle.complication:
+                        msg += " (resolved, but with a complication)"
                 self._compact_history()
                 self._dm_history.append(LLMMessage(role="user", content=msg))
                 self._chat.set_busy(True)
                 self._spawn_dm_thread(room, level)
         self._refresh_right_panel_from_actors(actor.actor_id)
+
+    def _maybe_resolve_obstacle(self, card, actor, outcome):
+        """Apply a successful contested-approach roll to the target's state (Phase 51.5 Part A).
+
+        When ``card.verb`` matches one of the target object's contested approaches
+        and ``outcome`` resolves it (crit/full clean, partial with a complication;
+        miss fails — locked mapping), route the matched transition through the
+        deterministic ``ActivateObject`` pipeline so its state change + side-effects
+        apply and objectives re-advance. Returns the
+        :class:`ObstacleRollResolution` applied, or ``None`` if nothing changed.
+        """
+        from dungeon_daddy.rpg.command import ActivateObject
+        from dungeon_daddy.rpg.models import RoomObject
+        from dungeon_daddy.rpg.obstacles import resolve_obstacle_with_roll
+
+        if self._mem_repo is None or self._rpg_campaign_id is None:
+            return None
+        obj_dict = self._mem_repo.get_room_object(card.noun_id)
+        if obj_dict is None:
+            return None
+        resolved = resolve_obstacle_with_roll(
+            RoomObject(**obj_dict), verb=card.verb, outcome=outcome
+        )
+        if resolved is None:
+            return None
+        command = ActivateObject(
+            actor_id=actor.actor_id,
+            object_id=card.noun_id,
+            trigger=resolved.transition.trigger,
+        )
+        if self._apply_vna_command(command):
+            return resolved
+        return None
 
     def _on_exit_move(self, exit_id: str, how: str, *, item_slug: str | None = None) -> None:
         """Apply an engine-validated party move, then narrate the result."""
@@ -1463,6 +1874,8 @@ class PlayView(arcade.View):
 
         old_level_idx = self._state.current_level_idx
         self._state = new_session
+        # Walking out of the room closes any open dialogue channel (§4.3).
+        self._maybe_end_dialogue_on_room_change()
         room = None
         level = None
         if self._dungeon is not None:
@@ -1534,6 +1947,7 @@ class PlayView(arcade.View):
                 known_clock_ids=set(known_clock_ids),
                 known_actor_ids=set(known_actor_ids),
                 player_actor_ids=set(player_actor_ids),
+                obstacle_resolved_states=self._obstacle_resolved_states(campaign_id),
             )
             apply_result = apply_low_risk_proposals(
                 validation_result,
@@ -1542,10 +1956,76 @@ class PlayView(arcade.View):
                 action_key=resolution.action_key,
                 intent=resolution.intent,
             )
+            # A validated ResolveObstacleChange is applied through the deterministic
+            # ActivateObject seam (not apply_low_risk_proposals, which skips it), gated
+            # on a resolving roll outcome — the constrained Part B object-state authority.
+            actor_id = player_actor_ids[0] if player_actor_ids else (
+                known_actor_ids[0] if known_actor_ids else None
+            )
+            self._apply_obstacle_proposals(validation_result, resolution.outcome, actor_id)
         else:
             validation_result = ValidationResult()
             apply_result = ApplyResult()
         self._rpg_debug.set_proposal_result(validation_result, apply_result)
+
+    def _obstacle_resolved_states(self, campaign_id: str) -> dict[str, str]:
+        """Map ``{obstacle slug: authored resolved state}`` for the current room.
+
+        Bounds the DM-ruled ResolveObstacleChange authority to obstacles present in
+        the party's room, each only to its single canonical resolved state.
+        """
+        from dungeon_daddy.rpg.models import RoomObject
+        from dungeon_daddy.rpg.obstacles import obstacle_resolved_state
+
+        if self._mem_repo is None or self._state is None or not self._state.current_room_id:
+            return {}
+        states: dict[str, str] = {}
+        for od in self._mem_repo.get_objects_by_room(campaign_id, self._state.current_room_id):
+            resolved = obstacle_resolved_state(RoomObject(**od))
+            if resolved is not None:
+                states[od["slug"]] = resolved
+        return states
+
+    def _apply_obstacle_proposals(self, validation_result, outcome, actor_id) -> None:
+        """Apply accepted DM-ruled obstacle resolutions (Phase 51.5 Part B Slice 6).
+
+        For each accepted :class:`ResolveObstacleChange`, on a resolving roll outcome
+        (locked mapping), route the obstacle to its authored resolved state through
+        the deterministic ``ActivateObject`` pipeline so ``update_object_state`` +
+        side-effects fire and objectives re-advance. The validator already guarantees
+        ``to_state`` is the obstacle's authored resolved state.
+        """
+        from dungeon_daddy.rpg.command import ActivateObject
+        from dungeon_daddy.rpg.models import RoomObject
+        from dungeon_daddy.rpg.obstacles import is_resolving_outcome, resolving_trigger
+        from dungeon_daddy.rpg.proposal import ResolveObstacleChange
+
+        if self._mem_repo is None or actor_id is None or self._state is None:
+            return
+        if not is_resolving_outcome(outcome):
+            return
+        room_id = self._state.current_room_id
+        if not room_id:
+            return
+        campaign_id = self._rpg_campaign_id
+        by_slug = {
+            od["slug"]: RoomObject(**od)
+            for od in self._mem_repo.get_objects_by_room(campaign_id, room_id)
+        }
+        for change in validation_result.accepted:
+            if not isinstance(change, ResolveObstacleChange):
+                continue
+            obj = by_slug.get(change.object_slug)
+            if obj is None:
+                continue
+            trigger = resolving_trigger(obj, change.to_state)
+            if trigger is None:
+                continue
+            self._apply_vna_command(
+                ActivateObject(
+                    actor_id=actor_id, object_id=obj.object_id, trigger=trigger,
+                )
+            )
 
     def _apply_world_reaction(self, resolution):
         if self._rpg_service is None or self._mem_repo is None:
@@ -1773,11 +2253,10 @@ class PlayView(arcade.View):
             self._map.load(level, self._state, len(self._dungeon.levels), viewed_level_idx=new_idx)
 
     def _on_chat_send(self, text: str) -> None:
-        # While the contextual SAY box is up, a sent line is a dialogue line, not
-        # a DM free-text query. Phase 50.6 routes it to the stub (which ends the
-        # conversation); Phase 51 owns real dialogue routing.
-        if getattr(self, "_dialogue_stub_active", False):
-            self._on_dialogue_send_stub(text)
+        # While a dialogue channel is open, a sent line is a dialogue line, not
+        # a DM free-text query — route it to the channel (dispatched by kind).
+        if getattr(self, "_dialogue", None) is not None:
+            self._on_dialogue_send(text)
             return
         self._chat.add_message("gm", text)
         if text.strip() == "/clear":

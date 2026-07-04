@@ -24,3 +24,16 @@ def advance_clock(clock: ClockState, ticks: int) -> ClockState:
     if new_filled >= clock.segments:
         return clock.model_copy(update={"filled": clock.segments, "status": "completed"})
     return clock.model_copy(update={"filled": new_filled})
+
+
+def tick_clock(clock: ClockState, delta: int) -> ClockState:
+    """Move a clock by a signed delta, clamping filled to [0, segments].
+
+    A monotonic clock latches ``status="completed"`` when it reaches the top
+    (the existing :func:`advance_clock` behavior). A non-monotonic clock may
+    recede and never latches — its thresholds are read live by callers.
+    """
+    new_filled = max(0, min(clock.segments, clock.filled + delta))
+    if clock.monotonic and new_filled >= clock.segments:
+        return clock.model_copy(update={"filled": clock.segments, "status": "completed"})
+    return clock.model_copy(update={"filled": new_filled})

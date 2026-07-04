@@ -46,6 +46,10 @@ def apply_low_risk_proposals(
                 title=change.title,
                 summary=change.summary,
                 importance=change.importance,
+                # Auto-applied: no player review queue. The AI impacts the world
+                # directly (owner decision 2026-06-29); approved memories feed
+                # back through MemoryRetriever, which reads only `approved`.
+                status="approved",
             )
             for tag in change.tags:
                 repo.add_memory_tag(memory_id, tag)

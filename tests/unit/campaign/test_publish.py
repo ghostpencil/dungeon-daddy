@@ -126,6 +126,57 @@ def test_two_publish_calls_yield_independent_saves(tmp_path: Path) -> None:
     assert s2["dungeon_id"] == "run-2"
 
 
+def test_publish_writes_dungeon_persona_docs_and_refs(tmp_path: Path) -> None:
+    dungeons_dir = tmp_path / "dungeons"
+    saves_dir = tmp_path / "saves"
+    dungeons_dir.mkdir()
+    saves_dir.mkdir()
+    _seed_dungeon(dungeons_dir, "bone-cathedral")
+
+    manifest = CampaignManifest(
+        slug="bone-cathedral-seed",
+        title="Bone Cathedral",
+        dungeon_slug="bone-cathedral",
+        world_actors=[_actor("hero")],
+        player_side=["hero"],
+        dungeon_voice="I am the hungry dark.",
+        dungeon_knowledge=["The altar hides a key.", "Pinion fears fire."],
+    )
+
+    publish_save(manifest, dungeons_dir, saves_dir, "run-1", _MIGRATIONS_DIR)
+
+    save_dir = saves_dir / "run-1"
+    voice_path = save_dir / "memory" / "dungeon" / "voice.md"
+    knowledge_path = save_dir / "memory" / "dungeon" / "knowledge.md"
+    assert voice_path.exists()
+    assert knowledge_path.exists()
+
+    repo = MemoryRepository(save_dir / "campaign.duckdb")
+    campaign = repo.get_campaign("run-1")
+    assert campaign is not None
+    assert campaign["dungeon_voice_path"] == "memory/dungeon/voice.md"
+    assert campaign["dungeon_knowledge_path"] == "memory/dungeon/knowledge.md"
+
+
+def test_publish_without_persona_writes_no_docs_and_null_refs(tmp_path: Path) -> None:
+    dungeons_dir = tmp_path / "dungeons"
+    saves_dir = tmp_path / "saves"
+    dungeons_dir.mkdir()
+    saves_dir.mkdir()
+    _seed_dungeon(dungeons_dir, "bone-cathedral")
+
+    publish_save(_valid_manifest(), dungeons_dir, saves_dir, "run-1", _MIGRATIONS_DIR)
+
+    save_dir = saves_dir / "run-1"
+    assert not (save_dir / "memory" / "dungeon").exists()
+
+    repo = MemoryRepository(save_dir / "campaign.duckdb")
+    campaign = repo.get_campaign("run-1")
+    assert campaign is not None
+    assert campaign["dungeon_voice_path"] is None
+    assert campaign["dungeon_knowledge_path"] is None
+
+
 def test_invalid_manifest_raises(tmp_path: Path) -> None:
     dungeons_dir = tmp_path / "dungeons"
     saves_dir = tmp_path / "saves"

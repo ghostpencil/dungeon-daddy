@@ -8,6 +8,10 @@ from dungeon_daddy.campaign.manifest import CampaignManifest
 from dungeon_daddy.campaign.seeder import seed_from_manifest
 from dungeon_daddy.campaign.validator import validate_manifest
 from dungeon_daddy.data.models import SessionState
+from dungeon_daddy.memory.dungeon_persona import (
+    write_dungeon_knowledge,
+    write_dungeon_voice,
+)
 from dungeon_daddy.memory.repository import MemoryRepository
 
 
@@ -67,13 +71,34 @@ def _seed_duckdb(
 ) -> None:
     repo = MemoryRepository(save_dir / "campaign.duckdb")
     repo.initialize_schema(migrations_dir)
+    voice_path, knowledge_path = _write_dungeon_persona(manifest, save_dir, campaign_id)
     repo.save_campaign(
         campaign_id=campaign_id,
         slug=manifest.slug,
         title=manifest.title,
         dungeon_slug=manifest.dungeon_slug,
+        dungeon_voice_path=voice_path,
+        dungeon_knowledge_path=knowledge_path,
     )
     seed_from_manifest(manifest, repo, campaign_id)
+
+
+def _write_dungeon_persona(
+    manifest: CampaignManifest, save_dir: Path, campaign_id: str
+) -> tuple[str | None, str | None]:
+    """Write the dungeon persona docs (when authored) and return save-relative refs."""
+    dungeon_dir = save_dir / "memory" / "dungeon"
+    voice_ref: str | None = None
+    knowledge_ref: str | None = None
+    if manifest.dungeon_voice:
+        path = write_dungeon_voice(dungeon_dir, campaign_id, manifest.dungeon_voice)
+        voice_ref = path.relative_to(save_dir).as_posix()
+    if manifest.dungeon_knowledge:
+        path = write_dungeon_knowledge(
+            dungeon_dir, campaign_id, manifest.dungeon_knowledge
+        )
+        knowledge_ref = path.relative_to(save_dir).as_posix()
+    return voice_ref, knowledge_ref
 
 
 def _write_session_json(save_slug: str, save_dir: Path) -> None:

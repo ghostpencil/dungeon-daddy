@@ -16,6 +16,7 @@ from dungeon_daddy.rpg.proposal import (
     LLMReactionProposal,
     NpcReactionChange,
     ProposedChange,
+    ResolveObstacleChange,
     StripItemChange,
     TransformItemChange,
 )
@@ -48,6 +49,7 @@ def validate_proposal(
     known_item_slugs: set[str] | None = None,
     dungeon_item_counts: dict[str, int] | None = None,
     known_exit_ids: set[str] | None = None,
+    obstacle_resolved_states: dict[str, str] | None = None,
 ) -> ValidationResult:
     result = ValidationResult(source=proposal.source)
     actor_ids = known_actor_ids or set()
@@ -57,6 +59,7 @@ def validate_proposal(
     item_slugs = known_item_slugs or set()
     di_counts = dungeon_item_counts or {}
     exit_ids = known_exit_ids or set()
+    resolved_states = obstacle_resolved_states or {}
 
     for change in proposal.proposed_changes:
         rejection_reason: str | None = None
@@ -91,6 +94,15 @@ def validate_proposal(
         elif isinstance(change, BlockExitChange):
             if change.exit_id not in exit_ids:
                 rejection_reason = f"Unknown exit reference: {change.exit_id}"
+        elif isinstance(change, ResolveObstacleChange):
+            authored = resolved_states.get(change.object_slug)
+            if authored is None:
+                rejection_reason = f"Unknown obstacle reference: {change.object_slug}"
+            elif change.to_state != authored:
+                rejection_reason = (
+                    f"Obstacle {change.object_slug!r} cannot be pushed to "
+                    f"{change.to_state!r}; authored resolved state is {authored!r}"
+                )
 
         if rejection_reason is not None:
             _log.info("Proposal rejected [%s]: %s", change.kind, rejection_reason)

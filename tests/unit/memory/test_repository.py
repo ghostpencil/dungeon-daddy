@@ -267,6 +267,32 @@ class TestMemoryRepository:
         repo.close()
         assert "dungeon_slug" in cols
 
+    def test_campaign_persona_paths_round_trip(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.save_campaign(
+            campaign_id="c1",
+            slug="crucible",
+            title="The Crucible",
+            dungeon_voice_path="memory/dungeon/voice.md",
+            dungeon_knowledge_path="memory/dungeon/knowledge.md",
+        )
+        row = repo.get_campaign("c1")
+        repo.close()
+        assert row is not None
+        assert row["dungeon_voice_path"] == "memory/dungeon/voice.md"
+        assert row["dungeon_knowledge_path"] == "memory/dungeon/knowledge.md"
+
+    def test_campaign_persona_paths_default_none(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.save_campaign(campaign_id="c1", slug="crucible", title="The Crucible")
+        row = repo.get_campaign("c1")
+        repo.close()
+        assert row is not None
+        assert row["dungeon_voice_path"] is None
+        assert row["dungeon_knowledge_path"] is None
+
 
 # ---------------------------------------------------------------------------
 # actor_abilities — Cycles 14–21

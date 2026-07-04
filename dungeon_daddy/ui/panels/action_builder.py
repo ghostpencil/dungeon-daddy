@@ -52,6 +52,8 @@ class InChatActionBuilder:
         # Hit rects populated by draw(): slots, the open popup's rows, the button.
         self._slot_rects: list[tuple[float, float, float, float, str]] = []
         self._popup_row_rects: list[tuple[float, float, float, float, str]] = []
+        # Clickable suggested-approach chips for the selected obstacle (Slice 3).
+        self._suggestion_rects: list[tuple[float, float, float, float, str]] = []
         self._button_rect: tuple[float, float, float, float] | None = None
         # Collapsible band (Slice 11): collapsed shows only the header/toggle row.
         # ``_user_toggled`` latches once the user clicks the toggle so that
@@ -78,6 +80,35 @@ class InChatActionBuilder:
             result.append((_KIND_TARGET, self._panel.selected_target_label()))
         result.append((_KIND_ADVERB, self._panel.selected_adverb_label()))
         return result
+
+    # ------------------------------------------------------------------
+    # Obstacle approaches (Slice 3) — suggested actions for the selected obstacle
+    # ------------------------------------------------------------------
+
+    def suggested_approach_labels(self) -> list[str]:
+        """Display labels of the selected obstacle's suggested approach verbs.
+
+        The obstacle's class-flavored approaches (from the room context) filtered
+        to the verbs actually **offered** to the acting actor, so every suggestion
+        is actionable — universal approaches (fight, tinker, …) always show; a
+        class approach the actor lacks does not. Empty when the selected noun is
+        not an obstacle. Order follows the obstacle's approach order.
+        """
+        approach_verbs = self._panel.selected_noun_approach_verbs()
+        offered = {v.verb: v.label for v in self._panel.verb_options()}
+        return [offered[verb] for verb in approach_verbs if verb in offered]
+
+    def _select_suggested_approach(self, label: str) -> None:
+        """Select a suggested approach verb while keeping the obstacle noun.
+
+        ``select_verb`` re-defaults the Noun slot, so the currently-selected
+        obstacle is re-selected afterwards — the player's intent is "solve *this*
+        obstacle with that approach".
+        """
+        noun = self._panel.selected_noun_option()
+        self._panel.select_verb_by_label(label)
+        if noun is not None:
+            self._panel.select_noun(noun.noun_id)
 
     def slot_is_unset(self, kind: str) -> bool:
         """True when ``kind`` has no current selection.
@@ -154,15 +185,10 @@ class InChatActionBuilder:
         """Route a click. Returns ``True`` when the builder consumed it.
 
         An open popup takes priority (it is drawn on top): a click on one of its
-        rows selects that option and closes the popup. The collapse toggle in the
-        header row is hit-tested before the slots/button.
+        rows selects that option and closes the popup. Its rows can overlap the
+        header, so the popup is hit-tested *before* the collapse toggle; the
+        toggle is then hit-tested before the slots/button.
         """
-        if self._toggle_rect is not None:
-            left, bottom, w, h = self._toggle_rect
-            if left <= x < left + w and bottom <= y < bottom + h:
-                self.toggle_collapsed()
-                self._open_slot = None
-                return True
         if self._open_slot is not None:
             for left, bottom, w, h, label in self._popup_row_rects:
                 if left <= x < left + w and bottom <= y < bottom + h:
@@ -172,9 +198,19 @@ class InChatActionBuilder:
             # A click anywhere else while a popup is open dismisses it.
             self._open_slot = None
             return True
+        if self._toggle_rect is not None:
+            left, bottom, w, h = self._toggle_rect
+            if left <= x < left + w and bottom <= y < bottom + h:
+                self.toggle_collapsed()
+                self._open_slot = None
+                return True
         for left, bottom, w, h, kind in self._slot_rects:
             if left <= x < left + w and bottom <= y < bottom + h:
                 self._open_slot = kind
+                return True
+        for left, bottom, w, h, label in self._suggestion_rects:
+            if left <= x < left + w and bottom <= y < bottom + h:
+                self._select_suggested_approach(label)
                 return True
         if self._button_rect is not None:
             left, bottom, w, h = self._button_rect
@@ -295,6 +331,7 @@ class InChatActionBuilder:
     _SENTENCE_TOP_OFF = 16.0  # first-row baseline below the band top
     _PV_LINE_H = 15.0  # preview inset line height
     _PV_GAP = 6.0  # gap between the button row and the preview inset
+    _SUGGEST_ROW_H = 20.0  # suggested-approach chip row height
     # Constant gap kept between the wrapped sentence's lowest chip and the top of
     # the preview inset; the band sizes to honour it (Slice 11 dynamic height).
     _SENTENCE_PREVIEW_GAP = 16.0
@@ -383,6 +420,11 @@ class InChatActionBuilder:
         n = self.sentence_line_count(w)
         pv = self.preview_lines()
         pv_h = len(pv) * self._PV_LINE_H + 2 * PAD_SM if pv else 0.0
+        sug_h = (
+            self._SUGGEST_ROW_H + self._PV_GAP
+            if self.suggested_approach_labels()
+            else 0.0
+        )
         bottom_block = PAD_SM + self._BTN_H + self._PV_GAP  # button row + gap
         return (
             self._HEADER_H
@@ -392,6 +434,7 @@ class InChatActionBuilder:
             + bottom_block
             + (n - 1) * self._LINE_H
             + pv_h
+            + sug_h
         )
 
     def draw(self, x: float, y: float, w: float, h: float) -> None:
@@ -419,11 +462,13 @@ class InChatActionBuilder:
             RADIUS_SM,
             TEAL,
             TEXT_SM,
+            VIOLET,
             draw_rounded_rect,
         )
 
         self._slot_rects = []
         self._popup_row_rects = []
+        self._suggestion_rects = []
         self._button_rect = None
         self._toggle_rect = None
 
@@ -527,11 +572,11 @@ class InChatActionBuilder:
         # tags (spec §4.5), stacked just above the button row. No "PREVIEW"
         # kicker: the lines are self-describing and the kicker's accent bar poked
         # above the box. Lines are centred with symmetric top/bottom padding.
+        pv_line_h = self._PV_LINE_H
+        pv_bot = btn_y + btn_h + self._PV_GAP
         pv_lines = self.preview_lines()
+        pv_h = len(pv_lines) * pv_line_h + 2 * PAD_SM if pv_lines else 0.0
         if pv_lines:
-            pv_line_h = self._PV_LINE_H
-            pv_bot = btn_y + btn_h + self._PV_GAP
-            pv_h = len(pv_lines) * pv_line_h + 2 * PAD_SM
             draw_rounded_rect(
                 left + (right - left) / 2, pv_bot + pv_h / 2, right - left, pv_h,
                 RADIUS_SM, BG_1, border_color=LINE, border_width=1,
@@ -544,6 +589,37 @@ class InChatActionBuilder:
                     font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="center",
                 )
                 line_y -= pv_line_h
+
+        # Suggested-approach chips — the selected obstacle's class-flavored
+        # approaches (Slice 3), a clickable row above the preview inset. Clicking
+        # a chip fills the Verb slot with that approach (keeping the obstacle
+        # noun). A leading "TRY" caption reads as a hint, not a value.
+        sug_labels = self.suggested_approach_labels()
+        if sug_labels:
+            sug_bot = pv_bot + pv_h + self._PV_GAP
+            sug_cy = sug_bot + self._SUGGEST_ROW_H / 2
+            cur_x = left
+            arcade.draw_text(
+                "TRY", cur_x, sug_cy, INK_3,
+                font_size=TEXT_SM, font_name=FONT_MONO, anchor_y="center",
+            )
+            cur_x += self._text_w("TRY") + self._UNIT_GAP
+            for label in sug_labels:
+                chip_w = self._text_w(label) + PAD_SM * 2
+                draw_rounded_rect(
+                    cur_x + chip_w / 2, sug_cy, chip_w, self._SUGGEST_ROW_H,
+                    RADIUS_SM, BG_3, border_color=VIOLET, border_width=1,
+                )
+                arcade.draw_text(
+                    label.upper(), cur_x + chip_w / 2, sug_cy, VIOLET,
+                    font_size=TEXT_SM, font_name=FONT_MONO,
+                    anchor_x="center", anchor_y="center",
+                )
+                self._suggestion_rects.append(
+                    (cur_x, sug_cy - self._SUGGEST_ROW_H / 2, chip_w,
+                     self._SUGGEST_ROW_H, label)
+                )
+                cur_x += chip_w + self._UNIT_GAP
 
         # Open popup — drawn last, stacked upward from its slot so it never
         # spills off the bottom of the column.

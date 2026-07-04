@@ -73,6 +73,21 @@ class BlockExitChange(BaseModel):
     reason: str
 
 
+class ResolveObstacleChange(BaseModel):
+    """DM ruling that a described action resolves an obstacle (Phase 51.5 Part B).
+
+    The one narrowly-constrained exception to the LLM-never-mutates-object-state
+    boundary: the DM may push an obstacle to its resolved state, but the validator
+    only permits the obstacle's *authored* resolved state — the LLM cannot invent
+    ``to_state`` values.
+    """
+
+    kind: Literal["resolve_obstacle"] = "resolve_obstacle"
+    object_slug: str
+    to_state: str
+    reason: str
+
+
 ProposedChange = Annotated[
     Union[
         AdvanceClockChange,
@@ -84,6 +99,7 @@ ProposedChange = Annotated[
         StripItemChange,
         TransformItemChange,
         BlockExitChange,
+        ResolveObstacleChange,
     ],
     Field(discriminator="kind"),
 ]

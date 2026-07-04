@@ -1,0 +1,1 @@
+ALTER TABLE clocks ADD COLUMN monotonic BOOLEAN DEFAULT true

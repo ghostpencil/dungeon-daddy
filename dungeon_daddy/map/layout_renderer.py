@@ -34,7 +34,7 @@ from dungeon_daddy.map.dungeon_layout.visual_hierarchy_config import VisualHiera
 from dungeon_daddy.map.layout_debug_renderer import LayoutDebugRenderer
 from dungeon_daddy.ui.fog_of_war import HIDDEN_LABEL, fog_of_war_label
 from dungeon_daddy.rpg.action_options import RoomThings
-from dungeon_daddy.ui.theme import FONT_MONO, FONT_UI, GOLD, TEAL, TEXT_XS, draw_chip
+from dungeon_daddy.ui.theme import FONT_MONO, FONT_UI, GOLD, TEAL, TEXT_XS, VIOLET, draw_chip
 
 _ROOM_FILL = (30, 35, 45)
 _ROOM_BORDER = (100, 120, 140)
@@ -58,6 +58,7 @@ _PANEL_THING_LINE_HEIGHT = 22  # "thing" rows carry a status chip → taller
 # with the glyphs rather than sitting a row low (Slice 8 fix).
 _THING_ROW_CENTER_DY = 4
 _PANEL_SELECTED_COLOR = (*TEAL, 255)  # selected "Things Here" row text
+_PANEL_DUNGEON_COLOR = (*VIOLET, 255)  # "Speak to the Dungeon" entry affordance
 _PANEL_MARKER_COL_W = 16  # left gutter reserved for the per-row selection marker
 _PANEL_MARKER_FONT_SIZE = 13  # selected marker is drawn larger so it reads clearly
 _PANEL_PADDING = 10
@@ -66,7 +67,9 @@ _PANEL_FONT_SIZE = 9
 
 
 def _line_height(line: PanelLine) -> int:
-    return _PANEL_THING_LINE_HEIGHT if line.kind == "thing" else _PANEL_LINE_HEIGHT
+    if line.kind in ("thing", "dungeon_speak"):
+        return _PANEL_THING_LINE_HEIGHT
+    return _PANEL_LINE_HEIGHT
 
 
 def _panel_height(lines: list[PanelLine]) -> float:
@@ -160,6 +163,7 @@ class LayoutRenderer:
         mode: str = "graph",
         room_things: RoomThings | None = None,
         selected_noun_id: str | None = None,
+        dungeon_channel_open: bool = False,
     ) -> None:
         cfg = presentation_config or GraphPresentationConfig()
         # Reset each draw; only the play-mode branch repopulates it.
@@ -194,7 +198,9 @@ class LayoutRenderer:
                     # Play mode: the player-facing "Things Here" overlay replaces
                     # the graph authoring readout. Placement still anchors to the
                     # selected (== current) room, so positioning is unchanged.
-                    lines = format_things_here(room_things, selected_noun_id)
+                    lines = format_things_here(
+                        room_things, selected_noun_id, dungeon_channel_open
+                    )
                 else:
                     panel_data = build_room_detail(sel, level, result) if sel else None
                     lines = format_detail_panel(panel_data)
@@ -491,12 +497,15 @@ class LayoutRenderer:
                 # format_things_here) plus TEAL text — no rectangle, which read
                 # misaligned (Slice 8 fix).
                 color = _PANEL_SELECTED_COLOR
+            elif line.kind == "dungeon_speak":
+                color = _PANEL_DUNGEON_COLOR
             else:
                 color = _PANEL_VALUE_COLOR
             row_h = _line_height(line)
             row_center = y + _THING_ROW_CENTER_DY
             is_thing = line.kind == "thing"
-            if is_thing and line.noun_id is not None:
+            is_clickable = line.kind in ("thing", "dungeon_speak")
+            if is_clickable and line.noun_id is not None:
                 # Record the clickable row rect (screen space), centred on the
                 # drawn text, so a click routes to the right noun (§5.3).
                 self._thing_rects[line.noun_id] = ScreenRect(

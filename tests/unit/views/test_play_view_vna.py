@@ -108,6 +108,57 @@ def test_refresh_vna_panel_feeds_things_here_overlay(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Phase 51 Slice 9 — dungeon-channel entry affordance + gating
+# ---------------------------------------------------------------------------
+
+def _seed_intimacy_clock(repo, *, filled: int, segments: int = 6):
+    repo.save_clock(
+        clock_id="clk-intimacy", campaign_id="camp-1",
+        label="Regard", segments=segments, filled=filled,
+        category="dungeon_intimacy", clock_level="dungeon", monotonic=False,
+    )
+
+
+def test_push_overlay_opens_dungeon_channel_when_gates_pass(tmp_path):
+    view = _make_view(tmp_path)
+    view._map = MagicMock()
+    _seed_intimacy_clock(view._mem_repo, filled=3)
+    view._last_room_context = {"room_id": "r1", "resonance_point": True}
+    view._last_actor_dict = {"actor_id": "a1", "display_name": "Hero"}
+
+    view._push_things_here_overlay()
+
+    kwargs = view._map.set_things_here.call_args.kwargs
+    assert kwargs["dungeon_channel_open"] is True
+
+
+def test_push_overlay_keeps_channel_closed_off_resonance(tmp_path):
+    view = _make_view(tmp_path)
+    view._map = MagicMock()
+    _seed_intimacy_clock(view._mem_repo, filled=6)
+    view._last_room_context = {"room_id": "r1", "resonance_point": False}
+    view._last_actor_dict = {"actor_id": "a1", "display_name": "Hero"}
+
+    view._push_things_here_overlay()
+
+    kwargs = view._map.set_things_here.call_args.kwargs
+    assert kwargs["dungeon_channel_open"] is False
+
+
+def test_overlay_click_speak_opens_dungeon_dialogue(tmp_path):
+    from dungeon_daddy.map.dungeon_layout.detail_panel_renderer import (
+        DUNGEON_SPEAK_NOUN_ID,
+    )
+    view = _make_view(tmp_path)
+    view._map = MagicMock()
+    view._begin_dungeon_dialogue = MagicMock()
+
+    view._on_overlay_noun_click(DUNGEON_SPEAK_NOUN_ID)
+
+    view._begin_dungeon_dialogue.assert_called_once_with()
+
+
+# ---------------------------------------------------------------------------
 # Phase 50.6 Slice 8 — overlay noun click feeds the builder
 # ---------------------------------------------------------------------------
 
@@ -522,9 +573,12 @@ def test_submit_activate_card_posts_roll_bubble_for_contested_transition(tmp_pat
     assert view._chat.add_message.called
     msg = view._chat.add_message.call_args.args[1]
     assert "rolls" in msg  # mechanical roll bubble, not "not wired" message
-    # Roll path → object state unchanged
+    # Roll path taken (vs the deterministic activate). Object state now changes
+    # only on a resolving outcome (Phase 51.5 Part A) — the random roll leaves it
+    # either unchanged (miss) or at the resolved state (crit/full/partial).
+    # Deterministic outcome→state coverage is in test_play_view_obstacle.py.
     updated = view._mem_repo.get_room_object("obj-trap")
-    assert updated["current_state"] == "armed"
+    assert updated["current_state"] in ("armed", "triggered")
 
 
 def test_submit_activate_card_posts_error_when_no_valid_transition(tmp_path):
@@ -574,6 +628,80 @@ def test_submit_activate_with_required_item_missing_posts_error(tmp_path):
     assert "lift-fuse" in msg
     updated = view._mem_repo.get_room_object("obj-lift")
     assert updated["current_state"] == "idle"
+
+
+# ---------------------------------------------------------------------------
+# Phase 51.5 Slice 9 — advance_objectives wired into command resolution
+# ---------------------------------------------------------------------------
+
+def _save_objective(repo, **kw):
+    from dungeon_daddy.rpg.models import Objective, ObjectiveCompletion
+
+    completion = kw.pop("completion", None) or ObjectiveCompletion(
+        kind="object_state", target_slug="gearworks", required_state="restored",
+    )
+    defaults = dict(
+        objective_id="obj-1", campaign_id="camp-1", slug="restore-gearworks",
+        title="Restore the Gearworks", description="Repair the sand-choked gearworks.",
+        tier_index=0, status="active", advances_clock_slug="dungeon_intimacy",
+        reveals_knowledge=["The forge remembers its first fire."],
+    )
+    defaults.update(kw)
+    objective = Objective(completion=completion, **defaults)
+    repo.save_objective(objective)
+    return objective
+
+
+def test_apply_vna_command_completes_objective_and_surfaces_tier_up(tmp_path):
+    # Restoring a subsystem to the objective's required state completes it
+    # (advance_objectives runs post-command) and surfaces a dungeon line.
+    from dungeon_daddy.rpg.action_options import ActionCard
+    from dungeon_daddy.rpg.models import ObjectTransition, RoomObject
+
+    view = _make_view(tmp_path)
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-gears", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="gearworks", display_name="Sand-Choked Gearworks", archetype="mechanism",
+        description="A jammed mass of gears.", current_state="jammed",
+        transitions=[ObjectTransition(
+            transition_id="tr-fix", object_id="obj-gears",
+            from_state="jammed", to_state="restored", trigger="repair", contested=False,
+        )],
+    ))
+    _save_objective(view._mem_repo)
+
+    view._on_vna_submit(ActionCard(verb="activate", noun_id="obj-gears", adverb="carefully"))
+
+    assert view._mem_repo.get_objectives("camp-1")[0]["status"] == "completed"
+    posted = [c.args[1] for c in view._chat.add_message.call_args_list]
+    assert any("deepens" in m for m in posted)
+
+
+def test_apply_vna_command_no_tier_up_when_nothing_completes(tmp_path):
+    # A successful command that does not satisfy any objective posts no dungeon line.
+    from dungeon_daddy.rpg.action_options import ActionCard
+    from dungeon_daddy.rpg.models import ObjectTransition, RoomObject
+
+    view = _make_view(tmp_path)
+    view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-gears", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="gearworks", display_name="Sand-Choked Gearworks", archetype="mechanism",
+        description="A jammed mass of gears.", current_state="jammed",
+        transitions=[ObjectTransition(
+            transition_id="tr-fix", object_id="obj-gears",
+            from_state="jammed", to_state="loosened", trigger="repair", contested=False,
+        )],
+    ))
+    # Objective needs "restored" — "loosened" does not satisfy it.
+    _save_objective(view._mem_repo)
+
+    view._on_vna_submit(ActionCard(verb="activate", noun_id="obj-gears", adverb="carefully"))
+
+    assert view._mem_repo.get_objectives("camp-1")[0]["status"] == "active"
+    posted = [c.args[1] for c in view._chat.add_message.call_args_list]
+    assert not any("deepens" in m for m in posted)
 
 
 def test_submit_activate_with_required_item_held_transitions_and_consumes(tmp_path):
@@ -954,16 +1082,19 @@ def test_sway_on_hostile_creature_rolls_not_dialogue(tmp_path):
     view._chat.set_dialogue_mode.assert_not_called()
 
 
-def test_dialogue_send_exits_dialogue_stub(tmp_path):
-    # While the SAY box is up, sending a line ends the (stubbed) conversation and
-    # swaps back to the builder. Real dialogue routing is Phase 51.
+def test_dialogue_send_routes_to_dialogue_channel(tmp_path):
+    # While a dialogue session is open, a sent line is routed to the dialogue
+    # channel (not the DM free-text path). Phase 51 Slice 8.
+    from dungeon_daddy.views.play_view import DialogueSession
+
     view = _make_view(tmp_path)
-    view._dialogue_stub_active = True
+    view._dialogue = DialogueSession(kind="npc", room_id="r1", target_id="npc-1")
 
     view._on_chat_send("hello warden")
 
-    assert view._dialogue_stub_active is False
-    view._chat.set_dialogue_mode.assert_called_once_with(False)
+    # The npc thin binding records the turn and keeps the channel open.
+    assert view._dialogue is not None
+    assert ("player", "hello warden") in view._dialogue.turns
 
 
 def test_build_context_bundle_includes_current_room_objects(tmp_path):

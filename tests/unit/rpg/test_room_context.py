@@ -6,7 +6,7 @@ import pytest
 
 from dungeon_daddy.data.models import SessionState
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.rpg.models import RoomExit
+from dungeon_daddy.rpg.models import RoomExit, RoomObject
 from dungeon_daddy.rpg.room_context import build_room_context
 
 MIGRATIONS_DIR = (
@@ -178,3 +178,35 @@ def test_resonance_point_defaults_to_false(repo: MemoryRepository) -> None:
 def test_resonance_point_true_is_passed_through(repo: MemoryRepository) -> None:
     result = build_room_context(ROOM_A, CAMPAIGN_ID, _session(), repo, resonance_point=True)
     assert result["resonance_point"] is True
+
+
+def _resonance_object(room_id: str = ROOM_A) -> RoomObject:
+    return RoomObject(
+        object_id=f"obj:{room_id}:font",
+        campaign_id=CAMPAIGN_ID,
+        room_id=room_id,
+        level_id="level:1",
+        slug="resonance-font",
+        display_name="Humming Font",
+        archetype="resonance_point",
+        description="A font that hums when you draw near.",
+        current_state="dormant",
+    )
+
+
+def test_resonance_point_derived_from_room_object(repo: MemoryRepository) -> None:
+    repo.save_room_object(_resonance_object())
+
+    result = build_room_context(ROOM_A, CAMPAIGN_ID, _session(), repo)
+
+    assert result["resonance_point"] is True
+
+
+def test_resonance_point_false_when_no_resonance_object(repo: MemoryRepository) -> None:
+    repo.save_room_object(
+        _resonance_object().model_copy(update={"archetype": "container"})
+    )
+
+    result = build_room_context(ROOM_A, CAMPAIGN_ID, _session(), repo)
+
+    assert result["resonance_point"] is False
