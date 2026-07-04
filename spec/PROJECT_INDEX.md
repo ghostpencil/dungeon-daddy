@@ -60,12 +60,21 @@ on branch `feat/phase-51.6-wrp`.**
      str|None`, `stress_amount: int=0`) — miss/partial tiers only (success/critical flow through
      transitions + the objective service, D5). Round-trip + defaults + validation covered. Full
      suite green (3407 passed).
-   - ⏭️ **NEXT: Slice 4 — migration `019` + repo load/save** (persistence, phase spec §4.4):
-     `019_reaction_policy.sql` adds the `reaction_policy` column on `room_objects` (DEFAULT
-     `'ambient'`) **and** the `object_reaction_bindings` table in one migration; repo loads
-     bindings with the object (like `transitions`). Three migration tests (applies on `018`-head,
-     idempotent from scratch, back-compat reads) + round-trip incl. bindings + policy.
-   - Slices 5–10 pending (see phase spec §4).
+   - ✅ **Slice 4 — migration `019` + repo load/save** (persistence) (`019_reaction_policy.sql`,
+     `memory/repository.py`, `tests/integration/test_rpg_memory_migrations.py`,
+     `tests/unit/memory/test_room_object_repository.py`). One migration adds the `reaction_policy`
+     column on `room_objects` (DEFAULT `'ambient'`, DuckDB backfills old rows) **and** the
+     `object_reaction_bindings` table. Repo `save_room_object` upserts policy + delete-then-insert
+     bindings (like `transitions`); all three SELECTs carry `reaction_policy`;
+     `_room_object_row_to_dict` loads `reaction_bindings` and coalesces NULL policy → `ambient` for
+     pre-019 rows. Tests: 019 applies on an `018`-head DB (old row reads `ambient`, bindings table
+     present), column-present, round-trip incl. policy + bindings, default-when-unset, upsert
+     replaces bindings. Full suite green (3412 passed).
+   - ⏭️ **NEXT: Slice 5 — ambient selection rule** (pure helper, phase spec §4.5, design §4):
+     `select_ambient_clock(active_clocks, room_id, level_id) -> ClockState | None` — single
+     tightest-scoped active **adverse** clock (room > level, ties by lowest id); ignores
+     `action_tags`. Worked example: statue-miss in R1 → "Scorpion Nest Agitated"; none → `None`.
+   - Slices 6–10 pending (see phase spec §4).
 2. **Then: Tag Hygiene → Narrator Lookup Tool** — new two-part spec
    `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` (draft 2026-07-04): Phase A unifies the tag
    taxonomy and fixes the broken tag pipeline (audit: actor tags dropped at seed time, three

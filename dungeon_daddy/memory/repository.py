@@ -1124,9 +1124,9 @@ class MemoryRepository:
             """
             INSERT INTO room_objects (
                 object_id, campaign_id, room_id, level_id, slug,
-                display_name, archetype, description, current_state
+                display_name, archetype, description, current_state, reaction_policy
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (object_id) DO UPDATE SET
                 room_id      = excluded.room_id,
                 level_id     = excluded.level_id,
@@ -1134,7 +1134,8 @@ class MemoryRepository:
                 display_name = excluded.display_name,
                 archetype    = excluded.archetype,
                 description  = excluded.description,
-                current_state = excluded.current_state
+                current_state = excluded.current_state,
+                reaction_policy = excluded.reaction_policy
             """,
             [
                 obj.object_id,
@@ -1146,11 +1147,35 @@ class MemoryRepository:
                 obj.archetype,
                 obj.description,
                 obj.current_state,
+                obj.reaction_policy,
             ],
         )
         self._conn.execute(
             "DELETE FROM object_transitions WHERE object_id = ?", [obj.object_id]
         )
+        self._conn.execute(
+            "DELETE FROM object_reaction_bindings WHERE object_id = ?", [obj.object_id]
+        )
+        for b in obj.reaction_bindings:
+            self._conn.execute(
+                """
+                INSERT INTO object_reaction_bindings (
+                    binding_id, object_id, action_verb, outcome,
+                    clock_slug, clock_delta, stress_track, stress_amount
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    b.binding_id,
+                    b.object_id,
+                    b.action_verb,
+                    b.outcome,
+                    b.clock_slug,
+                    b.clock_delta,
+                    b.stress_track,
+                    b.stress_amount,
+                ],
+            )
         for t in obj.transitions:
             self._conn.execute(
                 """
@@ -1180,7 +1205,7 @@ class MemoryRepository:
         row = self._conn.execute(
             """
             SELECT object_id, campaign_id, room_id, level_id, slug,
-                   display_name, archetype, description, current_state
+                   display_name, archetype, description, current_state, reaction_policy
             FROM room_objects WHERE object_id = ?
             """,
             [object_id],
@@ -1194,7 +1219,7 @@ class MemoryRepository:
         rows = self._conn.execute(
             """
             SELECT object_id, campaign_id, room_id, level_id, slug,
-                   display_name, archetype, description, current_state
+                   display_name, archetype, description, current_state, reaction_policy
             FROM room_objects
             WHERE campaign_id = ? AND room_id = ?
             ORDER BY display_name
@@ -1209,7 +1234,7 @@ class MemoryRepository:
         rows = self._conn.execute(
             """
             SELECT object_id, campaign_id, room_id, level_id, slug,
-                   display_name, archetype, description, current_state
+                   display_name, archetype, description, current_state, reaction_policy
             FROM room_objects
             WHERE campaign_id = ?
             ORDER BY slug
@@ -1253,6 +1278,28 @@ class MemoryRepository:
             }
             for tr in t_rows
         ]
+        b_rows = self._conn.execute(
+            """
+            SELECT binding_id, object_id, action_verb, outcome,
+                   clock_slug, clock_delta, stress_track, stress_amount
+            FROM object_reaction_bindings WHERE object_id = ?
+            ORDER BY binding_id
+            """,
+            [object_id],
+        ).fetchall()
+        reaction_bindings = [
+            {
+                "binding_id": br[0],
+                "object_id": br[1],
+                "action_verb": br[2],
+                "outcome": br[3],
+                "clock_slug": br[4],
+                "clock_delta": br[5],
+                "stress_track": br[6],
+                "stress_amount": br[7],
+            }
+            for br in b_rows
+        ]
         return {
             "object_id": r[0],
             "campaign_id": r[1],
@@ -1263,7 +1310,9 @@ class MemoryRepository:
             "archetype": r[6],
             "description": r[7],
             "current_state": r[8],
+            "reaction_policy": r[9] if r[9] is not None else "ambient",
             "transitions": transitions,
+            "reaction_bindings": reaction_bindings,
         }
 
     # ------------------------------------------------------------------
