@@ -16,10 +16,66 @@ ClockCategory = Literal[
 
 _ADVERSE_CATEGORIES = frozenset({"danger", "pursuit", "ritual"})
 
+# The canonical ClockCategory members, as a runtime-iterable tuple (the Literal
+# type itself is not iterable). Order matches the Literal above.
+CLOCK_CATEGORIES: tuple[ClockCategory, ...] = (
+    "objective",
+    "relationship",
+    "faction_pressure",
+    "dungeon_intimacy",
+    "danger",
+    "pursuit",
+    "ritual",
+)
+_CLOCK_CATEGORY_MEMBERS = frozenset(CLOCK_CATEGORIES)
+
+# Non-enum category strings that appear in seeded/authored data (e.g. the
+# campaign manifests) mapped onto their canonical ClockCategory. "threat" and
+# "environment" are generic adverse buckets → danger; "escalation" is an
+# alert/detection ramp → pursuit.
+_CLOCK_CATEGORY_SYNONYMS: dict[str, ClockCategory] = {
+    "threat": "danger",
+    "environment": "danger",
+    "escalation": "pursuit",
+}
+
+# Fallback for an unrecognized category. Deliberately a firewall-protected,
+# non-adverse member: an unknown clock must never become ambient-eligible
+# (that fail-safe asymmetry is the whole point of the firewall). Unknowns are
+# reported via is_known_clock_category rather than coerced silently.
+_UNKNOWN_CLOCK_CATEGORY_FALLBACK: ClockCategory = "faction_pressure"
+
 
 def is_adverse(category: str | None) -> bool:
     """A clock is adverse iff its category is danger, pursuit, or ritual."""
     return category in _ADVERSE_CATEGORIES
+
+
+def is_known_clock_category(category: str | None) -> bool:
+    """True if the raw category is None, a canonical member, or a known synonym.
+
+    A False result is the explicit "unknown category" signal — a data pass can
+    flag the clock instead of silently coercing it to the fallback.
+    """
+    if category is None:
+        return True
+    return category in _CLOCK_CATEGORY_MEMBERS or category in _CLOCK_CATEGORY_SYNONYMS
+
+
+def normalize_clock_category(category: str | None) -> ClockCategory | None:
+    """Map a raw clock category string onto the ClockCategory enum.
+
+    None stays None; canonical members pass through unchanged (idempotent);
+    known synonyms map to their canonical member; anything else falls back to
+    _UNKNOWN_CLOCK_CATEGORY_FALLBACK. Every non-None result is a valid enum member.
+    """
+    if category is None:
+        return None
+    if category in _CLOCK_CATEGORY_MEMBERS:
+        return category  # type: ignore[return-value]
+    if category in _CLOCK_CATEGORY_SYNONYMS:
+        return _CLOCK_CATEGORY_SYNONYMS[category]
+    return _UNKNOWN_CLOCK_CATEGORY_FALLBACK
 
 
 class StressTrack(BaseModel):
@@ -35,7 +91,7 @@ class StressTrack(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def filled_within_capacity(self) -> "StressTrack":
+    def filled_within_capacity(self) -> StressTrack:
         if self.filled > self.capacity:
             raise ValueError("filled cannot exceed capacity")
         return self
@@ -63,7 +119,7 @@ class ClockState(BaseModel):
     monotonic: bool = True
 
     @model_validator(mode="after")
-    def filled_within_segments(self) -> "ClockState":
+    def filled_within_segments(self) -> ClockState:
         if self.filled > self.segments:
             raise ValueError("filled cannot exceed segments")
         return self
@@ -156,8 +212,8 @@ class WorldReaction(BaseModel):
     campaign_id: str
     source_resolution_id: str
     outcome: Literal["critical", "full", "partial", "miss"]
-    clock_lines: list["ReactionClockLine"] = Field(default_factory=list)
-    stress_lines: list["ReactionStressLine"] = Field(default_factory=list)
+    clock_lines: list[ReactionClockLine] = Field(default_factory=list)
+    stress_lines: list[ReactionStressLine] = Field(default_factory=list)
     summary_lines: list[str] = Field(default_factory=list)
 
 
@@ -196,7 +252,7 @@ class ItemFeature(BaseModel):
     modifier: int | None = None
 
     @model_validator(mode="after")
-    def check_modifier_consistency(self) -> "ItemFeature":
+    def check_modifier_consistency(self) -> ItemFeature:
         if self.feature_type == "rating_modifier" and self.modifier is None:
             raise ValueError("rating_modifier feature requires a non-null modifier")
         if self.feature_type == "new_action" and self.modifier is not None:
@@ -230,7 +286,7 @@ class Item(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def check_item_invariants(self) -> "Item":
+    def check_item_invariants(self) -> Item:
         if self.item_type == "class_kit":
             if self.charges_max is None or self.charges_max < 1:
                 raise ValueError("class_kit requires charges_max >= 1")
@@ -300,7 +356,7 @@ class ObjectiveCompletion(BaseModel):
     required_state: str | None = None
 
     @model_validator(mode="after")
-    def object_state_requires_required_state(self) -> "ObjectiveCompletion":
+    def object_state_requires_required_state(self) -> ObjectiveCompletion:
         if self.kind == "object_state" and not self.required_state:
             raise ValueError("object_state completion requires required_state")
         return self

@@ -44,10 +44,21 @@ on branch `feat/phase-51.6-wrp`.**
      pre-normalization saves/seeds load (confirmed live seeds carry non-enum `threat`/`escalation`/
      `environment` — Slice 2 maps those). Pure `is_adverse()` = category ∈ {danger,pursuit,ritual}.
      Full suite green (3385 passed).
-   - ⏭️ **NEXT: Slice 2 — clock-category normalization pass** (data): idempotent normalizer mapping
-     seeded/live category strings to the enum (incl. recognizing `objective`); covers the live
-     Crucible clocks; unknown → explicit fallback, not silent.
-   - Slices 3–10 pending (see phase spec §4).
+   - ✅ **Slice 2 — clock-category normalization pass** (data) (`rpg/models.py`,
+     `tests/unit/rpg/test_models.py`, `tests/unit/rpg/test_seed_pack.py`). `CLOCK_CATEGORIES`
+     (runtime tuple) + pure `normalize_clock_category()` (None→None; canonical members idempotent;
+     synonyms `threat`/`environment`→`danger`, `escalation`→`pursuit`; **unknown → `faction_pressure`
+     fallback** — a firewall-protected, non-adverse member so an unrecognized clock can never become
+     ambient-eligible) + `is_known_clock_category()` (the "not silent" flag for data passes). Seed
+     coverage guard in `TestCampaignSeedFilesValidate` confirms every shipped Crucible/tomb clock
+     category normalizes onto the enum. Full suite green (3396 passed).
+   - ⏭️ **NEXT: Slice 3 — `reaction_policy` + `ObjectReactionBinding` models** (pure model, phase
+     spec §4.3): add `reaction_policy: Literal["scripted","ambient","inert"] = "ambient"` to
+     `RoomObject`; add `ObjectReactionBinding` (`binding_id, object_id, action_verb, outcome:
+     Literal["miss","partial"], clock_slug, clock_delta, stress_track, stress_amount`) with `*`
+     wildcard verb; `RoomObject.reaction_bindings: list[ObjectReactionBinding]`. Assert round-trip
+     + defaults.
+   - Slices 4–10 pending (see phase spec §4).
 2. **Then: Tag Hygiene → Narrator Lookup Tool** — new two-part spec
    `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` (draft 2026-07-04): Phase A unifies the tag
    taxonomy and fixes the broken tag pipeline (audit: actor tags dropped at seed time, three

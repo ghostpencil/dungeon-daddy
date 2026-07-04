@@ -1,9 +1,15 @@
 import json
-import pytest
 from pathlib import Path
+
+import pytest
 from pydantic import ValidationError
 
 from dungeon_daddy.memory.repository import MemoryRepository
+from dungeon_daddy.rpg.models import (
+    CLOCK_CATEGORIES,
+    is_known_clock_category,
+    normalize_clock_category,
+)
 from dungeon_daddy.rpg.seed_pack import (
     ApplyResult,
     SeedActor,
@@ -510,6 +516,25 @@ class TestCampaignSeedFilesValidate:
         assert "room" in levels, f"{campaign_dir.name}: missing room clock"
         assert "dungeon" in levels, f"{campaign_dir.name}: missing dungeon clock"
         assert "quest" in levels, f"{campaign_dir.name}: missing quest clock"
+
+    @pytest.mark.parametrize("campaign_dir", list(_SEED_DATA_DIR.iterdir()) if _SEED_DATA_DIR.exists() else [])
+    def test_campaign_clock_categories_normalize_to_the_enum(self, campaign_dir: Path) -> None:
+        # Phase 51.6 Slice 2: every shipped clock category must be recognized
+        # (a canonical member or a known synonym) and normalize onto a valid
+        # ClockCategory. An unmapped category here is the "not silent" signal —
+        # this test fails so the author adds an enum member or a synonym rather
+        # than letting it fall back invisibly.
+        seed_file = campaign_dir / "rpg_seed.json"
+        if not seed_file.exists():
+            pytest.skip(f"No rpg_seed.json in {campaign_dir.name}")
+        pack = load_seed_pack(seed_file)
+        for clock in pack.clocks:
+            assert is_known_clock_category(clock.category), (
+                f"{campaign_dir.name}: clock {clock.slug!r} has unrecognized "
+                f"category {clock.category!r} (add an enum member or a synonym)"
+            )
+            normalized = normalize_clock_category(clock.category)
+            assert normalized is None or normalized in CLOCK_CATEGORIES
 
     @pytest.mark.parametrize("campaign_dir", list(_SEED_DATA_DIR.iterdir()) if _SEED_DATA_DIR.exists() else [])
     def test_campaign_room_clocks_have_scope_room_id(self, campaign_dir: Path) -> None:

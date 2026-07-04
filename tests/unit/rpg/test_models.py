@@ -2,13 +2,13 @@ import pytest
 from pydantic import ValidationError
 
 from dungeon_daddy.rpg.models import (
+    CLOCK_CATEGORIES,
     ActionRating,
     ActionRequest,
     ActionResolution,
     ActorState,
     ClockState,
     FalloutRecord,
-    is_adverse,
     Item,
     ItemFeature,
     Objective,
@@ -20,6 +20,9 @@ from dungeon_daddy.rpg.models import (
     RoomObject,
     StressTrack,
     WorldReaction,
+    is_adverse,
+    is_known_clock_category,
+    normalize_clock_category,
 )
 
 
@@ -258,6 +261,50 @@ class TestIsAdverse:
         assert is_adverse(None) is False
         assert is_adverse("threat") is False
         assert is_adverse("") is False
+
+
+class TestNormalizeClockCategory:
+    def test_none_stays_none(self) -> None:
+        assert normalize_clock_category(None) is None
+
+    def test_canonical_members_pass_through_unchanged(self) -> None:
+        for cat in CLOCK_CATEGORIES:
+            assert normalize_clock_category(cat) == cat
+
+    def test_is_idempotent(self) -> None:
+        for cat in (None, "danger", "threat", "environment", "escalation", "mystery"):
+            once = normalize_clock_category(cat)
+            assert normalize_clock_category(once) == once
+
+    def test_known_synonyms_map_to_canonical_members(self) -> None:
+        assert normalize_clock_category("threat") == "danger"
+        assert normalize_clock_category("environment") == "danger"
+        assert normalize_clock_category("escalation") == "pursuit"
+
+    def test_unknown_string_falls_back_to_a_protected_non_adverse_member(self) -> None:
+        result = normalize_clock_category("mystery-category")
+        assert result in CLOCK_CATEGORIES
+        # Fail-safe: an unrecognized clock must never become ambient-eligible.
+        assert is_adverse(result) is False
+
+    def test_every_normalized_result_is_a_valid_enum_member(self) -> None:
+        for raw in (None, "danger", "threat", "environment", "escalation", "???"):
+            result = normalize_clock_category(raw)
+            assert result is None or result in CLOCK_CATEGORIES
+
+
+class TestIsKnownClockCategory:
+    def test_canonical_members_and_known_synonyms_are_known(self) -> None:
+        for cat in (*CLOCK_CATEGORIES, "threat", "environment", "escalation"):
+            assert is_known_clock_category(cat) is True
+
+    def test_none_is_known(self) -> None:
+        assert is_known_clock_category(None) is True
+
+    def test_unrecognized_string_is_not_known(self) -> None:
+        # This is the "explicit, not silent" signal: a data pass can flag the
+        # clock instead of coercing it invisibly.
+        assert is_known_clock_category("mystery-category") is False
 
 
 class TestActionRating:
