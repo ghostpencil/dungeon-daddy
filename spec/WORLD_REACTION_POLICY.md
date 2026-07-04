@@ -1,8 +1,8 @@
 # World Reaction Policy — Design Spec (proposed)
 
-**Status:** Design settled (owner decisions locked, 2026-07-01). **Not yet scheduled** —
-this is a new feature area outside the Phase 51.5 slice plan. Implementation is engine
-work and must be phase-scoped before starting.
+**Status:** Design settled (owner decisions locked, 2026-07-01; amended 2026-07-04).
+**Scheduled as Phase 51.6** (phase-scoped 2026-07-04) — slice plan, files-in-scope, and exit
+criteria in `spec/PHASE_51_6_WORLD_REACTION_POLICY.md`. This file remains the canonical design.
 
 **Supersedes** the blunt miss-consequence behavior in `spec/PHASE_35_WORLD_REACTION_SERVICE.md`.
 **Depends on / preserves** the `docs/LLM_AUTHORITY_BOUNDARY.md` rule and Phase 51.5 **D5**
@@ -236,9 +236,9 @@ Stall (R2), Sealed Dwarven Cargo Crate (R3).
 - ~~Migration/back-compat~~ **RESOLVED 2026-07-04:** migration `019` adds the column with
   DEFAULT `'ambient'`; model default covers pre-migration reads. Nothing is retro-promoted —
   the §6 scripted promotions happen only in the Crucible seeds.
-- **Phase scheduling (still open):** owner to slot it (its own phase, or folded into a
-  reaction-systems phase alongside Phase 53). Do not implement under Phase 51.5 without an
-  explicit scope decision.
+- ~~Phase scheduling~~ **RESOLVED 2026-07-04: Phase 51.6**, its own dotted sub-phase on a
+  fresh branch off `main` (not folded into the shipped 51.5, not merged with Phase 53). Full
+  slice plan, files-in-scope, and exit criteria: `spec/PHASE_51_6_WORLD_REACTION_POLICY.md`.
 
 ## 10. Code-audit findings (2026-07-04) — behaviors the original draft missed
 

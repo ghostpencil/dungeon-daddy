@@ -14,18 +14,17 @@ Do not write all tests for a module at once. Follow the **Red-Green-Refactor** l
 
 ---
 
-## Test File Map & Priority
+## Test File Layout & Build Order
 
-Modules must be built following this dependency order. Complete one "Vertical Slice" (Test + Impl) before moving to the next priority level:
+Unit tests mirror the application package: `tests/unit/<package>/test_<module>.py`
+(e.g. `dungeon_daddy/rpg/objectives.py` → `tests/unit/rpg/test_objectives.py`).
 
-| Application module | Test file | Priority |
-| :--- | :--- | :--- |
-| `dungeon_daddy/data/models.py` | `tests/unit/data/test_models.py` | 1 |
-| `dungeon_daddy/data/repository.py` | `tests/unit/data/test_repository.py` | 2 |
-| `dungeon_daddy/llm/provider.py` | `tests/unit/llm/test_provider.py` | 3 |
-| `dungeon_daddy/llm/agents/*.py` | `tests/unit/llm/test_*.py` | 4-7 |
-| `dungeon_daddy/ui/theme.py` | `tests/unit/ui/test_theme.py` | 8 |
-| `dungeon_daddy/map/*.py` | `tests/unit/map/test_*.py` | 9-12 |
+**Build order is defined per phase in the phase spec's slice plan** — pure models
+first, persistence next, services, LLM seams, then integration/wiring, seeds and
+UI last. Do not invent a global priority order; follow the current phase's slices.
+
+(`tests/RPG_MEMORY_TEST_PLAN.md` applies this same philosophy to the RPG/memory
+layers — it defers to this file on policy.)
 
 ---
 
@@ -36,8 +35,12 @@ Modules must be built following this dependency order. Complete one "Vertical Sl
 * **Protocol:** No mocking. Use real Pydantic models and `tmp_path`.
 
 ### 2. LLM Layer (The "Deep Module" Approach)
-* **Behavior focus:** Verify the agent produces correct system prompts and handles errors.
-* **Protocol:** **Never make real API calls.** Patch the `anthropic.Anthropic` client using `mocker`.
+* **Behavior focus:** Verify the agent assembles correct prompts/context sections and handles errors.
+* **Protocol:** **Never make real API calls in unit tests.** Agents take their provider via
+  dependency injection (CLAUDE.md rule) — **inject a fake provider at that seam** and assert on
+  the messages the agent hands it. Do not patch SDK clients (`openai.OpenAI` /
+  `anthropic.Anthropic`) inside agent tests; SDK-level patching belongs only in the provider's
+  own unit tests (`tests/unit/llm/test_provider.py`), where the provider *is* the unit.
 
 ### 3. Map Renderers (Visual Logic)
 * **Behavior focus:** Verify that the correct drawing functions are called with expected parameters.
@@ -109,10 +112,51 @@ Only the Arcade rendering components (`_inspector`, `_chat`, `_tree`, `_map`) ne
 ---
 
 ## Integration Tests
-Written only after the unit-level "Tracer Bullets" for a phase are complete:
-* `tests/integration/test_dungeon_persistence.py`: Full disk I/O round-trip.
-* `tests/integration/test_llm_integration.py`: Real API calls (Requires `ANTHROPIC_API_KEY`).
-* `tests/integration/test_play_menu.py`: Menu wiring — real Window + real DesignView + real repo.
+
+Written only after the unit-level "Tracer Bullets" for a phase are complete. They live in
+`tests/integration/` and fall into these categories:
+
+* **Persistence round-trips** — full disk I/O through real repos (e.g.
+  `test_dungeon_persistence.py`, `test_memory_persistence_roundtrip.py`,
+  `test_rpg_memory_migrations.py`).
+* **End-to-end resolution seams** — real Window/View objects (`__new__` + manual setup) wired to
+  real services, exercising a whole command path (e.g. `test_card_resolution_e2e.py`,
+  `test_activate_object_e2e.py`, `test_play_mode_rpg_wiring.py`).
+* **Pipeline tests** — multi-layer flows: context bundles, campaign pipeline, RPG+memory
+  full pipeline.
+* **Live-API tests** — `test_llm_integration.py` makes real provider calls; marked `live_api`
+  and **skipped without `OPENAI_API_KEY`** (the app's provider). These are the only integration
+  tests that touch the network.
+
+---
+
+## Migration Tests (required for every new migration)
+
+Every `dungeon_daddy/data/migrations/NNN_*.sql` ships with tests asserting:
+
+1. **Applies on a previous-head DB** — a database migrated through `NNN-1` migrates cleanly
+   to `NNN`.
+2. **Idempotent from scratch** — a fresh DB reaches head with the new migration included.
+3. **Back-compat reads** — rows created before the migration load correctly through the models
+   (defaults fill in; no crash on old saves).
+
+Pattern reference: `tests/integration/test_rpg_memory_migrations.py`.
+
+---
+
+## Evals (LLM output quality — separate from the deterministic suite)
+
+`tests/evals/` gauges AI output *quality* (DM narration, generator validity) with **live, paid,
+non-deterministic** API calls. They are excluded from the default run
+(`addopts = "-m 'not eval'"` in `pyproject.toml`):
+
+* Run manually: `pytest -m eval` · baseline: `python tools/run_evals.py`
+  (scores in `tests/evals/baseline_scores.json`).
+* Never add an eval to the deterministic suite, and never "fix" a flaky eval by loosening a
+  deterministic test — evals absorb LLM variance (e.g. mirroring production's retry budget),
+  deterministic tests stay strict.
+
+**Markers:** `eval` (above) and `live_api` (needs a real key; skipped when the key is absent).
 
 ---
 
@@ -139,8 +183,8 @@ pixel-color checks confirm the result.
 
 ### Strategy B — Vision-guided (adaptive sequence)
 
-Use the Claude vision API (`claude-sonnet-4-6`) to look at each screenshot and decide
-which step to execute next.  Steps are named functions with plain-English descriptions.
+Use the Claude vision API (current Sonnet model — see the model id pinned in the existing
+smoke tests) to look at each screenshot and decide which step to execute next.  Steps are named functions with plain-English descriptions.
 The driver loops until a terminal step is reached or `max_steps` is hit.
 
 **Use when:**

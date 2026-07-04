@@ -26,14 +26,15 @@ current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index `spec/IMPLEMENT
 puzzle-obstacle multi-approach feature (incl. Part B's constrained DM-ruled obstacle authority, bounded
 to an obstacle's **authored** resolved state). No 51.x build work remains.
 
-**Next — CHOSEN (owner, 2026-07-04): World Reaction Policy.**
-1. **World Reaction Policy** — fixes a real bug (a STUDY-miss moved 3 clocks incl.
+**Next — CHOSEN (owner, 2026-07-04): World Reaction Policy → scoped as Phase 51.6, ready to build.**
+1. **Phase 51.6 — World Reaction Policy** — fixes a real bug (a STUDY-miss moved 3 clocks incl.
    `dungeon_intimacy`, violating D5). Owner decisions locked 2026-07-01; **design amended
    2026-07-04** after a code-grounded review: §9 open items resolved (sibling
    `object_reaction_bindings` table, `ClockCategory` enum prerequisite, adverse-derived-from-
-   category, all three `_apply_world_reaction` call sites) + new §10 code-audit appendix. Spec
-   `spec/WORLD_REACTION_POLICY.md`. Still needs phase-scoping before build. Do **not** fold
-   into 51.5.
+   category, all three `_apply_world_reaction` call sites) + §10 code-audit appendix. **Phase-scoped
+   2026-07-04:** 10-slice TDD plan, files-in-scope, exit criteria in
+   `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` (design canonical in `spec/WORLD_REACTION_POLICY.md`).
+   Ready to build on a fresh branch off `main`; ships on its own PR. Do **not** fold into 51.5.
 2. **Then: Tag Hygiene → Narrator Lookup Tool** — new two-part spec
    `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` (draft 2026-07-04): Phase A unifies the tag
    taxonomy and fixes the broken tag pipeline (audit: actor tags dropped at seed time, three
@@ -142,12 +143,13 @@ Per-session implementation logs are in git history and the auto-memory (`project
   `IMPLEMENTATION_PHASES_33_ONWARDS.md`. A `spec/PHASE_NN_*.md` is written when each phase starts.
 - Phase 53 (Threat Behavior & Monster Reactions, planned): engine-bounded monster reactions, no enemy
   turn; bosses escalate via clock thresholds. Design: `spec/MONSTER_REACTION_DESIGN.md`.
-- World Reaction Policy (**chosen next**, needs phase-scoping — new feature, do NOT fold into 51.5):
+- World Reaction Policy → **Phase 51.6** (scoped 2026-07-04, ready to build — do NOT fold into 51.5):
   per-object `reaction_policy` (`scripted`/`ambient`/`inert`) to replace the blunt "miss = every tagged
   clock +2" fan-out. Fixes a real bug (a STUDY-miss on the R1 statue moved 3 campaign clocks incl. the
   `dungeon_intimacy` clock, violating D5's single-source rule). Owner decisions locked 2026-07-01;
-  amended 2026-07-04 (§9 resolved, §10 audit appendix). Design: `spec/WORLD_REACTION_POLICY.md`
-  (supersedes the miss behavior in `spec/PHASE_35_WORLD_REACTION_SERVICE.md`).
+  amended 2026-07-04 (§9 resolved, §10 audit appendix). Phase scope (10-slice TDD plan, files,
+  exit criteria): `spec/PHASE_51_6_WORLD_REACTION_POLICY.md`. Design (canonical):
+  `spec/WORLD_REACTION_POLICY.md` (supersedes the miss behavior in `spec/PHASE_35_WORLD_REACTION_SERVICE.md`).
 - Tag Taxonomy & Narrator Lookup (draft 2026-07-04, sequenced after WRP):
   `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` — Phase A tag hygiene (single namespaced taxonomy,
   migration `020`, seed/retrieval fixes, `# Related Lore` pre-fetch), Phase B read-only narrator

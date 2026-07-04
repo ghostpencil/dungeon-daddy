@@ -6,7 +6,16 @@ manually during a test run.
 
 ---
 
-## Claude-driven tests (preferred)
+## Verification posture (read first)
+
+**Phase acceptance is owner-manual.** The owner launches the app and verifies GUI behavior
+themselves — do **not** drive the live app with computer-use to "verify" a phase unless
+explicitly asked. The harness + MCP driving below is for **authoring smoke tests** and for
+on-request interactive debugging, not the default acceptance path.
+
+---
+
+## Claude-driven tests (when requested)
 
 Use `computer-use-mcp` (`mcp__computer-use-mcp__computer`) for screenshots and
 interaction.  The harness owns the process; the MCP tool owns the visuals.
