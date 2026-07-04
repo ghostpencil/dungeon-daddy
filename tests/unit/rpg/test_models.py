@@ -13,6 +13,7 @@ from dungeon_daddy.rpg.models import (
     ItemFeature,
     Objective,
     ObjectiveCompletion,
+    ObjectReactionBinding,
     ObjectTransition,
     ReactionClockLine,
     ReactionStressLine,
@@ -719,6 +720,133 @@ class TestObjectTransition:
         )
         assert t.contested is True
         assert t.action_verb == "scrap"
+
+
+class TestRoomObjectReactionPolicy:
+    def _obj(self, **overrides: object) -> RoomObject:
+        kwargs: dict[str, object] = dict(
+            object_id="obj:c:statue",
+            campaign_id="c",
+            room_id="room:r1",
+            level_id="level:1",
+            slug="statue",
+            display_name="Toppled Artificer Statue",
+            archetype="lore_fixture",
+            description="A toppled statue of the artificer.",
+            current_state="intact",
+        )
+        kwargs.update(overrides)
+        return RoomObject(**kwargs)  # type: ignore[arg-type]
+
+    def test_reaction_policy_defaults_to_ambient(self) -> None:
+        obj = self._obj()
+        assert obj.reaction_policy == "ambient"
+
+    def test_reaction_bindings_default_empty(self) -> None:
+        obj = self._obj()
+        assert obj.reaction_bindings == []
+
+    def test_all_reaction_policies_accepted(self) -> None:
+        for policy in ("scripted", "ambient", "inert"):
+            obj = self._obj(reaction_policy=policy)
+            assert obj.reaction_policy == policy
+
+    def test_unknown_reaction_policy_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            self._obj(reaction_policy="chaotic")
+
+    def test_round_trip_preserves_policy_and_bindings(self) -> None:
+        obj = self._obj(
+            reaction_policy="scripted",
+            reaction_bindings=[
+                ObjectReactionBinding(
+                    binding_id="rb:1",
+                    object_id="obj:c:statue",
+                    action_verb="study",
+                    outcome="miss",
+                    clock_slug="scorpion-nest-agitated",
+                    clock_delta=1,
+                )
+            ],
+        )
+        restored = RoomObject.model_validate(obj.model_dump())
+        assert restored.reaction_policy == "scripted"
+        assert len(restored.reaction_bindings) == 1
+        assert restored.reaction_bindings[0].binding_id == "rb:1"
+        assert restored.reaction_bindings[0].clock_slug == "scorpion-nest-agitated"
+
+
+class TestObjectReactionBinding:
+    def test_constructs_with_required_fields_optional_defaults(self) -> None:
+        b = ObjectReactionBinding(
+            binding_id="rb:1",
+            object_id="obj:c:statue",
+            action_verb="study",
+            outcome="miss",
+        )
+        assert b.binding_id == "rb:1"
+        assert b.action_verb == "study"
+        assert b.outcome == "miss"
+        assert b.clock_slug is None
+        assert b.clock_delta == 0
+        assert b.stress_track is None
+        assert b.stress_amount == 0
+
+    def test_wildcard_verb_accepted(self) -> None:
+        b = ObjectReactionBinding(
+            binding_id="rb:2",
+            object_id="obj:c:statue",
+            action_verb="*",
+            outcome="partial",
+        )
+        assert b.action_verb == "*"
+
+    def test_both_outcome_tiers_accepted(self) -> None:
+        for outcome in ("miss", "partial"):
+            b = ObjectReactionBinding(
+                binding_id="rb:x",
+                object_id="obj:c:statue",
+                action_verb="study",
+                outcome=outcome,
+            )
+            assert b.outcome == outcome
+
+    def test_unknown_outcome_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            ObjectReactionBinding(
+                binding_id="rb:3",
+                object_id="obj:c:statue",
+                action_verb="study",
+                outcome="success",
+            )
+
+    def test_clock_and_stress_consequences_stored(self) -> None:
+        b = ObjectReactionBinding(
+            binding_id="rb:4",
+            object_id="obj:c:statue",
+            action_verb="force",
+            outcome="miss",
+            clock_slug="scorpion-nest-agitated",
+            clock_delta=2,
+            stress_track="body",
+            stress_amount=1,
+        )
+        assert b.clock_slug == "scorpion-nest-agitated"
+        assert b.clock_delta == 2
+        assert b.stress_track == "body"
+        assert b.stress_amount == 1
+
+    def test_round_trip(self) -> None:
+        b = ObjectReactionBinding(
+            binding_id="rb:5",
+            object_id="obj:c:statue",
+            action_verb="*",
+            outcome="partial",
+            clock_slug="the-factory-learns",
+            clock_delta=1,
+        )
+        restored = ObjectReactionBinding.model_validate(b.model_dump())
+        assert restored == b
 
 
 class TestRoomExit:

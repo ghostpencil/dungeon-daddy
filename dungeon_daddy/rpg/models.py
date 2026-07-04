@@ -323,6 +323,25 @@ class ObjectTransition(BaseModel):
     action_verb: str | None = None
 
 
+class ObjectReactionBinding(BaseModel):
+    """A scripted world-reaction consequence for a `scripted` RoomObject (Phase 51.6 §5).
+
+    Authored, engine-owned mapping ``action_verb × outcome → consequence`` for the
+    miss/partial tiers only (success/critical flow through transitions and the
+    objective service, D5). ``action_verb`` may be ``"*"`` to match any verb.
+    A binding may advance a clock, apply stress, or both.
+    """
+
+    binding_id: str
+    object_id: str
+    action_verb: str
+    outcome: Literal["miss", "partial"]
+    clock_slug: str | None = None
+    clock_delta: int = 0
+    stress_track: str | None = None
+    stress_amount: int = 0
+
+
 class RoomObject(BaseModel):
     object_id: str
     campaign_id: str
@@ -334,6 +353,11 @@ class RoomObject(BaseModel):
     description: str
     current_state: str
     transitions: list[ObjectTransition] = Field(default_factory=list)
+    # Phase 51.6 World Reaction Policy: how a miss/partial on this object reacts.
+    # `ambient` = one locally-scoped adverse clock (§4); `scripted` = only the
+    # authored `reaction_bindings` (§5); `inert` = no mechanics.
+    reaction_policy: Literal["scripted", "ambient", "inert"] = "ambient"
+    reaction_bindings: list[ObjectReactionBinding] = Field(default_factory=list)
 
     @field_validator("description")
     @classmethod

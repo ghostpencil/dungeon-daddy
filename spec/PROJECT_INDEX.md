@@ -52,13 +52,20 @@ on branch `feat/phase-51.6-wrp`.**
      ambient-eligible) + `is_known_clock_category()` (the "not silent" flag for data passes). Seed
      coverage guard in `TestCampaignSeedFilesValidate` confirms every shipped Crucible/tomb clock
      category normalizes onto the enum. Full suite green (3396 passed).
-   - ⏭️ **NEXT: Slice 3 — `reaction_policy` + `ObjectReactionBinding` models** (pure model, phase
-     spec §4.3): add `reaction_policy: Literal["scripted","ambient","inert"] = "ambient"` to
-     `RoomObject`; add `ObjectReactionBinding` (`binding_id, object_id, action_verb, outcome:
-     Literal["miss","partial"], clock_slug, clock_delta, stress_track, stress_amount`) with `*`
-     wildcard verb; `RoomObject.reaction_bindings: list[ObjectReactionBinding]`. Assert round-trip
-     + defaults.
-   - Slices 4–10 pending (see phase spec §4).
+   - ✅ **Slice 3 — `reaction_policy` + `ObjectReactionBinding` models** (pure model) (`rpg/models.py`,
+     `tests/unit/rpg/test_models.py`). `RoomObject.reaction_policy: Literal["scripted","ambient",
+     "inert"] = "ambient"` + `RoomObject.reaction_bindings: list[ObjectReactionBinding]`. New
+     `ObjectReactionBinding` (`binding_id, object_id, action_verb` with `*` wildcard, `outcome:
+     Literal["miss","partial"]`, `clock_slug: str|None`, `clock_delta: int=0`, `stress_track:
+     str|None`, `stress_amount: int=0`) — miss/partial tiers only (success/critical flow through
+     transitions + the objective service, D5). Round-trip + defaults + validation covered. Full
+     suite green (3407 passed).
+   - ⏭️ **NEXT: Slice 4 — migration `019` + repo load/save** (persistence, phase spec §4.4):
+     `019_reaction_policy.sql` adds the `reaction_policy` column on `room_objects` (DEFAULT
+     `'ambient'`) **and** the `object_reaction_bindings` table in one migration; repo loads
+     bindings with the object (like `transitions`). Three migration tests (applies on `018`-head,
+     idempotent from scratch, back-compat reads) + round-trip incl. bindings + policy.
+   - Slices 5–10 pending (see phase spec §4).
 2. **Then: Tag Hygiene → Narrator Lookup Tool** — new two-part spec
    `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` (draft 2026-07-04): Phase A unifies the tag
    taxonomy and fixes the broken tag pipeline (audit: actor tags dropped at seed time, three
