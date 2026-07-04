@@ -26,11 +26,23 @@ current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index `spec/IMPLEMENT
 puzzle-obstacle multi-approach feature (incl. Part B's constrained DM-ruled obstacle authority, bounded
 to an obstacle's **authored** resolved state). No 51.x build work remains.
 
-**Next — owner's call:**
-1. **World Reaction Policy** — settled-but-**unscheduled** design that fixes a real bug (a STUDY-miss
-   moved 3 clocks incl. `dungeon_intimacy`, violating D5). Owner decisions locked 2026-07-01; spec
-   `spec/WORLD_REACTION_POLICY.md`. A new feature — do **not** fold into 51.5.
-2. **Phase 52 (Milestone Advancement)** or **Phase 53 (Threat Behavior)** — next roadmap phases
+**Next — CHOSEN (owner, 2026-07-04): World Reaction Policy.**
+1. **World Reaction Policy** — fixes a real bug (a STUDY-miss moved 3 clocks incl.
+   `dungeon_intimacy`, violating D5). Owner decisions locked 2026-07-01; **design amended
+   2026-07-04** after a code-grounded review: §9 open items resolved (sibling
+   `object_reaction_bindings` table, `ClockCategory` enum prerequisite, adverse-derived-from-
+   category, all three `_apply_world_reaction` call sites) + new §10 code-audit appendix. Spec
+   `spec/WORLD_REACTION_POLICY.md`. Still needs phase-scoping before build. Do **not** fold
+   into 51.5.
+2. **Then: Tag Hygiene → Narrator Lookup Tool** — new two-part spec
+   `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` (draft 2026-07-04): Phase A unifies the tag
+   taxonomy and fixes the broken tag pipeline (audit: actor tags dropped at seed time, three
+   actor-namespace spellings, retrieval never passes tags, untagged world entities); Phase B
+   gives the narrator agents a read-only `lookup_world` DuckDB tool. Owner-decided: **agent-owned
+   tool loop** (provider stays pure transport) and **two-tier retrieval** (deterministic
+   `# Related Lore` pre-fetch by default; tool only for out-of-scene topics). Remaining
+   T/L decision points to ratify at phase start. Sequenced after WRP.
+3. **Phase 52 (Milestone Advancement)** or **Phase 53 (Threat Behavior)** — next roadmap phases
    (`spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`).
 
 Reference on the just-shipped 51.5 work (live Crucible state, condensed architecture, locked decisions
@@ -130,12 +142,16 @@ Per-session implementation logs are in git history and the auto-memory (`project
   `IMPLEMENTATION_PHASES_33_ONWARDS.md`. A `spec/PHASE_NN_*.md` is written when each phase starts.
 - Phase 53 (Threat Behavior & Monster Reactions, planned): engine-bounded monster reactions, no enemy
   turn; bosses escalate via clock thresholds. Design: `spec/MONSTER_REACTION_DESIGN.md`.
-- World Reaction Policy (design settled, **unscheduled** — new feature, do NOT fold into 51.5): per-object
-  `reaction_policy` (`scripted`/`ambient`/`inert`) to replace the blunt "miss = every tagged clock +2"
-  fan-out. Fixes a real bug (a STUDY-miss on the R1 statue moved 3 campaign clocks incl. the
-  `dungeon_intimacy` clock, violating D5's single-source rule). Owner decisions locked 2026-07-01.
-  Design: `spec/WORLD_REACTION_POLICY.md` (supersedes the miss behavior in
-  `spec/PHASE_35_WORLD_REACTION_SERVICE.md`).
+- World Reaction Policy (**chosen next**, needs phase-scoping — new feature, do NOT fold into 51.5):
+  per-object `reaction_policy` (`scripted`/`ambient`/`inert`) to replace the blunt "miss = every tagged
+  clock +2" fan-out. Fixes a real bug (a STUDY-miss on the R1 statue moved 3 campaign clocks incl. the
+  `dungeon_intimacy` clock, violating D5's single-source rule). Owner decisions locked 2026-07-01;
+  amended 2026-07-04 (§9 resolved, §10 audit appendix). Design: `spec/WORLD_REACTION_POLICY.md`
+  (supersedes the miss behavior in `spec/PHASE_35_WORLD_REACTION_SERVICE.md`).
+- Tag Taxonomy & Narrator Lookup (draft 2026-07-04, sequenced after WRP):
+  `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` — Phase A tag hygiene (single namespaced taxonomy,
+  migration `020`, seed/retrieval fixes, `# Related Lore` pre-fetch), Phase B read-only narrator
+  lookup tool (`complete_round` provider transport + agent-owned loop in `llm/tool_loop.py`).
 - Reseed-a-save gotchas: `--campaigns-dir` for the saves dir; `PYTHONPATH=.` for the populate scripts;
   close the app first (DuckDB is single-writer).
 - New-game reset (dev/playtest): `python -m tools.reset_crucible_new_game` reverts play progress on the
