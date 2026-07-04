@@ -2,18 +2,18 @@
 
 This file defines the phased build order for Dungeon Daddy. Each phase ends with
 something runnable and/or a green test suite. Work within a phase before moving to
-the next. Do not skip phases â€” later phases depend on the foundations laid in earlier ones.
+the next. Do not skip phases — later phases depend on the foundations laid in earlier ones.
 
 **Current status is listed for each phase.**
 
 ---
 
-## Phase 1 â€” Pure Python Foundation
+## Phase 1 — Pure Python Foundation
 
 **Status: Complete**
 
 Build and test the entire data layer before any UI or LLM code exists.
-This phase has no Arcade dependency â€” tests run headlessly with no display.
+This phase has no Arcade dependency — tests run headlessly with no display.
 
 ### Modules
 
@@ -39,7 +39,7 @@ This phase has no Arcade dependency â€” tests run headlessly with no displa
 ### Exit Criteria
 
 - `pytest tests/unit/data/` is green
-- Round-trip test: load sample dungeon â†’ `model_dump(mode="json")` â†’ re-validate â†’ equal
+- Round-trip test: load sample dungeon → `model_dump(mode="json")` → re-validate → equal
 - `validate_dungeon()` catches each error type with an intentionally broken fixture
 - `DungeonRepository` tests use `tmp_path`; no real files written outside tmp
 - Memory tests: `append_room_event` creates directory + file + section header on first call;
@@ -47,12 +47,12 @@ This phase has no Arcade dependency â€” tests run headlessly with no displa
 
 ---
 
-## Phase 2 â€” UI Primitives
+## Phase 2 — UI Primitives
 
 **Status: Complete**
 
 Build the theme constants and chrome drawing helpers. No window opens yet.
-Tests patch `arcade.draw_*` â€” no display required.
+Tests patch `arcade.draw_*` — no display required.
 
 ### Modules
 
@@ -63,7 +63,7 @@ Tests patch `arcade.draw_*` â€” no display required.
 
 ### What to build
 
-- `dungeon_daddy/ui/theme.py`: all color tuples (`BG_0`â€¦`BG_HI`, `LINE`, `INK`,
+- `dungeon_daddy/ui/theme.py`: all color tuples (`BG_0`…`BG_HI`, `LINE`, `INK`,
   `TEAL`, `VIOLET`, `EMBER`, `GOLD`), `ROOM_COLORS` dict, font name constants,
   font size scale, spacing and panel width constants
 - `dungeon_daddy/ui/chrome.py`: `MenuAction` dataclass, `draw_menu_bar()`,
@@ -74,11 +74,11 @@ Tests patch `arcade.draw_*` â€” no display required.
 - `pytest tests/unit/ui/` is green
 - `theme.py` exports all constants referenced in `spec/VISUAL_DESIGN.md`
 - `MenuAction` dataclass matches spec; all menu items (including unimplemented ones)
-  route through `_nyi()` or a real handler â€” nothing is decorative
+  route through `_nyi()` or a real handler — nothing is decorative
 
 ---
 
-## Phase 3 â€” Window Opens
+## Phase 3 — Window Opens
 
 **Status: Complete**
 
@@ -99,7 +99,7 @@ No panels, no views beyond a placeholder. First time Arcade actually runs.
 - `__main__.py` entry point: construct `AppConfig`, call `ensure_dirs()`,
   construct `AnthropicProvider` (or no-op stub if key missing), open window
 - A single placeholder `arcade.View` subclass that draws the chrome and a
-  "Loadingâ€¦" label â€” just enough to confirm the window opens
+  "Loading…" label — just enough to confirm the window opens
 - Font files committed under `dungeon_daddy/assets/fonts/` (8 TTF files)
 
 ### Exit Criteria
@@ -110,7 +110,7 @@ No panels, no views beyond a placeholder. First time Arcade actually runs.
 
 ---
 
-## Phase 4 â€” LLM Foundation
+## Phase 4 — LLM Foundation
 
 **Status: Complete**
 
@@ -154,13 +154,13 @@ Build and test the LLM provider and all agent wrappers. No UI. Tests use mocked 
 
 ---
 
-## Phase 5 â€” Design View Skeleton
+## Phase 5 — Design View Skeleton
 
 **Status: Complete**
 
 `DesignView` opens in **wizard mode** when no dungeon exists, or in **edit mode**
-when a dungeon is loaded. Chat input works. No LLM calls wired yet â€” sending a
-message shows a placeholder "â€¦" response. The dungeon tree and inspector panels
+when a dungeon is loaded. Chat input works. No LLM calls wired yet — sending a
+message shows a placeholder "…" response. The dungeon tree and inspector panels
 render their structure but with placeholder content.
 
 ### Modules
@@ -175,13 +175,13 @@ render their structure but with placeholder content.
 ### What to build
 
 - `DesignView`: `on_show_view()`, `on_hide_view()`, `on_draw()`, `on_update()`,
-  `_build_ui()`, `on_chat_send()` (stub â€” no thread yet)
+  `_build_ui()`, `on_chat_send()` (stub — no thread yet)
 - `DesignView` modes: `wizard_mode`, `generation_mode`, `edit_mode`
   (tracked as `self._design_mode: str`)
 - `ChatPanel`: scrollable history, input field, send button (greyed when busy),
-  typing indicator, "â†“ New message" badge
+  typing indicator, "↓ New message" badge
 - `DungeonTreePanel`: collapsible level/room tree, coloured by loop path membership;
-  shows "Generating level Nâ€¦" placeholder rows during generation mode
+  shows "Generating level N…" placeholder rows during generation mode
 - `InspectorPanel`: tabbed (Settings | Loops), renders placeholder content
 
 ### Exit Criteria
@@ -193,7 +193,7 @@ render their structure but with placeholder content.
 
 ---
 
-## Phase 6 â€” Play View + Grid Map
+## Phase 6 — Play View + Grid Map
 
 **Status: Complete**
 
@@ -205,7 +205,7 @@ Room clicks update session state. No LLM wired yet.
 | Module | Test File |
 |---|---|
 | `dungeon_daddy/views/play_view.py` | (manual smoke test) |
-| `dungeon_daddy/map/base_renderer.py` | (abstract â€” tested via subclasses) |
+| `dungeon_daddy/map/base_renderer.py` | (abstract — tested via subclasses) |
 | `dungeon_daddy/map/grid_renderer.py` | `tests/unit/map/test_grid_renderer.py` |
 | `dungeon_daddy/map/loop_overlay.py` | `tests/unit/map/test_loop_overlay.py` |
 | `dungeon_daddy/ui/panels/map_panel.py` | (manual smoke test) |
@@ -230,7 +230,7 @@ Room clicks update session state. No LLM wired yet.
 
 ---
 
-## Phase 7 â€” Wire Up LLM Design Flow (Wizard + Generator)
+## Phase 7 — Wire Up LLM Design Flow (Wizard + Generator)
 
 **Status: Complete**
 
@@ -252,14 +252,14 @@ validating each before accepting it. Edit mode activates `DesignAgent` for refin
 - `_run_design_chat(history, dungeon)` thread target for edit mode (calls `DesignAgent.chat()`)
 - `_result_queue: queue.Queue[LLMResult]` + `_llm_busy` guard (shared by all three)
 - `LLMResult` dataclass extended with `result_type: str` (`"wizard"`, `"level"`, `"chat"`)
-- `on_update()` queue drain â€” dispatches based on `result_type`:
-  - `"wizard"`: check for brief block â†’ if found, transition to generation mode
+- `on_update()` queue drain — dispatches based on `result_type`:
+  - `"wizard"`: check for brief block → if found, transition to generation mode
   - `"level"`: parse `Level`, append to dungeon, update tree, prompt GM to continue
   - `"chat"`: append DM bubble
 - `on_hide()` thread join with 3-second timeout
 - Send button greyed while `_llm_busy`
 
-### State Machine â€” `DesignView.on_update()` dispatch
+### State Machine — `DesignView.on_update()` dispatch
 
 `LLMResult` gains a `result_type` field (`"wizard" | "level" | "chat"`) to let
 `on_update()` route results without an if/elif chain on `_design_mode`:
@@ -286,7 +286,7 @@ match result.result_type:
             self._brief = brief
             self._design_mode = "generation"
             self._current_level_number = 1
-            self._append_system_bubble("Generating level 1â€¦")
+            self._append_system_bubble("Generating level 1…")
             self._spawn_generator_thread(1)
         else:
             self._llm_busy = False   # wizard continues
@@ -302,7 +302,7 @@ match result.result_type:
                     self._current_level_number += 1
                     self._append_system_bubble(
                         f"Level {self._current_level_number - 1} ready. "
-                        f"Generating level {self._current_level_number}â€¦"
+                        f"Generating level {self._current_level_number}…"
                     )
                     self._spawn_generator_thread(self._current_level_number)
                 else:
@@ -317,7 +317,7 @@ match result.result_type:
                     self._design_mode = "edit"
                 else:
                     self._append_system_bubble(
-                        f"Revising level {self._current_level_number}â€¦"
+                        f"Revising level {self._current_level_number}…"
                     )
                     self._spawn_generator_thread(
                         self._current_level_number, errors=vresult.errors
@@ -339,14 +339,14 @@ match result.result_type:
 - Wizard collects dungeon settings and produces a `DungeonBrief` via real Claude call
 - Generator produces all levels with valid JSON (requires `ANTHROPIC_API_KEY`)
 - Each level appears in `DungeonTreePanel` as it is generated
-- Validation errors trigger automatic retry (visible in chat as "Revising level Nâ€¦")
+- Validation errors trigger automatic retry (visible in chat as "Revising level N…")
 - After all levels, edit mode activates and the GM can refine via `DesignAgent`
-- If `ANTHROPIC_API_KEY` is missing, an inline notice appears â€” no crash
+- If `ANTHROPIC_API_KEY` is missing, an inline notice appears — no crash
 - Closing the window during generation joins the active thread cleanly
 
 ---
 
-## Phase 8 â€” Wire Up LLM DM Chat + Room Memory
+## Phase 8 — Wire Up LLM DM Chat + Room Memory
 
 **Status: Complete**
 
@@ -371,9 +371,9 @@ The remaining map renderers (tiles, graph) are implemented.
 - Threading wiring for `PlayView` + `DungeonMasterAgent`
 - `on_room_click()` loads room memory and triggers `DungeonMasterAgent.respond()`
   with `room_memory` from `DungeonRepository.load_room_memory()`
-- `/remember` command interception in `on_chat_send()` â€” calls
+- `/remember` command interception in `on_chat_send()` — calls
   `DungeonRepository.append_room_event()`, appends system bubble, no LLM call
-- "Edit Memory" button in `PlayView` â€” opens `UITextArea` overlay with level
+- "Edit Memory" button in `PlayView` — opens `UITextArea` overlay with level
   memory markdown; save calls `DungeonRepository.save_room_memory()`
 - `TilesRenderer`: shaded top-down tile style
 - `GraphRenderer`: abstract node graph style
@@ -391,11 +391,11 @@ The remaining map renderers (tiles, graph) are implemented.
   reading the file directly in the test
 - "Edit Memory" overlay opens, edits persist after save
 - Map variant switcher swaps renderers without crashing
-- `File â†’ Save` persists the dungeon and session state to disk
+- `File → Save` persists the dungeon and session state to disk
 
 ---
 
-## Phase 9 â€” Edit Memory Overlay + LLM Integration Tests
+## Phase 9 — Edit Memory Overlay + LLM Integration Tests
 
 **Status: Complete**
 
@@ -411,14 +411,14 @@ skippable LLM integration test suite.
 
 ### What to build
 
-- "Edit Memory" button in `PlayView` â€” visible only when the current level has a
+- "Edit Memory" button in `PlayView` — visible only when the current level has a
   memory file (`DungeonRepository.load_room_memory()` returns non-empty string)
 - Clicking the button opens a `UITextArea` overlay (drawn over the map panel) pre-filled
   with the current level's memory markdown
 - "Save" button on the overlay calls `DungeonRepository.save_room_memory()` and closes
   the overlay
 - "Cancel" button (or Esc key) closes the overlay without saving
-- `tests/integration/test_llm_integration.py` â€” one real provider call per agent
+- `tests/integration/test_llm_integration.py` — one real provider call per agent
   (skipped via `pytest.mark.skipif` when `OPENAI_API_KEY` is not set)
 
 ### Exit Criteria
@@ -430,12 +430,12 @@ skippable LLM integration test suite.
 - [x] Cancel / Esc closes overlay without writing to disk
 - [x] `pytest tests/unit/` green (282 tests)
 - [x] `pytest tests/integration/test_llm_integration.py` green (LLM tests skip without key)
-- [x] Live: `/remember` a note â†’ open Edit Memory â†’ edit text â†’ save â†’ reload overlay â†’
+- [x] Live: `/remember` a note → open Edit Memory → edit text → save → reload overlay →
       verify edited text persists
 
 ---
 
-## Phase 10 â€” Design Mode Loop Editor
+## Phase 10 — Design Mode Loop Editor
 
 **Status: Complete**
 
@@ -453,130 +453,130 @@ add/remove sub-loops, switch levels, and see active loop assignments on the map.
 
 ### What to build
 
-- `auto_assign_loop_rooms(level)` â€” BFS algorithm: entry=most-connected, goal=BFS-furthest,
+- `auto_assign_loop_rooms(level)` — BFS algorithm: entry=most-connected, goal=BFS-furthest,
   path_a=shortest, path_b=fewest-overlap alternate (linear fallback: path_b=path_a)
-- `LoopsPanel` â€” draws ACTIVE LOOPS and PATTERN LIBRARY sections; `_pattern_rects` and
+- `LoopsPanel` — draws ACTIVE LOOPS and PATTERN LIBRARY sections; `_pattern_rects` and
   `_remove_rects` hit-tested on click; `_level_rects` for level picker
-- `InspectorPanel` Loops tab wired â€” `on_mouse_press(x, y, modifiers)` routes via `_tab_rects`
-- `chat_bubble.py` â€” `draw(x, y, text, color, max_width)` widget for in-map DM narration
+- `InspectorPanel` Loops tab wired — `on_mouse_press(x, y, modifiers)` routes via `_tab_rects`
+- `chat_bubble.py` — `draw(x, y, text, color, max_width)` widget for in-map DM narration
 
 ### What was built (2026-05-05)
 
-- `dungeon_daddy/data/loop_assignment.py` â€” BFS algorithm complete; 7 unit tests
-- `dungeon_daddy/ui/panels/loops_panel.py` â€” ACTIVE LOOPS + PATTERN LIBRARY draw/click; 8 unit tests
-- `dungeon_daddy/ui/panels/inspector_panel.py` â€” Loops tab wired; tab routing via `_tab_rects`
-- `dungeon_daddy/views/design_view.py` â€” `on_mouse_press()` passes `modifiers` to inspector
+- `dungeon_daddy/data/loop_assignment.py` — BFS algorithm complete; 7 unit tests
+- `dungeon_daddy/ui/panels/loops_panel.py` — ACTIVE LOOPS + PATTERN LIBRARY draw/click; 8 unit tests
+- `dungeon_daddy/ui/panels/inspector_panel.py` — Loops tab wired; tab routing via `_tab_rects`
+- `dungeon_daddy/views/design_view.py` — `on_mouse_press()` passes `modifiers` to inspector
 - 297 unit tests, all green; smoke test PASS (Loops tab + PATTERN LIBRARY render correctly)
 
 ### What was built (2026-05-05, session 2)
 
-- **`dungeon_daddy/ui/panels/loops_panel.py`** â€” Ã— remove button:
+- **`dungeon_daddy/ui/panels/loops_panel.py`** — Ã— remove button:
   `_remove_rects: dict[str, tuple]` populated in `draw()` for each sub-loop card (right-aligned chip);
-  `on_mouse_press()` checks `_remove_rects` before pattern rects â†’ calls `remove_sub_loop(loop_id)`.
-- `tests/unit/ui/test_loops_panel.py` â€” 9 tests (added `test_on_mouse_press_remove_rect_removes_sub_loop`)
+  `on_mouse_press()` checks `_remove_rects` before pattern rects → calls `remove_sub_loop(loop_id)`.
+- `tests/unit/ui/test_loops_panel.py` — 9 tests (added `test_on_mouse_press_remove_rect_removes_sub_loop`)
 - **Total: 298 unit tests, all green**
 
 ### What was built (2026-05-05, session 3)
 
-- **`dungeon_daddy/ui/panels/loops_panel.py`** â€” Level picker chips:
+- **`dungeon_daddy/ui/panels/loops_panel.py`** — Level picker chips:
   `_levels: list[Level]` + `_level_rects: dict[int, tuple]` added to `__init__`;
-  `set_levels(levels)` method added; `draw()` renders L1/L2/â€¦ chips above ACTIVE LOOPS,
-  active level highlighted in TEAL; `on_mouse_press()` checks `_level_rects` first â†’ calls `set_level()`.
-- **`dungeon_daddy/ui/panels/inspector_panel.py`** â€” `set_dungeon()` now calls
+  `set_levels(levels)` method added; `draw()` renders L1/L2/… chips above ACTIVE LOOPS,
+  active level highlighted in TEAL; `on_mouse_press()` checks `_level_rects` first → calls `set_level()`.
+- **`dungeon_daddy/ui/panels/inspector_panel.py`** — `set_dungeon()` now calls
   `set_levels(dungeon.levels)` (and `set_levels([])` on clear).
-- `tests/unit/ui/test_loops_panel.py` â€” 10 tests (added `test_on_mouse_press_level_rect_sets_level`)
+- `tests/unit/ui/test_loops_panel.py` — 10 tests (added `test_on_mouse_press_level_rect_sets_level`)
 - **Total: 299 unit tests, all green**
 
 ### What was built (2026-05-05, session 4)
 
-- **`dungeon_daddy/ui/widgets/chat_bubble.py`** â€” `ChatBubble.draw(x, y, text, color, max_width)`;
+- **`dungeon_daddy/ui/widgets/chat_bubble.py`** — `ChatBubble.draw(x, y, text, color, max_width)`;
   draws rounded-rect bubble with accent border and wrapped text. Import confirmed clean.
-- **`dungeon_daddy/ui/panels/loops_panel.py`** â€” Bug fixes:
+- **`dungeon_daddy/ui/panels/loops_panel.py`** — Bug fixes:
   - Added missing `BG_1` import (caused `NameError` when Loops tab was active)
-  - Fixed `pat.id` â†’ `pat.key` in `_pattern_rects` population (`LoopPattern` uses `.key`)
-- **`tools/ui_input.py`** â€” Added `shift_click_app()` helper (holds Shift during left-click)
-- **`tools/smoke_test_phase10.py`** â€” Phase 10 smoke test created (6 behaviors); partially passing:
+  - Fixed `pat.id` → `pat.key` in `_pattern_rects` population (`LoopPattern` uses `.key`)
+- **`tools/ui_input.py`** — Added `shift_click_app()` helper (holds Shift during left-click)
+- **`tools/smoke_test_phase10.py`** — Phase 10 smoke test created (6 behaviors); partially passing:
   - B1 PASS: Loops tab switches (TEAL detected)
-  - B2 PASS: Pattern click â†’ TEAL loop card in ACTIVE LOOPS
+  - B2 PASS: Pattern click → TEAL loop card in ACTIVE LOOPS
   - B3 FAIL: Shift-click y-coordinate off; need to recalibrate `_PAT1_Y_WITH_MAIN`
   - B4 PASS: No VIOLET in sub-loop region (trivially, since B3 failed)
-  - B5 PASS: Level picker chip click â€” app alive
+  - B5 PASS: Level picker chip click — app alive
   - B6 FAIL: `dungeon_daddy` module not on `sys.path` when run from `tools/`
 - **Total: 299 unit tests, all green**
 
 ### What was built (2026-05-05, session 5)
 
-- **`dungeon_daddy/ui/panels/loops_panel.py`** â€” `+` button on each pattern card:
+- **`dungeon_daddy/ui/panels/loops_panel.py`** — `+` button on each pattern card:
   `_add_rects: dict[str, tuple]` added to `__init__` and cleared in `draw()`;
   each pattern card draws a teal `+` chip at the far right (18Ã—16px);
   A/B path text shifted left to avoid overlap;
   `_pattern_rects` now covers only the card body (left of `+`);
-  `on_mouse_press()` checks `_add_rects` before `_pattern_rects` â†’ calls `add_sub_loop()` directly (no shift needed).
-- `tests/unit/ui/test_loops_panel.py` â€” 12 tests (added `test_on_mouse_press_add_rect_calls_add_sub_loop`,
+  `on_mouse_press()` checks `_add_rects` before `_pattern_rects` → calls `add_sub_loop()` directly (no shift needed).
+- `tests/unit/ui/test_loops_panel.py` — 12 tests (added `test_on_mouse_press_add_rect_calls_add_sub_loop`,
   `test_on_mouse_press_add_rect_does_not_call_apply_pattern`)
 - **Total: 301 unit tests, all green**
 
 ### What was built (2026-05-05, session 6)
 
-- **`tools/smoke_test_phase10.py`** â€” B3 replaced: shift-click skip removed; now clicks `+` button at
+- **`tools/smoke_test_phase10.py`** — B3 replaced: shift-click skip removed; now clicks `+` button at
   `(_REMOVE_BTN_X, _PAT1_Y_WITH_MAIN)` = `(1379, 590)`, then scans y=605..645 for VIOLET sub-loop card.
   `shift_click_app` import removed. All 6 behaviors PASS.
 
-### What was built (2026-05-05, session 7 â€” stabilization)
+### What was built (2026-05-05, session 7 — stabilization)
 
-- **Play map room labels** â€” all 3 renderers (grid, tiles, graph) now show `"Name (1-A)"` format
-- **`dungeon_daddy/ui/theme.py`** â€” `draw_chip()` gained optional `width: int = 80` param
-- **`dungeon_daddy/ui/panels/chat_panel.py`** â€” suggestion chips sized to text width (7px/char + padding, 8px gaps); `_chip_rects` populated during `draw()`; `on_mouse_press(x, y) -> bool` added â€” clicks chips send the chip text via `_on_send`; ignored when busy
-- **`dungeon_daddy/views/design_view.py`** â€” `on_mouse_press` now routes to `self._chat.on_mouse_press()`; removed leftover debug `print`
-- `tests/unit/ui/test_chat_panel.py` â€” 6 new tests for chip click handling
-- `tests/unit/map/test_grid_renderer.py` â€” updated 2 label assertions to include room ID
+- **Play map room labels** — all 3 renderers (grid, tiles, graph) now show `"Name (1-A)"` format
+- **`dungeon_daddy/ui/theme.py`** — `draw_chip()` gained optional `width: int = 80` param
+- **`dungeon_daddy/ui/panels/chat_panel.py`** — suggestion chips sized to text width (7px/char + padding, 8px gaps); `_chip_rects` populated during `draw()`; `on_mouse_press(x, y) -> bool` added — clicks chips send the chip text via `_on_send`; ignored when busy
+- **`dungeon_daddy/views/design_view.py`** — `on_mouse_press` now routes to `self._chat.on_mouse_press()`; removed leftover debug `print`
+- `tests/unit/ui/test_chat_panel.py` — 6 new tests for chip click handling
+- `tests/unit/map/test_grid_renderer.py` — updated 2 label assertions to include room ID
 - **Total: 307 unit tests, all green**
 
-### What was built (2026-05-05, session 8 â€” UI/UX polish)
+### What was built (2026-05-05, session 8 — UI/UX polish)
 
 13 UI/UX fixes applied across `chat_panel.py`, `dungeon_tree_panel.py`,
 `inspector_panel.py`, `chrome.py`, and `theme.py`:
 
 - Chat messages now top-anchor when content is sparse (no dead zone)
 - Dungeon panel empty state: hex icon + "No dungeon yet" + hint text
-- Input box reduced: `INPUT_H` 112â†’62, `INPUT_AREA_H` 160â†’104
+- Input box reduced: `INPUT_H` 112→62, `INPUT_AREA_H` 160→104
 - Send button renamed from "Draft" to "Send"
-- Mode label ("Wizard Mode") replaced chip with plain `Â· label` status text
+- Mode label ("Wizard Mode") replaced chip with plain `· label` status text
 - Suggestion chips repositioned above the input box (were below, clipped)
-- Context docs status unified: `âœ“ NNN words` / `â—‹ pending` / `â—‹ N / N`
+- Context docs status unified: `✓ NNN words` / `○ pending` / `○ N / N`
 - Theme field placeholder text added
 - Complexity label and segmented control split into two rows (no overlap)
-- `draw_kicker`: color `INK_3`â†’`INK_2`, teal accent bar added
+- `draw_kicker`: color `INK_3`→`INK_2`, teal accent bar added
 - "DESIGN MODE" wrapped in a bordered badge
 - Dungeon tree panel: explicit left border added
-- `â—† Dungeon` bubble label color `INK_3`â†’`VIOLET`; double-space fixed
+- `◆ Dungeon` bubble label color `INK_3`→`VIOLET`; double-space fixed
 
 **Total: 307 unit tests, all green**
 
-### What was built (2026-05-05, session 9 â€” Play Mode UI/UX polish)
+### What was built (2026-05-05, session 9 — Play Mode UI/UX polish)
 
 11 Play Mode UI/UX fixes applied, each verified with a manual visual check:
 
-1. **Chat header label** â€” `chat_panel.py` uses `mode="play"` to render "DUNGEON CHAT" kicker
-2. **Play mode chips + LLM wiring** â€” `_CHIPS_PLAY` set active; chip click calls `_on_level_change`
-   routed through `play_view._chat.on_mouse_press()` â†’ `_on_chat_send()` â†’ `DungeonMasterAgent`
-3. **"Ask" button label** â€” button text in play mode is "Ask" (was "Send")
-4. **Current Room banner** â€” 80 px `BG_1`/violet-gradient banner below header; "CURRENT ROOM"
+1. **Chat header label** — `chat_panel.py` uses `mode="play"` to render "DUNGEON CHAT" kicker
+2. **Play mode chips + LLM wiring** — `_CHIPS_PLAY` set active; chip click calls `_on_level_change`
+   routed through `play_view._chat.on_mouse_press()` → `_on_chat_send()` → `DungeonMasterAgent`
+3. **"Ask" button label** — button text in play mode is "Ask" (was "Send")
+4. **Current Room banner** — 80 px `BG_1`/violet-gradient banner below header; "CURRENT ROOM"
    kicker + room name (`FONT_SERIF` 19 px) + note (12 px `INK_3`); wired via `set_current_room()`
-5. **Turn/room chips in header** â€” teal "Turn {n}" chip at x+148, violet room-ID chip at x+240
-6. **Variant tabs moved into map canvas** â€” removed fixed tab bar background; tabs repositioned
+5. **Turn/room chips in header** — teal "Turn {n}" chip at x+148, violet room-ID chip at x+240
+6. **Variant tabs moved into map canvas** — removed fixed tab bar background; tabs repositioned
    as 52Ã—22 px overlay at top-right inside `map_panel.py`; `_HEADER_H = 38`
-7. **Edit Memory button removed from Play mode** â€” `_OVERLAY_TAB_H = 0`; no button rendered
-8. **"DUNGEON VIEWER" header + gold dungeon title chip** â€” header bar added to map panel; gold
+7. **Edit Memory button removed from Play mode** — `_OVERLAY_TAB_H = 0`; no button rendered
+8. **"DUNGEON VIEWER" header + gold dungeon title chip** — header bar added to map panel; gold
    pill auto-widths to `len(title)*7+20`; chip positioned at x+155+half-width; gold chip
    background brightened to `(90, 78, 22)` in `theme.py` `draw_chip()` palette
-9. **Level name overlay (top-left) + legend (bottom-left)** â€” `_draw_level_overlay()` (teal "L{n}"
+9. **Level name overlay (top-left) + legend (bottom-left)** — `_draw_level_overlay()` (teal "L{n}"
    + level name + dimensions) and `_draw_legend()` (icon+label pairs) drawn in-canvas
-10. **Room type colors always visible** â€” removed fog-of-war from `grid_renderer.py` and
+10. **Room type colors always visible** — removed fog-of-war from `grid_renderer.py` and
     `graph_renderer.py`; all rooms render with their type `fill`/`stroke` regardless of
     `visited_rooms`; test `test_unseen_rooms_use_unseen_fill` renamed `test_rooms_use_type_fill`
-11. **Compass rose in level stepper** â€” `level_stepper.py` draws a circle outline + "N" label
-    (`FONT_SERIF`) at the bottom of the stepper rail; `â–¼` button moved up `_COMPASS_H=48 px`
+11. **Compass rose in level stepper** — `level_stepper.py` draws a circle outline + "N" label
+    (`FONT_SERIF`) at the bottom of the stepper rail; `▼` button moved up `_COMPASS_H=48 px`
     to reserve space
 
 **Total: 306 unit tests, all green (1 pre-existing `test_draw_title_bar_calls_rect_filled` failure)**
@@ -590,7 +590,7 @@ add/remove sub-loops, switch levels, and see active loop assignments on the map.
 - [x] Level picker shows all levels; active level is highlighted
 - [x] `chat_bubble.py` widget renders without crash (smoke test)
 - [x] `pytest tests/unit/` green (307 tests)
-- [x] Live smoke: pattern click â†’ loop applied; + button â†’ sub-loop added; Ã— â†’ removed
+- [x] Live smoke: pattern click → loop applied; + button → sub-loop added; Ã— → removed
 
 ---
 

@@ -1,8 +1,8 @@
 ﻿# Implementation Phases — 19 through 25 (Map Layout)
 
-## Phase 19 â€” Vector Map Layout Phase 1
+## Phase 19 — Vector Map Layout Phase 1
 
-**Status: Complete** â€” 337 map unit tests passing. mypy zero errors. Closed 2026-05-30.
+**Status: Complete** — 337 map unit tests passing. mypy zero errors. Closed 2026-05-30.
 
 Spec: `spec/MAP_LAYOUT_PHASE_NEXT.md`
 
@@ -27,19 +27,19 @@ Improve the dungeon map renderer from a generic node graph into a semantically-a
 
 | Step | Task | Status |
 |---|---|---|
-| 1 | Geometry models | **Done** â€” `dungeon_layout/models.py`, 21 tests |
-| 2 | Room role classification + template selection | **Done** â€” `dungeon_layout/semantics.py`, 39 tests |
-| 3 | Critical-path-first seed layout | **Done** â€” `dungeon_layout/seed_layout.py`, 4 tests |
-| 4 | Port generation | **Done** â€” `dungeon_layout/ports.py`, 7 tests |
-| 5 | Obstacle-aware orthogonal routing | **Done** â€” `dungeon_layout/route_orthogonal.py`, 7 tests |
-| 6 | Label placement | **Done** â€” `dungeon_layout/labels.py`, 6 tests |
-| 7 | Camera auto-fit | **Done** â€” `dungeon_layout/camera_fit.py`, 6 tests |
-| 8 | Validation tests + JSON/Markdown feedback reports | **Done** â€” `dungeon_layout/validation.py`, 17 unit + 13 integration tests |
-| 9 | Debug overlay | **Done** â€” `dungeon_layout/debug_overlay.py` + `layout_debug_renderer.py`, 9 tests |
-| W | Pipeline wiring into map panel | **Done** â€” `dungeon_layout/__init__.py`, `layout_renderer.py`, `map_panel.py`, 19 tests |
-| 10 | Room name labels in Graph view | **Done** â€” 1 test |
-| 11 | Room click + selection highlight | **Done** â€” 6 tests |
-| B | Post-close bug fixes (labels, room/connection â†’ chat) | **Done** â€” 5 tests |
+| 1 | Geometry models | **Done** — `dungeon_layout/models.py`, 21 tests |
+| 2 | Room role classification + template selection | **Done** — `dungeon_layout/semantics.py`, 39 tests |
+| 3 | Critical-path-first seed layout | **Done** — `dungeon_layout/seed_layout.py`, 4 tests |
+| 4 | Port generation | **Done** — `dungeon_layout/ports.py`, 7 tests |
+| 5 | Obstacle-aware orthogonal routing | **Done** — `dungeon_layout/route_orthogonal.py`, 7 tests |
+| 6 | Label placement | **Done** — `dungeon_layout/labels.py`, 6 tests |
+| 7 | Camera auto-fit | **Done** — `dungeon_layout/camera_fit.py`, 6 tests |
+| 8 | Validation tests + JSON/Markdown feedback reports | **Done** — `dungeon_layout/validation.py`, 17 unit + 13 integration tests |
+| 9 | Debug overlay | **Done** — `dungeon_layout/debug_overlay.py` + `layout_debug_renderer.py`, 9 tests |
+| W | Pipeline wiring into map panel | **Done** — `dungeon_layout/__init__.py`, `layout_renderer.py`, `map_panel.py`, 19 tests |
+| 10 | Room name labels in Graph view | **Done** — 1 test |
+| 11 | Room click + selection highlight | **Done** — 6 tests |
+| B | Post-close bug fixes (labels, room/connection → chat) | **Done** — 5 tests |
 
 ### Exit Criteria
 
@@ -61,15 +61,15 @@ Improve the dungeon map renderer from a generic node graph into a semantically-a
 
 ---
 
-## Phase 20 â€” Vector Map Layout Phase 2: Visual Hierarchy & Semantic Presentation
+## Phase 20 — Vector Map Layout Phase 2: Visual Hierarchy & Semantic Presentation
 
-**Status: Complete** â€” 1097 unit+integration tests passing. Closed 2026-05-30.
+**Status: Complete** — 1097 unit+integration tests passing. Closed 2026-05-30.
 
 Spec: `spec/MAP_LAYOUT_PHASE_2.md`
 
 Built on Phase 19's collision-free graph layout to add semantic visual hierarchy:
 room role styling, connection type language, endpoint emphasis, critical path
-presentation, and visual hierarchy feedback output. Graph Mode only â€” Grid Mode
+presentation, and visual hierarchy feedback output. Graph Mode only — Grid Mode
 untouched.
 
 ### Modules Added / Updated
@@ -101,9 +101,9 @@ untouched.
 
 ---
 
-## Phase 21 â€” Graph Mode Phase 2.5: Semantic Metadata Backfill and Validation
+## Phase 21 — Graph Mode Phase 2.5: Semantic Metadata Backfill and Validation
 
-**Status: Complete** â€” 1184 unit+integration tests passing. Closed 2026-05-30.
+**Status: Complete** — 1184 unit+integration tests passing. Closed 2026-05-30.
 
 Spec: `spec/MAP_LAYOUT_PHASE2.5.md`
 
@@ -111,7 +111,7 @@ Improved the semantic layer quality by backfilling explicit metadata into existi
 dungeon fixtures and local dungeon files. Reduced `unknown` roles from 9 to 0,
 fixed ambiguous endpoints (Crucible L2 Maintenance Tunnel, Crucible L3 Power Core
 Chamber), and added explicit critical paths for all target floors. Graph Mode only
-â€” Grid Mode untouched.
+— Grid Mode untouched.
 
 ### Modules
 
@@ -127,14 +127,14 @@ Chamber), and added explicit critical paths for all target floors. Graph Mode on
 | `dungeon_daddy/map/dungeon_layout/connection_style.py` (update) | explicit style / role override |
 | `scripts/backfill_graph_metadata.py` (new) | dry-run + write modes, timestamped backups |
 | `scripts/generate_layout_screenshots_phase25.py` (new) | Phase 2.5 PNG artifact generator |
-| `tests/fixtures/crucible.json` (update) | backfill metadata â€” all 3 levels |
-| `tests/fixtures/tomb.json` (update) | backfill metadata â€” all 3 levels |
+| `tests/fixtures/crucible.json` (update) | backfill metadata — all 3 levels |
+| `tests/fixtures/tomb.json` (update) | backfill metadata — all 3 levels |
 
 ### Implementation Steps
 
 | Step | Task | Status |
 |---|---|---|
-| 1 | Update semantic role resolution pipeline (explicit â†’ floor-level â†’ inference) | **Done** |
+| 1 | Update semantic role resolution pipeline (explicit → floor-level → inference) | **Done** |
 | 2 | Endpoint detection: explicit `endpoint_room_id` overrides role-priority detection | **Done** |
 | 3 | Critical path: explicit `layout_metadata.critical_path` overrides inferred path | **Done** |
 | 4 | Connection style: explicit `connection_style` / `layout_connection_role` override | **Done** |
@@ -159,7 +159,7 @@ Chamber), and added explicit critical paths for all target floors. Graph Mode on
 - [x] `Power Core Chamber` (Crucible L3) is endpoint when explicit metadata says so
 - [x] `Descent Chamber` (Tomb L1) explicitly treated as descent/endpoint
 - [x] Semantic scores improve or stay the same for all target fixtures
-- [x] Unknown role count decreases for target fixtures (9 â†’ 0)
+- [x] Unknown role count decreases for target fixtures (9 → 0)
 - [x] `metadata_quality_feedback` appears in JSON reports
 - [x] Summary report includes metadata quality columns
 - [x] Backfill script runs in dry-run mode
@@ -172,9 +172,9 @@ Chamber), and added explicit critical paths for all target floors. Graph Mode on
 
 ---
 
-## Phase 22 â€” Graph Mode Phase 3: Interaction Polish + Phase 2.5 Cleanup
+## Phase 22 — Graph Mode Phase 3: Interaction Polish + Phase 2.5 Cleanup
 
-**Status: Complete** â€” 1280 unit+integration tests passing. Closed 2026-05-31.
+**Status: Complete** — 1280 unit+integration tests passing. Closed 2026-05-31.
 
 Spec: `spec/MAP_LAYOUT_PHASE_3.md`
 
@@ -182,8 +182,8 @@ Added interaction polish to Graph Mode: hover states, room selection, focus mode
 
 ### Entry Conditions
 
-- Phase 21 complete âœ“
-- 1184 unit+integration tests passing âœ“
+- Phase 21 complete ✓
+- 1184 unit+integration tests passing ✓
 - Spec: `spec/MAP_LAYOUT_PHASE_3.md`
 
 ### Modules
@@ -201,7 +201,7 @@ Added interaction polish to Graph Mode: hover states, room selection, focus mode
 | `dungeon_daddy/views/play_view.py` (update) | (mouse motion routing) |
 | `dungeon_daddy/data/models.py` (update) | (graph_notes, visual_priority fields) |
 | `scripts/backfill_graph_metadata.py` (update) | (connection_patches support) |
-| `scripts/generate_phase3_graph_artifacts.py` (new) | (artifact generation â€” no unit test) |
+| `scripts/generate_phase3_graph_artifacts.py` (new) | (artifact generation — no unit test) |
 | `tests/fixtures/crucible.json` (update) | (connection metadata backfill) |
 | `tests/fixtures/tomb.json` (update) | (connection metadata backfill) |
 
@@ -209,20 +209,20 @@ Added interaction polish to Graph Mode: hover states, room selection, focus mode
 
 | Step | Task | Status |
 |---|---|---|
-| P3-1 | Phase 2.5 cleanup: refine objective warning naming (`MISSING_ENDPOINT_ROLE`, `NO_QUEST_OBJECTIVE_ROLE`, `ENDPOINT_IS_TRANSITION_ONLY`) in `validation.py` | **Done** â€” 4 new tests; severity tiering added |
-| P3-2 | Connection metadata backfill for crucible + tomb fixtures and local dungeon files; visual parity gaps (border color, fill color, marker position) | **Done** â€” `apply_connection_patch` added; 36 connections patched across 6 levels; `border_color`/`fill_color` on `GraphRoomStyle`; marker y fixed; 9 new tests |
-| P3-3 | `GraphViewState` model: camera, selected room, hovered room, hovered connection | **Done** â€” `CameraState` + `GraphViewState`; 12 new tests |
-| P3-4 | Room hit testing (point-in-rect) + connection hit testing (tolerance distance; room wins over connection) | **Done** â€” `hit_test.py`; 9 new tests |
-| P3-5 | Style resolution pipeline: base â†’ semantic role â†’ critical path â†’ focus/fade â†’ hover â†’ selected | **Done** â€” `style_resolver.py`; 8 new tests |
-| P3-6 | Room hover visual state: border brightens/thickens; restores on mouse-out unless room is selected | **Done** â€” `view_state` wired into `LayoutRenderer.draw()`; 4 new tests |
-| P3-7 | Room selection + focus mode: connected rooms highlight, unrelated rooms/connections fade | **Done** â€” `_connected_room_ids` helper; edge fading at 40% alpha; 3 new tests |
-| P3-8 | Connection hover: brightens/thickens near segment; tolerance-based hit testing | **Done** â€” `alpha+60` + `line_width+0.5`; 3 new tests |
-| P3-9 | Room detail panel: fixed panel showing name, ID, role, connections, notes | **Done** â€” `room_detail_panel.py`; 24 new tests |
-| P3-10 | Critical path emphasis: stronger visual state when selected room is on the critical path | **Done** â€” `selected_on_critical_path` flag; `+40 border_alpha` + `+0.5 width`; 3 new tests |
-| P3-11 | Keyboard controls: R = recenter/reset view; Escape = clear selection | **Done** â€” `handle_key_press` in `map_panel.py`; 6 new tests |
-| P3-12 | Artifact generation script + screenshot artifacts under `artifacts/layout/phase3/` | **Done** â€” 31 artifacts generated; `map_panel.py` wired with `GraphViewState`; 5 new tests |
-| P3-13 | Integration tests: geometry/semantic/metadata scores do not regress; interaction states render without exception | **Done** â€” 4 new integration tests; 1279 passing |
-| P3-14 | Output artifacts: `interaction_feedback` JSON per fixture, `phase3_feedback_summary.md`, `before_after_summary.md`, `connection_metadata_migration_report.md`, `implementation_summary.md` | **Done** â€” all 6 artifact types present; 1280 passing |
+| P3-1 | Phase 2.5 cleanup: refine objective warning naming (`MISSING_ENDPOINT_ROLE`, `NO_QUEST_OBJECTIVE_ROLE`, `ENDPOINT_IS_TRANSITION_ONLY`) in `validation.py` | **Done** — 4 new tests; severity tiering added |
+| P3-2 | Connection metadata backfill for crucible + tomb fixtures and local dungeon files; visual parity gaps (border color, fill color, marker position) | **Done** — `apply_connection_patch` added; 36 connections patched across 6 levels; `border_color`/`fill_color` on `GraphRoomStyle`; marker y fixed; 9 new tests |
+| P3-3 | `GraphViewState` model: camera, selected room, hovered room, hovered connection | **Done** — `CameraState` + `GraphViewState`; 12 new tests |
+| P3-4 | Room hit testing (point-in-rect) + connection hit testing (tolerance distance; room wins over connection) | **Done** — `hit_test.py`; 9 new tests |
+| P3-5 | Style resolution pipeline: base → semantic role → critical path → focus/fade → hover → selected | **Done** — `style_resolver.py`; 8 new tests |
+| P3-6 | Room hover visual state: border brightens/thickens; restores on mouse-out unless room is selected | **Done** — `view_state` wired into `LayoutRenderer.draw()`; 4 new tests |
+| P3-7 | Room selection + focus mode: connected rooms highlight, unrelated rooms/connections fade | **Done** — `_connected_room_ids` helper; edge fading at 40% alpha; 3 new tests |
+| P3-8 | Connection hover: brightens/thickens near segment; tolerance-based hit testing | **Done** — `alpha+60` + `line_width+0.5`; 3 new tests |
+| P3-9 | Room detail panel: fixed panel showing name, ID, role, connections, notes | **Done** — `room_detail_panel.py`; 24 new tests |
+| P3-10 | Critical path emphasis: stronger visual state when selected room is on the critical path | **Done** — `selected_on_critical_path` flag; `+40 border_alpha` + `+0.5 width`; 3 new tests |
+| P3-11 | Keyboard controls: R = recenter/reset view; Escape = clear selection | **Done** — `handle_key_press` in `map_panel.py`; 6 new tests |
+| P3-12 | Artifact generation script + screenshot artifacts under `artifacts/layout/phase3/` | **Done** — 31 artifacts generated; `map_panel.py` wired with `GraphViewState`; 5 new tests |
+| P3-13 | Integration tests: geometry/semantic/metadata scores do not regress; interaction states render without exception | **Done** — 4 new integration tests; 1279 passing |
+| P3-14 | Output artifacts: `interaction_feedback` JSON per fixture, `phase3_feedback_summary.md`, `before_after_summary.md`, `connection_metadata_migration_report.md`, `implementation_summary.md` | **Done** — all 6 artifact types present; 1280 passing |
 
 ### Exit Criteria
 
@@ -241,9 +241,9 @@ Added interaction polish to Graph Mode: hover states, room selection, focus mode
 
 ---
 
-## Phase 23 â€” Graph Mode Phase 4: Presentation, Detail Panel, and Dungeon Personality
+## Phase 23 — Graph Mode Phase 4: Presentation, Detail Panel, and Dungeon Personality
 
-**Status: Complete** â€” 1368 unit+integration tests passing. Closed 2026-06-01.
+**Status: Complete** — 1368 unit+integration tests passing. Closed 2026-06-01.
 
 Spec: `spec/MAP_LAYOUT_PHASE_4.md`
 
@@ -260,7 +260,7 @@ Turn Graph Mode from a clean semantic schematic into a game-like dungeon interfa
 | `dungeon_daddy/map/dungeon_layout/atmosphere.py` (new) | `tests/unit/map/layout/test_atmosphere.py` |
 | `dungeon_daddy/map/dungeon_layout/style_resolver.py` (update) | `tests/unit/map/layout/test_style_resolver.py` |
 | `dungeon_daddy/map/layout_renderer.py` (update) | `tests/unit/map/test_layout_renderer.py` |
-| `scripts/generate_phase4_graph_artifacts.py` (new) | (artifact generation â€” no unit test) |
+| `scripts/generate_phase4_graph_artifacts.py` (new) | (artifact generation — no unit test) |
 
 ### Implementation Steps
 
@@ -269,7 +269,7 @@ Turn Graph Mode from a clean semantic schematic into a game-like dungeon interfa
 | P4-1 | `GraphPresentationConfig` dataclass with all toggles; defaults all enabled | **Done** |
 | P4-2 | Visible detail panel rendered in Graph Mode using existing `build_room_detail` data | **Done** |
 | P4-3 | Strengthen hover (border +1 px, brighter alpha, optional glow) and selected-room styling (border +2 px, second outline) | **Done** |
-| P4-4 | Role markers: small text glyphs (`IN`, `OBJ`, `BOSS`, `!`, `KEY`, `â†“`, `HUB`) drawn in room boxes | **Done** |
+| P4-4 | Role markers: small text glyphs (`IN`, `OBJ`, `BOSS`, `!`, `KEY`, `↓`, `HUB`) drawn in room boxes | **Done** |
 | P4-5 | Connection markers: `critical_path` (brighter/thicker), `locked` (lock marker), `secret`/`shortcut` (dashed/faint), `vertical` (arrow marker) | **Done** |
 | P4-6 | Restrained atmosphere layer: vignette, subtle background, thin frame, deterministic and configurable | **Done** |
 | P4-7 | Artifact generation script and all required screenshots + JSON reports under `artifacts/layout/phase4/` | **Done** |
@@ -293,9 +293,9 @@ Turn Graph Mode from a clean semantic schematic into a game-like dungeon interfa
 
 ---
 
-## Phase 24 â€” Graph Mode Phase 4.1: Cleanup
+## Phase 24 — Graph Mode Phase 4.1: Cleanup
 
-**Status: Complete** â€” 1395 unit+integration tests passing. Closed 2026-06-02.
+**Status: Complete** — 1395 unit+integration tests passing. Closed 2026-06-02.
 
 Spec: `spec/MAP_LAYOUT_PHASE_4_1.md`
 
@@ -307,7 +307,7 @@ Small cleanup pass on Phase 23 (Phase 4). No new features. No redesign. Grid Mod
 2. Prevent the room detail panel from covering the selected room and its connected paths.
 3. Improve framing for long linear floors (especially Crucible L3).
 4. Fix Crucible L2 connection marker gaps.
-5. Keep all Phase 1â€“4 guarantees intact.
+5. Keep all Phase 1–4 guarantees intact.
 6. Produce required artifacts for human review.
 
 ### Modules
@@ -317,7 +317,7 @@ Small cleanup pass on Phase 23 (Phase 4). No new features. No redesign. Grid Mod
 | `dungeon_daddy/map/dungeon_layout/detail_panel_renderer.py` (update) | Smart panel placement (Option A/B/C from spec) |
 | `dungeon_daddy/map/dungeon_layout/validation.py` (update) | Visibility + panel-placement feedback fields |
 | `dungeon_daddy/map/layout_renderer.py` (update) | Long-linear floor framing logic |
-| `scripts/generate_phase4_1_graph_artifacts.py` (new) | Artifact generation â€” no unit test |
+| `scripts/generate_phase4_1_graph_artifacts.py` (new) | Artifact generation — no unit test |
 | `tests/unit/map/layout/` (update) | Detail panel placement, long-floor framing, Crucible L2 marker scoring, visibility feedback |
 
 ### Implementation Steps
@@ -359,9 +359,9 @@ Presentation:  100.0 or justified non-penalized result for crucible_l2
 
 ---
 
-## Phase 25 â€” Map Visual Polish Phase 1: Background + Room Frame Assets
+## Phase 25 — Map Visual Polish Phase 1: Background + Room Frame Assets
 
-**Status: Complete** â€” 1410 unit+integration tests passing. Closed 2026-06-02.
+**Status: Complete** — 1410 unit+integration tests passing. Closed 2026-06-02.
 
 Spec: `spec/MAP_VISUAL_POLISH_PHASE_1.md`
 
@@ -378,11 +378,11 @@ Add asset-backed visual polish to the Play Mode Graph map. No layout behavior ch
 
 | Step | Task | Status |
 |---|---|---|
-| VP-1 | Asset loading infrastructure â€” safe load helper for background PNG + 6 frame PNGs; log-once on missing; path resolution from package root | Not Started |
-| VP-2 | Background image â€” draw `background_graph_default.png` in `MapPanel`, Graph mode only, scissor-clipped, scaled to viewport, over solid `BG_0` fallback | Not Started |
-| VP-3 | Room frame textures â€” load and draw centered 136Ã—96 frame PNGs in `LayoutRenderer._draw_rooms()`, scaled by zoom, after existing outlines, before label text | Not Started |
-| VP-4 | Frame selection logic â€” `frame_current` > `frame_hover` > `frame_default`; stub hooks for memory/danger/locked | Not Started |
-| VP-5 | Regression pass â€” Grid mode, Tiles mode, zoom/pan, hit testing, selection, detail panel, existing tests all green | Not Started |
+| VP-1 | Asset loading infrastructure — safe load helper for background PNG + 6 frame PNGs; log-once on missing; path resolution from package root | Not Started |
+| VP-2 | Background image — draw `background_graph_default.png` in `MapPanel`, Graph mode only, scissor-clipped, scaled to viewport, over solid `BG_0` fallback | Not Started |
+| VP-3 | Room frame textures — load and draw centered 136Ã—96 frame PNGs in `LayoutRenderer._draw_rooms()`, scaled by zoom, after existing outlines, before label text | Not Started |
+| VP-4 | Frame selection logic — `frame_current` > `frame_hover` > `frame_default`; stub hooks for memory/danger/locked | Not Started |
+| VP-5 | Regression pass — Grid mode, Tiles mode, zoom/pan, hit testing, selection, detail panel, existing tests all green | Not Started |
 
 ### Asset Paths
 
