@@ -1,6 +1,6 @@
 # Phase 50 — Hybrid Action Model
 
-Status: **COMPLETE** (started 2026-06-20, finished 2026-06-23, branch `phase-50`).
+Status: **COMPLETE & merged to `main`** (started 2026-06-20, finished 2026-06-23; branch `phase-50`, issue #80).
 Depends on: 47 (room contents), 48 (navigation + `how?` contract), 49 (playbooks).
 Roadmap source: `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (Phase 50 rows + "Key design
 resolutions" 2026-06-17).

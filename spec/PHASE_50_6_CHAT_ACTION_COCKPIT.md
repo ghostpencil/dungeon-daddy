@@ -1,7 +1,7 @@
 # Phase 50.6 — Chat Action Cockpit
 
-**Status:** ✅ **COMPLETE & GUI-verified (2026-06-26)** — all 11 slices on branch `phase-50.6`
-(not yet merged to `main`). The Slice 11 smoke test was **skipped by user choice** (manual verify
+**Status:** ✅ **COMPLETE, GUI-verified & merged to `main`** (2026-06-26, PR #82) — all 11 slices,
+originally on branch `phase-50.6`. The Slice 11 smoke test was **skipped by user choice** (manual verify
 sufficient; the cockpit is expected to evolve). Per-slice implementation log: `spec/PROJECT_INDEX.md`.
 **Type:** BUILD add-on (dynamic, like Phase 50.5 — *not* on the 51–53 roadmap, no GitHub issue).
 **Depends on:** Phase 50 (Hybrid Action Model), Phase 50.5 (Use-on grammar).

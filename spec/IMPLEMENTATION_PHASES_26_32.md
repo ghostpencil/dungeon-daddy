@@ -1,8 +1,8 @@
 ﻿# Implementation Phases — 26 through 32 (RPG + Memory Foundation)
 
-## Phase 26 â€” RPG + Memory Foundation
+## Phase 26 — RPG + Memory Foundation
 
-**Status: Complete** â€” 1480 unit+integration tests passing. Closed 2026-06-02.
+**Status: Complete** — 1480 unit+integration tests passing. Closed 2026-06-02.
 
 Spec: `spec/PHASE_26_RPG_MEMORY_FOUNDATION.md`
 
@@ -22,9 +22,9 @@ Create module skeletons, base models, migration runner, DuckDB repository shell,
 
 ---
 
-## Phase 27 â€” RPG Core Loop
+## Phase 27 — RPG Core Loop
 
-**Status: Complete** â€” 1511 unit+integration tests passing. Closed 2026-06-02.
+**Status: Complete** — 1511 unit+integration tests passing. Closed 2026-06-02.
 
 Spec: `spec/PHASE_27_RPG_CORE_LOOP.md`
 
@@ -32,9 +32,9 @@ Implement headless Charge-style action resolution, momentum, clocks, stress trac
 
 ---
 
-## Phase 28 â€” Memory Persistence
+## Phase 28 — Memory Persistence
 
-**Status: Complete** â€” 1546 unit+integration tests passing. Closed 2026-06-02.
+**Status: Complete** — 1546 unit+integration tests passing. Closed 2026-06-02.
 
 Spec: `spec/PHASE_28_MEMORY_PERSISTENCE.md`
 
@@ -46,29 +46,29 @@ Persist campaigns, sessions, scenes, actors, actions, clocks, domain events, mem
 |---|---|---|
 | 28-1 | Campaign / actor / stress track / action rating persistence | Done |
 | 28-2 | Clock + action resolution persistence | Done |
-| 28-3 | Memory entry CRUD â€” save, get, tags, links, checksum update | Done |
-| 28-4 | Sync report â€” missing file, invalid front matter, checksum mismatch, orphan Markdown/DB | Done |
-| 28-5 | Deterministic retrieval â€” by actor, location, tag, importance rank | Done |
-| 28-6 | Integration roundtrip â€” RPG state + memory survive restart | Done |
+| 28-3 | Memory entry CRUD — save, get, tags, links, checksum update | Done |
+| 28-4 | Sync report — missing file, invalid front matter, checksum mismatch, orphan Markdown/DB | Done |
+| 28-5 | Deterministic retrieval — by actor, location, tag, importance rank | Done |
+| 28-6 | Integration roundtrip — RPG state + memory survive restart | Done |
 
-### Post-Phase 28 â€” Campaign-Dungeon Link
+### Post-Phase 28 — Campaign-Dungeon Link
 
 Add `dungeon_slug` column to `campaigns` table via migration `002_dungeon_slug.sql`.
 
-This links each campaign row to the dungeon folder it was started from (`DungeonRepository` uses folder name as the dungeon identifier). The `dungeon_slug` records which dungeon design the campaign is running â€” it is the folder name under `dungeons_dir`, not a file path.
+This links each campaign row to the dungeon folder it was started from (`DungeonRepository` uses folder name as the dungeon identifier). The `dungeon_slug` records which dungeon design the campaign is running — it is the folder name under `dungeons_dir`, not a file path.
 
 | Step | Task | Status |
 |---|---|---|
-| 28-X1 | Add `002_dungeon_slug.sql` migration â€” `ALTER TABLE campaigns ADD COLUMN dungeon_slug TEXT` | Not Started |
+| 28-X1 | Add `002_dungeon_slug.sql` migration — `ALTER TABLE campaigns ADD COLUMN dungeon_slug TEXT` | Not Started |
 | 28-X2 | Add `save_campaign` overload / update to accept `dungeon_slug` param | Not Started |
 | 28-X3 | Update `get_campaign` to return `dungeon_slug` in the result dict | Not Started |
 | 28-X4 | Tests: save campaign with dungeon_slug, retrieve, confirm round-trip | Not Started |
 
 ---
 
-## Phase 29 â€” Fallout + Dungeon Influence
+## Phase 29 — Fallout + Dungeon Influence
 
-**Status: Complete** â€” 1568 unit+integration tests passing. Closed 2026-06-02.
+**Status: Complete** — 1568 unit+integration tests passing. Closed 2026-06-02.
 
 Spec: `spec/PHASE_29_FALLOUT_AND_DUNGEON_INFLUENCE.md`
 
@@ -76,9 +76,9 @@ Implement Body, Composure, Bonds, and Weird fallout; intimacy risk; dungeon infl
 
 ---
 
-## Phase 29.5 â€” Campaign Save Folder Rename
+## Phase 29.5 — Campaign Save Folder Rename
 
-**Status: Complete** â€” 1575 tests passing. Closed 2026-06-03.
+**Status: Complete** — 1575 tests passing. Closed 2026-06-03.
 
 No spec file yet. This is a structural rename with no new game behaviour.
 
@@ -92,12 +92,12 @@ The intended end state is that the **campaign** is the primary save entity: `<ca
 
 | Step | Task |
 |---|---|
-| 29.5-1 | `DungeonRepository.clone_dungeon(source_slug, dest_slug)` â€” copies `dungeon.json` and all context docs (`setting.md`, `party.md`, `level_*_design.md`); does NOT copy `session.json`, `campaign.duckdb`, `memory/`, `rpg-memory/` |
-| 29.5-2 | Rename `AppConfig.dungeons_dir` â†’ `AppConfig.campaigns_dir`; update all call sites |
-| 29.5-3 | Rename `DungeonRepository.__init__(dungeons_dir)` parameter â†’ `campaigns_dir`; update all call sites |
+| 29.5-1 | `DungeonRepository.clone_dungeon(source_slug, dest_slug)` — copies `dungeon.json` and all context docs (`setting.md`, `party.md`, `level_*_design.md`); does NOT copy `session.json`, `campaign.duckdb`, `memory/`, `rpg-memory/` |
+| 29.5-2 | Rename `AppConfig.dungeons_dir` → `AppConfig.campaigns_dir`; update all call sites |
+| 29.5-3 | Rename `DungeonRepository.__init__(dungeons_dir)` parameter → `campaigns_dir`; update all call sites |
 | 29.5-4 | Convention: campaign folder name = campaign `slug`; `dungeon_slug` column on `campaigns` table becomes a "source template" reference only |
-| 29.5-5 | Update `DungeonRepository.list_dungeons()` â†’ `list_campaigns()`; deprecation alias kept for one phase |
-| 29.5-6 | Migration guide note in `spec/HISTORY.md` â€” folder rename is breaking for existing save data; instruct users to rename their `dungeons/` directory to `campaigns/` |
+| 29.5-5 | Update `DungeonRepository.list_dungeons()` → `list_campaigns()`; deprecation alias kept for one phase |
+| 29.5-6 | Migration guide note in `spec/HISTORY.md` — folder rename is breaking for existing save data; instruct users to rename their `dungeons/` directory to `campaigns/` |
 | 29.5-7 | Full test suite green; no behaviour change for existing dungeons/campaigns |
 
 ### Why defer
@@ -108,25 +108,25 @@ This is a pure rename. It touches `AppConfig`, `DungeonRepository`, and all call
 
 ```
 <campaigns_dir>/
-  <campaign_slug>/          â† folder name IS the campaign save name
-    dungeon.json            â† dungeon design (copied from source template on clone)
-    session.json            â† play session state
-    campaign.duckdb         â† MemoryRepository â€” RPG state + narrative memory
-    memory/                 â† existing room play notes (level_N.md)
-    rpg-memory/             â† Phase 28 Markdown narrative memory files
+  <campaign_slug>/          ← folder name IS the campaign save name
+    dungeon.json            ← dungeon design (copied from source template on clone)
+    session.json            ← play session state
+    campaign.duckdb         ← MemoryRepository — RPG state + narrative memory
+    memory/                 ← existing room play notes (level_N.md)
+    rpg-memory/             ← Phase 28 Markdown narrative memory files
       actors/
       events/
       fallout/
-    setting.md              â† AI context docs (copied on clone)
+    setting.md              ← AI context docs (copied on clone)
     party.md
     level_N_design.md
 ```
 
 ---
 
-## Phase 30 â€” Play Mode UI + Debug Tools
+## Phase 30 — Play Mode UI + Debug Tools
 
-**Status: Complete** â€” 1639 unit+integration tests passing. Closed 2026-06-03.
+**Status: Complete** — 1639 unit+integration tests passing. Closed 2026-06-03.
 
 Spec: `spec/PHASE_30_PLAY_MODE_UI_AND_DEBUG_TOOLS.md`
 
@@ -134,19 +134,19 @@ Expose RPG state, clocks, fallout, and memory in Play Mode using panels and debu
 
 ---
 
-## Phase 31 â€” Context Bundles + AI Integration
+## Phase 31 — Context Bundles + AI Integration
 
-**Status: Complete** â€” 1686 unit+integration tests passing. Closed 2026-06-03.
+**Status: Complete** — 1686 unit+integration tests passing. Closed 2026-06-03.
 
 Spec: `spec/PHASE_31_CONTEXT_BUNDLES_AND_AI_INTEGRATION.md`
 
-Built `MemoryRetriever` (tag/actor/location filtering, importance+recency ranking, token budget trim), `ContextBundleBuilder` (assembles `ContextBundle` from real DuckDB: scene brief, mechanical state, fallout, clocks, memory cards, provenance), `DMAgent.build_prompt(context_bundle)` (injects bundle into system prompt), and `DebugControls.set_bundle()` / `bundle_section_lines()` for provenance display. Bug fix: `dm_agent.build_prompt()` clock label key was `name`; repo uses `label`. Context bundle not yet wired into live app UI flow â€” wiring is a Phase 32+ concern.
+Built `MemoryRetriever` (tag/actor/location filtering, importance+recency ranking, token budget trim), `ContextBundleBuilder` (assembles `ContextBundle` from real DuckDB: scene brief, mechanical state, fallout, clocks, memory cards, provenance), `DMAgent.build_prompt(context_bundle)` (injects bundle into system prompt), and `DebugControls.set_bundle()` / `bundle_section_lines()` for provenance display. Bug fix: `dm_agent.build_prompt()` clock label key was `name`; repo uses `label`. Context bundle not yet wired into live app UI flow — wiring is a Phase 32+ concern.
 
 ---
 
-## Phase 32 â€” Stabilization + Balancing
+## Phase 32 — Stabilization + Balancing
 
-**Status: Complete** â€” 1708 unit+integration tests passing. Closed 2026-06-03.
+**Status: Complete** — 1708 unit+integration tests passing. Closed 2026-06-03.
 
 Spec: `spec/PHASE_32_STABILIZATION_AND_BALANCING.md`
 
@@ -159,13 +159,13 @@ Hardened end-to-end tests, smoke tests, golden fixtures, sync repair tools, bala
 | 32-1 | Golden fixtures (`tests/fixtures/phase32_campaign.py`) | Done |
 | 32-2 | Golden context bundle snapshots (`tests/integration/test_context_bundle_snapshots.py`) | Done |
 | 32-3 | Repair tools (`validate_campaign`, `rebuild_memory_projection`, `export_campaign`, `import_campaign_fixture`) | Done |
-| 32-4 | Balance pass â€” constants locked in `spec/BALANCE_NOTES.md` | Done |
+| 32-4 | Balance pass — constants locked in `spec/BALANCE_NOTES.md` | Done |
 | 32-5 | Documentation (`docs/GM_RULES.md`, `ARCHITECTURE.md`, `TROUBLESHOOTING.md`, `MIGRATION.md`) | Done |
 | 32-6 | Full pipeline test + smoke script (`test_rpg_memory_full_pipeline.py`, `smoke_test_phase32.py`) | Done |
 
 ### Exit Criteria
 
-- [x] End-to-end action â†’ stress â†’ fallout â†’ memory â†’ context â†’ DM narration path works
+- [x] End-to-end action → stress → fallout → memory → context → DM narration path works
 - [x] Sync validator catches and reports drift
 - [x] Golden context bundle snapshots are stable
 - [x] Documentation sufficient for future phases without re-deriving architecture
@@ -177,10 +177,10 @@ Hardened end-to-end tests, smoke tests, golden fixtures, sync repair tools, bala
 
 - **Do not advance to the next phase until all exit criteria for the current phase are met.**
 - **Each phase's test files are written before the module they cover.** See `spec/TESTING.md`.
-- **Update this file** when a phase is complete: change `Not Started` â†’ `Complete`
+- **Update this file** when a phase is complete: change `Not Started` → `Complete`
   (or `In Progress` if partially done).
-- Phases 1â€“4 have no Arcade display dependency â€” run them in any environment.
-- Phases 5â€“8 require a display; on headless CI, skip arcade-rendering tests using
+- Phases 1–4 have no Arcade display dependency — run them in any environment.
+- Phases 5–8 require a display; on headless CI, skip arcade-rendering tests using
   `pytest -m "not requires_display"` (mark those tests accordingly).
 
 ---

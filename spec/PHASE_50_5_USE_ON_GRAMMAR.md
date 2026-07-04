@@ -1,6 +1,6 @@
 # Phase 50.5 — "Use Noun on Noun" Transitive Grammar
 
-Status: **COMPLETE (2026-06-24)**. Branch: `phase-50.5`. PR pending.
+Status: **COMPLETE & merged to `main`** (2026-06-24, PR #81). Branch: `phase-50.5`.
 Depends on: 47 (room contents), 48 (navigation + exit gating), 49 (playbooks), 50 (VNA panel).
 
 > A **dynamic add-on to Phase 50**, not on the roadmap and **with no GitHub issue**. It grew

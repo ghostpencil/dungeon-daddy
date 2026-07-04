@@ -1,6 +1,6 @@
 ﻿# Implementation Phases — 33 Onwards (Active Play Loop + Future Roadmap)
 
-## Phase 33 â€” Player-Controlled Action Loop âœ“ Complete (2026-06-04, 1761 passing)
+## Phase 33 — Player-Controlled Action Loop ✓ Complete (2026-06-04, 1761 passing)
 
 Make the RPG loop visible and playable in Play Mode.
 
@@ -14,9 +14,9 @@ Major work:
 - Pass `ContextBundle` into live DM narration.
 - Add Debug bundle provenance display.
 
-## Phase 34 â€” Campaign RPG Data Deepening
+## Phase 34 — Campaign RPG Data Deepening
 
-**Status: Complete (2026-06-05) â€” 1802 passing**
+**Status: Complete (2026-06-05) — 1802 passing**
 
 Make the existing campaigns meaningful RPG testbeds. Phase 33 proved a player action can be resolved; Phase 34 makes the campaigns interesting enough that those actions matter.
 
@@ -60,17 +60,17 @@ Spec: `spec/PHASE_34_CAMPAIGN_RPG_DATA_DEEPENING.md`
 - [x] Both existing campaigns have RPG seed packs in `seed_data/campaigns/<slug>/rpg_seed.json`
 - [x] Both campaigns have at least one player-controlled actor
 - [x] Both campaigns have dungeon-controlled actors (NPCs/monsters)
-- [x] Both campaigns have 3â€“6 clocks connected to threats
-- [x] Both campaigns have 5â€“10 starter memories retrievable by context bundle
+- [x] Both campaigns have 3–6 clocks connected to threats
+- [x] Both campaigns have 5–10 starter memories retrievable by context bundle
 - [x] Seeder applies seed packs idempotently (`--dry-run` + `--force` both work)
 - [x] Player Action UI shows meaningful actor choices after seeding
 - [x] Context bundle includes actor state, memories, clocks, and fallout after seeding
 - [x] Tests cover schema parse, stable ID, idempotency, and context bundle retrieval
 - [x] `pytest tests/unit/` + `tests/integration/` green
 
-## Phase 35 â€” Deterministic World Reaction Service
+## Phase 35 — Deterministic World Reaction Service
 
-**Status: Complete** (2026-06-05) â€” 1818 unit tests passing.
+**Status: Complete** (2026-06-05) — 1818 unit tests passing.
 
 Make the dungeon push back through deterministic state changes.
 
@@ -86,9 +86,9 @@ Major work:
 
 Full spec: `spec/PHASE_35_WORLD_REACTION_SERVICE.md`
 
-## Phase 35.5 â€” Clock Scoping
+## Phase 35.5 — Clock Scoping
 
-**Status: Complete** (2026-06-06) â€” 1698 unit tests passing. All 10 manual UI behavior tests passing.
+**Status: Complete** (2026-06-06) — 1698 unit tests passing. All 10 manual UI behavior tests passing.
 
 Make clock advancement contextually meaningful so clocks only tick when
 the triggering action is relevant to them.
@@ -107,9 +107,9 @@ Major work:
 
 Spec: `spec/FEATURE_CLOCK_SCOPING.md`
 
-## Phase 35.6 â€” Stress Routing by Action Intent
+## Phase 35.6 — Stress Routing by Action Intent
 
-**Status: Complete (2026-06-06) â€” 1738 unit tests passing**
+**Status: Complete (2026-06-06) — 1738 unit tests passing**
 
 Replace hard-coded `body` stress in `compute_world_reaction()` with deterministic
 stress-track selection driven by clock category, clock level, action key, and
@@ -120,9 +120,9 @@ Major work:
 - Add `intent: str | None` to `ActionRequest` and `ActionResolution`.
 - Update UI request builder to populate intent from the submitted intent text.
 - Create `dungeon_daddy/rpg/stress_routing.py` with `choose_stress_track()`.
-- Clock category mapping: `danger`/`hazard` â†’ body; `horror`/`fear` â†’ composure; `relationship`/`betrayal` â†’ bonds; `ritual`/`occult`/`dungeon_intimacy` â†’ weird.
-- Clock level mapping (weaker signal): `room`/`level` â†’ body; `dungeon` â†’ weird; `quest` â†’ composure; `character`/`faction` â†’ bonds.
-- Action key mapping: `fight`/`move`/`endure`/`tinker` â†’ body; `study`/`focus`/`sense` â†’ composure; `sway` â†’ bonds; `channel` â†’ weird.
+- Clock category mapping: `danger`/`hazard` → body; `horror`/`fear` → composure; `relationship`/`betrayal` → bonds; `ritual`/`occult`/`dungeon_intimacy` → weird.
+- Clock level mapping (weaker signal): `room`/`level` → body; `dungeon` → weird; `quest` → composure; `character`/`faction` → bonds.
+- Action key mapping: `fight`/`move`/`endure`/`tinker` → body; `study`/`focus`/`sense` → composure; `sway` → bonds; `channel` → weird.
 - Intent keyword mapping (lowest priority): weird > bonds > composure > body when multiple groups match.
 - Wire `choose_stress_track()` into `compute_world_reaction()`, passing matched clocks.
 - Fix `PlayView._apply_world_reaction()` to read capacity from the actual stress track, not hard-coded `body`.
@@ -130,14 +130,14 @@ Major work:
 
 Spec: `spec/FEATURE_STRESS_ROUTING_BY_ACTION_INTENT.md`
 
-## Phase 36 â€” LLM-Proposed Reaction Drafts âœ“ Complete (2026-06-07)
+## Phase 36 — LLM-Proposed Reaction Drafts ✓ Complete (2026-06-07)
 
 Allow LLM creativity without giving it authority.
 
 Major work:
 
 - Add structured proposal format (`LLMReactionProposal`, `ProposedChange` discriminated union).
-- Validate proposed changes â€” reject unknown clocks/actors, player-actor intent control.
+- Validate proposed changes — reject unknown clocks/actors, player-actor intent control.
 - Auto-apply low-risk proposals (`create_memory`); keep `advance_clock` / `npc_reaction` as draft.
 - `apply_consequence` auto-applies only when LLM track matches deterministic `choose_stress_track()`.
 - `request_proposal` uses `response_format: json_object` and explicit flat-object schema prompt.
@@ -147,29 +147,33 @@ Major work:
 
 Spec: `spec/PHASE_36_LLM_REACTION_PROPOSALS.md`
 
-## Phase 37 â€” Memory Approval and Campaign Curation âœ“ Complete (2026-06-08)
+## Phase 37 — Memory Approval and Campaign Curation ✓ Complete (2026-06-08)
 
 Improve long-term play quality by controlling memory drift. 1814 unit tests passing; all manual UI tests passing.
 
 Major work:
 
-- `MemoryEntry.status` â†’ `Literal["draft", "approved", "rejected", "archived"]`, default `"draft"`.
+- `MemoryEntry.status` → `Literal["draft", "approved", "rejected", "archived"]`, default `"draft"`.
 - `MemoryRetriever.query()` returns only `approved` by default.
 - `MemoryRepository.update_memory_status()` + `count_by_status()` added.
-- Migration `006_memory_approval_status.sql` converts `active`â†’`approved`, `resolved`â†’`archived`.
+- Migration `006_memory_approval_status.sql` converts `active`→`approved`, `resolved`→`archived`.
 - Seed pack saves seeded memories as `approved`.
 - `build_curation_report()` in `dungeon_daddy/memory/curation.py`.
 - `MemoryInspectorPanel.approve_selected()`, `reject_selected()`, `edit_selected_summary()`, `pop_pending_commit()`.
 - `PlayView._handle_mem_click()` + `_persist_pending_memory_commit()` wired in live UI.
 - MEM tab APPROVE/REJECT buttons live; detail pane with title truncation, word-wrap, dynamic height.
-- Alpha playtest smoke test `tools/smoke_test_phase37.py` â€” 16 behaviors across both seeded campaigns.
+- Alpha playtest smoke test `tools/smoke_test_phase37.py` — 16 behaviors across both seeded campaigns.
 
 Spec: `spec/PHASE_37_MEMORY_APPROVAL_AND_CAMPAIGN_CURATION.md`
 
 
 ---
 
-# Dungeon Daddy â€” RPG System Stabilization and Chat-Centered Play Roadmap
+# Dungeon Daddy — RPG System Stabilization and Chat-Centered Play Roadmap
+
+> **Historical snapshot (Phase 37 era).** The "Current State Summary" and "Current Concern" below
+> were written when Phase 37 was the frontier; they are kept for provenance. For today's state see
+> `spec/PROJECT_INDEX.md`; for the live roadmap see "Planned Roadmap — Phases 49–53" further down.
 
 **Audience:** Claude Code working in the `ghostpencil/dungeon-daddy` repository  
 **Purpose:** Stabilize the post-Phase-37 RPG system, then guide the next development phases toward a more natural Dungeon Daddy play experience.  
@@ -202,68 +206,29 @@ The immediate priority is **not** to add more mechanics. The immediate priority 
 
 ## Non-Negotiable Authority Boundary
 
-This boundary must remain true in all future phases.
-
-```text
-The player controls the player side:
-- one or more player-controlled actors
-- intent declarations
-- selected or confirmed actions
-- strategic decisions
-
-Dungeon Daddy controls the world:
-- dungeon
-- monsters
-- NPCs
-- factions
-- hazards
-- secrets
-- clocks
-- consequences
-- narration
-
-The RPG service and memory layer are authoritative.
-The LLM is advisory.
-The LLM may narrate, summarize, interpret tone, or propose structured changes.
-The LLM must not directly mutate authoritative RPG or memory state.
-```
-
-The guiding phrase remains:
+The full statement of who controls what is **canonical in `docs/LLM_AUTHORITY_BOUNDARY.md`**
+(summarized in `spec/PROJECT_INDEX.md` → "Product Direction"). It must hold in every future phase.
+The guiding phrase:
 
 ```text
 The LLM may propose.
 The engine disposes.
 ```
 
+> **Phase 51.5 Part B** added the single narrowly-constrained exception — the DM may resolve an
+> obstacle, but only to its **authored** resolved state — recorded in that same boundary doc.
+
 ---
 
 ## Architectural Guardrails
 
-Preserve the existing dependency direction:
+The authoritative dependency direction, threading, and view-ownership rules live in
+**`spec/ARCHITECTURE.md`** (and `spec/RPG_MEMORY_ARCHITECTURE.md` for the `rpg/` and `memory/`
+layers). Do not re-derive them here. Three roadmap-level rules to keep front of mind:
 
-```text
-views/play_view.py
-  -> rpg/service.py
-  -> memory/context_bundle.py
-  -> llm/agents/dm_agent.py
-
-rpg/service.py
-  -> rpg/actions.py
-  -> rpg/world_reaction.py
-  -> rpg/stress_routing.py
-  -> memory/repository.py only through explicit persistence/event boundaries
-
-llm/agents/dm_agent.py
-  -> receives ContextBundle and known IDs
-  -> does not query DuckDB
-  -> does not import RPGService
-```
-
-Do not let UI panels become repositories, rule engines, or LLM agents.
-
-Do not let the LLM choose and apply state changes without deterministic validation.
-
-Do not let the next UI work destroy the existing right-side RPG panel. It should be demoted into an inspector/debug/status surface, not deleted.
+- Do not let UI panels become repositories, rule engines, or LLM agents.
+- Do not let the LLM choose and apply state changes without deterministic validation.
+- Do not let new UI work delete the right-side RPG panel — demote it to an inspector/status surface.
 
 ---
 
@@ -297,7 +262,7 @@ This is small but important. Without it, the system cannot fully honor player-de
 
 ---
 
-# Phase 37.1 â€” RPG Intent and Consequence Stabilization
+# Phase 37.1 — RPG Intent and Consequence Stabilization
 
 ## Goal
 
@@ -349,7 +314,7 @@ LLM proposal result:
 
 ## Development Tasks
 
-### 37.1.1 â€” Intent Plumbing Audit
+### 37.1.1 — Intent Plumbing Audit
 
 Inspect:
 
@@ -368,7 +333,7 @@ Confirm that:
 - `_run_proposal_pipeline()` receives the same intent.
 - DM narration history includes the player intent.
 
-### 37.1.2 â€” Regression Tests for Intent Preservation
+### 37.1.2 — Regression Tests for Intent Preservation
 
 Add or update unit tests covering:
 
@@ -377,7 +342,7 @@ Add or update unit tests covering:
 - `compute_world_reaction()` passes `resolution.intent` to stress routing.
 - A live-style PlayView action uses the typed intent in the resolution.
 
-### 37.1.3 â€” Intent-Sensitive Stress Routing Tests
+### 37.1.3 — Intent-Sensitive Stress Routing Tests
 
 Add tests proving that intent affects stress when no stronger clock category/level applies.
 
@@ -405,7 +370,7 @@ Intent contains: ritual
 Expected stress: body, because matched clock category wins.
 ```
 
-### 37.1.4 â€” Proposal Application Audit
+### 37.1.4 — Proposal Application Audit
 
 Inspect:
 
@@ -423,7 +388,7 @@ Confirm that:
 
 Do not broaden proposal auto-application in this phase.
 
-### 37.1.5 â€” Debug Visibility
+### 37.1.5 — Debug Visibility
 
 Improve debug output if needed so a developer can understand one action end-to-end:
 
@@ -508,9 +473,9 @@ Phase 37.1 is complete when:
 
 ---
 
-# Phase 38 â€” Chat-Centered RPG Interaction Refactor
+# Phase 38 — Chat-Centered RPG Interaction Refactor
 
-**Status: Complete (2026-06-09) â€” 1920 unit tests passing. Smoke test 18/18 behaviors passing.**
+**Status: Complete (2026-06-09) — 1920 unit tests passing. Smoke test 18/18 behaviors passing.**
 
 ## Goal
 
@@ -572,7 +537,7 @@ Actions: [FIGHT] [MOVE] [TINKER] [STUDY] [FOCUS] [SWAY] [SENSE] [CHANNEL] [ENDUR
 Intent: existing chat input
 ```
 
-Flow A â€” Explicit Action:
+Flow A — Explicit Action:
 
 ```text
 Player selects: Mara
@@ -583,7 +548,7 @@ System resolves STUDY using Mara's rating.
 Dungeon Daddy narrates outcome.
 ```
 
-Flow B â€” Chat Intent with Action Confirmation Stub:
+Flow B — Chat Intent with Action Confirmation Stub:
 
 ```text
 Player types: Mara studies the mural to understand what the dungeon wants.
@@ -598,7 +563,7 @@ Flow B can be minimal and deterministic in Phase 38. Do not require LLM-based in
 
 ## Development Tasks
 
-### 38.1 â€” Separate Player Action State from Right Panel
+### 38.1 — Separate Player Action State from Right Panel
 
 Create a small view/controller model for pending player action state. Suggested name:
 
@@ -616,7 +581,7 @@ It should track:
 
 Do not store authoritative RPG state here.
 
-### 38.2 â€” Add Chat-Side Actor Mini-Card
+### 38.2 — Add Chat-Side Actor Mini-Card
 
 Add a compact selected-actor display in or near `ChatPanel`.
 
@@ -629,7 +594,7 @@ It should show:
 
 Single-actor campaigns should not feel awkward. If there is only one player actor, actor selection controls may be hidden or disabled.
 
-### 38.3 â€” Add Chat-Side Action Chips
+### 38.3 — Add Chat-Side Action Chips
 
 Add action chips near the chat input:
 
@@ -646,7 +611,7 @@ TINKER 1
 
 Selecting a chip should set the pending action but should not resolve immediately.
 
-### 38.4 â€” Send Intent Through Existing Chat Input
+### 38.4 — Send Intent Through Existing Chat Input
 
 When a player sends chat text while an action chip is selected:
 
@@ -662,18 +627,18 @@ The same code path should be shared with the old right-panel action system where
 
 Avoid duplicating world reaction logic in two places.
 
-### 38.5 â€” Preserve Right Panel as Inspector
+### 38.5 — Preserve Right Panel as Inspector
 
 The right action tab can remain for now, but it should not be the only way to take actions.
 
 Right panel should update after chat-side actions.
 
-### 38.6 â€” Add Mechanical Result Chat Bubble
+### 38.6 — Add Mechanical Result Chat Bubble
 
 Add a compact system/mechanical chat bubble before the DM narration:
 
 ```text
-Mara rolls STUDY â€” Partial Success [4]
+Mara rolls STUDY — Partial Success [4]
 World Reaction:
 - Bone Warden Stirs +1
 - Weird +1
@@ -764,7 +729,7 @@ In Phase 39, this can start with deterministic heuristics. LLM assistance may be
 
 ## Development Tasks
 
-### 39.1 â€” Pending Intent Model
+### 39.1 — Pending Intent Model
 
 Create a model for unresolved player intent:
 
@@ -780,7 +745,7 @@ PendingIntent
 
 This is UI/session state, not authoritative campaign history until resolved.
 
-### 39.2 â€” Deterministic Intent Classifier
+### 39.2 — Deterministic Intent Classifier
 
 Create a simple deterministic classifier first.
 
@@ -800,7 +765,7 @@ endure keywords: withstand, survive, hold, bear, take the hit
 
 This classifier should return ranked suggestions, not a final command.
 
-### 39.3 â€” Framing UI in Chat
+### 39.3 — Framing UI in Chat
 
 When plain chat appears actionable:
 
@@ -809,7 +774,7 @@ When plain chat appears actionable:
 - do not call `RpgService.resolve_action` yet,
 - let player confirm.
 
-### 39.4 â€” Confirmation Path
+### 39.4 — Confirmation Path
 
 When player clicks a suggested action:
 
@@ -819,7 +784,7 @@ When player clicks a suggested action:
 - update memory/proposal/debug as appropriate,
 - narrate outcome.
 
-### 39.5 â€” No-Roll Path
+### 39.5 — No-Roll Path
 
 Allow player or system to mark the intent as `No Roll`.
 
@@ -937,7 +902,7 @@ Do not require the LLM for basic campaign authoring.
 
 ## Development Tasks
 
-### 40.1 â€” Campaign Manifest Schema
+### 40.1 — Campaign Manifest Schema
 
 Define a manifest format. Start small.
 
@@ -991,7 +956,7 @@ ClockManifest
 - completion_effect
 ```
 
-### 40.2 â€” Manifest Validator
+### 40.2 — Manifest Validator
 
 Create validation that catches:
 
@@ -1005,7 +970,7 @@ Create validation that catches:
 - room threat references to missing actors/clocks,
 - empty player side.
 
-### 40.3 â€” Campaign Creation CLI
+### 40.3 — Campaign Creation CLI
 
 Create or extend tools for:
 
@@ -1017,13 +982,13 @@ tools/validate_campaign.py
 
 The first implementation may be CLI-only.
 
-### 40.4 â€” Export Existing Campaign as Manifest
+### 40.4 — Export Existing Campaign as Manifest
 
 Add export support that can generate a manifest-like view from an existing seeded campaign.
 
 This helps convert The Crucible and Tomb of the Forgotten King into reusable examples.
 
-### 40.5 â€” Example Campaign Manifest
+### 40.5 — Example Campaign Manifest
 
 Add one example manifest under:
 
@@ -1076,9 +1041,9 @@ Phase 40 is complete when:
 
 These are not part of the immediate implementation request unless explicitly approved.
 
-## Phase 41 â€” AI-Assisted Campaign Drafting
+## Phase 41 — AI-Assisted Campaign Drafting
 
-**Status: Complete (2026-06-13) â€” 2266 tests passing. Manually verified.**
+**Status: Complete (2026-06-13) — 2266 tests passing. Manually verified.**
 
 Let the LLM draft campaign manifest changes, but require validation and human approval before writing.
 
@@ -1091,12 +1056,12 @@ Exit criteria all met:
 - Validator always runs before any patch is applied
 - Human must explicitly approve before the manifest is mutated
 - Patch application is idempotent
-- LLM provider is injected â€” no live API calls in unit tests
-- Integration test: end-to-end natural-language â†' patch â†' validate â†' apply â†' re-validate
+- LLM provider is injected — no live API calls in unit tests
+- Integration test: end-to-end natural-language → patch → validate → apply → re-validate
 
-## Phase 42 â€” Campaign Authoring UI
+## Phase 42 — Campaign Authoring UI
 
-**Status: Complete (2026-06-13) â€” 2402 tests passing.**
+**Status: Complete (2026-06-13) — 2402 tests passing.**
 
 Add a Design Mode interface for:
 
@@ -1111,9 +1076,9 @@ Add a Design Mode interface for:
 
 Spec: `spec/PHASE_42_CAMPAIGN_AUTHORING_UI.md`
 
-## Phase 43 â€” Faction System
+## Phase 43 — Faction System
 
-**Status: Complete (2026-06-13) â€” 2402 tests passing.**
+**Status: Complete (2026-06-13) — 2402 tests passing.**
 
 Add named factions as first-class campaign entities with persistent reputation state.
 
@@ -1128,9 +1093,9 @@ Major work:
 - Campaign UI: faction-specific edit form and list card (reputation chip, tier label, no action ratings/stress tracks).
 - 7 TDD slices.
 
-## Phase 44 â€” Playtest Telemetry and Balance Reports
+## Phase 44 — Playtest Telemetry and Balance Reports
 
-**Status: Complete (2026-06-13) â€” 2435 tests passing**
+**Status: Complete (2026-06-13) — 2435 tests passing**
 
 Generate reports from domain events:
 
@@ -1141,13 +1106,13 @@ Generate reports from domain events:
 - proposal acceptance/rejection rates,
 - memories created/approved/rejected.
 
-## Phase 45 â€” Campaign Pipeline: Dungeon Library â†' Campaign Seeds â†' Save Games
+## Phase 45 — Campaign Pipeline: Dungeon Library → Campaign Seeds → Save Games
 
-**Status: Complete (2026-06-14) â€” 2436 tests passing**
+**Status: Complete (2026-06-14) — 2436 tests passing**
 Spec: `spec/PHASE_45_CAMPAIGN_PIPELINE.md`
 Branch: `phase-45-campaign-pipeline`
 
-Wire Design â†' Campaign â†' Play into a real authoring â†' publishing â†' playing pipeline
+Wire Design → Campaign → Play into a real authoring → publishing → playing pipeline
 backed by three on-disk libraries: `dungeons/` (reusable templates), `campaign_seeds/`
 (manifests attached to a dungeon), and `saves/` (self-contained `dungeon + seed + live
 state`). Publishing a seed snapshots its dungeon + manifest into a new save and seeds its
@@ -1155,7 +1120,7 @@ DuckDB. Existing `campaigns/*` auto-migrate once. A new Library home screen is t
 landing/hub view. Post-phase: entire top-level menu bar removed; 4-pill navigation
 (Library / Design / Campaign / Play).
 
-9 TDD slices (0â€”8): config dirs, dungeon library wiring, seed library, seed persistence,
+9 TDD slices (0—8): config dirs, dungeon library wiring, seed library, seed persistence,
 publish service, play loads saves, Library view, one-time migration, startup integration.
 
 ## Phase 46 — Inventory System (COMPLETE)
@@ -1272,9 +1237,9 @@ LLM narration hook after deterministic `ActivateObject`. Level 2 seed (`tools/po
 
 ## Phase 50.6 — Chat Action Cockpit (COMPLETE)
 
-**Status: Complete & GUI-verified (2026-06-26) — suite green**
+**Status: Complete, GUI-verified & merged to `main` (2026-06-26, PR #82) — suite green**
 Spec: `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md`
-Branch: `phase-50.6` (not yet merged to `main`)
+Branch: `phase-50.6`
 
 Dynamic add-on to Phase 50 (not on the roadmap, no GitHub issue). Closes the action loop inside the
 **left chat column**: the in-chat **Action Builder** (relocated out of the right RPG panel) is now the
@@ -1299,23 +1264,70 @@ they are now removed from the manager while hidden. Smoke test skipped by user c
 Also from the same review: Command-Sentence Polish CP-1…CP-7 (clause-aware wrap, slot tints/
 placeholders, dropped the suggested-verbs row + PREVIEW kicker); a reseed/no-playbook crash fix.
 
+## Phase 51 — Talk to the Dungeon (COMPLETE)
+
+**Status: Complete, GUI-verified & merged to `main` (2026-07-04, PR #83) — suite green (3195)**
+Spec: `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`
+Branch: `phase-51`
+
+First roadmap phase past the 50.x add-ons. A live **dungeon-voice channel** opens at resonance
+points: `DungeonVoiceAgent` (LLM narrates only), a **recedable/latching intimacy clock** (signed
+`tick_clock(clock, delta)` + `monotonic: bool` on `ClockState`, migration `016`), dungeon-persona
+persistence (Markdown helpers + DuckDB ref columns, migration `017`), per-tier knowledge reveals,
+and the distinct `◆ THE CRUCIBLE` chat treatment. Slices: recedable clock engine, `resonance_point`
+archetype + room flag, intimacy gate, knowledge filter, `DungeonVoiceAgent` + dungeon-voice bundle,
+per-exchange engine side-effects, PlayView dialogue routing, seed-time + attach-time persona
+read/write, and the dungeon-channel UI treatment.
+
+## Phase 51.5 — Dungeon Objectives & Intimacy Tiers (COMPLETE)
+
+**Status: Complete, GUI-verified & merged to `main` (2026-07-04, PR #83, with Phase 51 per D8) — suite green (3195)**
+Spec: `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`
+Branch: `phase-51`
+
+Extends Phase 51: grounds the channel in deterministic state so the intimacy ladder is climbed **by
+doing**, not by chatting. First-class `Objective` / `ObjectiveCompletion` model + migration `018`;
+`rpg/objectives.py` deterministic `completion_satisfied` / `advance_objectives` — the **single**
+intimacy-tick source (D5; chat no longer ticks, D1) driving a **latching tier index** (D6) with
+per-tier `reveals_knowledge` (D7); the full 4-tier Crucible ladder seeded (`gearworks` →
+`coolant-loop` → `arcane-conduits` → `core-containment`). Decisions D1–D8 locked in the spec.
+
+**Puzzle-obstacle / multi-approach add-on** (post-spec, folded into 51.5):
+- **Part A** — an obstacle is a `RoomObject` with multiple **contested transitions converging on one
+  canonical resolved state**; class-flavored approaches (Artificer *tinker*, Fighter *fight*, Thief
+  *finesse*) resolve it via the deterministic `ActivateObject` seam. Outcome→success mapping locked
+  (full/crit → resolves, partial → resolves with a complication, miss → fails). Logic in
+  `rpg/obstacles.py`.
+- **Part B** — the one **narrowly-constrained exception** to "the LLM never mutates object state": a
+  `ResolveObstacleChange` proposal lets the DM rule that a plausibly-described action resolves an
+  obstacle, gated by the validator to the obstacle's **authored** resolved state only, then applied
+  through the deterministic `ActivateObject` seam. Documented in `docs/LLM_AUTHORITY_BOUNDARY.md` +
+  `PHASE_51_5…§11`.
+- Container-loot via `spawns_item_slug` + builder hit-test fix.
+
+> **Known pre-existing issue (carried, not introduced):** the Phase 35 world-reaction tag fan-out can
+> advance the `dungeon_intimacy` clock on a miss, violating D5's single-source rule. Fix is designed
+> and locked (`spec/WORLD_REACTION_POLICY.md`) as its own **unscheduled** phase — deliberately not
+> folded into 51.5.
+
 ---
 
 # Planned Roadmap — Phases 49–53
 
-These phases are **defined on the GitHub Projects roadmap** (`ghostpencil/dungeon-daddy`,
-project #1). Phases 48–50, plus the off-roadmap add-ons **50.5** and **50.6**, are **complete**;
-**51–53 are not yet implemented**. Numbering and scope below mirror that board. A detailed
-`spec/PHASE_NN_*.md` is written when each phase actually starts.
+These phases are **defined on the GitHub Projects roadmap** (`ghostpencil/dungeon-daddy`, project #1).
+Phases **48–51** and the off-roadmap add-ons **50.5 / 50.6 / 51.5** are **complete and merged to
+`main`** — see their full entries in the phase history above, not restated here. Only the
+**not-yet-implemented** phases are listed below. A detailed `spec/PHASE_NN_*.md` is written when each
+phase actually starts.
 
 | Phase | Title | One-line scope |
 |---|---|---|
-| 48 | Dungeon Navigation | Room exits, party location, level connectors — **COMPLETE** |
-| 49 | Starting Playbooks | Class foundations: ratings, tracks, kit, **tags**, **signature adverbs**, starting abilities — **COMPLETE** |
-| 50 | Hybrid Action Model | Structured **Verb · Noun · Adverb** action input; LLM narrates only — **COMPLETE** |
-| 51 | Talk to the Dungeon | Intimacy-gated freeform channel at resonance points |
 | 52 | Milestone Advancement | Playbook beats, ranks to 5, ability unlocks |
 | 53 | Threat Behavior & Monster Reactions | Instinct-driven, engine-bounded monster reactions (no enemy turn); boss phases via clock thresholds |
+
+> **Also settled but unscheduled:** the **World Reaction Policy** (`spec/WORLD_REACTION_POLICY.md`) —
+> a new feature (per-object `reaction_policy`) that fixes the Phase 35 miss-fan-out bug. Not folded
+> into any phase above; slot it in when chosen.
 
 ## Phase Dependencies & Sequencing (47–53)
 
@@ -1445,13 +1457,13 @@ reaction spends only the existing currencies (stress, clocks, tags).
 Use this order:
 
 ```text
-1. Phase 37.1 â€” stabilize intent/consequence/proposal visibility.
+1. Phase 37.1 — stabilize intent/consequence/proposal visibility.
 2. Manual smoke test both seeded campaigns.
-3. Phase 38 â€” move primary action loop into chat.
+3. Phase 38 — move primary action loop into chat.
 4. Manual playtest and UX review.
-5. Phase 39 â€” add intent framing and confirmation.
+5. Phase 39 — add intent framing and confirmation.
 6. Manual playtest and UX review.
-7. Phase 40 â€” authoring foundation.
+7. Phase 40 — authoring foundation.
 ```
 
 Do not compress these phases. Each one changes a different risk surface:
@@ -1476,13 +1488,13 @@ Player:
 Mara studies the mural to understand what the dungeon wants from her.
 
 Dungeon Daddy:
-That sounds like STUDY. The risk is not physical harm â€” it is that the mural studies her back.
+That sounds like STUDY. The risk is not physical harm — it is that the mural studies her back.
 [Roll Study] [Use Sense] [No Roll]
 
 Player confirms.
 
 System:
-Mara rolls STUDY â€” Partial Success.
+Mara rolls STUDY — Partial Success.
 World Reaction:
 - The Dungeon Notices Mara +1
 - Weird +1

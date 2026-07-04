@@ -5,94 +5,40 @@
 Phase **50 / 50.5 / 50.6 — COMPLETE & merged to `main`** (Hybrid Action Model · Use-Noun-on-Noun
 grammar · Chat Action Cockpit). Detail in git history + Phase History table below.
 
-Phase **51 — Talk to the Dungeon: FEATURE-COMPLETE & GUI-verified** on branch `phase-51` (live
-dungeon-voice channel, intimacy clock, `DungeonVoiceAgent`, persona persistence, resonance points).
-Spec `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
+Phase **51 — Talk to the Dungeon: COMPLETE & merged to `main`** (PR #83, 2026-07-04) — live
+dungeon-voice channel, recedable/latching intimacy clock, `DungeonVoiceAgent`, dungeon-persona
+persistence, resonance points. Spec `spec/PHASE_51_TALK_TO_THE_DUNGEON.md`.
 
-Phase **51.5 — Dungeon Objectives & Intimacy Tiers: IN PROGRESS** on branch `phase-51` (extends 51;
-**no merge to `main` until 51.5 is built** — owner decision). Spec `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`,
-decisions locked D1–D8 (below). Built & GUI-verified so far:
-- **Slices 1–10 DONE & GUI-verified** — the full intimacy ladder (objectives → latching intimacy tier
-  index → per-tier knowledge), seeded into the live Crucible. Condensed architecture below.
-- **Puzzle-obstacle / multi-approach feature (#1+#2), Part A (Slices 1–4) DONE & committed + GUI-verified**
-  — a class-flavored approach roll resolves an obstacle and completes its objective; the builder suggests
-  the obstacle's approach verbs; the 4 Crucible obstacles author thematic contested approaches; both seeds
-  reseed additively.
-- **Container-loot feature + builder hit-test fix DONE, committed (`11e7eb6`) & GUI-verified**; live
-  Crucible reseeded + new-game-reset (state below).
-- **Part B (LLM authority expansion, Slices 5–7) DONE** — Slices 5–6 committed (`8daece5`,
-  `0665058`); **Slice 7 (docs) done** (`docs/LLM_AUTHORITY_BOUNDARY.md` + `PHASE_51_5…§11` record the
-  constrained DM-ruled obstacle authority). Part B complete. See START HERE.
+Phase **51.5 — Dungeon Objectives & Intimacy Tiers: COMPLETE & merged to `main`** (PR #83, together
+with Phase 51 per D8, 2026-07-04) — the full intimacy ladder (objectives → latching tier index →
+per-tier knowledge) plus the puzzle-obstacle multi-approach feature (Part A class-flavored contested
+approaches; Part B the constrained DM-ruled obstacle authority) and container-loot. Decisions locked
+D1–D8 (below). Spec `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`.
 
 Specs: 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` · 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` ·
 current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index `spec/IMPLEMENTATION_PHASES.md`).
 
 ---
 
-## START HERE — next session: Phase 51 + 51.5 are BUILD-COMPLETE → merge decision (D8)
+## START HERE — Phase 51 + 51.5 merged; pick the next phase
 
-**Part B is done, and with it all of Phase 51.5.** The DM-ruling authority expansion (let the DM rule
-that an *off-script but plausibly-described* action resolves an obstacle — the one narrowly-constrained
-exception to "the LLM never mutates object state," bounded to an obstacle's **authored** resolved state)
-is built (Slices 5–6) and documented (Slice 7).
+**All of Phase 51 + 51.5 shipped to `main` via PR #83 (2026-07-04)** — the intimacy ladder and the
+puzzle-obstacle multi-approach feature (incl. Part B's constrained DM-ruled obstacle authority, bounded
+to an obstacle's **authored** resolved state). No 51.x build work remains.
 
-**Next session — no more 51.5 build work remains.** Options, owner's call:
-1. **Merge to `main`** — per D8, Phase 51 + 51.5 merge to `main` together now that 51.5 is built. This
-   is the natural next step. (Open a PR from `phase-51`.)
-2. **World Reaction Policy** — the one settled-but-**unscheduled** design that fixes a real bug (see
-   Notes: a STUDY-miss moved 3 clocks incl. `dungeon_intimacy`, violating D5). Owner decisions locked
-   2026-07-01; spec `spec/WORLD_REACTION_POLICY.md`. Do **not** fold into 51.5 — it's a new feature.
-3. **Phase 52 (Milestone Advancement)** or **Phase 53 (Threat Behavior)** — next roadmap phases.
+**Next — owner's call:**
+1. **World Reaction Policy** — settled-but-**unscheduled** design that fixes a real bug (a STUDY-miss
+   moved 3 clocks incl. `dungeon_intimacy`, violating D5). Owner decisions locked 2026-07-01; spec
+   `spec/WORLD_REACTION_POLICY.md`. A new feature — do **not** fold into 51.5.
+2. **Phase 52 (Milestone Advancement)** or **Phase 53 (Threat Behavior)** — next roadmap phases
+   (`spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`).
 
-Confirm with the owner which to start. The Part B build detail is retained below for reference.
+Reference on the just-shipped 51.5 work (live Crucible state, condensed architecture, locked decisions
+D1–D8) is retained below.
 
-### Done — Slice 7 (docs)
-`docs/LLM_AUTHORITY_BOUNDARY.md` gains a "Constrained exception — DM-ruled obstacle resolution" section
-+ a validation-example rule; `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` gains §11 (Part A + Part B addendum)
-and a top-of-file callout. Records: the `resolve_obstacle` proposal kind, the validator's
-`obstacle_resolved_states` gate, current-room scoping, and the deterministic `ActivateObject` apply seam.
-
-### Done — Slice 5 (`8daece5`)
-Constrained `ResolveObstacleChange` proposal type (`rpg/proposal.py`: `kind="resolve_obstacle"`,
-`object_slug`, `to_state`, `reason`) + validator gate (`rpg/proposal_validator.py`): new optional
-`obstacle_resolved_states: dict[slug→authored_state]` param; rejects unknown-obstacle refs and any
-`to_state` ≠ the obstacle's authored resolved state (LLM can't invent states). Tests
-`test_proposal_obstacle.py` (+4).
-
-### Done — Slice 6 (`0665058`): wired into `play_view`'s proposal pipeline
-`_run_proposal_pipeline` builds the obstacle-state map via new `_obstacle_resolved_states(campaign_id)`
-(current room's `RoomObject`s → `{slug: obstacle_resolved_state(obj)}`, skip `None`) and passes it to
-`validate_proposal`. Accepted `ResolveObstacleChange`s are applied by new `_apply_obstacle_proposals(...)`
-through the deterministic `ActivateObject` seam (`_apply_vna_command`) — *not* `apply_low_risk_proposals`
-(which correctly skips the kind) — so side-effects fire and `_advance_objectives()` re-runs. Gated on a
-resolving outcome via new `rpg/obstacles.is_resolving_outcome`; `rpg/obstacles.resolving_trigger` maps the
-LLM-named resolved state back to a converging transition's trigger. Tests
-`test_play_view_obstacle_proposal.py` (+3, drive the real pipeline, mock only the LLM agent). Full unit
-suite green (3195).
-
-### Next — Slice 7 (docs)
-Update `docs/LLM_AUTHORITY_BOUNDARY.md` + `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` to record the
-constrained object-state authority (the DM may resolve an obstacle, but only to its authored state).
-
-### The feature (decisions locked)
-
-- **#2 — multiple ways to solve an objective (Hybrid).** A room object's `current_state` changes via the
-  deterministic `activate` verb; Part A added class-flavored **contested approaches** (Artificer *tinker*,
-  Fighter *fight*, Thief *finesse*). Part B adds the LLM-ruled path for *any plausibly-described action*.
-- **#1 — normalize completion (all paths → one COMPLETED objective).** An obstacle is a `RoomObject` in a
-  "blocked" state with **multiple contested transitions converging on one canonical resolved state** (e.g.
-  `gearworks: jammed ──{tinker|fight|endure}──▶ cleared`). The objective completes when the object reaches
-  that state — `completion_satisfied`/`advance_objectives` are agnostic to *how* it changed.
-- **Outcome→success mapping — LOCKED (owner, 2026-06-29):** full/critical → resolves; **partial → resolves
-  with a complication**; miss → fails. Encoded in `rpg/obstacles.py` (`_RESOLVING_OUTCOMES`).
-
-### The seam (Part A wired here; Slice 6 reuses it)
-
-`play_view._resolve_vna_roll` calls `_maybe_resolve_obstacle(card, actor, resolution.outcome)`: on a
-resolving roll whose verb matches a contested approach, it routes the matched transition through the
-deterministic `ActivateObject` pipeline (`_apply_vna_command`), which applies `update_object_state` +
-side-effects and re-runs `_advance_objectives()`. Pure decision logic lives in `rpg/obstacles.py`
-(`obstacle_approaches`, `obstacle_approach_verbs`, `obstacle_resolved_state`, `resolve_obstacle_with_roll`).
+> Full per-slice build detail (Parts A + B, the `ResolveObstacleChange` gate, and the `ActivateObject`
+> resolution seam) is in git history and canonical in `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` (§11) +
+> `docs/LLM_AUTHORITY_BOUNDARY.md`.
 
 ### Live Crucible state (2026-07-01, post container-loot reseed + new-game reset)
 Fresh new-game — party in **R1/L1**, only R1 visited, empty transcript; ladder at **tier 0
@@ -139,9 +85,9 @@ intimacy-tick source · D6 the `dungeon_intimacy` clock is a latching tier index
 
 **Core authority rule:** The RPG engine and memory layer are authoritative. The LLM is
 advisory. It may narrate, frame choices, interpret tone, and propose structured world
-reactions. It must not directly mutate authoritative state. *(Phase 51.5 Part B adds one
-narrowly-constrained exception, gate built in Slice 5: the DM may propose resolving an obstacle,
-but only to its authored resolved state — see START HERE.)*
+reactions. It must not directly mutate authoritative state. *(Phase 51.5 Part B added one
+narrowly-constrained, validator-gated exception: the DM may propose resolving an obstacle, but only to
+its authored resolved state — see `docs/LLM_AUTHORITY_BOUNDARY.md`.)*
 
 ---
 
@@ -160,6 +106,8 @@ Phases 42 and earlier: `spec/HISTORY.md`. Recent completed phases:
 
 | Phase | Summary | Spec |
 |---|---|---|
+| 51.5 — Dungeon Objectives & Intimacy Tiers | `Objective`/`ObjectiveCompletion` + migration `018`; deterministic `advance_objectives` (single intimacy-tick source, latching tier ladder + per-tier knowledge); puzzle-obstacle Parts A+B (`rpg/obstacles.py`, `ResolveObstacleChange`); container-loot via `spawns_item_slug` | `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` (PR #83) |
+| 51 — Talk to the Dungeon | Live dungeon-voice channel at resonance points; `DungeonVoiceAgent`; recedable/latching intimacy clock (migrations `016`/`017`); dungeon-persona persistence (Markdown + DuckDB refs); ◆ THE CRUCIBLE chat treatment | `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` (PR #83) |
 | 50.6 — Chat Action Cockpit | In-chat Action Builder (V·N·T·A slot chips + popups); "Things Here" clickable room overlay (click exit = auto-move, item = auto-pickup); retired the right-panel ACTION + EXITS tabs; dynamic/collapsible builder band | `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md` (PR #82) |
 | 50.5 — Use Noun on Noun | Grammar → `Verb · Noun · [Target] · Adverb`; `TRANSITIVE_VERBS`; `CombineItems` + migrations `013`/`014`; `GiveItem` validator; `activate` wired; `look` verb; Target dropdown | `spec/PHASE_50_5_USE_ON_GRAMMAR.md` (PR #81) |
 | 50 — Hybrid Action Model | Verb·Noun·Adverb action *Card*; `ActionCard` + `validate_card`; `resolve_card`/`resolve_card_roll` (`rpg/action_resolution.py`); `VnaActionPanel`; hybrid exit labels (`rpg/exit_labels.py`) | `spec/PHASE_50_HYBRID_ACTION_MODEL.md` (issue #80) |
@@ -178,7 +126,7 @@ Per-session implementation logs are in git history and the auto-memory (`project
 - Provider: OpenAI (`gpt-4o`); `OPENAI_API_KEY` must be set.
 - Phase specs: current/future in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`; index at
   `spec/IMPLEMENTATION_PHASES.md`. Spec-loading rules and skills: `CLAUDE.md` (canonical).
-- Roadmap for Phases 51–53 (planned): GitHub Projects `ghostpencil/dungeon-daddy` #1, mirrored in
+- Roadmap for Phases 52–53 (planned): GitHub Projects `ghostpencil/dungeon-daddy` #1, mirrored in
   `IMPLEMENTATION_PHASES_33_ONWARDS.md`. A `spec/PHASE_NN_*.md` is written when each phase starts.
 - Phase 53 (Threat Behavior & Monster Reactions, planned): engine-bounded monster reactions, no enemy
   turn; bosses escalate via clock thresholds. Design: `spec/MONSTER_REACTION_DESIGN.md`.
