@@ -8,6 +8,7 @@ from dungeon_daddy.rpg.models import (
     ActorState,
     ClockState,
     FalloutRecord,
+    is_adverse,
     Item,
     ItemFeature,
     Objective,
@@ -218,6 +219,21 @@ class TestClockState:
         assert c.stakes == "The room floods."
         assert c.completion_effect == "All future rolls here are harder."
 
+    def test_category_accepts_and_round_trips_a_clock_category(self) -> None:
+        c = ClockState(
+            clock_id="c", campaign_id="x", label="L", segments=4, category="danger"
+        )
+        assert c.category == "danger"
+        assert ClockState.model_validate(c.model_dump()).category == "danger"
+
+    def test_category_preserves_unknown_string_for_back_compat(self) -> None:
+        # Live/seeded clocks carry categories not yet in the enum (e.g. "threat",
+        # "escalation", "environment"); Slice 2 normalizes them. Loading must not crash.
+        c = ClockState(
+            clock_id="c", campaign_id="x", label="L", segments=4, category="threat"
+        )
+        assert c.category == "threat"
+
     def test_optional_level_metadata_defaults(self) -> None:
         c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4)
         assert c.category is None
@@ -226,6 +242,22 @@ class TestClockState:
         assert c.stakes is None
         assert c.completion_effect is None
         assert c.visible_to_player is True
+
+
+class TestIsAdverse:
+    def test_danger_pursuit_ritual_are_adverse(self) -> None:
+        assert is_adverse("danger") is True
+        assert is_adverse("pursuit") is True
+        assert is_adverse("ritual") is True
+
+    def test_firewalled_categories_are_not_adverse(self) -> None:
+        for cat in ("objective", "relationship", "faction_pressure", "dungeon_intimacy"):
+            assert is_adverse(cat) is False
+
+    def test_none_and_unknown_strings_are_not_adverse(self) -> None:
+        assert is_adverse(None) is False
+        assert is_adverse("threat") is False
+        assert is_adverse("") is False
 
 
 class TestActionRating:

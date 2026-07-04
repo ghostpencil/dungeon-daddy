@@ -4,6 +4,23 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+ClockCategory = Literal[
+    "objective",
+    "relationship",
+    "faction_pressure",
+    "dungeon_intimacy",
+    "danger",
+    "pursuit",
+    "ritual",
+]
+
+_ADVERSE_CATEGORIES = frozenset({"danger", "pursuit", "ritual"})
+
+
+def is_adverse(category: str | None) -> bool:
+    """A clock is adverse iff its category is danger, pursuit, or ritual."""
+    return category in _ADVERSE_CATEGORIES
+
 
 class StressTrack(BaseModel):
     track_key: str
@@ -34,7 +51,10 @@ class ClockState(BaseModel):
     scope_room_id: str | None = None
     action_tags: list[str] = Field(default_factory=list)
     clock_level: Literal["room", "level", "dungeon", "quest", "character", "faction"] = "dungeon"
-    category: str | None = None
+    # Typed with ClockCategory for the firewall (Phase 51.6), but `str` is still
+    # accepted so pre-normalization saves/seeds (e.g. "threat") load; Slice 2 maps
+    # those onto the enum.
+    category: ClockCategory | str | None = None
     level_id: str | None = None
     owner_actor_id: str | None = None
     stakes: str | None = None

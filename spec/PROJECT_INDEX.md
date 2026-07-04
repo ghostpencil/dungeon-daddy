@@ -26,7 +26,8 @@ current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index `spec/IMPLEMENT
 puzzle-obstacle multi-approach feature (incl. Part B's constrained DM-ruled obstacle authority, bounded
 to an obstacle's **authored** resolved state). No 51.x build work remains.
 
-**Next — CHOSEN (owner, 2026-07-04): World Reaction Policy → scoped as Phase 51.6, ready to build.**
+**Next — CHOSEN (owner, 2026-07-04): World Reaction Policy → scoped as Phase 51.6, IN PROGRESS
+on branch `feat/phase-51.6-wrp`.**
 1. **Phase 51.6 — World Reaction Policy** — fixes a real bug (a STUDY-miss moved 3 clocks incl.
    `dungeon_intimacy`, violating D5). Owner decisions locked 2026-07-01; **design amended
    2026-07-04** after a code-grounded review: §9 open items resolved (sibling
@@ -34,7 +35,19 @@ to an obstacle's **authored** resolved state). No 51.x build work remains.
    category, all three `_apply_world_reaction` call sites) + §10 code-audit appendix. **Phase-scoped
    2026-07-04:** 10-slice TDD plan, files-in-scope, exit criteria in
    `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` (design canonical in `spec/WORLD_REACTION_POLICY.md`).
-   Ready to build on a fresh branch off `main`; ships on its own PR. Do **not** fold into 51.5.
+   Ships on its own PR off `main`. Do **not** fold into 51.5.
+
+   **Slice progress (branch `feat/phase-51.6-wrp`):**
+   - ✅ **Slice 1 — `ClockCategory` enum + typed `category` + `is_adverse`** (`rpg/models.py`,
+     `tests/unit/rpg/test_models.py`). `ClockCategory` Literal (7 members); `ClockState.category`
+     typed `ClockCategory | str | None` — enum intent for the firewall, `str` still accepted so
+     pre-normalization saves/seeds load (confirmed live seeds carry non-enum `threat`/`escalation`/
+     `environment` — Slice 2 maps those). Pure `is_adverse()` = category ∈ {danger,pursuit,ritual}.
+     Full suite green (3385 passed).
+   - ⏭️ **NEXT: Slice 2 — clock-category normalization pass** (data): idempotent normalizer mapping
+     seeded/live category strings to the enum (incl. recognizing `objective`); covers the live
+     Crucible clocks; unknown → explicit fallback, not silent.
+   - Slices 3–10 pending (see phase spec §4).
 2. **Then: Tag Hygiene → Narrator Lookup Tool** — new two-part spec
    `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` (draft 2026-07-04): Phase A unifies the tag
    taxonomy and fixes the broken tag pipeline (audit: actor tags dropped at seed time, three
