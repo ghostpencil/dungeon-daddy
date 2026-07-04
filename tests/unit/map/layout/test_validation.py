@@ -350,8 +350,8 @@ def test_write_summary_with_visual_reports_row_shows_warning_count(tmp_path: Pat
     visual = {"test": _minimal_visual_report(warnings=["W1", "W2", "W3"])}
     out_file = write_summary([report], tmp_path, visual_reports=visual)
     content = out_file.read_text(encoding="utf-8")
-    # The table row for "test" should contain the count "3"
-    assert "| 3 |" in content or "3" in content
+    # The Visual Warnings cell for "test" should render the count as "| 3 |"
+    assert "| 3 |" in content
 
 
 # ---------------------------------------------------------------------------

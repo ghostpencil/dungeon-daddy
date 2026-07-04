@@ -157,9 +157,10 @@ def test_miss_produces_summary_lines():
     resolution = _resolution("miss")
     actor, tracks = _pc()
     result = compute_world_reaction(resolution, [_clock()], [(actor, tracks)])
-    assert len(result.summary_lines) >= 1
-    combined = " ".join(result.summary_lines).lower()
-    assert "heat" in combined or "clock" in combined or "stress" in combined
+    assert result.summary_lines[0] == "World reaction (MISS):"
+    combined = " ".join(result.summary_lines)
+    assert "Clock [Heat Rising]:" in combined  # the ticked threat clock
+    assert "Hero [body]:" in combined          # the stressed PC
 
 
 # ---------------------------------------------------------------------------

@@ -73,14 +73,21 @@ def test_frame_drawn_per_room() -> None:
 # Cycle 2 — no crash when default frame texture is None
 # ---------------------------------------------------------------------------
 
-def test_no_crash_when_default_frame_is_none() -> None:
+def test_no_frame_drawn_when_default_frame_is_none() -> None:
     rooms = {"r1": _room("r1")}
     result = _result(rooms=rooms)
     renderer = LayoutRenderer()
     renderer._art = _make_art(None)
 
-    with patch("dungeon_daddy.map.layout_renderer.arcade"):
+    with patch("dungeon_daddy.map.layout_renderer.arcade") as mock_arcade:
         renderer.draw(result, origin_x=0.0, origin_y=0.0, zoom=1.0)  # must not raise
+
+    # A None frame texture must be skipped, never passed to draw_texture_rect.
+    none_frame_calls = [
+        c for c in mock_arcade.draw_texture_rect.call_args_list
+        if c.args and c.args[0] is None
+    ]
+    assert none_frame_calls == []
 
 
 # ---------------------------------------------------------------------------

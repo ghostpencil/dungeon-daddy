@@ -269,11 +269,14 @@ def test_room_click_fires_on_room_select_callback() -> None:
     assert fired == ["1-A"]
 
 
-def test_no_callback_room_click_does_not_raise() -> None:
+def test_no_callback_room_click_selects_room_without_callback() -> None:
     p, room = _graph_panel_with_callback()  # no callback set
     cx = p._x + PAD_MD + room.x + room.w / 2
     cy = p._y + PAD_MD + room.y + room.h / 2
-    p.handle_mouse_press(cx, cy, arcade.MOUSE_BUTTON_LEFT)  # must not raise
+    handled = p.handle_mouse_press(cx, cy, arcade.MOUSE_BUTTON_LEFT)  # must not raise
+    # The click is still handled and selects the room; only the (absent) callback is skipped.
+    assert handled is True
+    assert p._selected_room_id == "1-A"
 
 
 # ---------------------------------------------------------------------------
@@ -330,11 +333,16 @@ def test_r_key_recenters_graph_camera() -> None:
     assert p._pan_offset_y != 9999.0
 
 
-def test_r_key_without_layout_does_not_raise() -> None:
+def test_r_key_without_layout_leaves_camera_unchanged() -> None:
     p = _panel_sized(w=900.0, h=700.0)
     p._active_variant = "Map"
     p._layout_result = None
-    p.handle_key_press(arcade.key.R)  # must not raise
+    p._pan_offset_x = 123.0
+    p._pan_offset_y = 456.0
+    p._zoom_level = 0.5
+    p.handle_key_press(arcade.key.R)  # no layout → recenter is a no-op, must not raise
+    assert (p._pan_offset_x, p._pan_offset_y) == (123.0, 456.0)
+    assert p._zoom_level == 0.5
 
 
 # ---------------------------------------------------------------------------

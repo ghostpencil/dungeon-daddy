@@ -63,7 +63,7 @@ def test_build_prompt_with_bundle_includes_memory_card_title():
     assert "2." in result
     assert "Pact with the Shadow" in result
     assert "Lost Amulet" in result
-    assert "importance" in result.lower() or "8" in result
+    assert "(importance: 8)" in result
 
 
 def test_build_prompt_with_bundle_includes_memory_card_summary():
