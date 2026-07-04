@@ -689,7 +689,7 @@ def test_reaction_section_lines_no_clocks_no_stress_shows_nothing_changed():
     ctrl = _controls()
     ctrl.set_reaction(wr)
     text = "\n".join(ctrl.reaction_section_lines())
-    assert "nothing" in text.lower() or "none" in text.lower() or "0" in text
+    assert "(nothing changed)" in text
 
 
 # ---------------------------------------------------------------------------
