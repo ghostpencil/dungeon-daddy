@@ -15,29 +15,35 @@ per-tier knowledge) plus the puzzle-obstacle multi-approach feature (Part A clas
 approaches; Part B the constrained DM-ruled obstacle authority) and container-loot. Decisions locked
 D1–D8 (below). Spec `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`.
 
-Specs: 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` · 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` ·
-current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md` (index `spec/IMPLEMENTATION_PHASES.md`).
+Phase **51.6 — World Reaction Policy: COMPLETE on `feat/phase-51.6-wrp` — ready to PR to `main`**
+(2026-07-05). All 10 slices done + Slice 10 GUI verify **green** (owner, 2026-07-05: an ambient
+statue miss/partial in R1 ticks **only** "Scorpion Nest Agitated" +1; Power Core / Factory-Learns /
+Mira / `dungeon_intimacy` stay put). Per-object `reaction_policy` (`scripted`/`ambient`/`inert`) +
+`ClockCategory` firewall replace the blunt "miss = every tagged clock +2" fan-out. Suite green
+(3430 passed), ruff + mypy(strict) clean. Commits: `e9a3383` (Slice 9 seed), `f5ab7b1` (uuid5
+clock-id fix), `1abe178`/index. Branch also carries the mypy 348→0 sweep. Spec
+`spec/PHASE_51_6_WORLD_REACTION_POLICY.md` (design `spec/WORLD_REACTION_POLICY.md`).
+
+Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` ·
+51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` · current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`
+(index `spec/IMPLEMENTATION_PHASES.md`).
 
 ---
 
-## START HERE — Phase 51 + 51.5 merged; pick the next phase
+## START HERE — Phase 51.6 COMPLETE (verified green); PR it, then pick the next phase
 
-**All of Phase 51 + 51.5 shipped to `main` via PR #83 (2026-07-04)** — the intimacy ladder and the
-puzzle-obstacle multi-approach feature (incl. Part B's constrained DM-ruled obstacle authority, bounded
-to an obstacle's **authored** resolved state). No 51.x build work remains.
+**Phase 51.6 build is DONE and GUI-verified on `feat/phase-51.6-wrp` (2026-07-05).** Immediate next
+action: **open a PR from `feat/phase-51.6-wrp` → `main`** (also closes out the mypy 348→0 sweep the
+branch carries). Then pick the next phase (Tag Hygiene → Narrator Lookup is the sequenced choice).
 
-**Next — CHOSEN (owner, 2026-07-04): World Reaction Policy → scoped as Phase 51.6, IN PROGRESS
-on branch `feat/phase-51.6-wrp`.**
-1. **Phase 51.6 — World Reaction Policy** — fixes a real bug (a STUDY-miss moved 3 clocks incl.
-   `dungeon_intimacy`, violating D5). Owner decisions locked 2026-07-01; **design amended
-   2026-07-04** after a code-grounded review: §9 open items resolved (sibling
-   `object_reaction_bindings` table, `ClockCategory` enum prerequisite, adverse-derived-from-
-   category, all three `_apply_world_reaction` call sites) + §10 code-audit appendix. **Phase-scoped
-   2026-07-04:** 10-slice TDD plan, files-in-scope, exit criteria in
-   `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` (design canonical in `spec/WORLD_REACTION_POLICY.md`).
-   Ships on its own PR off `main`. Do **not** fold into 51.5.
+1. **Phase 51.6 — World Reaction Policy — ✅ COMPLETE (ready to PR).** Fixed a real bug (a
+   STUDY-miss moved 3 clocks incl. `dungeon_intimacy`, violating D5). Per-object `reaction_policy`
+   (`scripted`/`ambient`/`inert`) + `ClockCategory` firewall replace the "miss = every tagged clock
+   +2" fan-out. **Slice 10 GUI verify passed** (owner, 2026-07-05). Suite green (3430 passed), ruff
+   + mypy(strict) clean. Phase scope/exit criteria `spec/PHASE_51_6_WORLD_REACTION_POLICY.md`;
+   design canonical `spec/WORLD_REACTION_POLICY.md`.
 
-   **Slice progress (branch `feat/phase-51.6-wrp`):**
+   **Slice progress (branch `feat/phase-51.6-wrp`) — ALL COMPLETE:**
    - ✅ **Slice 1 — `ClockCategory` enum + typed `category` + `is_adverse`** (`rpg/models.py`,
      `tests/unit/rpg/test_models.py`). `ClockCategory` Literal (7 members); `ClockState.category`
      typed `ClockCategory | str | None` — enum intent for the firewall, `str` still accepted so
@@ -148,10 +154,14 @@ on branch `feat/phase-51.6-wrp`.**
      §6 (statue `ambient`/no binding; gates/hazards/subsystems `scripted`; firewalled clocks
      untouched). Play state preserved (new-game: R1/L1, ladder tier 0 active, intimacy 0/4, R1
      "Scorpion Nest Agitated" active 0/4). Backup: `campaign.duckdb.bak-phase516-slice9-20260705-141458`.
-   - ⏭️ **NEXT: Slice 10 — manual GUI verify** (no automated UI): open the app on the (now
-     reseeded) live Crucible, STUDY the Toppled Artificer Statue in R1 and miss → **only**
-     "Scorpion Nest Agitated" **+1**; the Power Core / Factory-Learns / Mira / `dungeon_intimacy`
-     clocks stay put. Owner verifies.
+   - ✅ **Slice 10 — manual GUI verify** (no automated UI): owner-verified **green** on the live
+     Crucible (2026-07-05) — an ambient statue miss **and** partial in R1 tick **only** "Scorpion
+     Nest Agitated" **+1**; the Power Core / Factory-Learns / Mira / `dungeon_intimacy` clocks stay
+     put. (Confirmed intended: the ambient path ticks +1 on `miss` **and** `partial` per design §4 —
+     a flat +1, not half; half-magnitude is scripted-partial-fallback only.) Live save then reset to
+     a fresh new-game (party R1/L1, clocks 0, ladder tier 0) via `tools.reset_crucible_new_game`
+     (backup `campaign.duckdb.bak-newgame-20260705-142851`) — the reset preserves
+     policies/bindings (it only touches `current_state`).
 2. **Then: Tag Hygiene → Narrator Lookup Tool** — new two-part spec
    `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` (draft 2026-07-04): Phase A unifies the tag
    taxonomy and fixes the broken tag pipeline (audit: actor tags dropped at seed time, three
@@ -236,6 +246,7 @@ Phases 42 and earlier: `spec/HISTORY.md`. Recent completed phases:
 
 | Phase | Summary | Spec |
 |---|---|---|
+| 51.6 — World Reaction Policy | Per-object `reaction_policy` (`scripted`/`ambient`/`inert`) + `ObjectReactionBinding` sibling table + migration `019`; `ClockCategory` enum firewall (adverse = danger/pursuit/ritual); `rpg/world_reaction.py` ambient (≤1 local adverse clock, +1 on miss/partial) vs scripted (authored bindings only, `dungeon_intimacy` never moved — D5 by construction); Crucible §6 policy/binding seed; uuid5 clock-id resolution fix. Kills the "miss = every tagged clock +2" fan-out | `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` (branch `feat/phase-51.6-wrp`, ready to PR) |
 | 51.5 — Dungeon Objectives & Intimacy Tiers | `Objective`/`ObjectiveCompletion` + migration `018`; deterministic `advance_objectives` (single intimacy-tick source, latching tier ladder + per-tier knowledge); puzzle-obstacle Parts A+B (`rpg/obstacles.py`, `ResolveObstacleChange`); container-loot via `spawns_item_slug` | `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` (PR #83) |
 | 51 — Talk to the Dungeon | Live dungeon-voice channel at resonance points; `DungeonVoiceAgent`; recedable/latching intimacy clock (migrations `016`/`017`); dungeon-persona persistence (Markdown + DuckDB refs); ◆ THE CRUCIBLE chat treatment | `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` (PR #83) |
 | 50.6 — Chat Action Cockpit | In-chat Action Builder (V·N·T·A slot chips + popups); "Things Here" clickable room overlay (click exit = auto-move, item = auto-pickup); retired the right-panel ACTION + EXITS tabs; dynamic/collapsible builder band | `spec/PHASE_50_6_CHAT_ACTION_COCKPIT.md` (PR #82) |
@@ -260,13 +271,18 @@ Per-session implementation logs are in git history and the auto-memory (`project
   `IMPLEMENTATION_PHASES_33_ONWARDS.md`. A `spec/PHASE_NN_*.md` is written when each phase starts.
 - Phase 53 (Threat Behavior & Monster Reactions, planned): engine-bounded monster reactions, no enemy
   turn; bosses escalate via clock thresholds. Design: `spec/MONSTER_REACTION_DESIGN.md`.
-- World Reaction Policy → **Phase 51.6** (scoped 2026-07-04, ready to build — do NOT fold into 51.5):
-  per-object `reaction_policy` (`scripted`/`ambient`/`inert`) to replace the blunt "miss = every tagged
-  clock +2" fan-out. Fixes a real bug (a STUDY-miss on the R1 statue moved 3 campaign clocks incl. the
-  `dungeon_intimacy` clock, violating D5's single-source rule). Owner decisions locked 2026-07-01;
-  amended 2026-07-04 (§9 resolved, §10 audit appendix). Phase scope (10-slice TDD plan, files,
-  exit criteria): `spec/PHASE_51_6_WORLD_REACTION_POLICY.md`. Design (canonical):
-  `spec/WORLD_REACTION_POLICY.md` (supersedes the miss behavior in `spec/PHASE_35_WORLD_REACTION_SERVICE.md`).
+- World Reaction Policy → **Phase 51.6 — ✅ COMPLETE & verified (2026-07-05), ready to PR** (branch
+  `feat/phase-51.6-wrp`; do NOT fold into 51.5): per-object `reaction_policy`
+  (`scripted`/`ambient`/`inert`) replaced the blunt "miss = every tagged clock +2" fan-out; fixed the
+  bug (a STUDY-miss on the R1 statue moved 3 campaign clocks incl. `dungeon_intimacy`, violating D5).
+  All 10 slices + GUI verify green. Phase scope: `spec/PHASE_51_6_WORLD_REACTION_POLICY.md`; design
+  canonical: `spec/WORLD_REACTION_POLICY.md` (supersedes the miss behavior in
+  `spec/PHASE_35_WORLD_REACTION_SERVICE.md`).
+  - **Live-data gotcha (found + fixed during Slice 9/10):** `apply_seed_pack` writes UUID5 clock ids
+    (`rpg.seed_pack.derive_clock_id`), not `campaign.seeder._clock_id`'s `clock:{campaign}:{slug}`
+    string form. `world_reaction._find_clock_by_slug` now matches **both**, else scripted CLOCK
+    bindings silently no-op on real saves (commit `f5ab7b1`). Any new code resolving a clock by slug
+    on the Crucible must account for the UUID5 convention.
 - Tag Taxonomy & Narrator Lookup (draft 2026-07-04, sequenced after WRP):
   `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` — Phase A tag hygiene (single namespaced taxonomy,
   migration `020`, seed/retrieval fixes, `# Related Lore` pre-fetch), Phase B read-only narrator
