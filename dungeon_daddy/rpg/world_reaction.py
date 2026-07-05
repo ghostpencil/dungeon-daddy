@@ -17,6 +17,7 @@ from dungeon_daddy.rpg.models import (
     is_adverse,
     normalize_clock_category,
 )
+from dungeon_daddy.rpg.seed_pack import derive_clock_id
 
 # Outcomes on which the ambient path advances its selected clock by +1. Full is
 # a no-op (success flows through transitions/objectives) and critical never
@@ -150,12 +151,18 @@ def _advance_clock_line(clock: ClockState, ticks: int, reason: str) -> ReactionC
 def _find_clock_by_slug(clocks: list[ClockState], slug: str) -> ClockState | None:
     """Resolve a binding's ``clock_slug`` to a live clock.
 
-    Clock ids are ``clock:{campaign}:{slug}`` (`campaign.seeder._clock_id`), so a
-    binding names the slug and we match on the suffix; a bare ``clock_id == slug``
-    is also accepted for tests/unseeded data.
+    Two id conventions exist in the wild: ``campaign.seeder._clock_id`` writes the
+    string form ``clock:{campaign}:{slug}`` (matched on the suffix), while
+    ``rpg.seed_pack.derive_clock_id`` — the path that actually seeded the live
+    Crucible — writes ``uuid5(campaign_slug:slug)``. We match both, or every
+    scripted CLOCK binding silently no-ops on a seed-pack save. A bare
+    ``clock_id == slug`` is also accepted for tests/unseeded data.
     """
     for clock in clocks:
         if clock.clock_id == slug or clock.clock_id.endswith(f":{slug}"):
+            return clock
+        campaign_slug = clock.campaign_id.split(":")[-1]
+        if clock.clock_id == derive_clock_id(campaign_slug, slug):
             return clock
     return None
 

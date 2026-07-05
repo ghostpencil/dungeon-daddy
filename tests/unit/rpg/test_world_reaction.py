@@ -241,6 +241,32 @@ def test_scripted_applies_only_authored_clock_binding():
     assert result.clock_lines[0].new_filled == 3
 
 
+def test_scripted_binding_resolves_a_uuid5_seeded_clock_id():
+    # Production reality: apply_seed_pack derives clock ids as
+    # uuid5(campaign_slug:slug) (rpg/seed_pack.derive_clock_id), NOT the
+    # `clock:campaign:slug` string form the unit tests above use. A scripted
+    # binding names the slug, so resolution must handle the real id convention
+    # or every scripted CLOCK binding silently no-ops on the live save.
+    from dungeon_daddy.rpg.seed_pack import derive_clock_id
+
+    actor, tracks = _pc()
+    overload = ClockState(
+        clock_id=derive_clock_id("the-crucible", "arcane-overload-building"),
+        campaign_id="campaign:the-crucible",
+        label="Arcane Overload Building", segments=8, filled=2,
+        clock_level="dungeon", category="ritual",
+    )
+    obj = _object("scripted", [
+        _binding_row("*", "miss", clock_slug="arcane-overload-building", clock_delta=1),
+    ])
+    result = compute_world_reaction(
+        _resolution("miss", action_key="tinker"), [overload], [(actor, tracks)],
+        current_room_id="r02", current_level_id="level-2", acted_object=obj,
+    )
+    assert [line.clock_id for line in result.clock_lines] == [overload.clock_id]
+    assert result.clock_lines[0].ticks == 1
+
+
 def test_scripted_no_matching_binding_is_no_op():
     actor, tracks = _pc()
     nest = _room_clock("scorpion-nest")
