@@ -46,8 +46,14 @@ _CLOCK_CATEGORY_SYNONYMS: dict[str, ClockCategory] = {
 _UNKNOWN_CLOCK_CATEGORY_FALLBACK: ClockCategory = "faction_pressure"
 
 
-def is_adverse(category: str | None) -> bool:
-    """A clock is adverse iff its category is danger, pursuit, or ritual."""
+def is_adverse(category: ClockCategory | None) -> bool:
+    """A clock is adverse iff its category is danger, pursuit, or ritual.
+
+    Takes an already-normalized ``ClockCategory`` (or ``None``). The narrowed
+    signature is deliberate: callers must run raw strings through
+    ``normalize_clock_category`` first, or a synonym like ``"threat"`` would be
+    read as non-adverse and silently drop out of the ambient tier.
+    """
     return category in _ADVERSE_CATEGORIES
 
 
@@ -340,6 +346,26 @@ class ObjectReactionBinding(BaseModel):
     clock_delta: int = 0
     stress_track: str | None = None
     stress_amount: int = 0
+
+    @model_validator(mode="after")
+    def check_effect_consistency(self) -> ObjectReactionBinding:
+        """Reject silent-no-op shapes: a target without a magnitude (or vice versa).
+
+        A ``clock_slug`` with a zero ``clock_delta`` (or a nonzero delta with no
+        slug) matches a verb/outcome and then advances nothing — the exact silent
+        failure this phase exists to prevent. Same for the stress pair. An
+        all-empty binding stays legal (flavor-only), but a half-specified effect
+        is always an authoring error.
+        """
+        if (self.clock_slug is not None) != (self.clock_delta != 0):
+            raise ValueError(
+                "clock_slug and a nonzero clock_delta must be set together"
+            )
+        if (self.stress_track is not None) != (self.stress_amount != 0):
+            raise ValueError(
+                "stress_track and a nonzero stress_amount must be set together"
+            )
+        return self
 
 
 class RoomObject(BaseModel):

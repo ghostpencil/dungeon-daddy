@@ -7,6 +7,7 @@ from dungeon_daddy.rpg.models import (
     ActionRequest,
     ActionResolution,
     ActorState,
+    ClockCategory,
     ClockState,
     FalloutRecord,
     Item,
@@ -255,13 +256,22 @@ class TestIsAdverse:
         assert is_adverse("ritual") is True
 
     def test_firewalled_categories_are_not_adverse(self) -> None:
-        for cat in ("objective", "relationship", "faction_pressure", "dungeon_intimacy"):
+        firewalled: tuple[ClockCategory, ...] = (
+            "objective", "relationship", "faction_pressure", "dungeon_intimacy",
+        )
+        for cat in firewalled:
             assert is_adverse(cat) is False
 
-    def test_none_and_unknown_strings_are_not_adverse(self) -> None:
+    def test_none_is_not_adverse(self) -> None:
         assert is_adverse(None) is False
-        assert is_adverse("threat") is False
-        assert is_adverse("") is False
+
+    def test_raw_synonyms_must_be_normalized_before_asking(self) -> None:
+        # is_adverse takes a normalized ClockCategory (the narrowed signature
+        # makes passing a raw string a type error). A synonym like "threat" is
+        # adverse only *after* normalization maps it onto danger; an unknown
+        # category normalizes to the non-adverse faction_pressure fallback.
+        assert is_adverse(normalize_clock_category("threat")) is True
+        assert is_adverse(normalize_clock_category("mystery-category")) is False
 
 
 class TestNormalizeClockCategory:
@@ -847,6 +857,40 @@ class TestObjectReactionBinding:
         )
         restored = ObjectReactionBinding.model_validate(b.model_dump())
         assert restored == b
+
+    def test_clock_slug_without_delta_rejected(self) -> None:
+        # Silent-no-op guard: a slug with a zero delta matches a verb/outcome
+        # and then advances nothing — reject it at authoring time.
+        with pytest.raises(ValidationError):
+            ObjectReactionBinding(
+                binding_id="rb:6", object_id="obj:c:statue",
+                action_verb="study", outcome="miss",
+                clock_slug="scorpion-nest-agitated", clock_delta=0,
+            )
+
+    def test_clock_delta_without_slug_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            ObjectReactionBinding(
+                binding_id="rb:7", object_id="obj:c:statue",
+                action_verb="study", outcome="miss",
+                clock_delta=2,
+            )
+
+    def test_stress_track_without_amount_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            ObjectReactionBinding(
+                binding_id="rb:8", object_id="obj:c:statue",
+                action_verb="study", outcome="miss",
+                stress_track="body", stress_amount=0,
+            )
+
+    def test_stress_amount_without_track_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            ObjectReactionBinding(
+                binding_id="rb:9", object_id="obj:c:statue",
+                action_verb="study", outcome="miss",
+                stress_amount=2,
+            )
 
 
 class TestRoomExit:

@@ -1,6 +1,8 @@
 """Unit tests for compute_world_reaction() and its Phase 51.6 helpers."""
 from __future__ import annotations
 
+import logging
+
 from dungeon_daddy.rpg.models import (
     ActionResolution,
     ActorState,
@@ -313,6 +315,67 @@ def test_scripted_never_moves_dungeon_intimacy_clock():
         current_room_id="R1", current_level_id="level-1", acted_object=obj,
     )
     assert result.clock_lines == []
+
+
+def test_scripted_binding_unresolved_clock_slug_logs_warning(caplog):
+    # Silent-no-op guard: a binding naming a clock that does not resolve must
+    # surface a warning. The f5ab7b1 bug (uuid5 vs string clock ids) stayed
+    # invisible precisely because this path emitted nothing when a slug missed.
+    actor, tracks = _pc()
+    obj = _object("scripted", [
+        _binding_row("*", "miss", clock_slug="no-such-clock", clock_delta=1),
+    ])
+    with caplog.at_level(logging.WARNING, logger="dungeon_daddy.rpg.world_reaction"):
+        result = compute_world_reaction(
+            _resolution("miss", action_key="study"), [], [(actor, tracks)],
+            current_room_id="R1", current_level_id="level-1", acted_object=obj,
+        )
+    assert result.clock_lines == []
+    assert any("no-such-clock" in r.getMessage() for r in caplog.records)
+
+
+def test_scripted_binding_naming_dungeon_intimacy_logs_warning(caplog):
+    # A binding that names a firewalled dungeon_intimacy clock is an authoring
+    # error (D5): it can never fire. Warn so a mis-seeded binding is grep-able.
+    actor, tracks = _pc()
+    intimacy = ClockState(
+        clock_id="clock:crucible:factory-learns", campaign_id="c1",
+        label="The Factory Learns", segments=4, filled=1,
+        clock_level="dungeon", category="dungeon_intimacy",
+    )
+    obj = _object("scripted", [
+        _binding_row("sense", "miss", clock_slug="factory-learns", clock_delta=2),
+    ])
+    with caplog.at_level(logging.WARNING, logger="dungeon_daddy.rpg.world_reaction"):
+        result = compute_world_reaction(
+            _resolution("miss", action_key="sense"), [intimacy], [(actor, tracks)],
+            current_room_id="R1", current_level_id="level-1", acted_object=obj,
+        )
+    assert result.clock_lines == []
+    assert any("factory-learns" in r.getMessage() for r in caplog.records)
+
+
+def test_scripted_binding_inactive_clock_is_quiet(caplog):
+    # A completed/paused target clock is a legitimate runtime state, not an
+    # authoring error — the engine skips it without a warning.
+    actor, tracks = _pc()
+    done = ClockState(
+        clock_id="clock:crucible:arcane-overload-building", campaign_id="c1",
+        label="Arcane Overload Building", segments=8, filled=8, status="completed",
+        clock_level="dungeon", category="danger",
+    )
+    obj = _object("scripted", [
+        _binding_row("tinker", "miss", clock_slug="arcane-overload-building", clock_delta=1),
+    ])
+    with caplog.at_level(logging.WARNING, logger="dungeon_daddy.rpg.world_reaction"):
+        result = compute_world_reaction(
+            _resolution("miss", action_key="tinker"), [done], [(actor, tracks)],
+            current_room_id="R1", current_level_id="level-1", acted_object=obj,
+        )
+    assert result.clock_lines == []
+    assert not any(
+        "arcane-overload-building" in r.getMessage() for r in caplog.records
+    )
 
 
 def test_scripted_full_outcome_is_no_op():

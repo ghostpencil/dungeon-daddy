@@ -1,7 +1,13 @@
-"""Deterministic world reaction rules — Phase 35."""
+"""Deterministic world reaction rules — Phase 51.6 (World Reaction Policy).
+
+Supersedes the Phase 35 tag fan-out: a miss/partial now reacts per the acted-upon
+object's ``reaction_policy`` (ambient / scripted / inert), not by matching action
+tags against every clock.
+"""
 from __future__ import annotations
 
 import dataclasses
+import logging
 import uuid
 
 from dungeon_daddy.rpg.models import (
@@ -18,6 +24,8 @@ from dungeon_daddy.rpg.models import (
     normalize_clock_category,
 )
 from dungeon_daddy.rpg.seed_pack import derive_clock_id
+
+_log = logging.getLogger(__name__)
 
 # Outcomes on which the ambient path advances its selected clock by +1. Full is
 # a no-op (success flows through transitions/objectives) and critical never
@@ -230,8 +238,23 @@ def _scripted_consequences(
     ):
         if cons.clock_slug is not None and cons.clock_delta != 0:
             clock = _find_clock_by_slug(threat_clocks, cons.clock_slug)
-            if (clock is not None and clock.status == "active"
-                    and normalize_clock_category(clock.category) != "dungeon_intimacy"):
+            if clock is None:
+                _log.warning(
+                    "Scripted reaction binding names unresolved clock slug %r "
+                    "(action=%s outcome=%s) — no clock advanced.",
+                    cons.clock_slug, resolution.action_key, resolution.outcome,
+                )
+            elif clock.status != "active":
+                # A completed/paused clock is a legitimate runtime state, not an
+                # authoring error — stay quiet.
+                pass
+            elif normalize_clock_category(clock.category) == "dungeon_intimacy":
+                _log.warning(
+                    "Scripted reaction binding names dungeon_intimacy clock %r — "
+                    "the D5 firewall skips it; advance it via the objective service.",
+                    cons.clock_slug,
+                )
+            else:
                 clock_lines.append(
                     _advance_clock_line(clock, cons.clock_delta, reason=resolution.outcome)
                 )
