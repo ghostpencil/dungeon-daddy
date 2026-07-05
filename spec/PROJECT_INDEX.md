@@ -103,14 +103,24 @@ on branch `feat/phase-51.6-wrp`.**
      `_STRESS_AMOUNT`, and the `choose_stress_track` call (`stress_routing.py` itself untouched —
      its own unit tests still cover the pure helper). Superseded Phase 35 tag-fan-out tests
      rewritten to the ambient contract. Full suite green (3414 passed).
-   - ⏭️ **NEXT: Slice 8 — seam: wire the object through all three call sites** (integration,
-     phase spec §4.8, design §7): pass the acted-upon `RoomObject` (policy + bindings) into
-     `_apply_world_reaction`/`react_to_resolution` from `play_view._resolve_vna_roll`
-     (`play_view.py:1799`, object resolved one line above at `:1798`) **and** the two chat-action
-     paths (`play_view.py:818`, `:983`); cover the synthesized `current_level_id` string
-     convention (`f"level-{idx+1}"`, `:2071-2073`). Integration test: STUDY-miss on the statue
-     moves exactly one clock; a non-object action falls to the ambient rule.
-   - Slices 9–10 pending (see phase spec §4).
+   - ✅ **Slice 8 — seam: wire the object through the call sites** (integration/view)
+     (`rpg/service.py`, `views/play_view.py`, `tests/unit/rpg/test_service.py`,
+     `tests/unit/views/test_play_view_vna.py`, `tests/unit/views/test_play_view_bundle.py`).
+     `react_to_resolution` gains `acted_object` (forwards to `compute_world_reaction`);
+     `_apply_world_reaction(resolution, acted_object=None)` forwards it; new
+     `_resolve_acted_object(noun_id)` maps a card noun → `RoomObject` (policy + bindings from the
+     repo) or `None` for item/actor/unknown/no-repo; `_resolve_vna_roll` resolves `card.noun_id`
+     and passes it in. The two chat-action paths (`:818`, `:983`) are intent/action-key based (no
+     noun) so they keep the default `acted_object=None` — the "non-object action → ambient" case.
+     Tests: service threads scripted binding (not ambient); `_resolve_acted_object` returns
+     policy/None cases; `_apply_world_reaction` end-to-end (real service + repo) — scripted object
+     moves **only** its bound clock, non-object action moves the ambient clock, and a guard test
+     pins the synthesized `f"level-{idx+1}"` level-scope convention (`:2071-2073`);
+     `_resolve_vna_roll` spy confirms the object is threaded. Full suite green (3422 passed).
+   - ⏭️ **NEXT: Slice 9 — seed the Crucible policy map + bindings** (seed, phase spec §4.9,
+     design §6): author the §6 object→policy map + scripted miss/partial bindings across
+     `tools/populate_crucible_level1.py` + `tools/populate_crucible_dungeon_channel.py`;
+     idempotent, preserves play progress. Then Slice 10 (manual GUI verify).
 2. **Then: Tag Hygiene → Narrator Lookup Tool** — new two-part spec
    `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` (draft 2026-07-04): Phase A unifies the tag
    taxonomy and fixes the broken tag pipeline (audit: actor tags dropped at seed time, three

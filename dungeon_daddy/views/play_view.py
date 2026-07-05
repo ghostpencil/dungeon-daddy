@@ -1796,7 +1796,8 @@ class PlayView(arcade.View):
         )
         resolution = card_roll.resolution
         obstacle = self._maybe_resolve_obstacle(card, actor, resolution.outcome)
-        reaction = self._apply_world_reaction(resolution)
+        acted_object = self._resolve_acted_object(card.noun_id)
+        reaction = self._apply_world_reaction(resolution, acted_object=acted_object)
         self._run_proposal_pipeline(resolution, campaign_id)
         self._chat.add_message(
             "system",
@@ -1821,6 +1822,22 @@ class PlayView(arcade.View):
                 self._chat.set_busy(True)
                 self._spawn_dm_thread(room, level)
         self._refresh_right_panel_from_actors(actor.actor_id)
+
+    def _resolve_acted_object(self, noun_id):
+        """Resolve a card's noun to its :class:`RoomObject`, or ``None``.
+
+        Phase 51.6 Slice 8: only room *objects* carry a ``reaction_policy`` +
+        scripted ``reaction_bindings``, so the world-reaction engine can branch
+        on them. Item/actor/exit nouns (and anything unknown) return ``None`` —
+        the reaction then falls to the ambient rule.
+        """
+        if self._mem_repo is None:
+            return None
+        obj_dict = self._mem_repo.get_room_object(noun_id)
+        if obj_dict is None:
+            return None
+        from dungeon_daddy.rpg.models import RoomObject
+        return RoomObject(**obj_dict)
 
     def _maybe_resolve_obstacle(self, card, actor, outcome):
         """Apply a successful contested-approach roll to the target's state (Phase 51.5 Part A).
@@ -2027,7 +2044,7 @@ class PlayView(arcade.View):
                 )
             )
 
-    def _apply_world_reaction(self, resolution):
+    def _apply_world_reaction(self, resolution, acted_object=None):
         if self._rpg_service is None or self._mem_repo is None:
             return None
         campaign_id = self._rpg_campaign_id
@@ -2076,6 +2093,7 @@ class PlayView(arcade.View):
                 resolution, threat_clocks, pc_pairs,
                 current_room_id=current_room_id,
                 current_level_id=current_level_id,
+                acted_object=acted_object,
             )
             for cl in reaction.clock_lines:
                 self._mem_repo.update_clock_progress(

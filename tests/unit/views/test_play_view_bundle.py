@@ -422,6 +422,104 @@ def test_apply_world_reaction_persists_weird_track_with_correct_capacity(tmp_pat
 
 
 # ---------------------------------------------------------------------------
+# Phase 51.6 Slice 8 — _apply_world_reaction threads the acted-upon object
+# ---------------------------------------------------------------------------
+
+def _reaction_view(tmp_path: Path):
+    """A view wired to a REAL RpgService so the object threads to the engine."""
+    from dungeon_daddy.rpg.models import ActorState
+    from dungeon_daddy.rpg.service import RpgService
+
+    view, _, _ = _make_view(tmp_path, with_rpg=True)
+    view._rpg_service = RpgService()
+    view._rpg_debug = None
+    view._rpg_campaign_id = "camp-1"
+    actor = ActorState(
+        actor_id="a-pc", campaign_id="camp-1", actor_type="pc",
+        slug="hero", display_name="Elara",
+    )
+    view._mem_repo.save_actor("a-pc", "camp-1", "pc", "hero", "Elara")
+    view._rpg_action = MagicMock(_actors=[actor])
+    return view
+
+
+def _seed_reaction_clocks(view):
+    """A room-scoped ambient danger clock + a dungeon-scoped scripted target."""
+    view._mem_repo.save_clock(
+        "clock:camp-1:ambient", "camp-1", "Scorpion Nest Agitated",
+        segments=6, filled=0, clock_level="room", scope_room_id="r1", category="danger",
+    )
+    view._mem_repo.save_clock(
+        "clock:camp-1:scripted", "camp-1", "Factory Learns",
+        segments=6, filled=0, clock_level="dungeon", category="faction_pressure",
+    )
+
+
+def _miss_resolution():
+    from dungeon_daddy.rpg.models import ActionResolution
+    return ActionResolution(
+        resolution_id="r1", campaign_id="camp-1", actor_id="a-pc",
+        action_key="study", dice_rolled=[2], outcome="miss",
+    )
+
+
+def test_apply_world_reaction_scripted_object_moves_only_its_bound_clock(tmp_path: Path):
+    """A scripted object fires only its authored binding — exactly one clock
+    moves in the DB, and it is the bound one (not the local ambient clock)."""
+    from dungeon_daddy.rpg.models import ObjectReactionBinding, RoomObject
+
+    view = _reaction_view(tmp_path)
+    _seed_reaction_clocks(view)
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-statue", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="statue", display_name="Toppled Statue", archetype="lore_fixture",
+        description="A toppled artificer statue.", current_state="idle",
+        reaction_policy="scripted",
+        reaction_bindings=[ObjectReactionBinding(
+            binding_id="b1", object_id="obj-statue", action_verb="study",
+            outcome="miss", clock_slug="scripted", clock_delta=1,
+        )],
+    ))
+    acted = RoomObject(**view._mem_repo.get_room_object("obj-statue"))
+
+    view._apply_world_reaction(_miss_resolution(), acted_object=acted)
+
+    clocks = {c["clock_id"]: c["filled"] for c in view._mem_repo.get_clocks("camp-1")}
+    assert clocks["clock:camp-1:scripted"] == 1
+    assert clocks["clock:camp-1:ambient"] == 0
+
+
+def test_apply_world_reaction_non_object_action_falls_to_ambient(tmp_path: Path):
+    """With no acted-upon object, the reaction falls to the ambient rule — the
+    local room-scoped adverse clock advances by exactly one."""
+    view = _reaction_view(tmp_path)
+    _seed_reaction_clocks(view)
+
+    view._apply_world_reaction(_miss_resolution())
+
+    clocks = {c["clock_id"]: c["filled"] for c in view._mem_repo.get_clocks("camp-1")}
+    assert clocks["clock:camp-1:ambient"] == 1
+    assert clocks["clock:camp-1:scripted"] == 0
+
+
+def test_apply_world_reaction_uses_synthesized_level_id_for_level_scope(tmp_path: Path):
+    """Guard the `f"level-{idx+1}"` convention: with the party on level index 0,
+    the view synthesizes ``"level-1"`` and a level-scoped ambient adverse clock
+    on ``level-1`` advances. A format change here would silently break level
+    ambient matching (play_view.py:2071-2073)."""
+    view = _reaction_view(tmp_path)  # _state.current_level_idx == 0 → "level-1"
+    view._mem_repo.save_clock(
+        "clock:camp-1:level", "camp-1", "Level Alert",
+        segments=6, filled=0, clock_level="level", level_id="level-1", category="danger",
+    )
+
+    view._apply_world_reaction(_miss_resolution())
+
+    clocks = {c["clock_id"]: c["filled"] for c in view._mem_repo.get_clocks("camp-1")}
+    assert clocks["clock:camp-1:level"] == 1
+
+
+# ---------------------------------------------------------------------------
 # Portrait — set_rpg_context stores portraits_dir; _refresh_chat_mini_card uses it
 # ---------------------------------------------------------------------------
 

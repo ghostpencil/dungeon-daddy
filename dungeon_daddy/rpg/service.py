@@ -14,6 +14,7 @@ from dungeon_daddy.rpg.models import (
     ActionResolution,
     ActorState,
     ClockState,
+    RoomObject,
     StressTrack,
     WorldReaction,
 )
@@ -74,11 +75,13 @@ class RpgService:
         pc_actors: list[tuple[ActorState, dict[str, StressTrack]]],
         current_room_id: str | None = None,
         current_level_id: str | None = None,
+        acted_object: RoomObject | None = None,
     ) -> tuple[WorldReaction, DomainEvent]:
         reaction = compute_world_reaction(
             resolution, threat_clocks, pc_actors,
             current_room_id=current_room_id,
             current_level_id=current_level_id,
+            acted_object=acted_object,
         )
         event = DomainEvent(
             event_id=str(uuid.uuid4()),
