@@ -1,12 +1,14 @@
 """Deterministic world reaction rules — Phase 35."""
 from __future__ import annotations
 
+import dataclasses
 import uuid
 
 from dungeon_daddy.rpg.models import (
     ActionResolution,
     ActorState,
     ClockState,
+    ObjectReactionBinding,
     ReactionClockLine,
     ReactionStressLine,
     StressTrack,
@@ -67,6 +69,78 @@ def select_ambient_clock(
     if not pool:
         return None
     return min(pool, key=lambda c: c.clock_id)
+
+
+@dataclasses.dataclass(frozen=True)
+class Consequence:
+    """A resolved scripted world-reaction effect (Phase 51.6 §5).
+
+    The applied effect portion of an :class:`ObjectReactionBinding` — after
+    verb/outcome matching and any partial-fallback scaling. May advance a clock,
+    apply stress, or both.
+    """
+
+    clock_slug: str | None
+    clock_delta: int
+    stress_track: str | None
+    stress_amount: int
+
+
+def _binding_matches_verb(binding: ObjectReactionBinding, verb: str) -> bool:
+    return binding.action_verb == verb or binding.action_verb == "*"
+
+
+def _half_magnitude(value: int) -> int:
+    """Halve toward zero, rounding down, but keep a nonzero value at least 1."""
+    if value == 0:
+        return 0
+    sign = 1 if value > 0 else -1
+    return sign * max(1, abs(value) // 2)
+
+
+def _consequence(binding: ObjectReactionBinding, *, scale_half: bool = False) -> Consequence:
+    if scale_half:
+        return Consequence(
+            clock_slug=binding.clock_slug,
+            clock_delta=_half_magnitude(binding.clock_delta),
+            stress_track=binding.stress_track,
+            stress_amount=_half_magnitude(binding.stress_amount),
+        )
+    return Consequence(
+        clock_slug=binding.clock_slug,
+        clock_delta=binding.clock_delta,
+        stress_track=binding.stress_track,
+        stress_amount=binding.stress_amount,
+    )
+
+
+def resolve_scripted_bindings(
+    bindings: list[ObjectReactionBinding],
+    verb: str,
+    outcome: str,
+) -> list[Consequence]:
+    """Resolve a `scripted` object's authored bindings for a verb × outcome.
+
+    Phase 51.6 (design §5/§9): match bindings whose ``action_verb`` equals
+    ``verb`` (or the ``"*"`` wildcard) and whose ``outcome`` matches. A
+    ``partial`` outcome with no authored partial row falls back to the object's
+    matching ``miss`` binding at **half magnitude, rounded down** (min 1 when the
+    miss binding is nonzero). Returns an empty list when nothing matches — no
+    fan-out to unrelated clocks.
+    """
+    matched = [
+        b for b in bindings
+        if b.outcome == outcome and _binding_matches_verb(b, verb)
+    ]
+    if matched:
+        return [_consequence(b) for b in matched]
+    if outcome == "partial":
+        miss = [
+            b for b in bindings
+            if b.outcome == "miss" and _binding_matches_verb(b, verb)
+        ]
+        return [_consequence(b, scale_half=True) for b in miss]
+    return []
 
 
 def compute_world_reaction(

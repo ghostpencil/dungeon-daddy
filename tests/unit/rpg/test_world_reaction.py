@@ -5,10 +5,12 @@ from dungeon_daddy.rpg.models import (
     ActionResolution,
     ActorState,
     ClockState,
+    ObjectReactionBinding,
     StressTrack,
 )
 from dungeon_daddy.rpg.world_reaction import (
     compute_world_reaction,
+    resolve_scripted_bindings,
     select_ambient_clock,
 )
 
@@ -635,3 +637,92 @@ def test_select_ambient_clock_recognizes_synonym_category_as_adverse():
     threat = _adverse_room_clock("nest", "R1", category="threat")
     result = select_ambient_clock([threat], room_id="R1", level_id="level-1")
     assert result is threat
+
+
+# ---------------------------------------------------------------------------
+# Phase 51.6 Slice 6 — resolve_scripted_bindings (design §5/§9)
+# ---------------------------------------------------------------------------
+
+def _binding(
+    verb: str,
+    outcome: str,
+    *,
+    clock_slug: str | None = "arcane-overload-building",
+    clock_delta: int = 0,
+    stress_track: str | None = None,
+    stress_amount: int = 0,
+    binding_id: str = "b1",
+) -> ObjectReactionBinding:
+    return ObjectReactionBinding(
+        binding_id=binding_id,
+        object_id="obj1",
+        action_verb=verb,
+        outcome=outcome,  # type: ignore[arg-type]
+        clock_slug=clock_slug,
+        clock_delta=clock_delta,
+        stress_track=stress_track,
+        stress_amount=stress_amount,
+    )
+
+
+def test_resolve_scripted_bindings_matches_verb_and_outcome():
+    binding = _binding("tinker", "miss", clock_delta=1)
+    result = resolve_scripted_bindings([binding], "tinker", "miss")
+    assert len(result) == 1
+    assert result[0].clock_slug == "arcane-overload-building"
+    assert result[0].clock_delta == 1
+
+
+def test_resolve_scripted_bindings_wildcard_verb_matches_any():
+    binding = _binding("*", "miss", clock_delta=2)
+    result = resolve_scripted_bindings([binding], "study", "miss")
+    assert len(result) == 1
+    assert result[0].clock_delta == 2
+
+
+def test_resolve_scripted_bindings_skips_non_matching_verb():
+    binding = _binding("tinker", "miss", clock_delta=1)
+    result = resolve_scripted_bindings([binding], "study", "miss")
+    assert result == []
+
+
+def test_resolve_scripted_bindings_skips_non_matching_outcome_for_miss_query():
+    # Query outcome="miss" with only a partial row → no match, no fallback.
+    binding = _binding("tinker", "partial", clock_delta=1)
+    result = resolve_scripted_bindings([binding], "tinker", "miss")
+    assert result == []
+
+
+def test_resolve_scripted_bindings_empty_returns_nothing():
+    result = resolve_scripted_bindings([], "tinker", "miss")
+    assert result == []
+
+
+def test_resolve_scripted_bindings_partial_uses_authored_partial_when_present():
+    miss = _binding("tinker", "miss", clock_delta=2, binding_id="m")
+    partial = _binding("tinker", "partial", clock_delta=1, binding_id="p")
+    result = resolve_scripted_bindings([miss, partial], "tinker", "partial")
+    assert len(result) == 1
+    assert result[0].clock_delta == 1  # authored partial, not halved miss
+
+
+def test_resolve_scripted_bindings_partial_falls_back_to_half_miss():
+    miss = _binding("tinker", "miss", clock_delta=2, stress_track="body", stress_amount=2)
+    result = resolve_scripted_bindings([miss], "tinker", "partial")
+    assert len(result) == 1
+    assert result[0].clock_delta == 1  # 2 // 2
+    assert result[0].stress_amount == 1  # 2 // 2
+
+
+def test_resolve_scripted_bindings_partial_fallback_min_one_when_miss_nonzero():
+    # half of 1 rounds down to 0, but a nonzero miss binding stays at least 1.
+    miss = _binding("tinker", "miss", clock_delta=1)
+    result = resolve_scripted_bindings([miss], "tinker", "partial")
+    assert result[0].clock_delta == 1
+
+
+def test_resolve_scripted_bindings_partial_fallback_zero_stays_zero():
+    # A miss binding with no stress → the halved fallback keeps stress at 0.
+    miss = _binding("tinker", "miss", clock_delta=2, stress_amount=0)
+    result = resolve_scripted_bindings([miss], "tinker", "partial")
+    assert result[0].stress_amount == 0

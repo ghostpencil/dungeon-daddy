@@ -80,12 +80,26 @@ on branch `feat/phase-51.6-wrp`.**
      `None` → narration only. Both spec worked examples covered (statue-miss in R1 → "Scorpion
      Nest Agitated"; none → `None`) + room-over-level, tie-break, firewall, dungeon-scope,
      inactive-skip, synonym. Full suite green (3421 passed).
-   - ⏭️ **NEXT: Slice 6 — scripted binding resolution** (pure/service, phase spec §4.6, design
-     §5/§9): `resolve_scripted_bindings(bindings, verb, outcome) -> list[Consequence]` — match
-     verb (or `*` wildcard) × `outcome`; a `partial` with no authored row falls back to the
-     object's `miss` binding at **half magnitude, rounded down (min 1 if the miss binding is
-     nonzero)**. Assert verb/wildcard match, partial fallback math, empty → nothing.
-   - Slices 7–10 pending (see phase spec §4).
+   - ✅ **Slice 6 — scripted binding resolution** (pure helper) (`rpg/world_reaction.py`,
+     `tests/unit/rpg/test_world_reaction.py`). New `Consequence` frozen dataclass (resolved
+     effect: `clock_slug`/`clock_delta`/`stress_track`/`stress_amount`) +
+     `resolve_scripted_bindings(bindings, verb, outcome) -> list[Consequence]` — matches on
+     `outcome` **and** verb (`action_verb == verb` or `*` wildcard); a `partial` with no
+     authored partial row falls back to the matching `miss` binding(s) at **half magnitude,
+     rounded toward zero (min 1 when the miss value is nonzero; 0 stays 0)**, applied
+     independently to `clock_delta` and `stress_amount`; no match → `[]` (no fan-out).
+     9 tests: verb match, wildcard, non-matching verb/outcome skip, empty→nothing,
+     authored-partial-wins, half-miss fallback, min-1-nonzero, zero-stays-zero. Full suite
+     green (3430 passed).
+   - ⏭️ **NEXT: Slice 7 — engine branch + firewall + cap** (engine, phase spec §4.7, design
+     §3/§7): `world_reaction.py` branches on the acted-upon object's `reaction_policy`
+     (`scripted`→authored bindings only; `ambient`→§4 `select_ambient_clock`; `inert`→nothing);
+     remove `objective`/`relationship`/`faction_pressure`/`dungeon_intimacy` from any
+     tag-matching path (firewall); enforce the blast-radius cap (ambient touches ≤1 clock);
+     stress moves onto scripted consequences (`stress_routing.py` stops inferring stress on
+     these paths). Assert: firewalled clocks never move via reaction; scripted applies only
+     authored deltas; ambient ≤1 clock.
+   - Slices 8–10 pending (see phase spec §4).
 2. **Then: Tag Hygiene → Narrator Lookup Tool** — new two-part spec
    `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` (draft 2026-07-04): Phase A unifies the tag
    taxonomy and fixes the broken tag pipeline (audit: actor tags dropped at seed time, three
