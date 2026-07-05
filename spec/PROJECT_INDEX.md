@@ -117,10 +117,27 @@ on branch `feat/phase-51.6-wrp`.**
      moves **only** its bound clock, non-object action moves the ambient clock, and a guard test
      pins the synthesized `f"level-{idx+1}"` level-scope convention (`:2071-2073`);
      `_resolve_vna_roll` spy confirms the object is threaded. Full suite green (3422 passed).
-   - ⏭️ **NEXT: Slice 9 — seed the Crucible policy map + bindings** (seed, phase spec §4.9,
-     design §6): author the §6 object→policy map + scripted miss/partial bindings across
-     `tools/populate_crucible_level1.py` + `tools/populate_crucible_dungeon_channel.py`;
-     idempotent, preserves play progress. Then Slice 10 (manual GUI verify).
+   - ✅ **Slice 9 — seed the Crucible policy map + bindings** (seed, design §6)
+     (`tools/populate_crucible_level1.py`, `tools/populate_crucible_dungeon_channel.py`,
+     `tests/unit/tools/test_populate_crucible_level1.py`,
+     `tests/unit/tools/test_populate_crucible_dungeon_channel.py`). Authored the §6
+     object→policy map + scripted miss bindings. **Level 1** (`_rb` helper + `_obj` policy/
+     bindings params): `great-lift`→`arcane-overload-building +1`, `gearworks`→`party-detected
+     +1`, `spike-plates`→Body +2, `dart-vents`→Body +1 (all `*`-verb miss), `trap-lever`
+     scripted with **no** binding (deterministic control); the six scenery/lore/container
+     objects stay `ambient` (model default). **Level 2** (`_Rung.miss_clock_slug/_delta` +
+     bindings in `_subsystem_object`): `coolant-loop`/`arcane-conduits`→`arcane-overload-building
+     +1`, `core-containment`→`+2` (climax), `arcane-resonance-node`→Weird +1. Every clock delta
+     targets an **adverse** clock; a guard test pins that **no binding names a firewalled clock**
+     (`the-dungeon-learns-you`/`restore-the-power-core`/`mira-guild-agenda-surfaces`/
+     `djinn-reclaims-the-engines`). `save_room_object` delete-then-inserts bindings, so reseed is
+     a no-op and preserves play state (upsert `current_state`). 7 new tests; full suite green
+     (**3429 passed**). ruff + mypy(strict) clean.
+   - ⏭️ **NEXT: Slice 10 — manual GUI verify** (no automated UI): on the live Crucible,
+     STUDY the Toppled Artificer Statue in R1 and miss → **only** "Scorpion Nest Agitated" **+1**;
+     the Power Core / Factory-Learns / Mira / `dungeon_intimacy` clocks stay put. **Requires
+     reseeding the live save first** (`PYTHONPATH=.`, `--campaigns-dir` the saves dir, close the
+     app — DuckDB single-writer) so the new policies/bindings land. Owner verifies.
 2. **Then: Tag Hygiene → Narrator Lookup Tool** — new two-part spec
    `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` (draft 2026-07-04): Phase A unifies the tag
    taxonomy and fixes the broken tag pipeline (audit: actor tags dropped at seed time, three
