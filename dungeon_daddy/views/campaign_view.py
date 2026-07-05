@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 import arcade
 import arcade.gui
@@ -36,7 +37,7 @@ _NAV_W = 220
 _EDIT_W = 300
 
 
-def _parse_rating_keys(data: dict) -> dict[str, int]:
+def _parse_rating_keys(data: dict[str, Any]) -> dict[str, int]:
     """Extract rating_<action> fields into an action_ratings dict, excluding zeros."""
     result: dict[str, int] = {}
     for key, value in data.items():
@@ -52,7 +53,9 @@ def _parse_rating_keys(data: dict) -> dict[str, int]:
     return result
 
 
-def _parse_stress_keys(data: dict, existing_tracks: list[dict]) -> list[dict]:
+def _parse_stress_keys(
+    data: dict[str, Any], existing_tracks: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     """Rebuild stress_tracks list from stress_<key> form fields, preserving filled values."""
     filled_by_key = {t["track_key"]: t.get("filled", 0) for t in existing_tracks}
     result = []
@@ -272,11 +275,11 @@ class CampaignView(arcade.View):
         self._selected_item_index = None
         s = self.active_section
         if s == "factions":
-            blank = FactionManifest(slug="", display_name="")
-            self._edit_panel.show_faction(blank, self._on_form_save, self._clear_selection, is_new=True)
+            blank_faction = FactionManifest(slug="", display_name="")
+            self._edit_panel.show_faction(blank_faction, self._on_form_save, self._clear_selection, is_new=True)
         elif s in ("player_side", "monsters", "npcs"):
-            blank = ActorManifest(slug="", display_name="", actor_type="pc")
-            self._edit_panel.show_actor(blank, self._on_form_save, self._clear_selection, is_new=True)
+            blank_actor = ActorManifest(slug="", display_name="", actor_type="pc")
+            self._edit_panel.show_actor(blank_actor, self._on_form_save, self._clear_selection, is_new=True)
         elif s == "clocks":
             blank_clk = ClockManifest(slug="", label="", segments=6)
             self._edit_panel.show_clock(blank_clk, self._on_form_save, self._clear_selection, is_new=True)
@@ -303,6 +306,9 @@ class CampaignView(arcade.View):
             )
 
     def _delete_item_at(self, idx: int) -> None:
+        if self.manifest is None:
+            return
+        m = self.manifest
         s = self.active_section
         items = self._section_items()
         if idx >= len(items):
@@ -317,10 +323,10 @@ class CampaignView(arcade.View):
         elif s == "clocks":
             self.remove_clock(item.slug)
         elif s == "lore":
-            real_idx = self.manifest.memory_seeds.index(item)
+            real_idx = m.memory_seeds.index(item)
             self.remove_memory_seed(real_idx)
         elif s == "threats":
-            real_idx = self.manifest.room_threats.index(item)
+            real_idx = m.room_threats.index(item)
             self.remove_room_threat(real_idx)
         elif s == "rooms":
             # Only placed room objects are deletable; dungeon rooms are not.
@@ -329,7 +335,10 @@ class CampaignView(arcade.View):
         self.save_seed()
         self._clear_selection()
 
-    def _on_form_save(self, data: dict) -> None:
+    def _on_form_save(self, data: dict[str, Any]) -> None:
+        if self.manifest is None:
+            return
+        m = self.manifest
         s = self.active_section
         is_new = self._edit_panel.mode.startswith("new_")
         if s == "factions":
@@ -406,7 +415,7 @@ class CampaignView(arcade.View):
                 items = self._section_items()
                 if self._selected_item_index < len(items):
                     slug = items[self._selected_item_index].slug
-                    kwargs: dict = {}
+                    kwargs: dict[str, Any] = {}
                     if "label" in data:
                         kwargs["label"] = data["label"]
                     if "stakes" in data:
@@ -419,8 +428,8 @@ class CampaignView(arcade.View):
             elif self._selected_item_index is not None:
                 items = self._section_items()
                 if self._selected_item_index < len(items):
-                    real_idx = self.manifest.memory_seeds.index(items[self._selected_item_index])
-                    self.manifest.memory_seeds[real_idx] = text
+                    real_idx = m.memory_seeds.index(items[self._selected_item_index])
+                    m.memory_seeds[real_idx] = text
                     self.is_dirty = True
         elif s == "threats":
             if is_new:
@@ -431,8 +440,8 @@ class CampaignView(arcade.View):
             elif self._selected_item_index is not None:
                 items = self._section_items()
                 if self._selected_item_index < len(items):
-                    real_idx = self.manifest.room_threats.index(items[self._selected_item_index])
-                    self.manifest.room_threats[real_idx] = {
+                    real_idx = m.room_threats.index(items[self._selected_item_index])
+                    m.room_threats[real_idx] = {
                         "location_slug": data.get("location_slug", ""),
                         "description": data.get("description", ""),
                     }
@@ -490,14 +499,20 @@ class CampaignView(arcade.View):
         self.active_section = section
 
     def add_actor(self, actor: ActorManifest | FactionManifest) -> None:
+        if self.manifest is None:
+            return
+        m = self.manifest
         if isinstance(actor, FactionManifest):
-            self.manifest.factions.append(actor)
+            m.factions.append(actor)
         else:
-            self.manifest.world_actors.append(actor)
+            m.world_actors.append(actor)
         self.is_dirty = True
 
     def update_actor(self, slug: str, **kwargs: object) -> None:
-        for collection in (self.manifest.world_actors, self.manifest.factions):
+        if self.manifest is None:
+            return
+        m = self.manifest
+        for collection in (m.world_actors, m.factions):
             for actor in collection:
                 if actor.slug == slug:
                     for key, value in kwargs.items():
@@ -506,22 +521,35 @@ class CampaignView(arcade.View):
                     return
 
     def remove_actor(self, slug: str) -> None:
-        for collection in (self.manifest.world_actors, self.manifest.factions):
-            for actor in collection:
-                if actor.slug == slug:
-                    collection.remove(actor)
-                    self.is_dirty = True
-                    return
+        if self.manifest is None:
+            return
+        m = self.manifest
+        for actor in m.world_actors:
+            if actor.slug == slug:
+                m.world_actors.remove(actor)
+                self.is_dirty = True
+                return
+        for faction in m.factions:
+            if faction.slug == slug:
+                m.factions.remove(faction)
+                self.is_dirty = True
+                return
 
     def set_player_side(self, slugs: list[str]) -> None:
+        if self.manifest is None:
+            return
         self.manifest.player_side = slugs
         self.is_dirty = True
 
     def add_clock(self, clock: ClockManifest) -> None:
+        if self.manifest is None:
+            return
         self.manifest.clocks.append(clock)
         self.is_dirty = True
 
     def update_clock(self, slug: str, **kwargs: object) -> None:
+        if self.manifest is None:
+            return
         for clock in self.manifest.clocks:
             if clock.slug == slug:
                 for key, value in kwargs.items():
@@ -530,25 +558,36 @@ class CampaignView(arcade.View):
                 return
 
     def remove_clock(self, slug: str) -> None:
-        for clock in self.manifest.clocks:
+        if self.manifest is None:
+            return
+        m = self.manifest
+        for clock in m.clocks:
             if clock.slug == slug:
-                self.manifest.clocks.remove(clock)
+                m.clocks.remove(clock)
                 self.is_dirty = True
                 return
 
     def add_memory_seed(self, text: str) -> None:
+        if self.manifest is None:
+            return
         self.manifest.memory_seeds.append(text)
         self.is_dirty = True
 
     def remove_memory_seed(self, index: int) -> None:
+        if self.manifest is None:
+            return
         del self.manifest.memory_seeds[index]
         self.is_dirty = True
 
-    def add_room_threat(self, threat: dict) -> None:
+    def add_room_threat(self, threat: dict[str, Any]) -> None:
+        if self.manifest is None:
+            return
         self.manifest.room_threats.append(threat)
         self.is_dirty = True
 
     def remove_room_threat(self, index: int) -> None:
+        if self.manifest is None:
+            return
         del self.manifest.room_threats[index]
         self.is_dirty = True
 
@@ -556,7 +595,7 @@ class CampaignView(arcade.View):
         self._seed_library = library
 
     def save_seed(self) -> None:
-        if self._seed_library is not None:
+        if self._seed_library is not None and self.manifest is not None:
             self._seed_library.save(self.manifest)
             self.is_dirty = False
 
@@ -565,6 +604,8 @@ class CampaignView(arcade.View):
             self.load_manifest(self._seed_library.load(slug))
 
     def attach_dungeon(self, slug: str) -> None:
+        if self.manifest is None:
+            return
         self.manifest.dungeon_slug = slug
         self.is_dirty = True
 
@@ -575,6 +616,9 @@ class CampaignView(arcade.View):
         return self.manifest.dungeon_slug
 
     def run_validation(self) -> list[ManifestError]:
+        if self.manifest is None:
+            self._validation_result = []
+            return self._validation_result
         self._validation_result = validate_manifest(self.manifest)
         return self._validation_result
 
@@ -585,17 +629,24 @@ class CampaignView(arcade.View):
         self._selected_room_id = room_id
 
     def add_room_object(self, obj: RoomObjectManifest) -> None:
+        if self.manifest is None:
+            return
         self.manifest.room_objects.append(obj)
         self.is_dirty = True
 
     def remove_room_object(self, slug: str) -> None:
-        for obj in self.manifest.room_objects:
+        if self.manifest is None:
+            return
+        m = self.manifest
+        for obj in m.room_objects:
             if obj.slug == slug:
-                self.manifest.room_objects.remove(obj)
+                m.room_objects.remove(obj)
                 self.is_dirty = True
                 return
 
     def save_to_path(self, path: Path) -> None:
+        if self.manifest is None:
+            return
         data = self.manifest.model_dump()
         Path(path).write_text(json.dumps(data, indent=2), encoding="utf-8")
         self.is_dirty = False
@@ -655,7 +706,7 @@ class CampaignView(arcade.View):
             "rooms": rooms_count,
         }
 
-    def _section_items(self) -> list:
+    def _section_items(self) -> list[Any]:
         if self.manifest is None or self.active_section is None:
             return []
         m = self.manifest

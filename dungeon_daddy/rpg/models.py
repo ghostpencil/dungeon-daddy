@@ -72,7 +72,7 @@ def normalize_clock_category(category: str | None) -> ClockCategory | None:
     if category is None:
         return None
     if category in _CLOCK_CATEGORY_MEMBERS:
-        return category  # type: ignore[return-value]
+        return category
     if category in _CLOCK_CATEGORY_SYNONYMS:
         return _CLOCK_CATEGORY_SYNONYMS[category]
     return _UNKNOWN_CLOCK_CATEGORY_FALLBACK

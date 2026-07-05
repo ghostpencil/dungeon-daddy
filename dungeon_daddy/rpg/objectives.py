@@ -11,7 +11,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from dungeon_daddy.rpg.clocks import tick_clock
 from dungeon_daddy.rpg.models import ClockState, ObjectiveCompletion
@@ -57,7 +57,7 @@ def completion_satisfied(
     if completion.kind == "object_state":
         for obj in world_state.get("objects", []):
             if obj.get("slug") == completion.target_slug:
-                return obj.get("current_state") == completion.required_state
+                return cast(bool, obj.get("current_state") == completion.required_state)
         return False
     raise NotImplementedError(
         f"completion kind {completion.kind!r} is not yet evaluated"
@@ -123,7 +123,7 @@ def advance_objectives(
 
 
 def _tick_intimacy(
-    repo: MemoryRepository, clocks: list[dict], clock_slug: str | None
+    repo: MemoryRepository, clocks: list[dict[str, Any]], clock_slug: str | None
 ) -> ClockState | None:
     """Tick + persist the clock whose ``category`` matches ``clock_slug``."""
     if not clock_slug:
@@ -141,7 +141,7 @@ def _tick_intimacy(
 
 
 def _activate_next_tier(
-    repo: MemoryRepository, objectives: list[dict], completed_tier: int
+    repo: MemoryRepository, objectives: list[dict[str, Any]], completed_tier: int
 ) -> list[str]:
     """Flip the next tier's locked objective(s) to ``active``."""
     activated: list[str] = []

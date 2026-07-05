@@ -1,7 +1,13 @@
 """Memory inspector panel — search and browse memory entries in Play Mode."""
 from __future__ import annotations
 
+from types import ModuleType
+from typing import TYPE_CHECKING
+
 from dungeon_daddy.memory.models import MemoryEntry
+
+if TYPE_CHECKING:
+    import arcade.gui
 
 _BOX_H = 26.0
 _ROW_H = 20.0
@@ -48,7 +54,7 @@ class MemoryInspectorPanel:
         self._sync_warnings: set[str] = set()
         self._pending_commit: MemoryEntry | None = None
         self._x = self._y = self._w = self._h = 0.0
-        self._widget: object | None = None  # arcade.gui.UIInputText when live
+        self._widget: arcade.gui.UIInputText | None = None  # set when live
         self._entry_rects: list[tuple[float, float, float, float, MemoryEntry]] = []
         self._button_rects: dict[str, tuple[float, float, float, float]] = {}
 
@@ -173,7 +179,7 @@ class MemoryInspectorPanel:
     def setup(self, x: float, y: float, w: float, h: float) -> None:
         self._x, self._y, self._w, self._h = x, y, w, h
 
-    def setup_widget(self, manager: object | None, x: float, y: float, w: float, h: float) -> None:
+    def setup_widget(self, manager: arcade.gui.UIManager | None, x: float, y: float, w: float, h: float) -> None:
         """Create and register an interactive UIInputText for search."""
         if manager is None:
             return
@@ -194,15 +200,15 @@ class MemoryInspectorPanel:
             text_color=(*INK_3, 255),
             multiline=False,
         )
-        manager.add(widget)  # type: ignore[union-attr]
+        manager.add(widget)
         self._widget = widget
 
-    def teardown_widget(self, manager: object | None) -> None:
+    def teardown_widget(self, manager: arcade.gui.UIManager | None) -> None:
         """Remove the UIInputText from the manager."""
         if manager is None or self._widget is None:
             return
         try:
-            manager.remove(self._widget)  # type: ignore[union-attr]
+            manager.remove(self._widget)
         except Exception:
             pass
         self._widget = None
@@ -234,7 +240,7 @@ class MemoryInspectorPanel:
         box_w = w - PAD_MD * 2
         box_cx, box_cy = box_x + box_w / 2, box_y + _BOX_H / 2
         if self._widget is not None:
-            self._search_query = self._widget.text  # type: ignore[union-attr]
+            self._search_query = self._widget.text
             if not self._search_query:
                 arcade.draw_text(
                     "search tag / actor / location",
@@ -293,7 +299,7 @@ class MemoryInspectorPanel:
         self._draw_detail_pane(x, y, w, detail_h, arcade)
         self._draw_action_buttons(x, y, w, arcade)
 
-    def _draw_detail_pane(self, x: float, y: float, w: float, detail_h: float, arcade) -> None:
+    def _draw_detail_pane(self, x: float, y: float, w: float, detail_h: float, arcade: ModuleType) -> None:
         from dungeon_daddy.ui.theme import (
             BG_2,
             FONT_UI,
@@ -342,7 +348,7 @@ class MemoryInspectorPanel:
                                  font_size=TEXT_XS, font_name=FONT_UI, anchor_y="top")
                 cur_y -= _LINE_H_SUM
 
-    def _draw_action_buttons(self, x: float, y: float, w: float, arcade) -> None:
+    def _draw_action_buttons(self, x: float, y: float, w: float, arcade: ModuleType) -> None:
         from dungeon_daddy.ui.theme import (
             BG_2,
             EMBER,

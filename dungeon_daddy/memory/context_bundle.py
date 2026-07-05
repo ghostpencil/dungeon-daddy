@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Literal
+from typing import Any, Literal
 
 from dungeon_daddy.memory.models import ContextBundle
 from dungeon_daddy.memory.repository import MemoryRepository
@@ -49,7 +49,7 @@ class ContextBundleBuilder:
 
     def _fetch_memories(
         self, repo: MemoryRepository
-    ) -> tuple[list[dict], list[str], dict]:
+    ) -> tuple[list[dict[str, Any]], list[str], dict[str, Any]]:
         retriever = MemoryRetriever(repo, self._campaign_id)
         all_entries = retriever.query()
         pinned = [e for e in all_entries if e.importance >= 9]
@@ -73,7 +73,7 @@ class ContextBundleBuilder:
         }
         return cards, must_remember, provenance
 
-    def _fetch_open_clocks(self, repo: MemoryRepository) -> list[dict]:
+    def _fetch_open_clocks(self, repo: MemoryRepository) -> list[dict[str, Any]]:
         clocks = [c for c in repo.get_clocks(self._campaign_id) if c["status"] == "active"]
         for c in clocks:
             owner_id = c.get("owner_actor_id")
@@ -82,15 +82,15 @@ class ContextBundleBuilder:
                 c["owner_display_name"] = actor["display_name"] if actor else None
         return clocks
 
-    def _fetch_active_fallout(self, repo: MemoryRepository) -> list[dict]:
-        result: list[dict] = []
+    def _fetch_active_fallout(self, repo: MemoryRepository) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
         for actor_id in self._focus_actor_ids:
             records = repo.get_fallout_records(self._campaign_id, actor_id)
             result.extend(r for r in records if r["status"] != "resolved")
         return result
 
-    def _fetch_mechanical_state(self, repo: MemoryRepository) -> dict:
-        state: dict = {}
+    def _fetch_mechanical_state(self, repo: MemoryRepository) -> dict[str, Any]:
+        state: dict[str, Any] = {}
         for actor_id in self._focus_actor_ids:
             state[actor_id] = {
                 "action_ratings": repo.get_actor_action_ratings(actor_id),
@@ -98,7 +98,7 @@ class ContextBundleBuilder:
             }
         return state
 
-    def _fetch_faction_reputations(self, repo: MemoryRepository) -> list[dict]:
+    def _fetch_faction_reputations(self, repo: MemoryRepository) -> list[dict[str, Any]]:
         factions = repo.get_factions(self._campaign_id)
         return [
             {
@@ -114,8 +114,8 @@ class ContextBundleBuilder:
             if f["status"] == "active"
         ]
 
-    def _fetch_inventory(self, repo: MemoryRepository) -> dict:
-        result: dict = {}
+    def _fetch_inventory(self, repo: MemoryRepository) -> dict[str, Any]:
+        result: dict[str, Any] = {}
         for actor_id in self._focus_actor_ids:
             items = repo.get_items_by_actor(actor_id)
             base_ratings = {
@@ -162,14 +162,15 @@ class ContextBundleBuilder:
             }
         return result
 
-    def _fetch_current_room(self, repo: MemoryRepository) -> dict:
+    def _fetch_current_room(self, repo: MemoryRepository) -> dict[str, Any]:
         if self._current_room_id is None:
             return {}
         return build_room_noun_context(repo, self._campaign_id, self._current_room_id)
 
-    def _fetch_scene_brief(self, repo: MemoryRepository) -> dict:
+    def _fetch_scene_brief(self, repo: MemoryRepository) -> dict[str, Any]:
         if self._scene_id is None:
             return {}
+        assert repo._conn is not None
         row = repo._conn.execute(
             "SELECT scene_id, location_slug, status FROM scenes WHERE scene_id = ?",
             [self._scene_id],
@@ -179,7 +180,7 @@ class ContextBundleBuilder:
         return {"scene_id": row[0], "location_slug": row[1], "status": row[2]}
 
 
-def _actor_noun(actor: dict) -> dict:
+def _actor_noun(actor: dict[str, Any]) -> dict[str, Any]:
     return {
         "actor_id": actor["actor_id"],
         "slug": actor["slug"],
@@ -193,7 +194,7 @@ def _actor_noun(actor: dict) -> dict:
 
 def build_room_noun_context(
     repo: MemoryRepository, campaign_id: str, room_id: str
-) -> dict:
+) -> dict[str, Any]:
     """The enriched ``current_room`` block: the concrete targets in a room.
 
     Returns ``objects`` / ``loose_items`` / ``npcs`` / ``monsters`` / ``exits``

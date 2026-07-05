@@ -9,13 +9,14 @@ from dungeon_daddy.rpg.stress import mark_stress
 
 def evaluate_fallout(
     actor: ActorState,
-    track_key: str,
+    track_key: Literal["body", "composure", "bonds", "weird"],
     campaign_id: str,
     existing_fallout: list[FalloutRecord] | None = None,
 ) -> tuple[FalloutRecord, StressTrack]:
     existing = existing_fallout or []
     active_on_track = [f for f in existing if f.track_key == track_key and f.status == "active"]
     count = len(active_on_track)
+    severity: Literal["minor", "moderate", "severe"]
     if count == 0:
         severity = "minor"
     elif count == 1:

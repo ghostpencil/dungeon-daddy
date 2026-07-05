@@ -33,16 +33,20 @@ def backfill_exits_if_empty(repo: MemoryRepository, dungeon_path: Path) -> int:
     raises: a failed backfill must not block loading the save.
     """
     try:
-        row = repo._conn.execute(
+        conn = repo._conn
+        if conn is None:
+            return 0
+        row = conn.execute(
             "SELECT campaign_id, slug, title FROM campaigns LIMIT 1"
         ).fetchone()
         if row is None:
             return 0
         campaign_id, slug, title = row
 
-        existing = repo._conn.execute(
+        count_row = conn.execute(
             "SELECT count(*) FROM room_exits WHERE campaign_id = ?", [campaign_id]
-        ).fetchone()[0]
+        ).fetchone()
+        existing = count_row[0] if count_row else 0
         if existing > 0:
             return 0
 
@@ -75,7 +79,10 @@ def refresh_exit_labels(repo: MemoryRepository, dungeon_path: Path) -> int:
     Never raises: a failed refresh must not block loading the save.
     """
     try:
-        row = repo._conn.execute(
+        db = repo._conn
+        if db is None:
+            return 0
+        row = db.execute(
             "SELECT campaign_id, slug FROM campaigns LIMIT 1"
         ).fetchone()
         if row is None:

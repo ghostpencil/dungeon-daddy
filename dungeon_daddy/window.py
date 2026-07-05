@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
     from dungeon_daddy.llm.agents.generator_agent import DungeonGeneratorAgent
     from dungeon_daddy.llm.agents.wizard_agent import DungeonWizardAgent
+    from dungeon_daddy.memory.repository import MemoryRepository
 
 import arcade
 
@@ -368,7 +369,7 @@ class DungeonDaddyWindow(arcade.Window):
 
     @staticmethod
     def _read_dungeon_persona(
-        mem_repo, campaign_id: str, campaign_dir: Path
+        mem_repo: MemoryRepository, campaign_id: str, campaign_dir: Path
     ) -> tuple[str | None, list[str]]:
         """Resolve the campaign's seed persona Markdown refs into (voice, knowledge).
 
@@ -474,10 +475,13 @@ class DungeonDaddyWindow(arcade.Window):
         """Publish a campaign seed as a save game, then launch it in Play mode."""
         from dungeon_daddy.campaign.publish import publish_save
         manifest = self._seed_library.load(seed_slug)
+        dungeons_dir = self._dungeon_repo._dir
+        saves_dir = self._save_repo._dir
+        assert dungeons_dir is not None and saves_dir is not None
         publish_save(
             manifest=manifest,
-            dungeons_dir=self._dungeon_repo._dir,
-            saves_dir=self._save_repo._dir,
+            dungeons_dir=dungeons_dir,
+            saves_dir=saves_dir,
             save_slug=seed_slug,
             migrations_dir=_MIGRATIONS_DIR,
         )

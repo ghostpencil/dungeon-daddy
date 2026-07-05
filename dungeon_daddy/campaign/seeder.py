@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from dungeon_daddy.campaign.manifest import (
     ActorManifest,
@@ -17,6 +17,7 @@ from dungeon_daddy.rpg.models import ActorAbility
 from dungeon_daddy.rpg.playbook import Playbook, PlaybookLibrary
 
 if TYPE_CHECKING:
+    from dungeon_daddy.campaign.manifest import ClockManifest
     from dungeon_daddy.data.models import Dungeon
 
 
@@ -130,9 +131,9 @@ def _seed_actor(
                 if isinstance(track, dict):
                     repo.save_actor_stress_track(
                         actor_id,
-                        track.get("track_key", "body"),
-                        capacity=track.get("capacity", 6),
-                        filled=track.get("filled", 0),
+                        cast(str, track.get("track_key", "body")),
+                        capacity=cast(int, track.get("capacity", 6)),
+                        filled=cast(int, track.get("filled", 0)),
                     )
         if playbook:
             kit_manifest = ItemManifest(
@@ -209,7 +210,7 @@ def _seed_actor_abilities(
 
 
 def _seed_clock(
-    clock,
+    clock: ClockManifest,
     repo: MemoryRepository,
     campaign_id: str,
     campaign_slug: str,

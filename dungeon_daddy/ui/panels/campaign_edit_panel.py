@@ -33,7 +33,7 @@ _log = logging.getLogger(__name__)
 
 _FIELD_H = 26
 
-_DEFAULT_TRANSITIONS: dict[str, list[dict]] = {
+_DEFAULT_TRANSITIONS: dict[str, list[dict[str, str]]] = {
     "container": [
         {"from_state": "sealed", "to_state": "opened", "trigger": "open"},
         {"from_state": "sealed", "to_state": "locked", "trigger": "lock"},
@@ -72,7 +72,7 @@ _DEFAULT_TRANSITIONS: dict[str, list[dict]] = {
 }
 
 
-def default_transitions_for_archetype(archetype: str) -> list[dict]:
+def default_transitions_for_archetype(archetype: str) -> list[dict[str, str]]:
     """Return default state machine transitions for the given archetype (empty list if unknown)."""
     return list(_DEFAULT_TRANSITIONS.get(archetype, []))
 _FIELD_GAP = 8
@@ -138,13 +138,13 @@ class CampaignEditPanel:
         self._manager: arcade.gui.UIManager | None = None
         self._widgets: list[arcade.gui.UIWidget] = []
         self.mode: str = "none"
-        self._on_save: Callable[[dict], None] | None = None
+        self._on_save: Callable[[dict[str, Any]], None] | None = None
         self._on_cancel: Callable[[], None] | None = None
         self._inputs: dict[str, arcade.gui.UIInputText] = {}
         # (text, center_y, color) tuples drawn each frame by draw()
-        self._labels: list[tuple[str, float, tuple]] = []
+        self._labels: list[tuple[str, float, tuple[Any, ...]]] = []
         # Extra data merged into _collect_inputs() (e.g. actor_type)
-        self._extra_data: dict = {}
+        self._extra_data: dict[str, Any] = {}
         # Number-picker state: value and draw position for each numeric field
         self._number_values: dict[str, int] = {}
         self._number_label_centers: dict[str, tuple[float, float]] = {}
@@ -180,7 +180,7 @@ class CampaignEditPanel:
     def show_actor(
         self,
         actor: object,
-        on_save: Callable[[dict], None],
+        on_save: Callable[[dict[str, Any]], None],
         on_cancel: Callable[[], None],
         *,
         is_new: bool = False,
@@ -194,7 +194,7 @@ class CampaignEditPanel:
     def show_clock(
         self,
         clock: object,
-        on_save: Callable[[dict], None],
+        on_save: Callable[[dict[str, Any]], None],
         on_cancel: Callable[[], None],
         *,
         is_new: bool = False,
@@ -208,7 +208,7 @@ class CampaignEditPanel:
     def show_lore(
         self,
         text: str,
-        on_save: Callable[[dict], None],
+        on_save: Callable[[dict[str, Any]], None],
         on_cancel: Callable[[], None],
         *,
         is_new: bool = False,
@@ -222,7 +222,7 @@ class CampaignEditPanel:
     def show_faction(
         self,
         faction: object,
-        on_save: Callable[[dict], None],
+        on_save: Callable[[dict[str, Any]], None],
         on_cancel: Callable[[], None],
         *,
         is_new: bool = False,
@@ -235,8 +235,8 @@ class CampaignEditPanel:
 
     def show_threat(
         self,
-        threat: dict,
-        on_save: Callable[[dict], None],
+        threat: dict[str, Any],
+        on_save: Callable[[dict[str, Any]], None],
         on_cancel: Callable[[], None],
         *,
         is_new: bool = False,
@@ -250,7 +250,7 @@ class CampaignEditPanel:
     def show_room_object(
         self,
         obj: object,
-        on_save: Callable[[dict], None],
+        on_save: Callable[[dict[str, Any]], None],
         on_cancel: Callable[[], None],
         *,
         is_new: bool = False,
@@ -396,7 +396,7 @@ class CampaignEditPanel:
         self._add(save_btn)
         self._add(cancel_btn)
 
-    def _collect_inputs(self) -> dict:
+    def _collect_inputs(self) -> dict[str, Any]:
         if self.mode in ("actor", "new_actor"):
             return self._collect_actor_inputs()
         if self.mode in ("faction", "new_faction"):
@@ -408,7 +408,7 @@ class CampaignEditPanel:
         result.update({k: str(v) for k, v in self._number_values.items()})
         return result
 
-    def _collect_actor_inputs(self) -> dict:
+    def _collect_actor_inputs(self) -> dict[str, Any]:
         result = {k: v.text for k, v in self._inputs.items()}
         result.update(self._extra_data)
         result.update({k: str(v) for k, v in self._number_values.items()})
@@ -432,7 +432,7 @@ class CampaignEditPanel:
         for stress_key in _STRESS_KEYS:
             self._number_values[f"stress_{stress_key}"] = track_caps.get(stress_key, 0)
 
-    def _collect_room_object_inputs(self) -> dict:
+    def _collect_room_object_inputs(self) -> dict[str, Any]:
         result = {k: v.text for k, v in self._inputs.items()}
         result.update(self._extra_data)  # room_id, level_id, archetype, transitions, slug
         # Archetype comes from the choice picker (source of truth); re-derive its
@@ -451,7 +451,7 @@ class CampaignEditPanel:
             result["slug"] = original
         return result
 
-    def _collect_faction_inputs(self) -> dict:
+    def _collect_faction_inputs(self) -> dict[str, Any]:
         result = {k: v.text for k, v in self._inputs.items()}
         result.update(self._extra_data)
         rep_idx = self._number_values.get("reputation_idx", 2)
@@ -473,7 +473,7 @@ class CampaignEditPanel:
         self._extra_data["actor_type"] = getattr(actor, "actor_type", "pc")
 
         initial_pb_slug: str | None = getattr(actor, "playbook_slug", None)
-        action_ratings: dict = getattr(actor, "action_ratings", {}) or {}
+        action_ratings: dict[str, Any] = getattr(actor, "action_ratings", {}) or {}
         stress_caps: dict[str, int] = {}
         for track in getattr(actor, "stress_tracks", []):
             if isinstance(track, dict):
@@ -483,7 +483,7 @@ class CampaignEditPanel:
             if k:
                 stress_caps[k] = v
 
-        def _lbl(text: str, color: tuple = INK_3) -> None:
+        def _lbl(text: str, color: tuple[Any, ...] = INK_3) -> None:
             nonlocal cursor
             cy = self._widget_y(cursor, _LABEL_H) + _LABEL_H / 2
             self._labels.append((text, cy, color))
@@ -653,7 +653,7 @@ class CampaignEditPanel:
         self._add_input("text", text, fx, self._widget_y(cursor, 160), fw, 160, multiline=True)
         self._add_save_cancel(cursor + 160 + _FIELD_GAP + 8)
 
-    def _build_threat_form(self, threat: dict) -> None:
+    def _build_threat_form(self, threat: dict[str, Any]) -> None:
         pad = PAD_SM
         fw = self._w - 2 * pad
         fx = self._x + pad
@@ -691,7 +691,7 @@ class CampaignEditPanel:
         # Slug is system-generated from NAME; the existing value is preserved on edit.
         self._extra_data["slug"] = str(getattr(obj, "slug", ""))
 
-        def _lbl(text: str, color: tuple = INK_3) -> None:
+        def _lbl(text: str, color: tuple[Any, ...] = INK_3) -> None:
             nonlocal cursor
             cy = self._widget_y(cursor, _LABEL_H) + _LABEL_H / 2
             self._labels.append((text, cy, color))
@@ -758,7 +758,7 @@ class CampaignEditPanel:
         fx = self._x + pad
         cursor = 48.0
 
-        def _lbl(text: str, color: tuple = INK_3) -> None:
+        def _lbl(text: str, color: tuple[Any, ...] = INK_3) -> None:
             nonlocal cursor
             cy = self._widget_y(cursor, _LABEL_H) + _LABEL_H / 2
             self._labels.append((text, cy, color))

@@ -3,8 +3,13 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
 import arcade
+
+if TYPE_CHECKING:
+    from dungeon_daddy.campaign.seed_library import CampaignSeedLibrary
+    from dungeon_daddy.data.repository import DungeonRepository
 
 from dungeon_daddy.ui.chrome import draw_title_bar, title_bar_mode_at
 from dungeon_daddy.ui.theme import (
@@ -46,9 +51,9 @@ class LibraryView(arcade.View):
         self._init_state()
 
     def _init_state(self) -> None:
-        self._dungeon_repo = None
-        self._seed_library = None
-        self._save_repo = None
+        self._dungeon_repo: DungeonRepository | None = None
+        self._seed_library: CampaignSeedLibrary | None = None
+        self._save_repo: DungeonRepository | None = None
         self._dungeon_list: list[str] = []
         self._seed_list: list[str] = []
         self._save_list: list[str] = []
@@ -58,7 +63,12 @@ class LibraryView(arcade.View):
     # Data sources
     # ------------------------------------------------------------------
 
-    def set_sources(self, dungeon_repo, seed_library, save_repo) -> None:
+    def set_sources(
+        self,
+        dungeon_repo: DungeonRepository,
+        seed_library: CampaignSeedLibrary,
+        save_repo: DungeonRepository,
+    ) -> None:
         self._dungeon_repo = dungeon_repo
         self._seed_library = seed_library
         self._save_repo = save_repo
@@ -167,7 +177,7 @@ class LibraryView(arcade.View):
     def _draw_library(self) -> None:
         col_xs, col_w, content_top = self._col_layout()
 
-        sections: list[tuple] = [
+        sections: list[tuple[Any, ...]] = [
             ("DUNGEONS",       self._dungeon_list, TEAL,   self._draw_dungeon_card,  True),
             ("CAMPAIGN SEEDS", self._seed_list,    VIOLET, self._draw_seed_card,     False),
             ("SAVES",          self._save_list,    EMBER,  self._draw_save_card,     False),
@@ -226,15 +236,15 @@ class LibraryView(arcade.View):
                 draw_rounded_rect(cx_center, card_cy, col_w, _CARD_H, 6, BG_2, LINE, 1)
                 draw_fn(slug, cx_left, card_cy, col_w, accent)
 
-    def _draw_dungeon_card(self, slug: str, x: float, cy: float, w: float, accent) -> None:
+    def _draw_dungeon_card(self, slug: str, x: float, cy: float, w: float, accent: tuple[int, int, int]) -> None:
         self._draw_card_title(slug, x, cy)
         self._draw_card_buttons(["Open in Designer", "New Seed"], x, cy, accent)
 
-    def _draw_seed_card(self, slug: str, x: float, cy: float, w: float, accent) -> None:
+    def _draw_seed_card(self, slug: str, x: float, cy: float, w: float, accent: tuple[int, int, int]) -> None:
         self._draw_card_title(slug, x, cy)
         self._draw_card_buttons(["Edit", "Publish"], x, cy, accent)
 
-    def _draw_save_card(self, slug: str, x: float, cy: float, w: float, accent) -> None:
+    def _draw_save_card(self, slug: str, x: float, cy: float, w: float, accent: tuple[int, int, int]) -> None:
         dt = self._save_meta.get(slug)
         if dt is not None:
             subtitle = "Played: " + dt.strftime("%b %d, %Y")
@@ -258,7 +268,7 @@ class LibraryView(arcade.View):
             anchor_x="left", anchor_y="center",
         )
 
-    def _draw_card_buttons(self, labels: list[str], x: float, cy: float, accent) -> None:
+    def _draw_card_buttons(self, labels: list[str], x: float, cy: float, accent: tuple[int, int, int]) -> None:
         bot = cy - _CARD_H / 2
         btn_y = bot + _BTN_H / 2 + 4
         btn_x = x + PAD_MD
@@ -300,7 +310,7 @@ class LibraryView(arcade.View):
             self.on_new_dungeon()
             return
 
-        sections: list[tuple] = [
+        sections: list[tuple[Any, ...]] = [
             (self._dungeon_list, ["Open in Designer", "New Seed"],
              [self.on_open_dungeon, self.on_new_seed]),
             (self._seed_list, ["Edit", "Publish"],

@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+from typing import Any
+
 from dungeon_daddy.rpg.models import RoomExit
 
 
 def validate_exit_conditions(
     exit_obj: RoomExit,
     inventory_slugs: list[str],
-    room_objects: list[dict],
-    clocks: list[dict],
+    room_objects: list[dict[str, Any]],
+    clocks: list[dict[str, Any]],
     approved_memory_slugs: list[str],
-) -> dict | None:
+) -> dict[str, str] | None:
     """Check all conditions on an exit. Returns None on pass or a structured failure dict."""
     if exit_obj.requires_item_slug is not None:
         if exit_obj.requires_item_slug not in inventory_slugs:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib.resources
 import json
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, field_validator, model_validator
 
@@ -66,7 +66,7 @@ class Playbook(BaseModel):
     signature_adverbs: list[SignatureAdverb]
     starting_abilities: list[str]
     ability_pool: list[PlaybookAbility] = []
-    beats: list[dict] = []
+    beats: list[dict[str, Any]] = []
 
     @model_validator(mode="after")
     def _validate_abilities(self) -> Playbook:
@@ -105,7 +105,7 @@ class PlaybookLibrary:
     def __init__(self) -> None:
         pkg = importlib.resources.files("dungeon_daddy.data")
         raw = (pkg / "playbooks.json").read_text(encoding="utf-8")
-        entries: list[dict] = json.loads(raw)
+        entries: list[dict[str, Any]] = json.loads(raw)
         self._playbooks: dict[str, Playbook] = {
             entry["slug"]: Playbook.model_validate(entry) for entry in entries
         }

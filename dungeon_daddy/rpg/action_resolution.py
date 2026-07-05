@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any, cast
 
 from dungeon_daddy.rpg.action_options import (
     VERB_ACTIVATE,
@@ -26,6 +27,7 @@ from dungeon_daddy.rpg.action_options import (
     VERB_MOVE,
     VERB_PICK_UP,
     VERB_USE,
+    ActionCard,
 )
 from dungeon_daddy.rpg.actions import resolve_action
 from dungeon_daddy.rpg.command import (
@@ -43,7 +45,7 @@ from dungeon_daddy.rpg.move_party import HOW_MODIFIER_FLAGS
 
 
 def resolve_card(
-    card,
+    card: ActionCard,
     *,
     actor_id: str,
     trigger: str | None = None,
@@ -67,9 +69,9 @@ def resolve_card(
             object_id=card.noun_id, actor_id=actor_id, trigger=trigger
         )
     if card.verb == VERB_GIVE:
-        return GiveItem(item_id=card.noun_id, to_actor_id=card.target_id)
+        return GiveItem(item_id=card.noun_id, to_actor_id=cast(str, card.target_id))
     if card.verb == VERB_COMBINE:
-        return CombineItems(item_a_id=card.noun_id, item_b_id=card.target_id, actor_id=actor_id)
+        return CombineItems(item_a_id=card.noun_id, item_b_id=cast(str, card.target_id), actor_id=actor_id)
     if card.verb == VERB_USE:
         if card.target_id == actor_id:
             return ConsumeItem(item_id=card.noun_id, reason="used")
@@ -92,10 +94,10 @@ class CardRoll:
 
 
 def resolve_card_roll(
-    card,
+    card: ActionCard,
     *,
     campaign_id: str,
-    actor: Mapping,
+    actor: Mapping[str, Any],
     momentum_spend: int = 0,
     push_yourself: bool = False,
     intent: str | None = None,

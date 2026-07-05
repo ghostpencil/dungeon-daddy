@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Collection, Mapping
+from typing import Any
 
 # Prepended to an exit whose revealed status is a key-gated lock. A padlock glyph
 # so the player can tell a locked door from an open one at a glance. Kept as a
@@ -27,7 +28,7 @@ LOCK_PREFIX = "\N{LOCK} "
 _LOCKED_LABEL_STATUSES = frozenset({"locked", "blocked"})
 
 
-def _center(room) -> tuple[float, float]:
+def _center(room: Any) -> tuple[float, float]:
     return (room.x + room.w / 2, room.y + room.h / 2)
 
 
@@ -39,7 +40,7 @@ _OCTANTS = (
 )
 
 
-def compass_direction(from_room, to_room) -> str | None:
+def compass_direction(from_room: Any, to_room: Any) -> str | None:
     """Eight-point compass direction from one room to another by centre.
 
     Returns one of the eight :data:`_OCTANTS` names, or ``None`` when the two
@@ -56,10 +57,10 @@ def compass_direction(from_room, to_room) -> str | None:
 
 
 def exit_noun_label(
-    exit_row: Mapping,
+    exit_row: Mapping[str, Any],
     *,
-    from_room,
-    rooms_by_id: Mapping,
+    from_room: Any,
+    rooms_by_id: Mapping[str, Any],
     visited_rooms: Collection[str],
 ) -> str:
     """Disambiguated label for an exit noun.

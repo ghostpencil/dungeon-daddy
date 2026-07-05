@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -32,7 +32,7 @@ class ActorManifest(BaseModel):
     concept: str | None = None
     status: Literal["active", "inactive", "dead", "absorbed", "lost"] = "active"
     action_ratings: dict[str, int] = Field(default_factory=dict)
-    stress_tracks: list[dict] = Field(default_factory=list)
+    stress_tracks: list[dict[str, Any]] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     playbook_slug: str | None = None
 
@@ -157,7 +157,7 @@ class CampaignManifest(BaseModel):
     factions: list[FactionManifest] = Field(default_factory=list)
     clocks: list[ClockManifest] = Field(default_factory=list)
     memory_seeds: list[str] = Field(default_factory=list)
-    room_threats: list[dict] = Field(default_factory=list)
+    room_threats: list[dict[str, Any]] = Field(default_factory=list)
     items: list[ItemManifest] = Field(default_factory=list)
     room_objects: list[RoomObjectManifest] = Field(default_factory=list)
     room_exits: list[RoomExitSeed] = Field(default_factory=list)

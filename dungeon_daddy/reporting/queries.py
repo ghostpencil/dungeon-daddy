@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from collections import Counter, defaultdict
+from typing import TYPE_CHECKING
 
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.reporting.models import (
@@ -10,6 +13,9 @@ from dungeon_daddy.reporting.models import (
     ProposalStats,
     StressDistributionRow,
 )
+
+if TYPE_CHECKING:
+    from dungeon_daddy.memory.repository import MemoryRepository
 
 
 def action_usage(events: list[DomainEvent]) -> list[ActionUsageRow]:
@@ -65,7 +71,7 @@ def clock_activity(events: list[DomainEvent]) -> list[ClockActivityRow]:
     return rows
 
 
-def fallout_frequency(repo, campaign_id: str) -> list[FalloutRow]:
+def fallout_frequency(repo: MemoryRepository, campaign_id: str) -> list[FalloutRow]:
     actors = repo.get_actors_by_campaign(campaign_id)
     rows: list[FalloutRow] = []
     for actor in actors:
@@ -94,7 +100,7 @@ def proposal_stats(events: list[DomainEvent]) -> ProposalStats:
     return ProposalStats(applied=applied, rejected=rejected, by_kind=dict(by_kind))
 
 
-def memory_stats(events: list[DomainEvent], repo, campaign_id: str) -> MemoryStats:
+def memory_stats(events: list[DomainEvent], repo: MemoryRepository, campaign_id: str) -> MemoryStats:
     created = sum(1 for e in events if e.event_type == "memory_created")
     counts = repo.count_by_status(campaign_id)
     return MemoryStats(

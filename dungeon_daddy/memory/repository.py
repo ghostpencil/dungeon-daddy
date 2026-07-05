@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import duckdb
 
@@ -177,7 +178,7 @@ class MemoryRepository:
              _json.dumps(tags or []), room_id, disposition],
         )
 
-    def get_actor(self, actor_id: str) -> dict | None:
+    def get_actor(self, actor_id: str) -> dict[str, Any] | None:
         import json as _json
         assert self._conn is not None
         row = self._conn.execute(
@@ -202,7 +203,7 @@ class MemoryRepository:
             "disposition": row[9],
         }
 
-    def get_actors_by_campaign(self, campaign_id: str) -> list[dict]:
+    def get_actors_by_campaign(self, campaign_id: str) -> list[dict[str, Any]]:
         assert self._conn is not None
         rows = self._conn.execute(
             """
@@ -228,14 +229,14 @@ class MemoryRepository:
 
     def get_actors_by_room(
         self, campaign_id: str, room_id: str, actor_types: list[str] | None = None
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         assert self._conn is not None
         sql = (
             "SELECT actor_id, campaign_id, actor_type, slug, display_name, status, "
             "playbook_slug, room_id, disposition "
             "FROM actors WHERE campaign_id = ? AND room_id = ?"
         )
-        params: list = [campaign_id, room_id]
+        params: list[str] = [campaign_id, room_id]
         if actor_types:
             placeholders = ", ".join("?" for _ in actor_types)
             sql += f" AND actor_type IN ({placeholders})"
@@ -271,7 +272,7 @@ class MemoryRepository:
             [actor_id, track_key, capacity, filled],
         )
 
-    def get_actor_stress_tracks(self, actor_id: str) -> list[dict]:
+    def get_actor_stress_tracks(self, actor_id: str) -> list[dict[str, Any]]:
         assert self._conn is not None
         rows = self._conn.execute(
             "SELECT track_key, capacity, filled FROM stress_tracks WHERE actor_id = ?",
@@ -292,7 +293,7 @@ class MemoryRepository:
             [actor_id, action_key, rating],
         )
 
-    def get_actor_action_ratings(self, actor_id: str) -> list[dict]:
+    def get_actor_action_ratings(self, actor_id: str) -> list[dict[str, Any]]:
         assert self._conn is not None
         rows = self._conn.execute(
             "SELECT action_key, rating FROM action_ratings WHERE actor_id = ?",
@@ -338,7 +339,7 @@ class MemoryRepository:
             ],
         )
 
-    def get_memory_entry(self, memory_id: str) -> dict | None:
+    def get_memory_entry(self, memory_id: str) -> dict[str, Any] | None:
         assert self._conn is not None
         row = self._conn.execute(
             """
@@ -389,7 +390,7 @@ class MemoryRepository:
             [from_id, to_id, link_type],
         )
 
-    def get_memory_links(self, from_id: str) -> list[dict]:
+    def get_memory_links(self, from_id: str) -> list[dict[str, Any]]:
         assert self._conn is not None
         rows = self._conn.execute(
             "SELECT from_id, to_id, link_type FROM memory_links WHERE from_id = ?",
@@ -428,7 +429,7 @@ class MemoryRepository:
             [checksum, markdown_path, memory_id],
         )
 
-    def get_memory_entries_by_campaign_all(self) -> list[dict]:
+    def get_memory_entries_by_campaign_all(self) -> list[dict[str, Any]]:
         assert self._conn is not None
         rows = self._conn.execute(
             """
@@ -453,7 +454,7 @@ class MemoryRepository:
             for r in rows
         ]
 
-    def get_memory_entries_by_campaign(self, campaign_id: str) -> list[dict]:
+    def get_memory_entries_by_campaign(self, campaign_id: str) -> list[dict[str, Any]]:
         assert self._conn is not None
         rows = self._conn.execute(
             """
@@ -505,7 +506,7 @@ class MemoryRepository:
             [resolution_id, campaign_id, scene_id, actor_id, action_key, outcome],
         )
 
-    def get_action_resolutions(self, campaign_id: str) -> list[dict]:
+    def get_action_resolutions(self, campaign_id: str) -> list[dict[str, Any]]:
         assert self._conn is not None
         rows = self._conn.execute(
             """
@@ -613,7 +614,7 @@ class MemoryRepository:
             [scope_room_id, json.dumps(action_tags), clock_id],
         )
 
-    def get_clocks(self, campaign_id: str) -> list[dict]:
+    def get_clocks(self, campaign_id: str) -> list[dict[str, Any]]:
         assert self._conn is not None
         rows = self._conn.execute(
             """
@@ -670,7 +671,7 @@ class MemoryRepository:
             [session_id, campaign_id, session_number, notes],
         )
 
-    def get_session(self, session_id: str) -> dict | None:
+    def get_session(self, session_id: str) -> dict[str, Any] | None:
         assert self._conn is not None
         row = self._conn.execute(
             "SELECT session_id, campaign_id, session_number, notes FROM sessions WHERE session_id = ?",
@@ -704,7 +705,7 @@ class MemoryRepository:
             [scene_id, campaign_id, session_id, location_slug, status],
         )
 
-    def get_scene(self, scene_id: str) -> dict | None:
+    def get_scene(self, scene_id: str) -> dict[str, Any] | None:
         assert self._conn is not None
         row = self._conn.execute(
             "SELECT scene_id, campaign_id, session_id, location_slug, status FROM scenes WHERE scene_id = ?",
@@ -761,7 +762,7 @@ class MemoryRepository:
             ],
         )
 
-    def get_campaign(self, campaign_id: str) -> dict | None:
+    def get_campaign(self, campaign_id: str) -> dict[str, Any] | None:
         assert self._conn is not None
         row = self._conn.execute(
             """
@@ -816,7 +817,7 @@ class MemoryRepository:
 
     def get_fallout_records(
         self, campaign_id: str, actor_id: str
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         assert self._conn is not None
         rows = self._conn.execute(
             """
@@ -881,7 +882,7 @@ class MemoryRepository:
             ],
         )
 
-    def get_factions(self, campaign_id: str) -> list[dict]:
+    def get_factions(self, campaign_id: str) -> list[dict[str, Any]]:
         assert self._conn is not None
         rows = self._conn.execute(
             """
@@ -987,7 +988,7 @@ class MemoryRepository:
                 [f.feature_id, f.item_id, f.feature_type, f.action_key, f.modifier],
             )
 
-    def get_items(self, campaign_id: str) -> list[dict]:
+    def get_items(self, campaign_id: str) -> list[dict[str, Any]]:
         assert self._conn is not None
         rows = self._conn.execute(
             """
@@ -1002,7 +1003,7 @@ class MemoryRepository:
         ).fetchall()
         return [self._item_row_to_dict(r) for r in rows]
 
-    def get_items_by_actor(self, actor_id: str) -> list[dict]:
+    def get_items_by_actor(self, actor_id: str) -> list[dict[str, Any]]:
         assert self._conn is not None
         rows = self._conn.execute(
             """
@@ -1017,7 +1018,7 @@ class MemoryRepository:
         ).fetchall()
         return [self._item_row_to_dict(r) for r in rows]
 
-    def get_items_by_room(self, campaign_id: str, room_id: str) -> list[dict]:
+    def get_items_by_room(self, campaign_id: str, room_id: str) -> list[dict[str, Any]]:
         assert self._conn is not None
         rows = self._conn.execute(
             """
@@ -1033,7 +1034,7 @@ class MemoryRepository:
         ).fetchall()
         return [self._item_row_to_dict(r) for r in rows]
 
-    def _item_row_to_dict(self, r: tuple) -> dict:
+    def _item_row_to_dict(self, r: tuple[Any, ...]) -> dict[str, Any]:
         assert self._conn is not None
         item_id = r[0]
         feature_rows = self._conn.execute(
@@ -1200,7 +1201,7 @@ class MemoryRepository:
                 ],
             )
 
-    def get_room_object(self, object_id: str) -> dict | None:
+    def get_room_object(self, object_id: str) -> dict[str, Any] | None:
         assert self._conn is not None
         row = self._conn.execute(
             """
@@ -1214,7 +1215,7 @@ class MemoryRepository:
             return None
         return self._room_object_row_to_dict(row)
 
-    def get_objects_by_room(self, campaign_id: str, room_id: str) -> list[dict]:
+    def get_objects_by_room(self, campaign_id: str, room_id: str) -> list[dict[str, Any]]:
         assert self._conn is not None
         rows = self._conn.execute(
             """
@@ -1228,7 +1229,7 @@ class MemoryRepository:
         ).fetchall()
         return [self._room_object_row_to_dict(r) for r in rows]
 
-    def get_objects_for_campaign(self, campaign_id: str) -> list[dict]:
+    def get_objects_for_campaign(self, campaign_id: str) -> list[dict[str, Any]]:
         """All room objects in a campaign (the world-state snapshot for objectives)."""
         assert self._conn is not None
         rows = self._conn.execute(
@@ -1250,7 +1251,7 @@ class MemoryRepository:
             [new_state, object_id],
         )
 
-    def _room_object_row_to_dict(self, r: tuple) -> dict:
+    def _room_object_row_to_dict(self, r: tuple[Any, ...]) -> dict[str, Any]:
         assert self._conn is not None
         object_id = r[0]
         t_rows = self._conn.execute(
@@ -1367,7 +1368,7 @@ class MemoryRepository:
                 [obj.objective_id, ordinal, secret],
             )
 
-    def get_objectives(self, campaign_id: str) -> list[dict]:
+    def get_objectives(self, campaign_id: str) -> list[dict[str, Any]]:
         assert self._conn is not None
         rows = self._conn.execute(
             """
@@ -1389,7 +1390,7 @@ class MemoryRepository:
             [status, objective_id],
         )
 
-    def _objective_row_to_dict(self, r: tuple) -> dict:
+    def _objective_row_to_dict(self, r: tuple[Any, ...]) -> dict[str, Any]:
         assert self._conn is not None
         k_rows = self._conn.execute(
             """
@@ -1467,7 +1468,7 @@ class MemoryRepository:
             ],
         )
 
-    def get_exits_by_room(self, campaign_id: str, room_id: str) -> list[dict]:
+    def get_exits_by_room(self, campaign_id: str, room_id: str) -> list[dict[str, Any]]:
         assert self._conn is not None
         rows = self._conn.execute(
             """
@@ -1483,7 +1484,7 @@ class MemoryRepository:
         ).fetchall()
         return [self._room_exit_row_to_dict(r) for r in rows]
 
-    def get_exit_by_id(self, exit_id: str) -> dict | None:
+    def get_exit_by_id(self, exit_id: str) -> dict[str, Any] | None:
         assert self._conn is not None
         row = self._conn.execute(
             """
@@ -1532,7 +1533,7 @@ class MemoryRepository:
         ).fetchone()
         return row[0] if row else 0
 
-    def _room_exit_row_to_dict(self, r: tuple) -> dict:
+    def _room_exit_row_to_dict(self, r: tuple[Any, ...]) -> dict[str, Any]:
         return {
             "exit_id": r[0],
             "campaign_id": r[1],

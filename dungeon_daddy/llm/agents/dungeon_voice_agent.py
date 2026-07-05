@@ -8,8 +8,14 @@ boundary). Knowledge filtering (``reveal_knowledge``) and memory retrieval
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
+
 from dungeon_daddy.llm.prompts import load_prompt
 from dungeon_daddy.llm.provider import LLMMessage, LLMProvider
+
+if TYPE_CHECKING:
+    from dungeon_daddy.memory.models import MemoryEntry
 
 
 class DungeonVoiceAgent:
@@ -27,7 +33,7 @@ class DungeonVoiceAgent:
         dungeon_knowledge: list[str],
         player_message: str,
         actor: str,
-        recent_memories=None,
+        recent_memories: list[MemoryEntry] | None = None,
         actor_name: str = "",
         actor_playbook: str | None = None,
         actor_tags: list[str] | None = None,
@@ -64,14 +70,14 @@ class DungeonVoiceAgent:
         intimacy_filled: int,
         intimacy_segments: int,
         dungeon_knowledge: list[str],
-        recent_memories,
+        recent_memories: list[MemoryEntry],
         actor_name: str = "",
         actor_playbook: str | None = None,
-        actor_tags=None,
-        systems_status=None,
+        actor_tags: list[str] | None = None,
+        systems_status: Sequence[tuple[str, ...]] | None = None,
         next_objective: str | None = None,
         next_objective_location: str | None = None,
-        session_turns=None,
+        session_turns: list[tuple[str, str]] | None = None,
     ) -> str:
         lines = [self.SYSTEM_PROMPT]
         lines.append("\n# Your Voice")

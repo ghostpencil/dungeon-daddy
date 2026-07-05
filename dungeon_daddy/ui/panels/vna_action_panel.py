@@ -15,6 +15,7 @@ module stays Arcade-free so it is unit-testable without a display context.
 from __future__ import annotations
 
 from collections.abc import Callable, Collection, Iterable, Mapping
+from typing import TYPE_CHECKING, Any, cast
 
 from dungeon_daddy.rpg.action_options import (
     ActionCard,
@@ -36,6 +37,11 @@ from dungeon_daddy.rpg.action_options import (
 )
 from dungeon_daddy.rpg.models import ActorAbility
 
+if TYPE_CHECKING:
+    import arcade.gui
+
+    from dungeon_daddy.rpg.playbook import PlaybookLibrary
+
 # Vertical band reserved at the top of the panel for the acting-actor header,
 # above the Verb/Noun/Adverb rows (shared by setup_widget and draw).
 _HEADER_H = 22
@@ -55,15 +61,15 @@ class VnaActionPanel:
         self._actor_name: str | None = None
         # Raw context mappings retained so the deterministic Preview box can be
         # rebuilt from live room threats / the acting actor (Phase 50.6 Slice 6).
-        self._room_context: Mapping = {}
-        self._actor: Mapping = {}
+        self._room_context: Mapping[str, Any] = {}
+        self._actor: Mapping[str, Any] = {}
         self._world_flags: list[str] = []
-        self._library: object | None = None
+        self._library: PlaybookLibrary | None = None
         self._on_submit: Callable[[ActionCard], None] | None = None
         self._last_error: CardError | None = None
         # Arcade widget state (populated by setup_widget; see Slice 8 wiring).
-        self._all_widgets: list = []
-        self._widget_params: tuple | None = None
+        self._all_widgets: list[arcade.gui.UIWidget] = []
+        self._widget_params: tuple[arcade.gui.UIManager, float, float, float, float] | None = None
 
     # ------------------------------------------------------------------
     # Context / option population
@@ -73,11 +79,11 @@ class VnaActionPanel:
         self,
         *,
         actor_abilities: Iterable[ActorAbility],
-        room_context: Mapping,
-        actor: Mapping,
+        room_context: Mapping[str, Any],
+        actor: Mapping[str, Any],
         playbook_slug: str,
         world_flags: Collection[str],
-        library: object | None = None,
+        library: PlaybookLibrary | None = None,
     ) -> None:
         """Populate the offered Verb/Noun/Adverb sets from the providers.
 
@@ -318,7 +324,7 @@ class VnaActionPanel:
     # ------------------------------------------------------------------
 
     def setup_widget(
-        self, manager: object | None, x: float, y: float, w: float, h: float
+        self, manager: arcade.gui.UIManager | None, x: float, y: float, w: float, h: float
     ) -> None:
         """Build the three V·N·A dropdowns plus a SUBMIT button.
 
@@ -352,14 +358,14 @@ class VnaActionPanel:
         row_gap = 18 + field_h  # label row + dropdown
         cur_y = y + h - PAD_MD - _HEADER_H - field_h  # leave room for actor header
 
-        def _dropdown(options: list[str], default: str | None) -> object:
+        def _dropdown(options: list[str], default: str | None) -> arcade.gui.UIDropdown:
             nonlocal cur_y
             dd = arcade.gui.UIDropdown(
                 x=int(x + PAD_MD), y=int(cur_y),
                 width=field_w, height=field_h,
-                default=default, options=options or [None],
+                default=default, options=cast("list[str | None]", options or [None]),
             )
-            manager.add(dd)  # type: ignore[union-attr]
+            manager.add(dd)
             self._all_widgets.append(dd)
             cur_y -= row_gap
             return dd
@@ -372,7 +378,7 @@ class VnaActionPanel:
         adverb_dd = _dropdown(self.adverb_labels(), self.selected_adverb_label())
 
         @verb_dd.event("on_change")
-        def _on_verb(event) -> None:
+        def _on_verb(event: arcade.gui.UIOnChangeEvent) -> None:
             if event.new_value is not None:
                 self.select_verb_by_label(event.new_value)
                 # Noun options are verb-dependent — rebuild so the Noun and
@@ -381,7 +387,7 @@ class VnaActionPanel:
                     self.setup_widget(*self._widget_params)
 
         @noun_dd.event("on_change")
-        def _on_noun(event) -> None:
+        def _on_noun(event: arcade.gui.UIOnChangeEvent) -> None:
             if event.new_value is not None:
                 self.select_noun_by_label(event.new_value)
                 # Adverb + Target options changed — rebuild so dropdowns reflect them.
@@ -390,12 +396,12 @@ class VnaActionPanel:
 
         if target_dd is not None:
             @target_dd.event("on_change")
-            def _on_target(event) -> None:
+            def _on_target(event: arcade.gui.UIOnChangeEvent) -> None:
                 if event.new_value is not None:
                     self.select_target_by_label(event.new_value)
 
         @adverb_dd.event("on_change")
-        def _on_adverb(event) -> None:
+        def _on_adverb(event: arcade.gui.UIOnChangeEvent) -> None:
             if event.new_value is not None:
                 self.select_adverb_by_label(event.new_value)
 
@@ -429,18 +435,18 @@ class VnaActionPanel:
         )
 
         @submit_btn.event
-        def on_click(event) -> None:
+        def on_click(event: arcade.gui.UIOnClickEvent) -> None:
             self.submit()
 
-        manager.add(submit_btn)  # type: ignore[union-attr]
+        manager.add(submit_btn)
         self._all_widgets.append(submit_btn)
 
-    def teardown_widget(self, manager: object | None) -> None:
+    def teardown_widget(self, manager: arcade.gui.UIManager | None) -> None:
         if manager is None:
             return
         for widget in self._all_widgets:
             try:
-                manager.remove(widget)  # type: ignore[union-attr]
+                manager.remove(widget)
             except Exception:
                 pass
         self._all_widgets.clear()

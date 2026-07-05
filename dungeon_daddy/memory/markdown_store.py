@@ -4,7 +4,7 @@ import hashlib
 from datetime import UTC, datetime
 from pathlib import Path
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 _REQUIRED_FIELDS = {"id", "type", "campaign_id", "updated_at"}
 
