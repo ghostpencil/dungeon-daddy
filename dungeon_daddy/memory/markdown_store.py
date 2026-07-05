@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -57,7 +57,7 @@ def write_fallout_markdown(fallout: object, base_dir: Path) -> Path:
         "severity": fallout.severity,
         "status": fallout.status,
         "tags": tags,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }
     body = f"# {fallout.title}\n\n## Summary\n\n{fallout.summary}\n"
     path = base_dir / f"{fallout.fallout_id}.md"

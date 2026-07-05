@@ -14,6 +14,7 @@ from dungeon_daddy.ui.theme import (
     BG_2,
     CHROME_MENUBAR_HEIGHT,
     CHROME_TITLEBAR_HEIGHT,
+    EMBER,
     FONT_UI_MED,
     GOLD,
     INK_3,
@@ -22,7 +23,6 @@ from dungeon_daddy.ui.theme import (
     TEAL,
     TEXT_MD,
     TEXT_SM,
-    EMBER,
     VIOLET,
 )
 

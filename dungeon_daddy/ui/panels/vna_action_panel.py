@@ -14,7 +14,7 @@ module stays Arcade-free so it is unit-testable without a display context.
 """
 from __future__ import annotations
 
-from typing import Callable, Collection, Iterable, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 
 from dungeon_daddy.rpg.action_options import (
     ActionCard,
@@ -330,8 +330,18 @@ class VnaActionPanel:
         if manager is None:
             return
         import arcade.gui
+
         from dungeon_daddy.ui.theme import (
-            BG_2, BG_3, BG_HI, FONT_UI, INK_1, INK_4, LINE, LINE_HI, PAD_MD, TEAL,
+            BG_2,
+            BG_3,
+            BG_HI,
+            FONT_UI,
+            INK_1,
+            INK_4,
+            LINE,
+            LINE_HI,
+            PAD_MD,
+            TEAL,
         )
 
         self._widget_params = (manager, x, y, w, h)
@@ -437,8 +447,14 @@ class VnaActionPanel:
 
     def draw(self, x: float, y: float, w: float, h: float) -> None:
         import arcade
+
         from dungeon_daddy.ui.theme import (
-            BG_1, FONT_UI, INK_4, PAD_MD, TEAL, TEXT_SM,
+            BG_1,
+            FONT_UI,
+            INK_4,
+            PAD_MD,
+            TEAL,
+            TEXT_SM,
         )
 
         arcade.draw_rect_filled(arcade.XYWH(x + w / 2, y + h / 2, w, h), BG_1)

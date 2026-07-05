@@ -10,15 +10,12 @@ import arcade
 import arcade.gui
 
 from dungeon_daddy.rpg.playbook import PlaybookLibrary
-
 from dungeon_daddy.ui.theme import (
     BG_1,
     BG_2,
     BG_3,
     BG_HI,
     FONT_MONO,
-    FONT_SERIF,
-    FONT_UI,
     FONT_UI_MED,
     INK_1,
     INK_2,
@@ -26,12 +23,10 @@ from dungeon_daddy.ui.theme import (
     INK_4,
     LINE,
     LINE_HI,
-    PAD_MD,
     PAD_SM,
     TEAL,
     TEXT_BASE,
     TEXT_SM,
-    draw_kicker,
 )
 
 _log = logging.getLogger(__name__)

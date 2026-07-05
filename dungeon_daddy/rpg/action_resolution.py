@@ -14,8 +14,8 @@ called directly.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 from dungeon_daddy.rpg.action_options import (
     VERB_ACTIVATE,

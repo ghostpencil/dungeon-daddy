@@ -11,7 +11,6 @@ from dungeon_daddy.campaign.manifest import (
     RoomObjectManifest,
 )
 from dungeon_daddy.data.models import Dungeon, DungeonMeta, Level, Room
-
 from dungeon_daddy.views.campaign_view import CampaignView
 
 

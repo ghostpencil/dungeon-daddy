@@ -1,7 +1,4 @@
 import uuid
-from datetime import datetime, timezone
-
-import pytest
 
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.reporting.queries import (
@@ -132,6 +129,7 @@ def test_fallout_frequency_empty_when_no_actors(repo):
 
 def test_fallout_frequency_returns_rows_for_actor(repo):
     import uuid
+
     from dungeon_daddy.rpg.models import FalloutRecord
     campaign_id = "camp-test"
     actor_id = f"actor:{uuid.uuid4()}"
@@ -189,6 +187,7 @@ def test_memory_stats_counts_events_and_repo(repo):
 
 def test_fallout_frequency_campaign_isolation(repo):
     import uuid
+
     from dungeon_daddy.rpg.models import FalloutRecord
     actor_id = f"actor:{uuid.uuid4()}"
     repo.save_actor(actor_id, "camp-a", "pc", "pc-x", "X")

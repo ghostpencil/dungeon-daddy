@@ -102,7 +102,6 @@ def export_campaign(repo: MemoryRepository, campaign_id: str) -> dict:
 
 if __name__ == "__main__":
     import argparse
-    import sys
 
     parser = argparse.ArgumentParser(description="Export campaign state to JSON")
     parser.add_argument("db_path", help="Path to campaign.duckdb")

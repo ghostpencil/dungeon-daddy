@@ -156,8 +156,9 @@ def test_on_new_dungeon_calls_window():
 
 def test_refresh_populates_save_meta_with_last_played(tmp_path):
     from datetime import datetime
-    from dungeon_daddy.data.repository import DungeonRepository
+
     from dungeon_daddy.data.models import SessionState
+    from dungeon_daddy.data.repository import DungeonRepository
 
     repo = DungeonRepository(campaigns_dir=tmp_path)
     # save-a has a session, save-b does not

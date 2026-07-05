@@ -354,7 +354,10 @@ class DungeonDaddyWindow(arcade.Window):
                 mem_repo = MemoryRepository(db_path)
                 mem_repo.initialize_schema(_MIGRATIONS_DIR)
                 campaign_id = f"campaign:{_slugify(save_name)}"
-                from dungeon_daddy.campaign.backfill import backfill_exits_if_empty, refresh_exit_labels
+                from dungeon_daddy.campaign.backfill import (
+                    backfill_exits_if_empty,
+                    refresh_exit_labels,
+                )
                 dungeon_json = campaign_dir / "dungeon.json"
                 backfill_exits_if_empty(mem_repo, dungeon_json)
                 refresh_exit_labels(mem_repo, dungeon_json)
@@ -373,7 +376,8 @@ class DungeonDaddyWindow(arcade.Window):
         read the docs via the P1 helpers. Missing refs/files → (None, []).
         """
         from dungeon_daddy.memory.dungeon_persona import (
-            read_dungeon_knowledge, read_dungeon_voice,
+            read_dungeon_knowledge,
+            read_dungeon_voice,
         )
 
         campaign = mem_repo.get_campaign(campaign_id)

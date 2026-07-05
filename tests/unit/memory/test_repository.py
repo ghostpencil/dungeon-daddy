@@ -1,7 +1,4 @@
-import json
 from pathlib import Path
-
-import pytest
 
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.memory.repository import MemoryRepository, MigrationRunner
@@ -217,7 +214,7 @@ class TestMemoryRepository:
         )
         db_path = tmp_path / "test.duckdb"
         conn = duckdb.connect(str(db_path))
-        from dungeon_daddy.memory.repository import _apply_migrations, _ensure_migration_table
+        from dungeon_daddy.memory.repository import _ensure_migration_table
         _ensure_migration_table(conn)
         for sql_file in migrations_up_to_005:
             sql = sql_file.read_text(encoding="utf-8")

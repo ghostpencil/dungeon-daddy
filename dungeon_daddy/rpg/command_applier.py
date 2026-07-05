@@ -6,7 +6,19 @@ from dataclasses import dataclass, field
 
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.rpg.command import ActivateObject, CombineItems, ConsumeItem, ConsumeKitCharge, DropItem, EquipItem, GiveItem, PickUpItem, PlayerCommand, TakeItem, UnequipItem
+from dungeon_daddy.rpg.command import (
+    ActivateObject,
+    CombineItems,
+    ConsumeItem,
+    ConsumeKitCharge,
+    DropItem,
+    EquipItem,
+    GiveItem,
+    PickUpItem,
+    PlayerCommand,
+    TakeItem,
+    UnequipItem,
+)
 from dungeon_daddy.rpg.command_validator import CommandValidationResult
 from dungeon_daddy.rpg.models import ClockState
 from dungeon_daddy.rpg.service import RpgService

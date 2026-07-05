@@ -69,7 +69,7 @@ class Playbook(BaseModel):
     beats: list[dict] = []
 
     @model_validator(mode="after")
-    def _validate_abilities(self) -> "Playbook":
+    def _validate_abilities(self) -> Playbook:
         kit_slugs = [a.slug for a in self.starting_kit.abilities]
         pool_slugs = [a.slug for a in self.ability_pool]
         all_slugs = kit_slugs + pool_slugs

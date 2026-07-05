@@ -179,6 +179,7 @@ class MemoryInspectorPanel:
             return
         import arcade
         import arcade.gui
+
         from dungeon_daddy.ui.theme import FONT_MONO, INK_3, PAD_MD, TEXT_SM
         self.teardown_widget(manager)
         box_x = x + PAD_MD
@@ -208,10 +209,19 @@ class MemoryInspectorPanel:
 
     def draw(self) -> None:
         import arcade
+
         from dungeon_daddy.ui.theme import (
-            BG_1, BG_2, BG_HI, INK_1, INK_3, INK_4, LINE, LINE_HI,
-            TEAL, TEAL_DIM, EMBER, VIOLET_DIM,
-            FONT_UI, FONT_MONO, TEXT_SM, PAD_MD,
+            BG_1,
+            BG_2,
+            BG_HI,
+            FONT_MONO,
+            FONT_UI,
+            INK_1,
+            INK_3,
+            INK_4,
+            LINE,
+            PAD_MD,
+            TEXT_SM,
             draw_chip,
         )
 
@@ -285,7 +295,16 @@ class MemoryInspectorPanel:
 
     def _draw_detail_pane(self, x: float, y: float, w: float, detail_h: float, arcade) -> None:
         from dungeon_daddy.ui.theme import (
-            BG_2, INK_1, INK_3, INK_4, LINE, TEXT_SM, TEXT_XS, PAD_MD, PAD_SM, FONT_UI,
+            BG_2,
+            FONT_UI,
+            INK_1,
+            INK_3,
+            INK_4,
+            LINE,
+            PAD_MD,
+            PAD_SM,
+            TEXT_SM,
+            TEXT_XS,
         )
         pane_y1 = y + PAD_MD * 2 + _BTN_H
         pane_y2 = pane_y1 + detail_h
@@ -325,8 +344,13 @@ class MemoryInspectorPanel:
 
     def _draw_action_buttons(self, x: float, y: float, w: float, arcade) -> None:
         from dungeon_daddy.ui.theme import (
-            BG_2, BG_3, INK_3, INK_4, LINE, TEAL, TEAL_DIM, EMBER, EMBER_GLOW,
-            FONT_UI, TEXT_SM, PAD_MD,
+            BG_2,
+            EMBER,
+            FONT_UI,
+            INK_4,
+            TEAL,
+            TEAL_DIM,
+            TEXT_SM,
         )
         has_sel = self._selected is not None
         ax1, ay1, ax2, ay2 = self._button_rects.get("approve", (0, 0, 0, 0))

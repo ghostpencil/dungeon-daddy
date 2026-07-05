@@ -4,7 +4,7 @@ from pathlib import Path
 
 from dungeon_daddy.memory.markdown_store import compute_checksum, write_memory
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.memory.sync import SyncIssue, SyncReporter
+from dungeon_daddy.memory.sync import SyncReporter
 
 
 def _write_valid_entry(path: Path, memory_id: str, campaign_id: str) -> str:

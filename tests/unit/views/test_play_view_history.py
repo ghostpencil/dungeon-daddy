@@ -5,11 +5,8 @@ from unittest.mock import patch
 
 from dungeon_daddy.data.models import (
     Connection,
-    Dungeon,
-    DungeonMeta,
     Level,
     Room,
-    SessionState,
 )
 from dungeon_daddy.views.play_view import DMResult
 from tests.unit.views._factories import _dungeon, _state

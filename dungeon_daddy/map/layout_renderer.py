@@ -32,8 +32,8 @@ from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyle, GraphRoo
 from dungeon_daddy.map.dungeon_layout.style_resolver import resolve_room_render_style
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_config import VisualHierarchyConfig
 from dungeon_daddy.map.layout_debug_renderer import LayoutDebugRenderer
-from dungeon_daddy.ui.fog_of_war import HIDDEN_LABEL, fog_of_war_label
 from dungeon_daddy.rpg.action_options import RoomThings
+from dungeon_daddy.ui.fog_of_war import HIDDEN_LABEL, fog_of_war_label
 from dungeon_daddy.ui.theme import FONT_MONO, FONT_UI, GOLD, TEAL, TEXT_XS, VIOLET, draw_chip
 
 _ROOM_FILL = (30, 35, 45)
@@ -138,7 +138,7 @@ class LayoutRenderer:
         # feed the action builder (Phase 50.6 §5.3). Empty in graph mode.
         self._thing_rects: dict[str, ScreenRect] = {}
 
-    def thing_rects(self) -> dict[str, "ScreenRect"]:
+    def thing_rects(self) -> dict[str, ScreenRect]:
         """Screen-space row rects from the last play-mode draw, by noun_id."""
         return self._thing_rects
 

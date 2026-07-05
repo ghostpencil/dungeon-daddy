@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -89,18 +89,7 @@ class ResolveObstacleChange(BaseModel):
 
 
 ProposedChange = Annotated[
-    Union[
-        AdvanceClockChange,
-        ApplyConsequenceChange,
-        CreateMemoryChange,
-        NpcReactionChange,
-        AdjustReputationChange,
-        GrantItemChange,
-        StripItemChange,
-        TransformItemChange,
-        BlockExitChange,
-        ResolveObstacleChange,
-    ],
+    AdvanceClockChange | ApplyConsequenceChange | CreateMemoryChange | NpcReactionChange | AdjustReputationChange | GrantItemChange | StripItemChange | TransformItemChange | BlockExitChange | ResolveObstacleChange,
     Field(discriminator="kind"),
 ]
 

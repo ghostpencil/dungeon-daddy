@@ -53,7 +53,7 @@ class ClockManifest(BaseModel):
     completion_effect: str | None = None
 
     @model_validator(mode="after")
-    def filled_within_segments(self) -> "ClockManifest":
+    def filled_within_segments(self) -> ClockManifest:
         if self.filled > self.segments:
             raise ValueError("filled cannot exceed segments")
         return self
@@ -107,7 +107,7 @@ class ObjectiveCompletionManifest(BaseModel):
     required_state: str | None = None
 
     @model_validator(mode="after")
-    def object_state_requires_required_state(self) -> "ObjectiveCompletionManifest":
+    def object_state_requires_required_state(self) -> ObjectiveCompletionManifest:
         if self.kind == "object_state" and not self.required_state:
             raise ValueError("object_state completion requires required_state")
         return self

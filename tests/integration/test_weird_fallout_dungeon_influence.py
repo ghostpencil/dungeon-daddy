@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from datetime import datetime, timezone
-
-import pytest
 
 from dungeon_daddy.memory.markdown_store import read_memory, write_fallout_markdown
 from dungeon_daddy.rpg.models import FalloutRecord

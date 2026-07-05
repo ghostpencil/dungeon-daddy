@@ -3,13 +3,10 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from dungeon_daddy.campaign.manifest import FactionManifest, RoomObjectManifest
 from dungeon_daddy.ui.panels.campaign_edit_panel import CampaignEditPanel
-from dungeon_daddy.ui.panels.campaign_nav_panel import CampaignNavPanel
 from dungeon_daddy.ui.panels.campaign_list_panel import CampaignListPanel
-
+from dungeon_daddy.ui.panels.campaign_nav_panel import CampaignNavPanel
 
 # ---------------------------------------------------------------------------
 # Helpers — CampaignEditPanel without Arcade

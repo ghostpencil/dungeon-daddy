@@ -1,9 +1,6 @@
 """Tests for migrate_campaigns_to_libraries in dungeon_daddy/data/repository.py."""
 
-import json
 from pathlib import Path
-
-import pytest
 
 
 def _dirs(tmp_path: Path):

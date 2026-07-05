@@ -8,10 +8,17 @@ from pathlib import Path
 import arcade
 import arcade.gui
 
-from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, ClockManifest, FactionManifest, ObjectTransitionManifest, RoomObjectManifest
-from dungeon_daddy.data.models import Dungeon
+from dungeon_daddy.campaign.manifest import (
+    ActorManifest,
+    CampaignManifest,
+    ClockManifest,
+    FactionManifest,
+    ObjectTransitionManifest,
+    RoomObjectManifest,
+)
 from dungeon_daddy.campaign.seed_library import CampaignSeedLibrary
 from dungeon_daddy.campaign.validator import ManifestError, validate_manifest
+from dungeon_daddy.data.models import Dungeon
 from dungeon_daddy.ui.chrome import draw_title_bar, title_bar_mode_at
 from dungeon_daddy.ui.panels.campaign_edit_panel import CampaignEditPanel
 from dungeon_daddy.ui.panels.campaign_list_panel import CampaignListPanel

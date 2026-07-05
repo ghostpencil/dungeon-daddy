@@ -39,7 +39,8 @@ class SceneStatePanel:
 
     def draw(self) -> None:
         import arcade
-        from dungeon_daddy.ui.theme import BG_1, INK_3, FONT_UI, TEXT_SM, PAD_MD
+
+        from dungeon_daddy.ui.theme import BG_1, FONT_UI, INK_3, PAD_MD, TEXT_SM
 
         x, y, w, h = self._x, self._y, self._w, self._h
         arcade.draw_rect_filled(arcade.XYWH(x + w / 2, y + h / 2, w, h), BG_1)

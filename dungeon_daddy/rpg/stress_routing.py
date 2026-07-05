@@ -93,7 +93,7 @@ def choose_stress_track(
     *,
     action_key: str,
     intent: str | None = None,
-    matched_clocks: "list[ClockState] | None" = None,
+    matched_clocks: list[ClockState] | None = None,
     explicit_track: StressTrackKey | None = None,
 ) -> StressTrackKey:
     if explicit_track is not None:

@@ -8,8 +8,8 @@ from typing import Literal
 
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.rpg.proposal import (
-    AdvanceClockChange,
     AdjustReputationChange,
+    AdvanceClockChange,
     ApplyConsequenceChange,
     BlockExitChange,
     GrantItemChange,

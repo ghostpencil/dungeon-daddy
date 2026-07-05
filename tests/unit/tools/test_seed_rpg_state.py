@@ -4,8 +4,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from seed_rpg_state import SeedResult, seed_campaign, seed_campaign_with_pack
 
 

@@ -1,6 +1,17 @@
 from __future__ import annotations
 
-from dungeon_daddy.rpg.command import ActivateObject, CombineItems, ConsumeItem, ConsumeKitCharge, DropItem, EquipItem, GiveItem, PickUpItem, TakeItem, UnequipItem
+from dungeon_daddy.rpg.command import (
+    ActivateObject,
+    CombineItems,
+    ConsumeItem,
+    ConsumeKitCharge,
+    DropItem,
+    EquipItem,
+    GiveItem,
+    PickUpItem,
+    TakeItem,
+    UnequipItem,
+)
 from dungeon_daddy.rpg.command_validator import validate_command
 from dungeon_daddy.rpg.models import Item, ObjectTransition, RoomObject
 

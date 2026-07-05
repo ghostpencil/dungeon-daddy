@@ -3,12 +3,10 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from dungeon_daddy.map.dungeon_layout import LayoutResult
 from dungeon_daddy.map.dungeon_layout.debug_overlay import DebugOverlay
 from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
-from dungeon_daddy.map.dungeon_layout.models import LayoutBounds, RoomRect, RoutedEdge
+from dungeon_daddy.map.dungeon_layout.models import LayoutBounds, RoomRect
 from dungeon_daddy.map.layout_renderer import LayoutRenderer
 
 # ---------------------------------------------------------------------------

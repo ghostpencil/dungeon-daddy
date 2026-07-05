@@ -40,9 +40,9 @@ def _actor() -> ActorState:
 
 
 def _make_view(tmp_path: Path):
-    from dungeon_daddy.views.play_view import PlayView
     from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
     from dungeon_daddy.ui.player_action_state import PlayerActionState
+    from dungeon_daddy.views.play_view import PlayView
 
     repo = MemoryRepository(tmp_path / "test.duckdb")
     repo.initialize_schema(MIGRATIONS_DIR)

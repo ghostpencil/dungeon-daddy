@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 from dungeon_daddy.data.models import DesignMode, Dungeon, DungeonMeta, Level
 from dungeon_daddy.llm.agents.wizard_agent import DungeonBrief
 from dungeon_daddy.llm.provider import LLMMessage
-from dungeon_daddy.views.design_view import DesignView, LLMResult, _WIZARD_GREETING
+from dungeon_daddy.views.design_view import _WIZARD_GREETING, DesignView, LLMResult
 
 # ---------------------------------------------------------------------------
 # LLMResult dataclass

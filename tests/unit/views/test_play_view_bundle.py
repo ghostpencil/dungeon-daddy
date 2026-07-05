@@ -2,11 +2,8 @@
 from __future__ import annotations
 
 import queue
-import time
 from pathlib import Path
 from unittest.mock import MagicMock
-
-import pytest
 
 from dungeon_daddy.data.models import (
     Dungeon,
@@ -31,6 +28,7 @@ MIGRATIONS_DIR = (
 
 def _make_rpg_side(active: int = 0):
     from unittest.mock import MagicMock
+
     from dungeon_daddy.views.play_view import _RpgSidePanel
     char, scene, fallout = MagicMock(), MagicMock(), MagicMock()
     mem = MagicMock()
@@ -132,7 +130,7 @@ def _make_view(tmp_path: Path, with_rpg: bool = True):
 
 def test_load_player_actors_calls_set_actors(tmp_path: Path):
     from unittest.mock import MagicMock
-    from dungeon_daddy.rpg.models import ActorState
+
     view, _, _ = _make_view(tmp_path, with_rpg=True)
     # Seed one pc and one npc into mem_repo
     view._mem_repo.save_actor("a-pc", "camp-1", "pc", "hero", "Elara")
@@ -188,6 +186,7 @@ def test_load_player_actors_excludes_faction_and_dungeon_presence(tmp_path: Path
 
 def test_on_resolve_action_calls_service_and_stores_result(tmp_path: Path):
     from unittest.mock import MagicMock
+
     from dungeon_daddy.rpg.models import ActionResolution
     view, _, _ = _make_view(tmp_path, with_rpg=True)
     resolution = ActionResolution(
@@ -216,6 +215,7 @@ def test_on_resolve_action_calls_service_and_stores_result(tmp_path: Path):
 
 def test_on_resolve_action_spawns_dm_narration(tmp_path: Path):
     from unittest.mock import MagicMock, patch
+
     from dungeon_daddy.rpg.models import ActionResolution
     view, room, level = _make_view(tmp_path, with_rpg=True)
     resolution = ActionResolution(
@@ -237,6 +237,7 @@ def test_on_resolve_action_spawns_dm_narration(tmp_path: Path):
 
 def test_on_resolve_action_dm_message_includes_actor_name(tmp_path: Path):
     from unittest.mock import MagicMock, patch
+
     from dungeon_daddy.rpg.models import ActionResolution, ActorState
     view, room, level = _make_view(tmp_path, with_rpg=True)
     resolution = ActionResolution(
@@ -261,6 +262,7 @@ def test_on_resolve_action_dm_message_includes_actor_name(tmp_path: Path):
 
 def test_on_resolve_action_no_room_adds_system_message(tmp_path: Path):
     from unittest.mock import MagicMock
+
     from dungeon_daddy.rpg.models import ActionResolution
     view, _, _ = _make_view(tmp_path, with_rpg=True)
     view._state.current_room_id = None  # no room selected
@@ -375,8 +377,12 @@ def test_load_memory_entries_no_op_without_mem_repo(tmp_path: Path):
 def test_apply_world_reaction_persists_weird_track_with_correct_capacity(tmp_path: Path):
     """A ReactionStressLine(track_key='weird') must be saved with weird capacity, not body."""
     from unittest.mock import MagicMock
+
     from dungeon_daddy.rpg.models import (
-        ActionResolution, ActorState, ReactionStressLine, WorldReaction,
+        ActionResolution,
+        ActorState,
+        ReactionStressLine,
+        WorldReaction,
     )
     view, _, _ = _make_view(tmp_path, with_rpg=True)
 
@@ -543,9 +549,10 @@ def test_set_rpg_context_portraits_dir_defaults_none(tmp_path):
 
 
 def test_refresh_chat_mini_card_passes_portraits_dir(tmp_path):
-    from unittest.mock import patch, MagicMock
-    from dungeon_daddy.views.play_view import PlayView
+    from unittest.mock import MagicMock, patch
+
     from dungeon_daddy.rpg.models import ActorState
+    from dungeon_daddy.views.play_view import PlayView
 
     view = PlayView.__new__(PlayView)
     view._portraits_dir = tmp_path / "portraits"

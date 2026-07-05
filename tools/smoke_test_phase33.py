@@ -29,7 +29,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import queue
 import shutil
 import sys
 import tempfile
@@ -65,22 +64,20 @@ _MIGRATIONS_DIR = _PROJECT_ROOT / "dungeon_daddy" / "data" / "migrations"
 _ARTIFACTS_DIR = _PROJECT_ROOT / "artifacts" / "play_mode" / "phase33"
 
 from smoke_helpers import (
-    BG_0,
     BG_1,
     CHROME_TOTAL_H,
     PAD_MD,
     WINDOW_H,
     WINDOW_W,
     color_close,
+    dropdown_item_center_y,
     fail,
     menu_bar_center_y,
     menu_slot_center_x,
     menu_slot_x,
-    dropdown_item_center_y,
     ok,
     pixel_rgb,
 )
-
 
 # ---------------------------------------------------------------------------
 # Seed helper for pipeline tests
@@ -88,7 +85,6 @@ from smoke_helpers import (
 
 def _seed(repo) -> tuple[str, str, str]:
     """Seed one campaign with pc/npc actors, stress, clocks, memory. Returns (campaign_id, pc_id, scene_id)."""
-    from dungeon_daddy.rpg.models import FalloutRecord
 
     campaign_id = "camp-33"
     pc_id = "actor-lyra"
@@ -186,6 +182,7 @@ _FILE_DEMO_IDX  = 2
 
 def _vision_assert(screenshot_path: Path, question: str) -> bool:
     import base64
+
     import anthropic
     client = anthropic.Anthropic()
     img_b64 = base64.standard_b64encode(screenshot_path.read_bytes()).decode()
@@ -214,7 +211,6 @@ def _rpg_panel_is_open(pixels, shot_w, win_left, win_top) -> bool:
     panel_mid_x = _RPG_PANEL_X + _RPG_PANEL_W / 2
     panel_mid_y = CONTENT_H / 2
     r, g, b = pixel_rgb(pixels, shot_w, win_left, win_top, panel_mid_x, panel_mid_y)
-    from smoke_helpers import color_close
     return color_close((r, g, b), BG_1, tol=20)
 
 
@@ -260,13 +256,13 @@ def _open_rpg_panel(h) -> None:
 def run_pipeline(tmp_path: Path) -> int:
     failures = 0
 
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
     from dungeon_daddy.memory.repository import MemoryRepository
-    from dungeon_daddy.rpg.actor_control import filter_player_actors, is_player_controlled
-    from dungeon_daddy.rpg.models import ActionRequest, ActionResolution, ActorState
+    from dungeon_daddy.rpg.actor_control import filter_player_actors
+    from dungeon_daddy.rpg.models import ActionResolution, ActorState
     from dungeon_daddy.rpg.service import RpgService
     from dungeon_daddy.ui.panels.player_action_panel import PlayerActionPanel
-    from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
-    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
 
     db = MemoryRepository(tmp_path / "campaign.duckdb")
     db.initialize_schema(_MIGRATIONS_DIR)
@@ -376,8 +372,10 @@ def run_pipeline(tmp_path: Path) -> int:
 
     # -- Behavior 6: DM agent receives context_bundle ----------------------
     print("\nBehavior 6 — DM agent respond() receives context_bundle kwarg")
-    from dungeon_daddy.data.models import Room, Level
-    import threading, queue as _queue
+    import queue as _queue
+    import threading
+
+    from dungeon_daddy.data.models import Level, Room
 
     agent = DungeonMasterAgent(provider=_MockProvider())
     received_bundle = []
@@ -485,7 +483,10 @@ def run_ui() -> int:
 
     try:
         from ui_harness import UITestHarness
-        from ui_input import click_app, type_text
+        from ui_input import (  # noqa: F401  availability probe; used via local imports below
+            click_app,
+            type_text,
+        )
     except ImportError as e:
         print(f"  SKIP  UITestHarness not available: {e}")
         return 0

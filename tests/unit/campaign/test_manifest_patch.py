@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-import pytest
-
-from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, ClockManifest, FactionManifest
+from dungeon_daddy.campaign.manifest import (
+    ActorManifest,
+    CampaignManifest,
+    ClockManifest,
+    FactionManifest,
+)
 from dungeon_daddy.campaign.patch import ManifestPatch, apply_patch
 
 

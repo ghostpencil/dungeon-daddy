@@ -96,8 +96,8 @@ def test_connection_label_drawn_centered_in_box() -> None:
 
 def test_hovered_connection_label_highlighted() -> None:
     """Hovering a connection highlights its label (matching the line highlight)."""
-    from dungeon_daddy.map.layout_renderer import _LABEL_COLOR, _LABEL_HOVER_COLOR
     from dungeon_daddy.map.dungeon_layout.graph_view_state import GraphViewState
+    from dungeon_daddy.map.layout_renderer import _LABEL_COLOR, _LABEL_HOVER_COLOR
 
     labels = [_label("a→b", "door", x=100.0, y=50.0), _label("c→d", "hall", x=200.0, y=50.0)]
     result = _result(labels=labels)

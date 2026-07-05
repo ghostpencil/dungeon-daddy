@@ -127,7 +127,7 @@ class ApplyResult:
 def apply_seed_pack(
     pack: SeedPack,
     campaign_id: str,
-    repo: "MemoryRepository",
+    repo: MemoryRepository,
     migrations_dir: Path,
 ) -> ApplyResult:
     from dungeon_daddy.memory.repository import MemoryRepository as _Repo  # noqa: F401

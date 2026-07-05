@@ -23,16 +23,16 @@ from dungeon_daddy.memory.models import MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.actor_control import filter_player_actors
 from dungeon_daddy.rpg.classifier import classify_intent
-from dungeon_daddy.ui.actor_mini_card import build_actor_mini_card
 from dungeon_daddy.rpg.intent import PendingIntent
 from dungeon_daddy.rpg.models import ActorState, ClockState, StressTrack
 from dungeon_daddy.rpg.proposal import parse_proposal
 from dungeon_daddy.rpg.proposal_applier import ApplyResult, apply_low_risk_proposals
 from dungeon_daddy.rpg.proposal_validator import ValidationResult, validate_proposal
 from dungeon_daddy.rpg.service import RpgService
+from dungeon_daddy.ui.actor_mini_card import build_actor_mini_card
 from dungeon_daddy.ui.chrome import PILLS_CLUSTER_W, draw_title_bar, title_bar_mode_at
 from dungeon_daddy.ui.mechanical_bubble import format_mechanical_bubble
-from dungeon_daddy.ui.player_action_state import PlayerActionState
+from dungeon_daddy.ui.panels.action_builder import InChatActionBuilder
 from dungeon_daddy.ui.panels.character_sheet_panel import CharacterSheetPanel
 from dungeon_daddy.ui.panels.chat_panel import ChatPanel
 from dungeon_daddy.ui.panels.debug_controls import DebugControls
@@ -40,9 +40,9 @@ from dungeon_daddy.ui.panels.fallout_panel import FalloutPanel
 from dungeon_daddy.ui.panels.map_panel import MapPanel
 from dungeon_daddy.ui.panels.memory_inspector_panel import MemoryInspectorPanel
 from dungeon_daddy.ui.panels.player_action_panel import PlayerActionPanel
-from dungeon_daddy.ui.panels.action_builder import InChatActionBuilder
-from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
 from dungeon_daddy.ui.panels.scene_state_panel import SceneStatePanel
+from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
+from dungeon_daddy.ui.player_action_state import PlayerActionState
 from dungeon_daddy.ui.theme import (
     BG_0,
     BG_1,
@@ -283,7 +283,6 @@ class _RpgSidePanel:
         self._draw_tab_bar()
 
     def _draw_tab_bar(self) -> None:
-        tab_w = self._w / len(_RPG_TAB_LABELS)
         for i, label in enumerate(_RPG_TAB_LABELS):
             tx, ty, tw, th = self._tab_rects[i]
             tcx, tcy = tx + tw / 2, ty + th / 2
@@ -298,7 +297,7 @@ class _RpgSidePanel:
             )
 
     def _draw_debug_tab(self) -> None:
-        x, y, w = self._x, self._y, self._w
+        x, y = self._x, self._y
         content_h = self._h - _RPG_TAB_H
         if self._debug is None:
             arcade.draw_text(
@@ -1173,7 +1172,10 @@ class PlayView(arcade.View):
             DUNGEON_SPEAK_NOUN_ID,
         )
         from dungeon_daddy.rpg.action_options import (
-            SOURCE_EXIT, SOURCE_LOOSE_ITEM, VERB_MOVE, VERB_PICK_UP,
+            SOURCE_EXIT,
+            SOURCE_LOOSE_ITEM,
+            VERB_MOVE,
+            VERB_PICK_UP,
         )
 
         # Phase 51 Slice 9: the synthetic "Speak to the Dungeon" row opens the
@@ -1261,8 +1263,13 @@ class PlayView(arcade.View):
         pre-routes through trigger selection); (3) skill verbs — action roll.
         """
         from dungeon_daddy.rpg.action_options import (
-            DIALOGUE_VERBS, VERB_ACTIVATE, VERB_LOOK, VERB_USE,
-            SOURCE_EXIT, SOURCE_LOCKED_EXIT, SOURCE_OBJECT,
+            DIALOGUE_VERBS,
+            SOURCE_EXIT,
+            SOURCE_LOCKED_EXIT,
+            SOURCE_OBJECT,
+            VERB_ACTIVATE,
+            VERB_LOOK,
+            VERB_USE,
             is_speakable,
         )
         from dungeon_daddy.rpg.action_resolution import resolve_card
@@ -1703,7 +1710,7 @@ class PlayView(arcade.View):
             None,
         )
         if transition is None:
-            self._chat.add_message("system", f"⚠ Nothing to do with this object right now.")
+            self._chat.add_message("system", "⚠ Nothing to do with this object right now.")
             return
 
         if transition.get("contested"):

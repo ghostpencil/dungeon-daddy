@@ -104,7 +104,7 @@ def _make_room():
     return Room(id="1-A", num=1, name="Entry Hall", x=0, y=0, w=3, h=3, type="hall", note="")
 
 def _make_level():
-    from dungeon_daddy.data.models import Connection, Level, Room
+    from dungeon_daddy.data.models import Level, Room
     return Level(
         id=1, name="Vestibule", summary="Flooded.", ecology="goblins",
         loop="lock_key", width=10, height=10, entries=[],
@@ -135,7 +135,8 @@ def test_respond_with_bundle_system_contains_scene_brief():
 
 
 def test_respond_without_bundle_no_regression():
-    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent, DungeonMasterAgent as DMA
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent as DMA
     from dungeon_daddy.llm.provider import LLMMessage
     provider = _MockProvider()
     agent = DungeonMasterAgent(provider=provider)

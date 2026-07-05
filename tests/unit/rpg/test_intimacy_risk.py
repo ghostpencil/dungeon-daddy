@@ -1,5 +1,5 @@
 from dungeon_daddy.rpg.fallout import apply_intimacy_risk
-from dungeon_daddy.rpg.models import ActorState, StressTrack
+from dungeon_daddy.rpg.models import ActorState
 from tests.unit.rpg._factories import make_pc
 
 

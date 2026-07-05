@@ -62,9 +62,22 @@ class PlayerActionPanel:
             return
         import arcade
         import arcade.gui
+
         from dungeon_daddy.ui.theme import (
-            BG_2, BG_3, BG_HI, FONT_UI, FONT_UI_MED, FONT_MONO, INK_1, INK_2, INK_3, INK_4,
-            LINE, LINE_HI, PAD_MD, TEXT_SM, TEAL,
+            BG_2,
+            BG_3,
+            BG_HI,
+            FONT_MONO,
+            FONT_UI,
+            INK_1,
+            INK_2,
+            INK_3,
+            INK_4,
+            LINE,
+            LINE_HI,
+            PAD_MD,
+            TEAL,
+            TEXT_SM,
         )
         self._widget_params = (manager, x, y, w, h)
         self.teardown_widget(manager)
@@ -124,7 +137,7 @@ class PlayerActionPanel:
                     self.setup_widget(*self._widget_params)
 
         @next_btn.event
-        def on_click(event) -> None:  # type: ignore[no-redef]
+        def on_click(event) -> None:  # type: ignore[no-redef]  # noqa: F811  arcade @event requires this name
             if self._actors:
                 self._actor_idx = (self._actor_idx + 1) % len(self._actors)
                 if self._widget_params:
@@ -175,7 +188,7 @@ class PlayerActionPanel:
             self._action_btn_refs[key] = btn
 
             @btn.event
-            def on_click(event, k=_key) -> None:
+            def on_click(event, k=_key) -> None:  # noqa: F811  arcade @event requires this name
                 self._action_key = k
                 for bk, b in self._action_btn_refs.items():
                     b.style = _btn_style(bk == k)  # type: ignore[union-attr]
@@ -198,7 +211,7 @@ class PlayerActionPanel:
         )
 
         @push_btn.event
-        def on_click(event) -> None:  # type: ignore[no-redef]
+        def on_click(event) -> None:  # type: ignore[no-redef]  # noqa: F811  arcade @event requires this name
             self._push_yourself = not self._push_yourself
 
         manager.add(push_btn)  # type: ignore[union-attr]
@@ -216,7 +229,7 @@ class PlayerActionPanel:
         )
 
         @resolve_btn.event
-        def on_click(event) -> None:  # type: ignore[no-redef]
+        def on_click(event) -> None:  # type: ignore[no-redef]  # noqa: F811  arcade @event requires this name
             if not self._on_resolve or not self._actors:
                 return
             actor = self._actors[min(self._actor_idx, len(self._actors) - 1)]
@@ -250,7 +263,8 @@ class PlayerActionPanel:
 
     def draw(self, x: float, y: float, width: float, height: float) -> None:
         import arcade
-        from dungeon_daddy.ui.theme import BG_1, INK_3, INK_4, FONT_UI, FONT_MONO, PAD_MD, TEXT_SM
+
+        from dungeon_daddy.ui.theme import BG_1, FONT_MONO, FONT_UI, INK_3, INK_4, PAD_MD, TEXT_SM
 
         _ACTION_KEYS = ["fight", "move", "tinker", "study", "focus", "sway", "sense", "channel", "endure"]
 

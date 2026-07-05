@@ -1,11 +1,8 @@
 """Unit tests for stress_routing.choose_stress_track() — Phase 35.6."""
 from __future__ import annotations
 
-import pytest
-
-from dungeon_daddy.rpg.stress_routing import choose_stress_track
 from dungeon_daddy.rpg.models import ClockState
-
+from dungeon_daddy.rpg.stress_routing import choose_stress_track
 
 # ---------------------------------------------------------------------------
 # Action-key mapping (no clocks, no intent)

@@ -518,9 +518,9 @@ def test_overlay_noun_click_outside_rows_does_not_fire() -> None:
 
 
 def test_overlay_noun_click_takes_priority_over_room_select() -> None:
-    from dungeon_daddy.map.dungeon_layout.panel_placement import ScreenRect
-    from dungeon_daddy.map.dungeon_layout.models import LayoutBounds, RoomRect
     from dungeon_daddy.map.dungeon_layout.debug_overlay import DebugOverlay
+    from dungeon_daddy.map.dungeon_layout.models import LayoutBounds, RoomRect
+    from dungeon_daddy.map.dungeon_layout.panel_placement import ScreenRect
     nouns: list[str] = []
     rooms: list[str] = []
     # The noun row overlaps the room rect at screen (PAD_MD..PAD_MD+120, ...).

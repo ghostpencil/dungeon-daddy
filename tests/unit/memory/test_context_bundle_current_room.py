@@ -3,7 +3,7 @@ from __future__ import annotations
 from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
 from dungeon_daddy.memory.models import ContextBundle
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.rpg.models import Item, RoomExit, RoomObject, ObjectTransition
+from dungeon_daddy.rpg.models import Item, ObjectTransition, RoomExit, RoomObject
 
 
 class TestContextBundleCurrentRoomField:

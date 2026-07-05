@@ -1,9 +1,9 @@
+from dungeon_daddy.rpg.models import StressTrack
 from dungeon_daddy.rpg.stress import (
     create_default_stress_tracks,
     is_track_filled,
     mark_stress,
 )
-from dungeon_daddy.rpg.models import StressTrack
 
 
 def test_create_default_stress_tracks_returns_four_tracks() -> None:

@@ -15,7 +15,7 @@ read honestly (e.g. ``"southwest"``).
 from __future__ import annotations
 
 import math
-from typing import Mapping, Collection
+from collections.abc import Collection, Mapping
 
 # Prepended to an exit whose revealed status is a key-gated lock. A padlock glyph
 # so the player can tell a locked door from an open one at a glance. Kept as a

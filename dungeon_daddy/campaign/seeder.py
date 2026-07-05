@@ -4,7 +4,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, FactionManifest, ItemManifest, RoomObjectManifest, RoomExitSeed
+from dungeon_daddy.campaign.manifest import (
+    ActorManifest,
+    CampaignManifest,
+    FactionManifest,
+    ItemManifest,
+    RoomExitSeed,
+    RoomObjectManifest,
+)
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.models import ActorAbility
 from dungeon_daddy.rpg.playbook import Playbook, PlaybookLibrary
@@ -34,7 +41,7 @@ def seed_from_manifest(
     campaign_id: str,
     dry_run: bool = False,
     force: bool = False,
-    dungeon: "Dungeon | None" = None,
+    dungeon: Dungeon | None = None,
 ) -> SeedResult:
     """Apply a CampaignManifest to a campaign DB.
 
@@ -517,7 +524,7 @@ def _seed_exits(
     result: SeedResult,
     dry_run: bool,
     force: bool,
-    dungeon: "Dungeon | None",
+    dungeon: Dungeon | None,
 ) -> None:
     from dungeon_daddy.rpg.models import RoomExit
 

@@ -189,9 +189,10 @@ class TestProposalAppliedEvent:
         assert applied_events[0].payload["kind"] == "create_memory"
 
     def test_adjust_reputation_emits_proposal_applied_event(self, tmp_path):
-        from dungeon_daddy.rpg.proposal import AdjustReputationChange
-        from dungeon_daddy.rpg.models import FactionState
         import uuid as _uuid
+
+        from dungeon_daddy.rpg.models import FactionState
+        from dungeon_daddy.rpg.proposal import AdjustReputationChange
         repo = _repo(tmp_path)
         faction = FactionState(
             faction_id=str(_uuid.uuid4()),

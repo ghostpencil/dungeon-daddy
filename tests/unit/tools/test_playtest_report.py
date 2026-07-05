@@ -1,7 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-
-import pytest
 
 from dungeon_daddy.reporting.models import (
     ActionUsageRow,
@@ -18,7 +16,7 @@ from dungeon_daddy.reporting.models import (
 def _empty_report() -> PlaytestReport:
     return PlaytestReport(
         campaign_id="camp:test",
-        generated_at=datetime(2026, 6, 13, 12, 0, tzinfo=timezone.utc),
+        generated_at=datetime(2026, 6, 13, 12, 0, tzinfo=UTC),
         action_usage=[],
         outcome_breakdown=OutcomeBreakdown(),
         stress_distribution=[],
@@ -32,7 +30,7 @@ def _empty_report() -> PlaytestReport:
 def _full_report() -> PlaytestReport:
     return PlaytestReport(
         campaign_id="camp:test",
-        generated_at=datetime(2026, 6, 13, 12, 0, tzinfo=timezone.utc),
+        generated_at=datetime(2026, 6, 13, 12, 0, tzinfo=UTC),
         action_usage=[ActionUsageRow(action_key="fight", count=12)],
         outcome_breakdown=OutcomeBreakdown(critical=2, full=5, partial=4, miss=3),
         stress_distribution=[StressDistributionRow(actor_id="pc-mara", track_key="body", total_marks=5)],

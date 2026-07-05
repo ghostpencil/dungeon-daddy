@@ -303,7 +303,7 @@ class TestNoRollPath:
 # Slice 8 — Action card set when intent is classified (39.S2 → updated 39.S6.3)
 # ---------------------------------------------------------------------------
 
-def _make_view_with_pending() -> tuple["PlayView", object]:
+def _make_view_with_pending() -> tuple[PlayView, object]:
     """Create a view with a pending intent and return (view, chip_click_callback)."""
     view = _make_view()
     view._on_chat_send("I study the mural to understand its secrets")
@@ -449,7 +449,7 @@ class TestActorMiniCardWiredToChat:
 # Slice 14 — Actor switcher (39.S6.2)
 # ---------------------------------------------------------------------------
 
-def _make_multi_actor_view() -> "PlayView":
+def _make_multi_actor_view() -> PlayView:
     """View with two actors in roster for switcher tests."""
     view = _make_view()
     view._action_state.set_actor_roster(["a1", "a2"])

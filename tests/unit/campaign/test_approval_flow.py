@@ -141,6 +141,7 @@ class TestRunDraftFlow:
 
     def test_approved_patch_is_written_to_manifest_file(self, tmp_path) -> None:
         import json
+
         from dungeon_daddy.campaign.draft_flow import run_draft_flow
 
         manifest = _base_manifest()
@@ -168,6 +169,7 @@ class TestRunDraftFlow:
 
     def test_rejected_patch_leaves_manifest_unchanged(self, tmp_path) -> None:
         import json
+
         from dungeon_daddy.campaign.draft_flow import run_draft_flow
 
         manifest = _base_manifest()
@@ -191,6 +193,7 @@ class TestRunDraftFlow:
 
     def test_invalid_patch_exits_nonzero_and_leaves_file_unchanged(self, tmp_path) -> None:
         import json
+
         from dungeon_daddy.campaign.draft_flow import run_draft_flow
 
         manifest = _base_manifest()

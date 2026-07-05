@@ -38,8 +38,8 @@ def _actor(**kw) -> ActorState:
 
 
 def _make_view(tmp_path: Path, actor: ActorState | None = None):
-    from dungeon_daddy.views.play_view import PlayView
     from dungeon_daddy.ui.player_action_state import PlayerActionState
+    from dungeon_daddy.views.play_view import PlayView
 
     mem_repo = MemoryRepository(tmp_path / "test.duckdb")
     mem_repo.initialize_schema(MIGRATIONS_DIR)
@@ -90,7 +90,7 @@ def test_refresh_vna_panel_surfaces_exit_as_noun(tmp_path):
 def test_refresh_vna_panel_feeds_things_here_overlay(tmp_path):
     """Phase 50.6 Slice 7: the same refresh feeds the map overlay, tracking the
     current room — so the overlay updates on load and on every move."""
-    from dungeon_daddy.rpg.action_options import RoomThings, SECTION_EXITS
+    from dungeon_daddy.rpg.action_options import SECTION_EXITS, RoomThings
     view = _make_view(tmp_path)
     view._map = MagicMock()
     _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="open")
@@ -321,7 +321,11 @@ def test_refresh_vna_panel_disambiguates_doors_by_direction(tmp_path):
 
 def _dungeon_with_connected_rooms(rooms, connections):
     from dungeon_daddy.data.models import (
-        Connection, Dungeon, DungeonMeta, Level, Room,
+        Connection,
+        Dungeon,
+        DungeonMeta,
+        Level,
+        Room,
     )
 
     room_models = [
@@ -742,7 +746,7 @@ def test_submit_activate_with_required_item_held_transitions_and_consumes(tmp_pa
 
 def test_submit_use_on_object_routes_as_activate(tmp_path):
     # use [fuse] on [lift] with target SOURCE_OBJECT → same activation path as activate [lift]
-    from dungeon_daddy.rpg.action_options import ActionCard, NounOption, SOURCE_OBJECT
+    from dungeon_daddy.rpg.action_options import SOURCE_OBJECT, ActionCard, NounOption
     from dungeon_daddy.rpg.models import Item, ObjectTransition, RoomObject
 
     view = _make_view(tmp_path)
@@ -953,7 +957,6 @@ def test_submit_look_card_no_state_change(tmp_path):
 
 def test_give_target_includes_other_party_members(tmp_path):
     """Other party PCs (from _rpg_action._actors) appear as give targets."""
-    from dungeon_daddy.rpg.action_options import ActionCard
     from dungeon_daddy.rpg.models import Item
 
     borin = _actor(actor_id="pc-2", slug="borin", display_name="Borin")
@@ -1093,7 +1096,7 @@ def test_use_non_matching_item_on_exit_does_not_clear_requires_item_slug(tmp_pat
 # ---------------------------------------------------------------------------
 
 def test_sway_on_willing_npc_opens_dialogue_not_roll(tmp_path):
-    from dungeon_daddy.rpg.action_options import ActionCard, NounOption, SOURCE_NPC
+    from dungeon_daddy.rpg.action_options import SOURCE_NPC, ActionCard, NounOption
 
     view = _make_view(tmp_path)
     view._resolve_vna_roll = MagicMock()
@@ -1112,7 +1115,7 @@ def test_sway_on_willing_npc_opens_dialogue_not_roll(tmp_path):
 
 def test_sway_on_hostile_creature_rolls_not_dialogue(tmp_path):
     # Not all creatures will talk — a hostile target stays a contested roll.
-    from dungeon_daddy.rpg.action_options import ActionCard, NounOption, SOURCE_MONSTER
+    from dungeon_daddy.rpg.action_options import SOURCE_MONSTER, ActionCard, NounOption
 
     view = _make_view(tmp_path)
     view._resolve_vna_roll = MagicMock()

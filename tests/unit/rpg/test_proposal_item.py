@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.models import Item
 from dungeon_daddy.rpg.proposal import (

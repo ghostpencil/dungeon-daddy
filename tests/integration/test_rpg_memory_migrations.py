@@ -2,7 +2,6 @@
 from pathlib import Path
 
 import duckdb
-import pytest
 
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.memory.repository import MemoryRepository, MigrationRunner

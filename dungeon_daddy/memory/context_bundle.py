@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Literal
 
-from dungeon_daddy.memory.models import ContextBundle, MemoryEntry
+from dungeon_daddy.memory.models import ContextBundle
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.memory.retrieval import MemoryRetriever
 from dungeon_daddy.rpg.models import RoomObject

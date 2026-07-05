@@ -16,15 +16,14 @@ plus the actor playbook's signature adverbs filtered by the noun's ``target_type
 """
 from __future__ import annotations
 
+from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Collection, Iterable, Mapping
 
 from pydantic import BaseModel
 
 from dungeon_daddy.rpg.models import ActorAbility
 from dungeon_daddy.rpg.move_party import HOW_MODIFIER_FLAGS
-from dungeon_daddy.rpg.playbook import PlaybookLibrary, _UNIVERSAL_VERBS
-
+from dungeon_daddy.rpg.playbook import _UNIVERSAL_VERBS, PlaybookLibrary
 
 # Canonical verb slugs. ``move`` is one of the 9 universal skill verbs but is
 # also an engine mutation; the interaction verbs below are *not* skill verbs —
@@ -116,8 +115,8 @@ def target_sources_for_verb(verb: str) -> set[str] | None:
 
 
 def verbs_for_noun(
-    noun: "NounOption", all_verbs: Iterable["VerbOption"]
-) -> list["VerbOption"]:
+    noun: NounOption, all_verbs: Iterable[VerbOption]
+) -> list[VerbOption]:
     """The verbs from ``all_verbs`` that may target ``noun`` — inverse of
     :func:`noun_sources_for_verb`.
 
@@ -141,7 +140,7 @@ def verbs_for_noun(
 _SPEAKABLE_DISPOSITIONS: frozenset[str] = frozenset({"willing"})
 
 
-def is_speakable(noun: "NounOption", room_context: Mapping) -> bool:
+def is_speakable(noun: NounOption, room_context: Mapping) -> bool:
     """True when ``noun`` is a creature the party can open dialogue with (§6).
 
     A noun is speakable only when it is an NPC or monster present in
@@ -218,7 +217,7 @@ class ActionPreview:
 
 
 def action_preview(
-    card: "ActionCard", room_context: Mapping, actor: Mapping
+    card: ActionCard, room_context: Mapping, actor: Mapping
 ) -> ActionPreview:
     """Build the deterministic Preview box for an action Card (spec §4.5).
 
@@ -376,7 +375,7 @@ def room_things(room_context: Mapping, actor: Mapping) -> RoomThings:
 
 
 def _room_thing(
-    noun: "NounOption",
+    noun: NounOption,
     objects_by_id: Mapping,
     exits_by_id: Mapping,
     creatures_by_id: Mapping,

@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from dungeon_daddy.rpg.models import ActorAbility
 from dungeon_daddy.ui.panels.action_builder import InChatActionBuilder
 from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
 

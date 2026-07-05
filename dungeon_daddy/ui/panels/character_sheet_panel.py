@@ -90,10 +90,20 @@ class CharacterSheetPanel:
 
     def draw(self) -> None:
         from dungeon_daddy.ui.theme import (
-            BG_1, BG_2, BG_3,
-            EMBER, INK_1, INK_2, INK_3, INK_4,
-            TEAL, VIOLET,
-            FONT_UI, TEXT_SM, TEXT_MD, PAD_MD, PAD_SM,
+            BG_1,
+            BG_3,
+            EMBER,
+            FONT_UI,
+            INK_1,
+            INK_2,
+            INK_3,
+            INK_4,
+            PAD_MD,
+            PAD_SM,
+            TEAL,
+            TEXT_MD,
+            TEXT_SM,
+            VIOLET,
         )
 
         x, y, w, h = self._x, self._y, self._w, self._h

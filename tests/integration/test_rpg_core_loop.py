@@ -7,9 +7,9 @@ Full headless RPG loop: PC studies a strange altar.
 - emits action.resolved, clock.advanced, stress.marked
 """
 
-from dungeon_daddy.rpg.service import RpgService
 from dungeon_daddy.rpg.clocks import create_clock
 from dungeon_daddy.rpg.models import ActionRequest
+from dungeon_daddy.rpg.service import RpgService
 
 
 def test_altar_headless_scenario() -> None:
