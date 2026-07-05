@@ -33,11 +33,16 @@ def test_apply_stress_emits_domain_event() -> None:
 
 
 def test_react_to_resolution_returns_world_reaction_and_event() -> None:
+    # Phase 51.6: a non-object action falls to the ambient rule — one +1 tick on
+    # the nearest local adverse clock, and no stress (stress is scripted-only).
     svc = RpgService()
     req = ActionRequest(campaign_id="c1", actor_id="a1", action_key="fight", dice_pool=1)
     resolution, _ = svc.resolve_action(req, fixed=[2])
     assert resolution.outcome == "miss"
-    clock = ClockState(clock_id="ck1", campaign_id="c1", label="Heat", segments=6, filled=1)
+    clock = ClockState(
+        clock_id="ck1", campaign_id="c1", label="Heat", segments=6, filled=1,
+        clock_level="room", scope_room_id="room_a", category="danger",
+    )
     actor = ActorState(
         actor_id="a1", campaign_id="c1", actor_type="pc",
         slug="hero", display_name="Hero",
@@ -45,12 +50,14 @@ def test_react_to_resolution_returns_world_reaction_and_event() -> None:
     tracks = {
         "body": StressTrack(track_key="body", capacity=4, filled=0),
     }
-    reaction, event = svc.react_to_resolution(resolution, [clock], [(actor, tracks)])
+    reaction, event = svc.react_to_resolution(
+        resolution, [clock], [(actor, tracks)], current_room_id="room_a"
+    )
     assert isinstance(reaction, WorldReaction)
     assert reaction.outcome == "miss"
     assert len(reaction.clock_lines) == 1
-    assert reaction.clock_lines[0].ticks == 2
-    assert len(reaction.stress_lines) == 1
+    assert reaction.clock_lines[0].ticks == 1
+    assert reaction.stress_lines == []
     assert isinstance(event, DomainEvent)
     assert event.event_type == "world.reacted"
 
@@ -62,7 +69,7 @@ def test_react_to_resolution_respects_current_room_id() -> None:
     assert resolution.outcome == "miss"
     clock = ClockState(
         clock_id="ck_scoped", campaign_id="c1", label="Scoped",
-        segments=4, filled=0, scope_room_id="room_a",
+        segments=4, filled=0, clock_level="room", scope_room_id="room_a", category="danger",
     )
     actor = ActorState(actor_id="a1", campaign_id="c1", actor_type="pc", slug="h", display_name="H")
     tracks = {"body": StressTrack(track_key="body", capacity=4, filled=0)}

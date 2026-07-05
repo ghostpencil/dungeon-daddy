@@ -1,4 +1,4 @@
-"""Unit tests for compute_world_reaction() — Phase 35 step 35-2."""
+"""Unit tests for compute_world_reaction() and its Phase 51.6 helpers."""
 from __future__ import annotations
 
 from dungeon_daddy.rpg.models import (
@@ -6,6 +6,7 @@ from dungeon_daddy.rpg.models import (
     ActorState,
     ClockState,
     ObjectReactionBinding,
+    RoomObject,
     StressTrack,
 )
 from dungeon_daddy.rpg.world_reaction import (
@@ -15,26 +16,14 @@ from dungeon_daddy.rpg.world_reaction import (
 )
 
 
-def _resolution(outcome: str, actor_id: str = "a1") -> ActionResolution:
+def _resolution(outcome: str, actor_id: str = "a1", action_key: str = "study") -> ActionResolution:
     return ActionResolution(
         resolution_id="res1",
         campaign_id="c1",
         actor_id=actor_id,
-        action_key="fight",
+        action_key=action_key,
         dice_rolled=[3],
         outcome=outcome,  # type: ignore[arg-type]
-    )
-
-
-def _clock(clock_id: str = "ck1", filled: int = 1, segments: int = 6) -> ClockState:
-    return ClockState(
-        clock_id=clock_id,
-        campaign_id="c1",
-        label="Heat Rising",
-        segments=segments,
-        filled=filled,
-        clock_level="room",
-        category="danger",
     )
 
 
@@ -50,506 +39,313 @@ def _pc(actor_id: str = "a1", body_filled: int = 0) -> tuple[ActorState, dict[st
     return actor, tracks
 
 
+def _room_clock(
+    clock_id: str,
+    room_id: str = "R1",
+    category: str = "danger",
+    label: str = "Scorpion Nest Agitated",
+    filled: int = 1,
+    segments: int = 6,
+) -> ClockState:
+    return ClockState(
+        clock_id=clock_id, campaign_id="c1", label=label, segments=segments,
+        filled=filled, clock_level="room", scope_room_id=room_id, category=category,
+    )
+
+
+def _object(policy: str, bindings: list[ObjectReactionBinding] | None = None) -> RoomObject:
+    return RoomObject(
+        object_id="obj1", campaign_id="c1", room_id="R1", level_id="level-1",
+        slug="statue", display_name="Toppled Artificer Statue",
+        archetype="lore_fixture", description="A toppled statue.", current_state="idle",
+        reaction_policy=policy,  # type: ignore[arg-type]
+        reaction_bindings=bindings or [],
+    )
+
+
 # ---------------------------------------------------------------------------
-# Miss — clocks +2, PC takes 2 body stress
+# Phase 51.6 Slice 7 — ambient policy branch (design §4)
 # ---------------------------------------------------------------------------
 
-def test_miss_advances_active_clock_by_two():
-    resolution = _resolution("miss")
+def test_ambient_miss_advances_single_local_adverse_clock_by_one():
+    # Worked example: STUDY-miss on the ambient statue in R1 → nest +1.
     actor, tracks = _pc()
-    result = compute_world_reaction(resolution, [_clock()], [(actor, tracks)])
+    nest = _room_clock("scorpion-nest")
+    result = compute_world_reaction(
+        _resolution("miss"), [nest], [(actor, tracks)],
+        current_room_id="R1", current_level_id="level-1",
+        acted_object=_object("ambient"),
+    )
     assert len(result.clock_lines) == 1
-    assert result.clock_lines[0].ticks == 2
-    assert result.clock_lines[0].new_filled == 3
-
-
-def test_miss_applies_two_body_stress_to_pc():
-    resolution = _resolution("miss")
-    actor, tracks = _pc()
-    result = compute_world_reaction(resolution, [_clock()], [(actor, tracks)])
-    assert len(result.stress_lines) == 1
-    assert result.stress_lines[0].amount == 2
-    assert result.stress_lines[0].track_key == "body"
-    assert result.stress_lines[0].new_filled == 2
-
-
-# ---------------------------------------------------------------------------
-# Partial — clocks +1, PC takes 1 body stress
-# ---------------------------------------------------------------------------
-
-def test_partial_advances_active_clock_by_one():
-    resolution = _resolution("partial")
-    actor, tracks = _pc()
-    result = compute_world_reaction(resolution, [_clock()], [(actor, tracks)])
+    assert result.clock_lines[0].clock_id == "scorpion-nest"
     assert result.clock_lines[0].ticks == 1
     assert result.clock_lines[0].new_filled == 2
 
 
-def test_partial_applies_one_body_stress_to_pc():
-    resolution = _resolution("partial")
+def test_ambient_partial_advances_local_adverse_clock_by_one():
     actor, tracks = _pc()
-    result = compute_world_reaction(resolution, [_clock()], [(actor, tracks)])
-    assert result.stress_lines[0].amount == 1
-    assert result.stress_lines[0].new_filled == 1
+    nest = _room_clock("scorpion-nest")
+    result = compute_world_reaction(
+        _resolution("partial"), [nest], [(actor, tracks)],
+        current_room_id="R1", current_level_id="level-1",
+        acted_object=_object("ambient"),
+    )
+    assert len(result.clock_lines) == 1
+    assert result.clock_lines[0].ticks == 1
 
 
-# ---------------------------------------------------------------------------
-# Full — no clock advance, no stress
-# ---------------------------------------------------------------------------
-
-def test_full_does_not_advance_clocks():
-    resolution = _resolution("full")
+def test_ambient_no_local_adverse_clock_is_narration_only():
     actor, tracks = _pc()
-    result = compute_world_reaction(resolution, [_clock()], [(actor, tracks)])
+    elsewhere = _room_clock("scorpion-nest", room_id="R9")
+    result = compute_world_reaction(
+        _resolution("miss"), [elsewhere], [(actor, tracks)],
+        current_room_id="R1", current_level_id="level-1",
+        acted_object=_object("ambient"),
+    )
+    assert result.clock_lines == []
+    assert result.stress_lines == []
+
+
+def test_ambient_applies_no_stress():
+    # Stress is a scripted consequence only; the ambient path never applies it.
+    actor, tracks = _pc()
+    nest = _room_clock("scorpion-nest")
+    result = compute_world_reaction(
+        _resolution("miss"), [nest], [(actor, tracks)],
+        current_room_id="R1", current_level_id="level-1",
+        acted_object=_object("ambient"),
+    )
+    assert result.stress_lines == []
+
+
+def test_ambient_full_does_not_advance():
+    actor, tracks = _pc()
+    nest = _room_clock("scorpion-nest")
+    result = compute_world_reaction(
+        _resolution("full"), [nest], [(actor, tracks)],
+        current_room_id="R1", current_level_id="level-1",
+        acted_object=_object("ambient"),
+    )
     assert result.clock_lines == []
 
 
-def test_full_does_not_apply_stress():
-    resolution = _resolution("full")
+def test_ambient_critical_never_rolls_back():
+    # Polarity fix: the ambient path never rolls a clock back.
     actor, tracks = _pc()
-    result = compute_world_reaction(resolution, [_clock()], [(actor, tracks)])
+    nest = _room_clock("scorpion-nest", filled=3)
+    result = compute_world_reaction(
+        _resolution("critical"), [nest], [(actor, tracks)],
+        current_room_id="R1", current_level_id="level-1",
+        acted_object=_object("ambient"),
+    )
+    assert result.clock_lines == []
+
+
+def test_ambient_firewall_skips_objective_relationship_faction_intimacy():
+    # Even locally room-scoped, these categories are never ambient-eligible;
+    # only the adverse clock moves. This is the original bug, dead by construction.
+    actor, tracks = _pc()
+    nest = _room_clock("scorpion-nest", category="danger")
+    objective = _room_clock("power-core", category="objective", label="Restore the Power Core")
+    intimacy = _room_clock("factory-learns", category="dungeon_intimacy", label="The Factory Learns")
+    relationship = _room_clock("mira", category="relationship", label="Mira Surfaces")
+    faction = _room_clock("guild", category="faction_pressure", label="Guild Agenda")
+    result = compute_world_reaction(
+        _resolution("miss"),
+        [nest, objective, intimacy, relationship, faction],
+        [(actor, tracks)],
+        current_room_id="R1", current_level_id="level-1",
+        acted_object=_object("ambient"),
+    )
+    moved = {line.clock_id for line in result.clock_lines}
+    assert moved == {"scorpion-nest"}
+
+
+def test_ambient_blast_radius_cap_is_one_clock():
+    # Two adverse room clocks present → exactly one advances (tightest/lowest id).
+    actor, tracks = _pc()
+    first = _room_clock("aaa-nest")
+    second = _room_clock("bbb-swarm")
+    result = compute_world_reaction(
+        _resolution("miss"), [second, first], [(actor, tracks)],
+        current_room_id="R1", current_level_id="level-1",
+        acted_object=_object("ambient"),
+    )
+    assert len(result.clock_lines) == 1
+    assert result.clock_lines[0].clock_id == "aaa-nest"
+
+
+def test_no_acted_object_defaults_to_ambient():
+    # Non-object actions fall to the ambient rule by default (§7).
+    actor, tracks = _pc()
+    nest = _room_clock("scorpion-nest")
+    result = compute_world_reaction(
+        _resolution("miss"), [nest], [(actor, tracks)],
+        current_room_id="R1", current_level_id="level-1",
+    )
+    assert len(result.clock_lines) == 1
+    assert result.clock_lines[0].ticks == 1
     assert result.stress_lines == []
 
 
 # ---------------------------------------------------------------------------
-# Critical — clocks retreat -1 (floor 0), no stress
+# Phase 51.6 Slice 7 — inert policy branch (design §2)
 # ---------------------------------------------------------------------------
 
-def test_critical_retreats_clock_by_one():
-    resolution = _resolution("critical")
+def test_inert_applies_no_mechanics():
     actor, tracks = _pc()
-    clock = _clock(filled=3)
-    result = compute_world_reaction(resolution, [clock], [(actor, tracks)])
-    assert result.clock_lines[0].ticks == -1
-    assert result.clock_lines[0].new_filled == 2
-
-
-def test_critical_does_not_retreat_below_zero():
-    resolution = _resolution("critical")
-    actor, tracks = _pc()
-    clock = _clock(filled=0)
-    result = compute_world_reaction(resolution, [clock], [(actor, tracks)])
-    assert result.clock_lines[0].new_filled == 0
-
-
-def test_critical_does_not_apply_stress():
-    resolution = _resolution("critical")
-    actor, tracks = _pc()
-    result = compute_world_reaction(resolution, [_clock()], [(actor, tracks)])
+    nest = _room_clock("scorpion-nest")
+    result = compute_world_reaction(
+        _resolution("miss"), [nest], [(actor, tracks)],
+        current_room_id="R1", current_level_id="level-1",
+        acted_object=_object("inert"),
+    )
+    assert result.clock_lines == []
     assert result.stress_lines == []
 
 
 # ---------------------------------------------------------------------------
-# Completed clocks are skipped
+# Phase 51.6 Slice 7 — scripted policy branch (design §5)
 # ---------------------------------------------------------------------------
 
-def test_completed_clock_is_skipped():
-    resolution = _resolution("miss")
+def _binding_row(
+    verb: str, outcome: str, *, clock_slug: str | None = None, clock_delta: int = 0,
+    stress_track: str | None = None, stress_amount: int = 0, binding_id: str = "b1",
+) -> ObjectReactionBinding:
+    return ObjectReactionBinding(
+        binding_id=binding_id, object_id="obj1", action_verb=verb, outcome=outcome,  # type: ignore[arg-type]
+        clock_slug=clock_slug, clock_delta=clock_delta,
+        stress_track=stress_track, stress_amount=stress_amount,
+    )
+
+
+def test_scripted_applies_only_authored_clock_binding():
+    # Scripted fires only its authored binding — no fan-out to the local adverse clock.
     actor, tracks = _pc()
-    done_clock = ClockState(
-        clock_id="ck_done", campaign_id="c1", label="Done", segments=4, filled=4,
-        status="completed",
+    overload = ClockState(
+        clock_id="clock:crucible:arcane-overload-building", campaign_id="c1",
+        label="Arcane Overload Building", segments=8, filled=2,
+        clock_level="dungeon", category="danger",
     )
-    result = compute_world_reaction(resolution, [done_clock], [(actor, tracks)])
-    assert result.clock_lines == []
+    nest = _room_clock("scorpion-nest")  # locally present but NOT authored
+    obj = _object("scripted", [
+        _binding_row("tinker", "miss", clock_slug="arcane-overload-building", clock_delta=1),
+    ])
+    result = compute_world_reaction(
+        _resolution("miss", action_key="tinker"), [overload, nest], [(actor, tracks)],
+        current_room_id="R1", current_level_id="level-1", acted_object=obj,
+    )
+    moved = {line.clock_id for line in result.clock_lines}
+    assert moved == {"clock:crucible:arcane-overload-building"}
+    assert result.clock_lines[0].ticks == 1
+    assert result.clock_lines[0].new_filled == 3
 
 
-# ---------------------------------------------------------------------------
-# Summary lines are generated
-# ---------------------------------------------------------------------------
-
-def test_miss_produces_summary_lines():
-    resolution = _resolution("miss")
+def test_scripted_no_matching_binding_is_no_op():
     actor, tracks = _pc()
-    result = compute_world_reaction(resolution, [_clock()], [(actor, tracks)])
-    assert result.summary_lines[0] == "World reaction (MISS):"
-    combined = " ".join(result.summary_lines)
-    assert "Clock [Heat Rising]:" in combined  # the ticked threat clock
-    assert "Hero [body]:" in combined          # the stressed PC
-
-
-# ---------------------------------------------------------------------------
-# Stress overflow clamps at capacity and flags fallout
-# ---------------------------------------------------------------------------
-
-def test_miss_stress_overflow_flags_fallout():
-    resolution = _resolution("miss")
-    actor, tracks = _pc(body_filled=3)
-    result = compute_world_reaction(resolution, [], [(actor, tracks)])
-    assert result.stress_lines[0].triggered_fallout is True
-    assert result.stress_lines[0].new_filled == 4
-
-
-# ---------------------------------------------------------------------------
-# Only the acting actor takes stress — not the whole party
-# ---------------------------------------------------------------------------
-
-def test_miss_stress_only_applied_to_acting_actor():
-    resolution = _resolution("miss", actor_id="a1")
-    acting, acting_tracks = _pc(actor_id="a1")
-    bystander, bystander_tracks = _pc(actor_id="a2")
+    nest = _room_clock("scorpion-nest")
+    obj = _object("scripted", [
+        _binding_row("tinker", "miss", clock_slug="arcane-overload-building", clock_delta=1),
+    ])
     result = compute_world_reaction(
-        resolution, [], [(acting, acting_tracks), (bystander, bystander_tracks)]
-    )
-    assert len(result.stress_lines) == 1
-    assert result.stress_lines[0].actor_id == "a1"
-
-
-def test_partial_stress_only_applied_to_acting_actor():
-    resolution = _resolution("partial", actor_id="a2")
-    actor1, tracks1 = _pc(actor_id="a1")
-    actor2, tracks2 = _pc(actor_id="a2")
-    result = compute_world_reaction(
-        resolution, [], [(actor1, tracks1), (actor2, tracks2)]
-    )
-    assert len(result.stress_lines) == 1
-    assert result.stress_lines[0].actor_id == "a2"
-
-
-# ---------------------------------------------------------------------------
-# Phase 35.5 — Clock scoping: room filter
-# ---------------------------------------------------------------------------
-
-def test_scoped_clock_advances_in_matching_room():
-    resolution = _resolution("miss")
-    actor, tracks = _pc()
-    clock = ClockState(
-        clock_id="ck1", campaign_id="c1", label="Trap Primed",
-        segments=6, filled=1, scope_room_id="room_a",
-    )
-    result = compute_world_reaction(
-        resolution, [clock], [(actor, tracks)], current_room_id="room_a"
-    )
-    assert len(result.clock_lines) == 1
-    assert result.clock_lines[0].ticks == 2
-
-
-def test_scoped_clock_skipped_in_wrong_room():
-    resolution = _resolution("miss")
-    actor, tracks = _pc()
-    clock = ClockState(
-        clock_id="ck1", campaign_id="c1", label="Trap Primed",
-        segments=6, filled=1, scope_room_id="room_a",
-    )
-    result = compute_world_reaction(
-        resolution, [clock], [(actor, tracks)], current_room_id="room_b"
+        _resolution("miss", action_key="study"), [nest], [(actor, tracks)],
+        current_room_id="R1", current_level_id="level-1", acted_object=obj,
     )
     assert result.clock_lines == []
+    assert result.stress_lines == []
 
 
-def test_global_clock_advances_regardless_of_room():
-    resolution = _resolution("miss")
+def test_scripted_applies_authored_stress_to_acting_actor():
     actor, tracks = _pc()
-    clock = ClockState(
-        clock_id="ck1", campaign_id="c1", label="Heat Rising",
-        segments=6, filled=1,
-    )
+    tracks["body"] = StressTrack(track_key="body", capacity=4, filled=0)
+    obj = _object("scripted", [
+        _binding_row("move", "miss", stress_track="body", stress_amount=2),
+    ])
     result = compute_world_reaction(
-        resolution, [clock], [(actor, tracks)], current_room_id="some_room"
+        _resolution("miss", action_key="move"), [], [(actor, tracks)],
+        current_room_id="R5", current_level_id="level-1", acted_object=obj,
     )
-    assert len(result.clock_lines) == 1
-
-
-# ---------------------------------------------------------------------------
-# Phase 35.5 — Clock scoping: action tags
-# ---------------------------------------------------------------------------
-
-def test_action_tagged_clock_advances_on_matching_action():
-    resolution = ActionResolution(
-        resolution_id="res1", campaign_id="c1", actor_id="a1",
-        action_key="sense", dice_rolled=[3], outcome="miss",
-    )
-    actor, tracks = _pc()
-    clock = ClockState(
-        clock_id="ck1", campaign_id="c1", label="Alert Clock",
-        segments=6, filled=1, action_tags=["sense", "study"],
-    )
-    result = compute_world_reaction(resolution, [clock], [(actor, tracks)])
-    assert len(result.clock_lines) == 1
-
-
-def test_action_tagged_clock_skipped_on_non_matching_action():
-    resolution = _resolution("miss")  # action_key="fight"
-    actor, tracks = _pc()
-    clock = ClockState(
-        clock_id="ck1", campaign_id="c1", label="Alert Clock",
-        segments=6, filled=1, action_tags=["sense", "study"],
-    )
-    result = compute_world_reaction(resolution, [clock], [(actor, tracks)])
-    assert result.clock_lines == []
-
-
-def test_untagged_clock_advances_on_any_action():
-    resolution = _resolution("miss")  # action_key="fight"
-    actor, tracks = _pc()
-    clock = ClockState(
-        clock_id="ck1", campaign_id="c1", label="Heat Rising",
-        segments=6, filled=1, action_tags=[],
-    )
-    result = compute_world_reaction(resolution, [clock], [(actor, tracks)])
-    assert len(result.clock_lines) == 1
-
-
-def test_composed_scope_and_tags_both_must_match():
-    actor, tracks = _pc()
-    clock = ClockState(
-        clock_id="ck1", campaign_id="c1", label="Boiler Trap",
-        segments=6, filled=1,
-        scope_room_id="room_boiler", action_tags=["fight", "move"],
-    )
-    # both match — should advance
-    res_match = ActionResolution(
-        resolution_id="r1", campaign_id="c1", actor_id="a1",
-        action_key="fight", dice_rolled=[2], outcome="miss",
-    )
-    result = compute_world_reaction(
-        res_match, [clock], [(actor, tracks)], current_room_id="room_boiler"
-    )
-    assert len(result.clock_lines) == 1
-
-    # room matches but action does not — should not advance
-    res_wrong_action = ActionResolution(
-        resolution_id="r2", campaign_id="c1", actor_id="a1",
-        action_key="sense", dice_rolled=[2], outcome="miss",
-    )
-    result2 = compute_world_reaction(
-        res_wrong_action, [clock], [(actor, tracks)], current_room_id="room_boiler"
-    )
-    assert result2.clock_lines == []
-
-    # action matches but room does not — should not advance
-    result3 = compute_world_reaction(
-        res_match, [clock], [(actor, tracks)], current_room_id="room_other"
-    )
-    assert result3.clock_lines == []
-
-
-# ---------------------------------------------------------------------------
-# Phase 35.5 — Clock scoping: level filter
-# ---------------------------------------------------------------------------
-
-def test_level_clock_advances_on_matching_level():
-    resolution = _resolution("miss")
-    actor, tracks = _pc()
-    clock = ClockState(
-        clock_id="ck1", campaign_id="c1", label="Factory Reawakens",
-        segments=8, filled=0, clock_level="level", level_id="level-2",
-    )
-    result = compute_world_reaction(
-        resolution, [clock], [(actor, tracks)], current_level_id="level-2"
-    )
-    assert len(result.clock_lines) == 1
-
-
-def test_level_clock_skipped_on_wrong_level():
-    resolution = _resolution("miss")
-    actor, tracks = _pc()
-    clock = ClockState(
-        clock_id="ck1", campaign_id="c1", label="Factory Reawakens",
-        segments=8, filled=0, clock_level="level", level_id="level-2",
-    )
-    result = compute_world_reaction(
-        resolution, [clock], [(actor, tracks)], current_level_id="level-1"
-    )
-    assert result.clock_lines == []
-
-
-def test_clock_without_level_id_advances_on_any_level():
-    resolution = _resolution("miss")
-    actor, tracks = _pc()
-    clock = ClockState(
-        clock_id="ck1", campaign_id="c1", label="Dungeon Stirs",
-        segments=6, filled=0, clock_level="dungeon",
-    )
-    result = compute_world_reaction(
-        resolution, [clock], [(actor, tracks)], current_level_id="level-1"
-    )
-    assert len(result.clock_lines) == 1
-
-
-def test_level_clock_advances_when_current_level_unknown():
-    # Fail open — don't suppress a clock if we can't determine the level
-    resolution = _resolution("miss")
-    actor, tracks = _pc()
-    clock = ClockState(
-        clock_id="ck1", campaign_id="c1", label="Factory Reawakens",
-        segments=8, filled=0, clock_level="level", level_id="level-2",
-    )
-    result = compute_world_reaction(
-        resolution, [clock], [(actor, tracks)], current_level_id=None
-    )
-    assert len(result.clock_lines) == 1
-
-
-# ---------------------------------------------------------------------------
-# Phase 35.6 — Stress routing by action key
-# ---------------------------------------------------------------------------
-
-def test_channel_miss_applies_weird_stress():
-    resolution = ActionResolution(
-        resolution_id="r1", campaign_id="c1", actor_id="a1",
-        action_key="channel", dice_rolled=[2], outcome="miss",
-    )
-    actor, tracks = _pc()
-    tracks["weird"] = StressTrack(track_key="weird", capacity=4, filled=0)
-    result = compute_world_reaction(resolution, [], [(actor, tracks)])
     assert len(result.stress_lines) == 1
-    assert result.stress_lines[0].track_key == "weird"
-
-
-# ---------------------------------------------------------------------------
-# Phase 37.1.2 — Intent-based stress routing through compute_world_reaction
-# ---------------------------------------------------------------------------
-
-def test_intent_routes_stress_when_no_clock_overrides():
-    # fight defaults to "body"; intent keyword "whisper" → "weird"
-    resolution = ActionResolution(
-        resolution_id="r1", campaign_id="c1", actor_id="a1",
-        action_key="fight", dice_rolled=[1, 2], outcome="miss",
-        intent="I listen to the dungeon's whisper",
-    )
-    actor = ActorState(
-        actor_id="a1", campaign_id="c1", actor_type="pc",
-        slug="hero", display_name="Hero",
-    )
-    tracks = {
-        "body": StressTrack(track_key="body", capacity=4, filled=0),
-        "weird": StressTrack(track_key="weird", capacity=4, filled=0),
-    }
-    result = compute_world_reaction(resolution, [], [(actor, tracks)])
-    assert len(result.stress_lines) == 1
-    assert result.stress_lines[0].track_key == "weird"
-
-
-def test_clock_category_wins_over_intent():
-    # danger clock → "body"; intent "whisper" would give "weird" — clock wins
-    resolution = ActionResolution(
-        resolution_id="r1", campaign_id="c1", actor_id="a1",
-        action_key="channel", dice_rolled=[1], outcome="miss",
-        intent="I listen to the dungeon's whisper",
-    )
-    actor = ActorState(
-        actor_id="a1", campaign_id="c1", actor_type="pc",
-        slug="hero", display_name="Hero",
-    )
-    tracks = {
-        "body": StressTrack(track_key="body", capacity=4, filled=0),
-        "weird": StressTrack(track_key="weird", capacity=4, filled=0),
-    }
-    clock = ClockState(
-        clock_id="ck1", campaign_id="c1", label="Danger Rising",
-        segments=6, filled=1, category="danger",
-    )
-    result = compute_world_reaction(resolution, [clock], [(actor, tracks)])
     assert result.stress_lines[0].track_key == "body"
+    assert result.stress_lines[0].amount == 2
+    assert result.stress_lines[0].new_filled == 2
 
 
-def test_sway_partial_applies_bonds_stress():
-    resolution = ActionResolution(
-        resolution_id="r1", campaign_id="c1", actor_id="a1",
-        action_key="sway", dice_rolled=[4], outcome="partial",
-    )
+def test_scripted_never_moves_dungeon_intimacy_clock():
+    # D5 by construction: even an authored binding cannot move dungeon_intimacy.
     actor, tracks = _pc()
-    tracks["bonds"] = StressTrack(track_key="bonds", capacity=4, filled=0)
-    result = compute_world_reaction(resolution, [], [(actor, tracks)])
-    assert len(result.stress_lines) == 1
-    assert result.stress_lines[0].track_key == "bonds"
-
-
-def test_sense_miss_with_dungeon_intimacy_clock_applies_weird_stress():
-    resolution = ActionResolution(
-        resolution_id="r1", campaign_id="c1", actor_id="a1",
-        action_key="sense", dice_rolled=[2], outcome="miss",
+    intimacy = ClockState(
+        clock_id="clock:crucible:factory-learns", campaign_id="c1",
+        label="The Factory Learns What You Fear", segments=4, filled=1,
+        clock_level="dungeon", category="dungeon_intimacy",
     )
-    actor, tracks = _pc()
-    tracks["weird"] = StressTrack(track_key="weird", capacity=4, filled=0)
-    clock = ClockState(
-        clock_id="ck1", campaign_id="c1", label="Dungeon Learns You",
-        segments=6, filled=0, category="dungeon_intimacy",
-        action_tags=["sense"],
-    )
-    result = compute_world_reaction(resolution, [clock], [(actor, tracks)])
-    assert result.stress_lines[0].track_key == "weird"
-
-
-def test_fight_miss_with_relationship_clock_applies_bonds_stress():
-    # Category has priority over action key: relationship → bonds beats fight → body
-    resolution = ActionResolution(
-        resolution_id="r1", campaign_id="c1", actor_id="a1",
-        action_key="fight", dice_rolled=[1], outcome="miss",
-    )
-    actor, tracks = _pc()
-    tracks["bonds"] = StressTrack(track_key="bonds", capacity=4, filled=0)
-    clock = ClockState(
-        clock_id="ck1", campaign_id="c1", label="Dax Remembers",
-        segments=6, filled=0, category="relationship",
-        clock_level="character",
-    )
-    result = compute_world_reaction(resolution, [clock], [(actor, tracks)])
-    assert result.stress_lines[0].track_key == "bonds"
-
-
-def test_weird_stress_overflow_flags_fallout():
-    resolution = ActionResolution(
-        resolution_id="r1", campaign_id="c1", actor_id="a1",
-        action_key="channel", dice_rolled=[2], outcome="miss",
-    )
-    actor, tracks = _pc()
-    tracks["weird"] = StressTrack(track_key="weird", capacity=4, filled=3)
-    result = compute_world_reaction(resolution, [], [(actor, tracks)])
-    assert result.stress_lines[0].track_key == "weird"
-    assert result.stress_lines[0].triggered_fallout is True
-    assert result.stress_lines[0].new_filled == 4
-
-
-def test_non_body_stress_only_applied_to_acting_actor():
-    resolution = ActionResolution(
-        resolution_id="r1", campaign_id="c1", actor_id="a1",
-        action_key="sway", dice_rolled=[2], outcome="miss",
-    )
-    actor1, tracks1 = _pc(actor_id="a1")
-    tracks1["bonds"] = StressTrack(track_key="bonds", capacity=4, filled=0)
-    actor2, tracks2 = _pc(actor_id="a2")
-    tracks2["bonds"] = StressTrack(track_key="bonds", capacity=4, filled=0)
+    obj = _object("scripted", [
+        _binding_row("sense", "miss", clock_slug="factory-learns", clock_delta=2),
+    ])
     result = compute_world_reaction(
-        resolution, [], [(actor1, tracks1), (actor2, tracks2)]
+        _resolution("miss", action_key="sense"), [intimacy], [(actor, tracks)],
+        current_room_id="R1", current_level_id="level-1", acted_object=obj,
     )
-    assert len(result.stress_lines) == 1
-    assert result.stress_lines[0].actor_id == "a1"
-    assert result.stress_lines[0].track_key == "bonds"
+    assert result.clock_lines == []
 
 
-def test_level_and_room_filters_compose():
-    # Clock has both scope_room_id and level_id — both must match
+def test_scripted_full_outcome_is_no_op():
     actor, tracks = _pc()
-    clock = ClockState(
-        clock_id="ck1", campaign_id="c1", label="Control Room Alert",
-        segments=6, filled=0,
-        clock_level="level", level_id="level-2",
-        scope_room_id="control_room",
+    overload = ClockState(
+        clock_id="clock:crucible:arcane-overload-building", campaign_id="c1",
+        label="Arcane Overload Building", segments=8, filled=2, category="danger",
     )
-    res = _resolution("miss")
+    obj = _object("scripted", [
+        _binding_row("tinker", "miss", clock_slug="arcane-overload-building", clock_delta=1),
+    ])
+    result = compute_world_reaction(
+        _resolution("full", action_key="tinker"), [overload], [(actor, tracks)],
+        current_room_id="R1", current_level_id="level-1", acted_object=obj,
+    )
+    assert result.clock_lines == []
 
-    # both match
-    r1 = compute_world_reaction(
-        res, [clock], [(actor, tracks)],
-        current_room_id="control_room", current_level_id="level-2"
-    )
-    assert len(r1.clock_lines) == 1
 
-    # right room, wrong level
-    r2 = compute_world_reaction(
-        res, [clock], [(actor, tracks)],
-        current_room_id="control_room", current_level_id="level-1"
+def test_scripted_partial_falls_back_to_half_miss():
+    actor, tracks = _pc()
+    overload = ClockState(
+        clock_id="clock:crucible:arcane-overload-building", campaign_id="c1",
+        label="Arcane Overload Building", segments=8, filled=2, category="danger",
     )
-    assert r2.clock_lines == []
+    obj = _object("scripted", [
+        _binding_row("tinker", "miss", clock_slug="arcane-overload-building", clock_delta=2),
+    ])
+    result = compute_world_reaction(
+        _resolution("partial", action_key="tinker"), [overload], [(actor, tracks)],
+        current_room_id="R1", current_level_id="level-1", acted_object=obj,
+    )
+    assert len(result.clock_lines) == 1
+    assert result.clock_lines[0].ticks == 1  # half of 2
 
-    # right level, wrong room
-    r3 = compute_world_reaction(
-        res, [clock], [(actor, tracks)],
-        current_room_id="other_room", current_level_id="level-2"
+
+# ---------------------------------------------------------------------------
+# Phase 51.6 Slice 7 — summary lines still generated
+# ---------------------------------------------------------------------------
+
+def test_ambient_miss_produces_summary_lines():
+    actor, tracks = _pc()
+    nest = _room_clock("scorpion-nest")
+    result = compute_world_reaction(
+        _resolution("miss"), [nest], [(actor, tracks)],
+        current_room_id="R1", current_level_id="level-1",
+        acted_object=_object("ambient"),
     )
-    assert r3.clock_lines == []
+    assert result.summary_lines[0] == "World reaction (MISS):"
+    assert "Clock [Scorpion Nest Agitated]:" in " ".join(result.summary_lines)
+
+
+def test_narration_only_reaction_reports_no_consequences():
+    actor, tracks = _pc()
+    result = compute_world_reaction(
+        _resolution("miss"), [], [(actor, tracks)],
+        current_room_id="R1", current_level_id="level-1",
+        acted_object=_object("ambient"),
+    )
+    assert any("No world consequences." in line for line in result.summary_lines)
 
 
 # ---------------------------------------------------------------------------

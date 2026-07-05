@@ -59,7 +59,12 @@ def _minimal_seed(campaign_slug: str) -> dict:
 
 class TestScopedClockFiltering:
     def test_room_clock_advances_only_in_matching_room(self, repo: MemoryRepository) -> None:
-        """Room clock with scope_room_id only advances when action is in that room."""
+        """Phase 51.6 ambient: only the local room-scoped adverse clock advances.
+
+        A non-object action falls to the ambient rule — the room-scoped danger
+        clock reacts in its room, the dungeon-scoped clock never does (not
+        ambient-eligible), and the blast radius is capped at one clock.
+        """
         campaign_id = "camp-test"
         actor_id = derive_actor_id("test-campaign", "hero")
 
@@ -107,23 +112,23 @@ class TestScopedClockFiltering:
 
         resolution = _make_miss_resolution(campaign_id, actor_id, "fight")
 
-        # Action in boiler-room: room clock should advance, dungeon clock should too
+        # Action in boiler-room: only the room-scoped clock advances (cap = 1);
+        # the dungeon-scoped clock is not ambient-eligible.
         reaction_in_room = compute_world_reaction(
             resolution, threat_clocks, [(pc_actor, {"body": body_track})],
             current_room_id="boiler-room",
         )
         advanced_in_room = {line.clock_id for line in reaction_in_room.clock_lines}
-        assert room_clock_id in advanced_in_room
-        assert dungeon_clock_id in advanced_in_room
+        assert advanced_in_room == {room_clock_id}
+        assert dungeon_clock_id not in advanced_in_room
 
-        # Action in different room: room clock should NOT advance, dungeon clock should
+        # Action in a different room: no local adverse clock → narration only.
         reaction_elsewhere = compute_world_reaction(
             resolution, threat_clocks, [(pc_actor, {"body": body_track})],
             current_room_id="library",
         )
         advanced_elsewhere = {line.clock_id for line in reaction_elsewhere.clock_lines}
-        assert room_clock_id not in advanced_elsewhere
-        assert dungeon_clock_id in advanced_elsewhere
+        assert advanced_elsewhere == set()
 
     def test_room_clock_metadata_survives_after_apply(self, repo: MemoryRepository) -> None:
         """After apply_seed_pack, room clock scope metadata is readable from get_clocks."""
@@ -158,7 +163,8 @@ class TestScopedClockFiltering:
         assert clock["completion_effect"] == "Trap fires."
 
     def test_level_clock_advances_regardless_of_room(self, repo: MemoryRepository) -> None:
-        """Level clock with no scope_room_id advances from any room on the campaign."""
+        """Phase 51.6 ambient: a level-scoped adverse clock advances from any room
+        on its level (the party is on that level), and never from another level."""
         campaign_id = "camp-test"
         actor_id = derive_actor_id("test-campaign", "hero")
 
@@ -190,11 +196,18 @@ class TestScopedClockFiltering:
         body_track = StressTrack(track_key="body", capacity=6, filled=0)
         resolution = _make_miss_resolution(campaign_id, actor_id, "fight")
 
+        level_clock_id = derive_clock_id("test-campaign", "level-alert")
         for room in ("level-2-room-a", "level-2-room-b", "completely-different-room"):
             reaction = compute_world_reaction(
                 resolution, threat_clocks, [(pc_actor, {"body": body_track})],
-                current_room_id=room,
+                current_room_id=room, current_level_id="level-2",
             )
-            level_clock_id = derive_clock_id("test-campaign", "level-alert")
             advanced = {line.clock_id for line in reaction.clock_lines}
             assert level_clock_id in advanced, f"Level clock should advance in room {room!r}"
+
+        # On a different level the party is not on, the clock does not advance.
+        off_level = compute_world_reaction(
+            resolution, threat_clocks, [(pc_actor, {"body": body_track})],
+            current_room_id="level-1-room", current_level_id="level-1",
+        )
+        assert level_clock_id not in {line.clock_id for line in off_level.clock_lines}
