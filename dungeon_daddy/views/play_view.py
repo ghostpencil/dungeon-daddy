@@ -1795,8 +1795,13 @@ class PlayView(arcade.View):
             actor={"actor_id": actor.actor_id, "actions": actor.actions},
         )
         resolution = card_roll.resolution
-        obstacle = self._maybe_resolve_obstacle(card, actor, resolution.outcome)
+        # Resolve the acted-upon object once and share it: the obstacle check
+        # reads its (pre-resolution) contested transitions, and the world
+        # reaction reads its state-independent policy + bindings.
         acted_object = self._resolve_acted_object(card.noun_id)
+        obstacle = self._maybe_resolve_obstacle(
+            card, actor, resolution.outcome, acted_object=acted_object
+        )
         reaction = self._apply_world_reaction(resolution, acted_object=acted_object)
         self._run_proposal_pipeline(resolution, campaign_id)
         self._chat.add_message(
@@ -1839,7 +1844,7 @@ class PlayView(arcade.View):
         from dungeon_daddy.rpg.models import RoomObject
         return RoomObject(**obj_dict)
 
-    def _maybe_resolve_obstacle(self, card, actor, outcome):
+    def _maybe_resolve_obstacle(self, card, actor, outcome, acted_object=None):
         """Apply a successful contested-approach roll to the target's state (Phase 51.5 Part A).
 
         When ``card.verb`` matches one of the target object's contested approaches
@@ -1848,19 +1853,20 @@ class PlayView(arcade.View):
         deterministic ``ActivateObject`` pipeline so its state change + side-effects
         apply and objectives re-advance. Returns the
         :class:`ObstacleRollResolution` applied, or ``None`` if nothing changed.
+
+        ``acted_object`` is the pre-resolved target (shared with the world
+        reaction to avoid a second fetch); it is re-resolved from ``card.noun_id``
+        when the caller does not supply it.
         """
         from dungeon_daddy.rpg.command import ActivateObject
-        from dungeon_daddy.rpg.models import RoomObject
         from dungeon_daddy.rpg.obstacles import resolve_obstacle_with_roll
 
         if self._mem_repo is None or self._rpg_campaign_id is None:
             return None
-        obj_dict = self._mem_repo.get_room_object(card.noun_id)
-        if obj_dict is None:
+        obj = acted_object if acted_object is not None else self._resolve_acted_object(card.noun_id)
+        if obj is None:
             return None
-        resolved = resolve_obstacle_with_roll(
-            RoomObject(**obj_dict), verb=card.verb, outcome=outcome
-        )
+        resolved = resolve_obstacle_with_roll(obj, verb=card.verb, outcome=outcome)
         if resolved is None:
             return None
         command = ActivateObject(
