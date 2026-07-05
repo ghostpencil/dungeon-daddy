@@ -247,3 +247,11 @@ Per-session implementation logs are in git history and the auto-memory (`project
   memories/events wiped) while keeping the authored campaign + dungeon persona docs. Auto-backs up
   `campaign.duckdb` + `session.json` first; close the app first.
 - Evals: `pytest -m eval` (live API, paid, non-deterministic); baseline `python tools/run_evals.py`.
+- **mypy baseline swept 348 → 0** (2026-07-05, branch `feat/phase-51.6-wrp`, commit `4985898`):
+  the CI `Type-check` step (`python -m mypy dungeon_daddy`, strict) had been red for a long time.
+  Annotation-only fixes across 41 files + ~18 real type-safety fixes (None-guards, Literal
+  tightening, canonical `LLMMessage` import, list/dict invariance splits). None were active
+  runtime bugs. ruff clean, full suite green. **CI still does not gate merges** (the `Tests`
+  workflow only runs on push-to-`main` / PRs-to-`main`, and no branch protection requires it), so
+  no GitHub run has executed the sweep yet — it'll run when this branch is PR'd/merged. To keep
+  mypy green, new code must stay strictly typed; a new error is now a genuine regression.
