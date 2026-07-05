@@ -91,15 +91,26 @@ on branch `feat/phase-51.6-wrp`.**
      9 tests: verb match, wildcard, non-matching verb/outcome skip, empty→nothing,
      authored-partial-wins, half-miss fallback, min-1-nonzero, zero-stays-zero. Full suite
      green (3430 passed).
-   - ⏭️ **NEXT: Slice 7 — engine branch + firewall + cap** (engine, phase spec §4.7, design
-     §3/§7): `world_reaction.py` branches on the acted-upon object's `reaction_policy`
-     (`scripted`→authored bindings only; `ambient`→§4 `select_ambient_clock`; `inert`→nothing);
-     remove `objective`/`relationship`/`faction_pressure`/`dungeon_intimacy` from any
-     tag-matching path (firewall); enforce the blast-radius cap (ambient touches ≤1 clock);
-     stress moves onto scripted consequences (`stress_routing.py` stops inferring stress on
-     these paths). Assert: firewalled clocks never move via reaction; scripted applies only
-     authored deltas; ambient ≤1 clock.
-   - Slices 8–10 pending (see phase spec §4).
+   - ✅ **Slice 7 — engine branch + firewall + cap** (engine) (`rpg/world_reaction.py`,
+     `tests/unit/rpg/test_world_reaction.py`, `tests/unit/rpg/test_service.py`,
+     `tests/integration/test_clock_scoping_integration.py`). `compute_world_reaction` gains
+     `acted_object: RoomObject | None` and branches on `reaction_policy`: `scripted`→authored
+     `reaction_bindings` only (via `resolve_scripted_bindings`; `dungeon_intimacy` never moved
+     here even if a binding names it — D5 firewall by construction; stress authored on the
+     binding); `ambient` (default, incl. all non-object actions)→**≤1** `+1` tick on the nearest
+     local adverse clock (`select_ambient_clock`), miss/partial only, never rolls back, no
+     stress; `inert`→zero mechanics. Removed the tag-matching path, `_CLOCK_TICKS`/
+     `_STRESS_AMOUNT`, and the `choose_stress_track` call (`stress_routing.py` itself untouched —
+     its own unit tests still cover the pure helper). Superseded Phase 35 tag-fan-out tests
+     rewritten to the ambient contract. Full suite green (3414 passed).
+   - ⏭️ **NEXT: Slice 8 — seam: wire the object through all three call sites** (integration,
+     phase spec §4.8, design §7): pass the acted-upon `RoomObject` (policy + bindings) into
+     `_apply_world_reaction`/`react_to_resolution` from `play_view._resolve_vna_roll`
+     (`play_view.py:1799`, object resolved one line above at `:1798`) **and** the two chat-action
+     paths (`play_view.py:818`, `:983`); cover the synthesized `current_level_id` string
+     convention (`f"level-{idx+1}"`, `:2071-2073`). Integration test: STUDY-miss on the statue
+     moves exactly one clock; a non-object action falls to the ambient rule.
+   - Slices 9–10 pending (see phase spec §4).
 2. **Then: Tag Hygiene → Narrator Lookup Tool** — new two-part spec
    `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` (draft 2026-07-04): Phase A unifies the tag
    taxonomy and fixes the broken tag pipeline (audit: actor tags dropped at seed time, three
