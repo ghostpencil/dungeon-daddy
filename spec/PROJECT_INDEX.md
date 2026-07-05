@@ -133,11 +133,25 @@ on branch `feat/phase-51.6-wrp`.**
      `djinn-reclaims-the-engines`). `save_room_object` delete-then-inserts bindings, so reseed is
      a no-op and preserves play state (upsert `current_state`). 7 new tests; full suite green
      (**3429 passed**). ruff + mypy(strict) clean.
-   - ⏭️ **NEXT: Slice 10 — manual GUI verify** (no automated UI): on the live Crucible,
-     STUDY the Toppled Artificer Statue in R1 and miss → **only** "Scorpion Nest Agitated" **+1**;
-     the Power Core / Factory-Learns / Mira / `dungeon_intimacy` clocks stay put. **Requires
-     reseeding the live save first** (`PYTHONPATH=.`, `--campaigns-dir` the saves dir, close the
-     app — DuckDB single-writer) so the new policies/bindings land. Owner verifies.
+   - ✅ **Follow-up fix — scripted clock bindings resolve uuid5-seeded ids**
+     (`rpg/world_reaction.py`, `tests/unit/rpg/test_world_reaction.py`, commit `f5ab7b1`).
+     Live-save prep exposed a Slice 7 gap: `_find_clock_by_slug` matched only the
+     `clock:{campaign}:{slug}` string form (`campaign.seeder._clock_id`), but the path that
+     actually seeded the live Crucible — `rpg.seed_pack.apply_seed_pack` — writes
+     `uuid5(campaign_slug:slug)` ids, so **every scripted CLOCK binding silently no-opped on the
+     real save** (the §5 Coolant-Loop example would not have fired). Fix also matches
+     `derive_clock_id(campaign_slug, slug)`. Ambient selection + stress bindings were unaffected
+     (no slug lookup). Verified live: all three bound slugs now resolve to their UUID clocks.
+   - 🟢 **Live save PREPPED for Slice 10 (2026-07-05):** the live Crucible
+     (`…/DungeonDaddy/saves/The Crucible/campaign.duckdb`) was migrated `018→019` (via
+     `initialize_schema`) and reseeded with both populate scripts — policies/bindings now match
+     §6 (statue `ambient`/no binding; gates/hazards/subsystems `scripted`; firewalled clocks
+     untouched). Play state preserved (new-game: R1/L1, ladder tier 0 active, intimacy 0/4, R1
+     "Scorpion Nest Agitated" active 0/4). Backup: `campaign.duckdb.bak-phase516-slice9-20260705-141458`.
+   - ⏭️ **NEXT: Slice 10 — manual GUI verify** (no automated UI): open the app on the (now
+     reseeded) live Crucible, STUDY the Toppled Artificer Statue in R1 and miss → **only**
+     "Scorpion Nest Agitated" **+1**; the Power Core / Factory-Learns / Mira / `dungeon_intimacy`
+     clocks stay put. Owner verifies.
 2. **Then: Tag Hygiene → Narrator Lookup Tool** — new two-part spec
    `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` (draft 2026-07-04): Phase A unifies the tag
    taxonomy and fixes the broken tag pipeline (audit: actor tags dropped at seed time, three
