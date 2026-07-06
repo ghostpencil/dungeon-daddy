@@ -57,9 +57,11 @@ class ReactionApplier:
             return None
         if session.campaign_id is None:
             return None
-        # Reads + compute: guarded so a read/compute failure is contained (never
-        # crashes the caller) but degrades silently — nothing was written, so no
-        # "could not be fully applied" line, matching the pre-51.7 behavior.
+        # Reads: fetch persisted world state. A repo read failure is contained
+        # (never crashes the caller) but IS surfaced to the GM — the reaction
+        # cannot be applied, the same user-visible outcome as a write failure.
+        # (Pre-51.7 these reads sat outside the guard and propagated; swallowing
+        # them silently was a regression.)
         try:
             threat_clocks = [
                 ClockState(**r) for r in mem_repo.get_clocks(session.campaign_id)
@@ -73,6 +75,14 @@ class ReactionApplier:
                 }
                 for a in session.actors
             }
+        except Exception:
+            _log.exception("world_reaction read failed")
+            self._post_system(REACTION_FAILURE_LINE)
+            return None
+
+        # Compute: a pure-logic failure degrades silently — nothing was written,
+        # so no "could not be fully applied" line, matching the pre-51.7 behavior.
+        try:
             pc_pairs = [(a, tracks_by_actor[a.actor_id]) for a in session.actors]
             reaction, _evt = self._rpg_service.react_to_resolution(
                 resolution, threat_clocks, pc_pairs,

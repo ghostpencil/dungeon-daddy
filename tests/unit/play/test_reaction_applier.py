@@ -119,14 +119,18 @@ def test_compute_failure_degrades_silently(tmp_path: Path) -> None:
     assert posted == []
 
 
-def test_read_failure_does_not_crash_or_post(tmp_path: Path) -> None:
-    """A read-time DB failure must be contained (no uncaught exception) and,
-    since nothing was written, must not post the write-failure line."""
+def test_read_failure_is_contained_and_posts_failure_line(tmp_path: Path) -> None:
+    """A read-time DB failure must be contained (no uncaught exception) but,
+    since the reaction cannot be applied, must surface the failure line to the
+    GM — restoring the pre-51.7 guarantee that a repo read failure is not silent
+    (compute failures still degrade silently; see the test below)."""
+    from dungeon_daddy.play.reaction_applier import REACTION_FAILURE_LINE
+
     applier, _session, repo, posted = _applier(tmp_path, _reaction())
     repo.get_clocks = MagicMock(side_effect=RuntimeError("db read down"))
 
     assert applier.apply(_resolution()) is None
-    assert posted == []
+    assert posted == [REACTION_FAILURE_LINE]
 
 
 def test_new_stress_track_synced_to_in_memory_actor(tmp_path: Path) -> None:

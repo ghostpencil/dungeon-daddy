@@ -91,6 +91,26 @@ controller lands in Slice 7); Slice 5 `current_level_rooms -> tuple[dict[str, An
 the x/y/w/h/name structural contract (`_PositionedRoom`) — a `Protocol` return type would restore
 it (pre-existing, moved verbatim).
 
+**PR #89 parallel review (6 agents, 2026-07-06) — 1 fixed, 2 deferred to next phase:**
+- ✅ **Fixed (regression):** `reaction_applier.apply` had broadened its guard to swallow repo
+  *read* failures (`get_clocks` / `get_actor_stress_tracks`) that pre-51.7 propagated — silently
+  skipping the world reaction with no GM feedback. Split reads into their own guard that surfaces
+  `REACTION_FAILURE_LINE` (compute stays contained-silent). Test
+  `test_read_failure_is_contained_and_posts_failure_line`; full suite green.
+- ⏳ **Deferred → next phase:** (2) the two broad `except Exception` catches in `actions.py`
+  (`run_chat_action` ~L375, `on_resolve_action` ~L423) log but post no user line — a failed
+  resolve/proposal/LLM call is invisible to the GM (pre-existing from `main`; add a system line +
+  narrow the catch). (3) the `(mem_repo, campaign_id)` co-presence guard is hand-checked 15+ times
+  across `reaction_applier`/`dialogue`/`actions`/`controller`/`navigation` — extract an
+  `ActiveCampaign(repo, campaign_id)` value / `context.active_campaign()` accessor (both the
+  type-design and simplify agents flagged this independently; highest-value low-risk cleanup).
+- Other review notes (non-blocking, candidates for a Slice 8 follow-up): drop
+  `NarrationCoordinator.is_busy`'s public setter; promote `PlayHost`'s panel-private reach-ins
+  (`_rpg_vna._nouns`, `_rpg_action._build_request`) to public methods; add logging to the silent
+  swallows in `navigation.current_level_rooms` and `controller.set_rpg_context`; add `ui` to the
+  repeated dependency-direction docstring; controller.py test gaps (`room_world_flags`,
+  contested `on_activate_submit`, repo-close-on-swap).
+
 After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice (item 2 below).
 
 **Phase 51.7 slice progress (branch `feat/phase-51.7-playview-decomp`):**
