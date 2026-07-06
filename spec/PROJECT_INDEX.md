@@ -40,24 +40,27 @@ Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_
 
 **PR #88 merged to `main` 2026-07-05 (`c0e1cba`) — Phase 51.6 fully closed.** Current work:
 **Phase 51.7 — PlayView Decomposition** on `feat/phase-51.7-playview-decomp` — spec + slice plan
-in `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Slices 0–4 landed 2026-07-06.
+in `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Slices 0–5 landed 2026-07-06.
 
-**⏸ RESUME HERE — Slice 5 (`NavigationCoordinator`).** Slice 4 (`ActionOrchestrator`) is
-committed & review-hardened (`c15dd65`, 2026-07-06 — the WIP `1c2206a` was amended into it).
-Next: extract the navigation seam (room selection / party movement / map + level switching /
-fog-of-war) out of `play_view.py` into `play/navigation.py`, following the Slice 0–4 pattern
-(no `arcade`; narrow late-bound ports; lazy `_ensure_*` bridge; thin view delegators; the
-`PlayView.__new__` factories stay unchanged). TDD via the tdd skill (read `spec/TESTING.md`
-first). `_on_exit_move` (still on the view — the party-move applier + narration) is a prime
-candidate to move here.
+**⏸ RESUME HERE — Slice 6 (`MemoryCoordinator`).** Slice 5 (`NavigationCoordinator`) is
+committed & review-hardened (`c99007c` + review `9801650`, 2026-07-06). The Slice 4 deferred
+follow-ups were also committed (`43e3783`: module-level `format_mechanical_bubble` import, shared
+`PlayView._post_chat` seam, `tests/unit/play/_factories.py`). Next: extract the memory seam into
+`play/memory_coordinator.py` — `/remember`, `_extract_remember`/`_auto_remember`,
+`_load_memory_entries`, MEM-tab commit persistence, level-memory overlay load/save (the overlay
+*widgets* stay in the view) — following the Slice 0–5 pattern (no `arcade`; narrow late-bound
+ports; lazy `_ensure_*` bridge; thin view delegators; the `PlayView.__new__` factories stay
+unchanged). TDD via the tdd skill (read `spec/TESTING.md` first). After Slice 6, Slice 7 is the
+`PlaySessionController` composition root that closes the phase (+ amend `spec/ARCHITECTURE.md` +
+owner GUI verify).
 
-**Deferred follow-ups (surfaced in Slice 4 review, not blocking):** play→ui
-`format_mechanical_bubble` runtime import (arcade-free today; consider moving/porting the module
-— exit criterion 3 still satisfied); the `get_debug` port hands play a UI panel type
+**Deferred follow-ups (not blocking):** the Slice 4 `get_debug` port hands play a UI panel type
 (TYPE_CHECKING-only; two narrow callables would be cleaner, but the debug-gates-proposal-pipeline
-coupling is pre-existing); consolidate duplicated test helpers into `tests/unit/play/conftest.py`
-(3rd copy of `MIGRATIONS_DIR` etc., mirror `tests/unit/rpg/conftest.py`); a shared
-`_post_chat(role, text)` view method for the 4 identical chat-post lambdas.
+coupling is pre-existing); Slice 5 `set_viewed_level` is a write-only `setattr` port poking
+view-only map-paging state (the deliberate documented seam — could be tightened when the
+controller lands in Slice 7); Slice 5 `current_level_rooms -> tuple[dict[str, Any], Any]` erases
+the x/y/w/h/name structural contract (`_PositionedRoom`) — a `Protocol` return type would restore
+it (pre-existing, moved verbatim).
 
 After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice (item 2 below).
 
@@ -155,6 +158,27 @@ After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice (item 2
   `_make_view_with_chip` never migrated its roster to the `_session` seam (Behavior 13 read the
   actor id, not the display name — red on the WIP commit); one-line `view._session.set_actors(...)`
   fix, phase-38 smoke now all-green. Full suite green (**3498 passed**), ruff + mypy(strict) clean.
+- ✅ **Slice 5 — `NavigationCoordinator`** (2026-07-06, `c99007c` + review `9801650`). New
+  `play/navigation.py` (no `arcade`) — `NavigationCoordinator` (11 late-bound ports) owns the
+  navigation seam: `on_exit_move` (engine-validated party move via `apply_move_party`, reject
+  warning, map/scene/selection follow, vna refresh, save, move narration, incl. the level-change
+  `map.load` + viewed-level tracking), `on_graph_room_select` (enter a clicked room + "We enter …"
+  narration), `focus_party_room` (reflect the saved room on load/resume, no narration), and the
+  layout-label helpers `prepare_vna_exits`/`current_level_rooms` (`_PositionedRoom` moved here).
+  Side effects flow through narrow ports (`post_message`/`request_narration`/`set_selected_room`/
+  `set_current_room`/`set_scene`/`load_level`/`update_map_state`/`set_viewed_level`/
+  `end_dialogue_on_room_change`/`refresh_vna_panel`/`save_session`); no `PlayView` reference.
+  `PlayView` keeps thin delegators (its input-routing surface — the `on_room_select` wiring,
+  `_refresh_vna_panel`'s exit-label call) + a lazy `_ensure_navigation` bridge; the direct-index
+  level lookups became bounds-checked `session.current_level()`/`current_room()` accessors.
+  Behavior-preserving; `play_view.py` 2030 → 1899 lines (dropped the now-unused `dataclass`
+  import). 9 new unit tests (`tests/unit/play/test_navigation.py`) exercise the coordinator
+  directly (real `MemoryRepository`, recording ports); existing view tests stay green via the
+  delegators. **`/code-review high` — no correctness bugs** (3 angles converged: the extraction is
+  faithful); 2 low-severity quality fixes applied (`9801650`): a `_reflect_room(room, level, *,
+  select)` helper for the map-cursor + chat + scene trio duplicated across 3 methods, and
+  `set_viewed_level` moved inside the `level is not None` guard so paging can't point at a level the
+  map never loaded. Full suite green (**3507 passed**), ruff + mypy(strict) clean.
 
 1. **Phase 51.6 — World Reaction Policy — ✅ COMPLETE (PR #88 open, review-hardened).** Fixed a
    real bug (a STUDY-miss moved 3 clocks incl. `dungeon_intimacy`, violating D5). Per-object
