@@ -15,14 +15,20 @@ per-tier knowledge) plus the puzzle-obstacle multi-approach feature (Part A clas
 approaches; Part B the constrained DM-ruled obstacle authority) and container-loot. Decisions locked
 D1–D8 (below). Spec `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`.
 
-Phase **51.6 — World Reaction Policy: COMPLETE on `feat/phase-51.6-wrp` — ready to PR to `main`**
-(2026-07-05). All 10 slices done + Slice 10 GUI verify **green** (owner, 2026-07-05: an ambient
-statue miss/partial in R1 ticks **only** "Scorpion Nest Agitated" +1; Power Core / Factory-Learns /
-Mira / `dungeon_intimacy` stay put). Per-object `reaction_policy` (`scripted`/`ambient`/`inert`) +
-`ClockCategory` firewall replace the blunt "miss = every tagged clock +2" fan-out. Suite green
-(3430 passed), ruff + mypy(strict) clean. Commits: `e9a3383` (Slice 9 seed), `f5ab7b1` (uuid5
-clock-id fix), `1abe178`/index. Branch also carries the mypy 348→0 sweep. Spec
-`spec/PHASE_51_6_WORLD_REACTION_POLICY.md` (design `spec/WORLD_REACTION_POLICY.md`).
+Phase **51.6 — World Reaction Policy: COMPLETE & merged to `main`** (PR #88, merged 2026-07-05,
+`c0e1cba`; also landed the mypy 348→0 sweep). Per-object `reaction_policy`
+(`scripted`/`ambient`/`inert`) + `ClockCategory` firewall replace the blunt "miss = every tagged
+clock +2" fan-out. Spec `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` (design
+`spec/WORLD_REACTION_POLICY.md`).
+
+Phase **51.7 — PlayView Decomposition: BUILD, started 2026-07-05** on
+`feat/phase-51.7-playview-decomp`. Incremental seam extraction of `views/play_view.py`
+(2,765 lines / ~110 methods / 7 responsibility clusters) into a new `dungeon_daddy/play/`
+package (`PlaySessionContext` + Action/Navigation/Dialogue/Memory/Narration coordinators;
+`PlaySessionController` composition root last). Folds in the two PR #88 deferred review items:
+Slice 1 fixes the non-atomic world-reaction write; the WRP "all three call sites" spec language
+is corrected (owner ruling 2026-07-05, `spec/WORLD_REACTION_POLICY.md` §7). Spec + slice plan:
+`spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`.
 
 Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` ·
 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` · current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`
@@ -30,12 +36,16 @@ Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_
 
 ---
 
-## START HERE — Phase 51.6 PR'd + review-hardened; pick the next phase
+## START HERE — Phase 51.7 PlayView Decomposition in BUILD
 
-**Phase 51.6 is DONE, GUI-verified, PR'd (#88), and post-review-hardened on `feat/phase-51.6-wrp`
-(2026-07-05).** Immediate next action: **merge PR #88 → `main`** (also lands the mypy 348→0 sweep),
-then pick the next phase (Tag Hygiene → Narrator Lookup is the sequenced choice). Two review items
-were **deliberately deferred** to a later pass — see "Deferred from PR #88 review" below.
+**PR #88 merged to `main` 2026-07-05 (`c0e1cba`) — Phase 51.6 fully closed.** Current work:
+**Phase 51.7 — PlayView Decomposition** on `feat/phase-51.7-playview-decomp` — spec + slice plan
+in `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Both PR #88 deferred review items are resolved
+or scheduled: the spec-language item is **closed** (owner ruled 2026-07-05: only noun-carrying
+paths pass `acted_object`; `spec/WORLD_REACTION_POLICY.md` §7 amended), and the non-atomic
+`_apply_world_reaction` write is **Slice 1** of 51.7. Next slice to build: **Slice 0 —
+`PlaySessionContext`**. After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice
+(item 2 below).
 
 1. **Phase 51.6 — World Reaction Policy — ✅ COMPLETE (PR #88 open, review-hardened).** Fixed a
    real bug (a STUDY-miss moved 3 clocks incl. `dungeon_intimacy`, violating D5). Per-object
@@ -60,19 +70,20 @@ were **deliberately deferred** to a later pass — see "Deferred from PR #88 rev
    its only production import). Suite green (**3408 passed** — the 3430→3408 delta is the removed
    `test_stress_routing.py`, offset by +8 new hardening tests), ruff + mypy(strict) clean.
 
-   **Deferred from PR #88 review (address in a later pass, NOT before merge):**
+   **Deferred from PR #88 review — both now dispositioned (2026-07-05):** item 1 is Phase 51.7
+   Slice 1; item 2 is closed (spec corrected). Historical detail:
    - **Non-atomic, user-silent write** in `play_view._apply_world_reaction` (`:2133-2170`):
      pre-existing broad `try/except Exception → return None` spans compute **and** multiple
      sequential DB writes (clock + stress). A mid-loop DB error half-applies state and shows the
      GM nothing (it does log a traceback). WRP newly routes scripted clock+stress writes through
      it, raising the stakes. Fix = wrap the writes in one transaction and/or surface a user-facing
      "reaction could not be fully applied" line. Own change (behavioral), not a hardening tweak.
-   - **Spec-language decision (code-reviewer #1):** §7/§8 say "all THREE `_apply_world_reaction`
-     call sites must pass `acted_object`," but only the VNA path (`play_view:1829`) is wired; the
-     two chat paths (`:829`, `:994`) have no noun so they correctly fall to the ambient rule with
-     `acted_object=None`. **Not a functional bug** (firewall intact; no old fan-out). Decide: (a)
-     accept + correct the spec's "all three" language, or (b) confirm no future chat path carries
-     an object. Owner call — no code change required for correctness.
+   - **Spec-language decision (code-reviewer #1) — ✅ CLOSED (owner ruled (a), 2026-07-05):**
+     §7 said "all THREE `_apply_world_reaction` call sites must pass `acted_object`," but only
+     noun-carrying paths can — the two chat paths (`:829`, `:994`) have no noun by construction
+     and correctly fall to the ambient rule with `acted_object=None`. Spec corrected
+     (`spec/WORLD_REACTION_POLICY.md` §7 seam bullet, amended 2026-07-05); any future
+     noun-carrying chat path must wire the object per the Slice 8 pattern. No code change.
    - Minor (nice-to-have): `CLOCK_CATEGORIES` via `get_args(ClockCategory)` to kill the
      Literal/tuple duplication; a `RoomObject` validator rejecting non-empty `reaction_bindings`
      when `reaction_policy != "scripted"`; move `derive_clock_id` to a shared id helper so the
