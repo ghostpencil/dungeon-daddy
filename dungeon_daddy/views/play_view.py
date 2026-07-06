@@ -2145,85 +2145,23 @@ class PlayView(arcade.View):
     def _apply_world_reaction(
         self, resolution: ActionResolution, acted_object: RoomObject | None = None
     ) -> WorldReaction | None:
-        if self._rpg_service is None or self._mem_repo is None:
-            return None
-        campaign_id = self._rpg_campaign_id
-        if campaign_id is None:
-            return None
-        from dungeon_daddy.rpg.models import ClockState
-        raw_clocks = self._mem_repo.get_clocks(campaign_id)
-        threat_clocks = [
-            ClockState(
-                clock_id=r["clock_id"],
-                campaign_id=r["campaign_id"],
-                label=r["label"],
-                segments=r["segments"],
-                filled=r["filled"],
-                status=r["status"],
-                scope_room_id=r.get("scope_room_id"),
-                action_tags=r.get("action_tags", []),
-                clock_level=r.get("clock_level", "dungeon"),
-                category=r.get("category"),
-                level_id=r.get("level_id"),
-                owner_actor_id=r.get("owner_actor_id"),
-                stakes=r.get("stakes"),
-                completion_effect=r.get("completion_effect"),
-                visible_to_player=r.get("visible_to_player", True),
-            )
-            for r in raw_clocks
-        ]
-        pc_pairs = []
-        for actor in self._session.actors:
-            raw_tracks = self._mem_repo.get_actor_stress_tracks(actor.actor_id)
-            tracks = {
-                t["track_key"]: StressTrack(
-                    track_key=t["track_key"],
-                    capacity=t["capacity"],
-                    filled=t["filled"],
-                )
-                for t in raw_tracks
-            }
-            pc_pairs.append((actor, tracks))
-        current_room_id = self._state.current_room_id if self._state else None
-        current_level_id = self._session.current_level_id
-        try:
-            reaction, _evt = self._rpg_service.react_to_resolution(
-                resolution, threat_clocks, pc_pairs,
-                current_room_id=current_room_id,
-                current_level_id=current_level_id,
-                acted_object=acted_object,
-            )
-            for cl in reaction.clock_lines:
-                self._mem_repo.update_clock_progress(
-                    clock_id=cl.clock_id,
-                    filled=cl.new_filled,
-                    status=cl.new_status,
-                )
-            for sl in reaction.stress_lines:
-                self._mem_repo.save_actor_stress_track(
-                    actor_id=sl.actor_id,
-                    track_key=sl.track_key,
-                    capacity=next(
-                        (
-                            tracks[sl.track_key].capacity
-                            for actor, tracks in pc_pairs
-                            if actor.actor_id == sl.actor_id and sl.track_key in tracks
-                        ),
-                        4,
-                    ),
-                    filled=sl.new_filled,
-                )
-            # Sync in-memory actors so _refresh_right_panel_from_actors sees new values
-            for sl in reaction.stress_lines:
-                for actor in self._session.actors:
-                    if actor.actor_id == sl.actor_id and sl.track_key in actor.stress:
-                        actor.stress[sl.track_key].filled = sl.new_filled
-            if self._rpg_debug is not None:
-                self._rpg_debug.set_reaction(reaction)
-            return reaction
-        except Exception:
-            _log.exception("world_reaction failed")
-        return None
+        """Delegate to :class:`ReactionApplier` (Phase 51.7, Slice 1).
+
+        The applier reads the session/clocks/stress from ``self._session``,
+        persists the clock + stress writes atomically, and posts a system line
+        if the reaction cannot be fully applied.
+        """
+        from dungeon_daddy.play.reaction_applier import ReactionApplier
+
+        applier = ReactionApplier(
+            self._session,
+            self._rpg_service,
+            post_system=lambda text: self._chat.add_message("system", text),
+            on_reaction=(
+                self._rpg_debug.set_reaction if self._rpg_debug is not None else None
+            ),
+        )
+        return applier.apply(resolution, acted_object)
 
     # ------------------------------------------------------------------
     # Map variant switching

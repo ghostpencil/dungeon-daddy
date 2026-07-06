@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.memory.repository import MemoryRepository, MigrationRunner
 
@@ -90,6 +92,54 @@ class TestMemoryRepository:
         assert len(events) == 1
         assert events[0].event_id == "evt_001"
         assert events[0].payload["actor"] == "pc_mara"
+        repo.close()
+
+    def test_transaction_commits_writes(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.save_clock("clk", "camp", "Doom", segments=6, filled=0)
+        with repo.transaction():
+            repo.update_clock_progress(clock_id="clk", filled=3, status="active")
+        filled = {c["clock_id"]: c["filled"] for c in repo.get_clocks("camp")}
+        assert filled["clk"] == 3
+        repo.close()
+
+    def test_transaction_rolls_back_on_exception(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.save_clock("clk", "camp", "Doom", segments=6, filled=0)
+        with pytest.raises(RuntimeError):
+            with repo.transaction():
+                repo.update_clock_progress(clock_id="clk", filled=3, status="active")
+                raise RuntimeError("mid-write failure")
+        filled = {c["clock_id"]: c["filled"] for c in repo.get_clocks("camp")}
+        assert filled["clk"] == 0, "the in-transaction write must be rolled back"
+        repo.close()
+
+    def test_transaction_nested_joins_outer(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.save_clock("clk", "camp", "Doom", segments=6, filled=0)
+        with repo.transaction():
+            repo.update_clock_progress(clock_id="clk", filled=2, status="active")
+            with repo.transaction():  # must not raise a nested-BEGIN error
+                repo.update_clock_progress(clock_id="clk", filled=5, status="active")
+        filled = {c["clock_id"]: c["filled"] for c in repo.get_clocks("camp")}
+        assert filled["clk"] == 5
+        repo.close()
+
+    def test_transaction_nested_exception_rolls_back_outer(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.save_clock("clk", "camp", "Doom", segments=6, filled=0)
+        with pytest.raises(RuntimeError):
+            with repo.transaction():
+                repo.update_clock_progress(clock_id="clk", filled=2, status="active")
+                with repo.transaction():
+                    repo.update_clock_progress(clock_id="clk", filled=5, status="active")
+                    raise RuntimeError("inner failure")
+        filled = {c["clock_id"]: c["filled"] for c in repo.get_clocks("camp")}
+        assert filled["clk"] == 0, "a failure anywhere in the outer txn rolls back all"
         repo.close()
 
     def test_get_domain_events_filters_by_campaign(self, tmp_path: Path) -> None:
