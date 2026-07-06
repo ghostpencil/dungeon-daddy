@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 import queue
-import re
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -29,10 +28,10 @@ from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
 from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
 from dungeon_daddy.llm.provider import LLMMessage
 from dungeon_daddy.map.graph_renderer import GraphRenderer
-from dungeon_daddy.memory.models import MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.play.actions import ActionOrchestrator
 from dungeon_daddy.play.dialogue import DialogueCoordinator, DialogueSession
+from dungeon_daddy.play.memory_coordinator import MemoryCoordinator
 from dungeon_daddy.play.narration import DMResult, NarrationCoordinator
 from dungeon_daddy.play.navigation import NavigationCoordinator
 from dungeon_daddy.play.session_context import PlaySessionContext
@@ -663,6 +662,49 @@ class PlayView(arcade.View):
         return self._ensure_navigation()
 
     # ------------------------------------------------------------------
+    # Memory bridge (Phase 51.7, Slice 6)
+    #
+    # The memory seam — ``/remember`` + the ``[REMEMBER: …]`` auto-hook, MEM-panel
+    # population, MEM-tab commit persistence, and the level-memory overlay's
+    # load/save persistence — lives in ``MemoryCoordinator``. The overlay
+    # *widgets* stay in the view (see ``_open_overlay_ui`` / ``_draw_overlay_*``);
+    # the coordinator owns only the persistence behind them. Lazily materialized
+    # so ``PlayView.__new__`` test setups still work; ports are late-bound lambdas
+    # reading live view state (the Slice 2–5 pattern), so ``_repo`` / ``_rpg_memory``
+    # are resolved at call time. The coordinator holds no ``PlayView`` reference.
+    # ------------------------------------------------------------------
+
+    def _ensure_memory(self) -> MemoryCoordinator:
+        coord = self.__dict__.get("_memory_coord")
+        if coord is None:
+            coord = MemoryCoordinator(
+                self._session,
+                post_message=self._post_chat,
+                append_room_event=(
+                    lambda name, level_id, room_id, room_name, event: (
+                        self._repo.append_room_event(
+                            name, level_id, room_id, room_name, event
+                        )
+                    )
+                ),
+                load_room_memory=lambda name, level_id: (
+                    self._repo.load_room_memory(name, level_id)
+                ),
+                save_room_memory=lambda name, level_id, content: (
+                    self._repo.save_room_memory(name, level_id, content)
+                ),
+                set_entries=lambda entries: self._rpg_memory.set_entries(entries),
+                pop_pending_commit=lambda: self._rpg_memory.pop_pending_commit(),
+                refresh_memory_state=lambda: self._refresh_memory_state(),
+            )
+            self.__dict__["_memory_coord"] = coord
+        return coord
+
+    @property
+    def _memory(self) -> MemoryCoordinator:
+        return self._ensure_memory()
+
+    # ------------------------------------------------------------------
     # View lifecycle
     # ------------------------------------------------------------------
 
@@ -985,28 +1027,7 @@ class PlayView(arcade.View):
         self._refresh_chat_mini_card()
 
     def _load_memory_entries(self) -> None:
-        if self._mem_repo is None:
-            return
-        campaign_id = self._rpg_campaign_id or (self._state.dungeon_id if self._state else None)
-        if campaign_id is None:
-            return
-        raw = self._mem_repo.get_memory_entries_by_campaign(campaign_id)
-        entries = []
-        for r in raw:
-            tags = self._mem_repo.get_memory_tags(r["memory_id"])
-            entries.append(MemoryEntry(
-                memory_id=r["memory_id"],
-                campaign_id=r["campaign_id"],
-                type=r["type"],
-                title=r["title"],
-                summary=r["summary"],
-                status=r["status"],
-                importance=r["importance"],
-                markdown_path=r["markdown_path"],
-                checksum=r["checksum"],
-                tags=tags,
-            ))
-        self._rpg_memory.set_entries(entries)
+        self._memory.load_memory_entries()
 
     # ------------------------------------------------------------------
     # Action delegators (Phase 51.7, Slice 4)
@@ -1437,28 +1458,23 @@ class PlayView(arcade.View):
     # ------------------------------------------------------------------
 
     def has_level_memory(self) -> bool:
-        if self._dungeon is None or self._state is None:
-            return False
-        level = self._dungeon.levels[self._state.current_level_idx]
-        return bool(self._repo.load_room_memory(self._state.dungeon_id, level.id))
+        return self._memory.has_level_memory()
 
     def open_memory_overlay(self) -> None:
-        if self._dungeon is None or self._state is None:
+        loaded = self._memory.load_level_memory()
+        if loaded is None:
             return
-        level = self._dungeon.levels[self._state.current_level_idx]
-        content = self._repo.load_room_memory(self._state.dungeon_id, level.id)
-        self._overlay_level_id = level.id
+        level_id, content = loaded
+        self._overlay_level_id = level_id
         self._overlay_content = content
-        self._open_overlay_ui(content, level.id)
+        self._open_overlay_ui(content, level_id)
 
     def save_memory_overlay(self) -> None:
-        if self._overlay_level_id is None:
-            return
-        if self._state is None:
+        if self._overlay_level_id is None or self._state is None:
             return
         input_widget = self._overlay_input
         content = input_widget.text if input_widget is not None else (self._overlay_content or "")
-        self._repo.save_room_memory(self._state.dungeon_id, self._overlay_level_id, content)
+        self._memory.save_level_memory(self._overlay_level_id, content)
         self.close_memory_overlay()
 
     def close_memory_overlay(self) -> None:
@@ -1561,47 +1577,13 @@ class PlayView(arcade.View):
         self._narration.request_narration(text)
 
     def _handle_remember(self, event: str) -> None:
-        if self._dungeon is None or self._state is None:
-            self._chat.add_message("system", "No dungeon loaded.")
-            return
-        if not self._state.current_room_id:
-            self._chat.add_message("system", "No room selected — click a room first.")
-            return
-        level = self._dungeon.levels[self._state.current_level_idx]
-        room_map = {r.id: r for r in level.rooms}
-        room = room_map.get(self._state.current_room_id)
-        room_name = room.name if room else self._state.current_room_id
-        self._repo.append_room_event(
-            self._state.dungeon_id, level.id,
-            self._state.current_room_id, room_name, event,
-        )
-        self._chat.add_message("system", f"Remembered: {event}")
-        self._refresh_memory_state()
-
-    _REMEMBER_RE = re.compile(r"\[REMEMBER:\s*(.+?)\]", re.IGNORECASE)
+        self._memory.handle_remember(event)
 
     def _extract_remember(self, text: str) -> tuple[str | None, str]:
-        match = self._REMEMBER_RE.search(text)
-        if match is None:
-            return None, text
-        remembered = match.group(1).strip()
-        cleaned = self._REMEMBER_RE.sub("", text, count=1).strip()
-        return remembered, cleaned
+        return self._memory.extract_remember(text)
 
     def _auto_remember(self, event: str) -> None:
-        if self._dungeon is None or self._state is None:
-            return
-        if not self._state.current_room_id:
-            return
-        level = self._dungeon.levels[self._state.current_level_idx]
-        room_map = {r.id: r for r in level.rooms}
-        room = room_map.get(self._state.current_room_id)
-        room_name = room.name if room else self._state.current_room_id
-        self._repo.append_room_event(
-            self._state.dungeon_id, level.id,
-            self._state.current_room_id, room_name, event,
-        )
-        self._chat.add_message("system", f"📝 Noted: {event}")
+        self._memory.auto_remember(event)
 
     # ------------------------------------------------------------------
     # MEM tab click routing
@@ -1622,10 +1604,7 @@ class PlayView(arcade.View):
             self._rpg_memory.select_entry(entry)
 
     def _persist_pending_memory_commit(self) -> None:
-        commit = self._rpg_memory.pop_pending_commit()
-        if commit is None or self._mem_repo is None:
-            return
-        self._mem_repo.update_memory_status(commit.memory_id, commit.status)
+        self._memory.persist_pending_commit()
 
     # ------------------------------------------------------------------
     # Memory state cache
