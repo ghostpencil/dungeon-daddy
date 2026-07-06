@@ -32,6 +32,7 @@ from dungeon_daddy.llm.provider import LLMMessage
 from dungeon_daddy.map.graph_renderer import GraphRenderer
 from dungeon_daddy.memory.models import MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
+from dungeon_daddy.play.actions import ActionOrchestrator
 from dungeon_daddy.play.dialogue import DialogueCoordinator, DialogueSession
 from dungeon_daddy.play.narration import DMResult, NarrationCoordinator
 from dungeon_daddy.play.session_context import PlaySessionContext
@@ -39,13 +40,9 @@ from dungeon_daddy.rpg.actor_control import filter_player_actors
 from dungeon_daddy.rpg.classifier import classify_intent
 from dungeon_daddy.rpg.intent import PendingIntent
 from dungeon_daddy.rpg.models import ActorState, ClockState, StressTrack
-from dungeon_daddy.rpg.proposal import parse_proposal
-from dungeon_daddy.rpg.proposal_applier import ApplyResult, apply_low_risk_proposals
-from dungeon_daddy.rpg.proposal_validator import ValidationResult, validate_proposal
 from dungeon_daddy.rpg.service import RpgService
 from dungeon_daddy.ui.actor_mini_card import build_actor_mini_card
 from dungeon_daddy.ui.chrome import PILLS_CLUSTER_W, draw_title_bar, title_bar_mode_at
-from dungeon_daddy.ui.mechanical_bubble import format_mechanical_bubble
 from dungeon_daddy.ui.panels.action_builder import InChatActionBuilder
 from dungeon_daddy.ui.panels.character_sheet_panel import CharacterSheetPanel
 from dungeon_daddy.ui.panels.chat_panel import ChatPanel
@@ -83,27 +80,10 @@ from dungeon_daddy.ui.theme import (
 )
 
 # DMResult + NarrationCoordinator moved to dungeon_daddy/play/narration.py
-# (Phase 51.7, Slice 2). DMResult is re-exported above for the existing
+# (Phase 51.7, Slice 2); DMResult is re-exported above for the existing
 # ``from dungeon_daddy.views.play_view import DMResult`` import sites.
-
-
-def describe_spawned_loot(transition: dict[str, Any], room_items: list[dict[str, Any]]) -> str:
-    """Deterministic note naming the item a transition reveals, for the narrator.
-
-    When a container transition carries ``spawns_item_slug`` and that item is now
-    present in the room, return ``"Name — description"`` so the DM narrator's
-    prose reflects reality (it actually finds the loot). Returns ``""`` when the
-    transition spawns nothing or the item isn't in the room.
-    """
-    slug = transition.get("spawns_item_slug")
-    if not slug:
-        return ""
-    item = next((i for i in room_items if i.get("slug") == slug), None)
-    if item is None:
-        return ""
-    name = item.get("display_name") or slug
-    desc = (item.get("description") or "").strip()
-    return f"{name} — {desc}" if desc else name
+# describe_spawned_loot moved to dungeon_daddy/play/actions.py (Slice 4) —
+# import it from there.
 
 
 @dataclass(frozen=True)
@@ -601,6 +581,56 @@ class PlayView(arcade.View):
         self._ensure_dialogue().dungeon_knowledge = value
 
     # ------------------------------------------------------------------
+    # Actions bridge (Phase 51.7, Slice 4)
+    #
+    # The action seam — the ``_on_vna_submit`` dispatch tree, the roll/command/
+    # obstacle/proposal paths, and objective advancement — lives in
+    # ``ActionOrchestrator``. Lazily materialized so ``PlayView.__new__`` test
+    # setups still work; the orchestrator is stateless (ports + shared session),
+    # so there is no state to bridge — the view keeps thin delegators as its
+    # input-routing surface. Ports are late-bound lambdas reading live view
+    # state (the Slice 2/3 pattern); the orchestrator holds no ``PlayView``
+    # reference.
+    # ------------------------------------------------------------------
+
+    def _ensure_actions(self) -> ActionOrchestrator:
+        orch = self.__dict__.get("_actions_orch")
+        if orch is None:
+            orch = ActionOrchestrator(
+                self._session,
+                get_rpg_service=lambda: self._rpg_service,
+                get_dm_agent=lambda: self._dm_agent,
+                get_debug=lambda: self._rpg_debug,
+                get_narration=lambda: self._narration,
+                get_acting_actor=lambda: self._acting_actor(),
+                get_nouns=lambda: (
+                    self._rpg_vna._nouns if hasattr(self, "_rpg_vna") else []
+                ),
+                get_room_context=lambda: getattr(self, "_last_room_context", {}),
+                post_message=lambda role, text: self._chat.add_message(role, text),
+                begin_dialogue=lambda **kw: self._begin_dialogue(**kw),
+                on_exit_move=lambda exit_id, how, item_slug=None: self._on_exit_move(
+                    exit_id, how, item_slug=item_slug
+                ),
+                clear_connection_lock=lambda f, t: (
+                    self._clear_dungeon_connection_lock(f, t)
+                ),
+                refresh_vna_panel=lambda: self._refresh_vna_panel(),
+                refresh_right_panel=lambda actor_id: (
+                    self._refresh_right_panel_from_actors(actor_id)
+                ),
+                build_request=lambda **kw: self._rpg_action._build_request(**kw),
+                format_result=lambda res: self._rpg_action._format_result(res),
+                store_result=lambda summary: self._rpg_action.store_result(summary),
+            )
+            self.__dict__["_actions_orch"] = orch
+        return orch
+
+    @property
+    def _actions(self) -> ActionOrchestrator:
+        return self._ensure_actions()
+
+    # ------------------------------------------------------------------
     # View lifecycle
     # ------------------------------------------------------------------
 
@@ -946,6 +976,14 @@ class PlayView(arcade.View):
             ))
         self._rpg_memory.set_entries(entries)
 
+    # ------------------------------------------------------------------
+    # Action delegators (Phase 51.7, Slice 4)
+    #
+    # The action logic lives in ``ActionOrchestrator``; these thin wrappers
+    # are the view's input-routing surface (panel callbacks, chip clicks, and
+    # the chat-send action path all target them).
+    # ------------------------------------------------------------------
+
     def _run_chat_action(
         self,
         campaign_id: str,
@@ -953,48 +991,7 @@ class PlayView(arcade.View):
         action_key: str,
         intent: str,
     ) -> None:
-        if self._rpg_service is None:
-            self._chat.add_message("system", "RPG service unavailable.")
-            return
-        actor = next(
-            (a for a in self._session.actors if a.actor_id == actor_id),
-            None,
-        )
-        dice_pool = (actor.actions.get(action_key) or 1) if actor else 1
-        actor_name = actor.display_name if actor else actor_id
-        request = self._rpg_action._build_request(
-            campaign_id=campaign_id,
-            actor_id=actor_id,
-            intent=intent,
-            action_key=action_key,
-            push_yourself=False,
-            momentum_spend=0,
-            dice_pool=dice_pool,
-        )
-        try:
-            resolution, _event = self._rpg_service.resolve_action(request)
-            summary = self._rpg_action._format_result(resolution)
-            self._rpg_action.store_result(summary)
-            reaction = self._apply_world_reaction(resolution)
-            self._run_proposal_pipeline(resolution, campaign_id)
-            self._chat.add_message(
-                "system",
-                format_mechanical_bubble(actor_name, action_key, resolution, reaction),
-            )
-            if self._dungeon is not None and self._state is not None:
-                room = self._session.current_room()
-                if room is None:
-                    self._chat.add_message("system", "Select a room to get DM narration.")
-                else:
-                    outcome = resolution.outcome.upper()
-                    msg = (
-                        f"{actor_name} [{action_key.upper()}] {intent or '(no intent)'}"
-                        f" — {outcome}"
-                    )
-                    self._narration.request_narration(msg)
-            self._refresh_right_panel_from_actors(actor_id)
-        except Exception:
-            _log.exception("_run_chat_action failed")
+        self._actions.run_chat_action(campaign_id, actor_id, action_key, intent)
 
     def _refresh_right_panel_from_actors(self, actor_id: str) -> None:
         """Sync right panel inspector with the actor who just acted."""
@@ -1115,42 +1112,10 @@ class PlayView(arcade.View):
         momentum_spend: int,
         dice_pool: int,
     ) -> None:
-        if self._rpg_service is None:
-            return
-        request = self._rpg_action._build_request(
-            campaign_id=campaign_id,
-            actor_id=actor_id,
-            intent=intent,
-            action_key=action_key,
-            push_yourself=push_yourself,
-            momentum_spend=momentum_spend,
-            dice_pool=dice_pool,
+        self._actions.on_resolve_action(
+            campaign_id, actor_id, intent, action_key,
+            push_yourself, momentum_spend, dice_pool,
         )
-        try:
-            resolution, _event = self._rpg_service.resolve_action(request)
-            summary = self._rpg_action._format_result(resolution)
-            self._rpg_action.store_result(summary)
-            self._apply_world_reaction(resolution)
-            self._run_proposal_pipeline(resolution, campaign_id)
-            if self._dungeon is not None and self._state is not None:
-                room = self._session.current_room()
-                if room is None:
-                    self._chat.add_message("system", "Select a room to get DM narration.")
-                else:
-                    outcome = summary.get("outcome", "?").upper()
-                    dice = summary.get("dice", [])
-                    actor_name = next(
-                        (a.display_name for a in self._session.actors if a.actor_id == actor_id),
-                        actor_id,
-                    )
-                    msg = (
-                        f"{actor_name} [{action_key.upper()}] {intent or '(no intent)'}"
-                        f" — {outcome}  dice={dice}"
-                    )
-                    self._narration.request_narration(msg)
-            self._refresh_right_panel_from_actors(actor_id)
-        except Exception:
-            _log.exception("resolve_action failed")
 
     # ------------------------------------------------------------------
     # Dungeon navigation (Phase 48) — click-to-move
@@ -1401,98 +1366,7 @@ class PlayView(arcade.View):
         return positioned, positioned.get(room_id)
 
     def _on_vna_submit(self, card: ActionCard) -> None:
-        """Route a validated ``ActionCard`` to the engine.
-
-        Three branches: (1) ``look`` — read-only description fetch, no dice,
-        no state change; (2) mutation verbs via ``resolve_card`` (``activate``
-        pre-routes through trigger selection); (3) skill verbs — action roll.
-        """
-        from dungeon_daddy.rpg.action_options import (
-            DIALOGUE_VERBS,
-            SOURCE_EXIT,
-            SOURCE_LOCKED_EXIT,
-            SOURCE_OBJECT,
-            VERB_ACTIVATE,
-            VERB_LOOK,
-            VERB_USE,
-            is_speakable,
-        )
-        from dungeon_daddy.rpg.action_resolution import resolve_card
-        from dungeon_daddy.rpg.command import MoveParty
-
-        actor = self._acting_actor()
-        if actor is None:
-            return
-
-        # Dialogue gate (Phase 50.6 Slice 10, §6): a sway/talk verb aimed at a
-        # *speakable* creature opens the contextual SAY box instead of rolling.
-        # A hostile/wary target falls through to the normal contested roll.
-        if card.verb in DIALOGUE_VERBS:
-            noun = next(
-                (n for n in self._rpg_vna._nouns if n.noun_id == card.noun_id), None
-            )
-            room_context = getattr(self, "_last_room_context", {})
-            if noun is not None and is_speakable(noun, room_context):
-                room_id = self._state.current_room_id if self._state else ""
-                self._begin_dialogue(
-                    kind="npc",
-                    room_id=room_id or "",
-                    target_id=noun.noun_id,
-                    opener=f"You open a conversation with {noun.label}.",
-                )
-                return
-
-        if card.verb == VERB_LOOK:
-            self._on_look_submit(card)
-            return
-
-        if card.verb == VERB_ACTIVATE:
-            self._on_activate_submit(card, actor)
-            return
-
-        if card.verb == VERB_USE and card.target_id is not None:
-            target_noun = next(
-                (n for n in self._rpg_vna._nouns if n.noun_id == card.target_id),
-                None,
-            )
-            if target_noun and target_noun.source in {SOURCE_EXIT, SOURCE_LOCKED_EXIT}:
-                item_noun = next(
-                    (n for n in self._rpg_vna._nouns if n.noun_id == card.noun_id),
-                    None,
-                )
-                item_slug = item_noun.slug if item_noun else None
-                if item_slug and self._mem_repo is not None:
-                    from dungeon_daddy.rpg.unlock_exit import clear_exit_key_requirement
-                    exit_row = self._mem_repo.get_exit_by_id(card.target_id)
-                    if exit_row and exit_row.get("requires_item_slug") == item_slug:
-                        clear_exit_key_requirement(
-                            card.target_id, self._rpg_campaign_id or "", self._mem_repo
-                        )
-                        self._clear_dungeon_connection_lock(
-                            exit_row["from_room_id"], exit_row["to_room_id"]
-                        )
-                        from dungeon_daddy.rpg.exit_labels import LOCK_PREFIX
-                        exit_label = target_noun.label.removeprefix(LOCK_PREFIX)
-                        self._chat.add_message("system", f"{exit_label}: unlocked.")
-                        self._refresh_vna_panel()
-                        return
-                self._on_exit_move(card.target_id, card.adverb, item_slug=item_slug)
-                return
-            if target_noun and target_noun.source == SOURCE_OBJECT:
-                from dungeon_daddy.rpg.action_options import ActionCard
-                activate_card = ActionCard(
-                    verb=VERB_ACTIVATE, noun_id=card.target_id, adverb=card.adverb,
-                )
-                self._on_activate_submit(activate_card, actor)
-                return
-
-        command = resolve_card(card, actor_id=actor.actor_id)
-        if command is None:
-            self._resolve_vna_roll(card, actor)
-        elif isinstance(command, MoveParty):
-            self._on_exit_move(command.exit_id, command.how)
-        else:
-            self._apply_vna_command(command)
+        self._actions.on_vna_submit(card)
 
     # ------------------------------------------------------------------
     # Dialogue delegators (Phase 51.7, Slice 3)
@@ -1546,200 +1420,14 @@ class PlayView(arcade.View):
     def _apply_dungeon_reply(self, player_message: str, reply: str) -> None:
         self._dialogue_coord.apply_dungeon_reply(player_message, reply)
 
-    def _on_look_submit(self, card: ActionCard) -> None:
-        """Read-only branch: fetch the noun's authoritative description and post it.
-
-        No dice rolled, no state changed. The description is ground truth —
-        it can gate puzzles (e.g. journal → key clue) and must never be
-        LLM-invented. The chat bubble makes it visible; the DM agent sees it
-        in history for narration context on subsequent turns.
-        """
-        description = self._look_up_noun_description(card.noun_id)
-        noun_label = card.noun_id
-        for noun in (getattr(self, "_rpg_vna", None) and self._rpg_vna._nouns or []):
-            if noun.noun_id == card.noun_id:
-                noun_label = noun.label
-                break
-        if description:
-            self._chat.add_message("system", f"{noun_label}: {description}")
-        else:
-            self._chat.add_message("system", f"⚠ Nothing to read about {noun_label}.")
-
-    def _look_up_noun_description(self, noun_id: str) -> str | None:
-        """Return the authoritative description for ``noun_id``, or ``None``."""
-        if self._mem_repo is None:
-            return None
-        obj = self._mem_repo.get_room_object(noun_id)
-        if obj is not None:
-            return obj.get("description") or None
-        campaign_id = self._rpg_campaign_id
-        if campaign_id is not None:
-            items = self._mem_repo.get_items(campaign_id)
-            item = next((i for i in items if i["item_id"] == noun_id), None)
-            if item is not None:
-                return item.get("description") or None
-        actor = self._mem_repo.get_actor(noun_id)
-        if actor is not None:
-            return actor.get("description") or actor.get("display_name") or None
-        return None
-
-    def _on_activate_submit(self, card: ActionCard, actor: ActorState) -> None:
-        """Handle ``activate`` verb: pick trigger from the object, then route.
-
-        Looks up the object's current transitions, selects the first one
-        matching the current state, and routes deterministic transitions to the
-        command pipeline and contested transitions to the action-roll path.
-        """
-        from dungeon_daddy.rpg.action_options import ActionCard
-        from dungeon_daddy.rpg.action_resolution import resolve_card
-
-        if self._mem_repo is None or self._rpg_campaign_id is None:
-            return
-
-        obj = self._mem_repo.get_room_object(card.noun_id)
-        if obj is None:
-            self._chat.add_message("system", f"⚠ Object not found: {card.noun_id}")
-            return
-
-        transition = next(
-            (t for t in obj.get("transitions", [])
-             if t.get("from_state") == obj.get("current_state")),
-            None,
-        )
-        if transition is None:
-            self._chat.add_message("system", "⚠ Nothing to do with this object right now.")
-            return
-
-        if transition.get("contested"):
-            roll_verb = transition.get("action_verb") or "fight"
-            roll_card = ActionCard(verb=roll_verb, noun_id=card.noun_id, adverb=card.adverb)
-            self._resolve_vna_roll(roll_card, actor)
-        else:
-            command = resolve_card(card, actor_id=actor.actor_id, trigger=transition["trigger"])
-            if self._apply_vna_command(command):
-                noun_label = obj.get("display_name") or card.noun_id
-                from_state = obj.get("current_state", "")
-                to_state = transition.get("to_state", "activated")
-                self._chat.add_message("system", f"{noun_label}: {to_state}.")
-                self._narrate_object_transition(actor, noun_label, from_state, to_state, transition)
-
-    def _narrate_object_transition(self, actor: ActorState, noun_label: str, from_state: str, to_state: str, transition: dict[str, Any]) -> None:
-        """Inject the deterministic transition result into DM history and request narration."""
-        if self._dungeon is None or self._state is None:
-            return
-        room = self._session.current_room()
-        if room is None:
-            return
-        content = (
-            f"{actor.display_name} {transition.get('trigger', 'activates')} the {noun_label}. "
-            f"[{noun_label}: {from_state} → {to_state}]"
-        )
-        # If the transition just revealed loot, name it so the narrator's prose
-        # matches reality (e.g. opening the locker actually finds the journal).
-        if self._mem_repo is not None and self._rpg_campaign_id is not None:
-            room_items = self._mem_repo.get_items_by_room(self._rpg_campaign_id, room.id)
-            loot = describe_spawned_loot(transition, room_items)
-            if loot:
-                content += f" [revealed inside: {loot}]"
-        self._narration.request_narration(content)
-
     def _apply_vna_command(self, command: PlayerCommand | None) -> bool:
-        """Validate + apply a non-move mutation command, then refresh.
-
-        Returns True if the command was accepted and applied, False if rejected.
-        """
-        from dungeon_daddy.rpg.command_applier import apply_command
-        from dungeon_daddy.rpg.command_validator import validate_command
-
-        if command is None:
-            return False
-        if self._mem_repo is None or self._rpg_campaign_id is None:
-            return False
-        room_id = self._state.current_room_id if self._state else None
-        validation = validate_command(
-            command, self._mem_repo, self._rpg_campaign_id, party_room_id=room_id,
-        )
-        if not validation.accepted:
-            self._chat.add_message("system", f"⚠ Can't do that: {validation.rejection_reason}")
-            return False
-        apply_command(command, validation, self._mem_repo, self._rpg_campaign_id)
-        self._advance_objectives()
-        self._refresh_vna_panel()
-        return True
-
-    def _advance_objectives(self) -> None:
-        """Re-evaluate active objectives after a world-state mutation (§7.9).
-
-        A subsystem reaching its required state completes the tier's objective,
-        ticking the latching intimacy clock (the single tick source, D5) and
-        activating the next tier. Each completion surfaces a dungeon line.
-        """
-        from dungeon_daddy.rpg.objectives import advance_objectives
-
-        if self._mem_repo is None or self._rpg_campaign_id is None:
-            return
-        for _ in advance_objectives(self._mem_repo, self._rpg_campaign_id):
-            self._chat.add_message(
-                "dungeon", "◆ The Crucible stirs — its bond with you deepens."
-            )
+        return self._actions.apply_vna_command(command)
 
     def _resolve_vna_roll(self, card: ActionCard, actor: ActorState) -> None:
-        """Resolve a skill-verb Card as an action roll and narrate the outcome."""
-        from dungeon_daddy.rpg.action_resolution import resolve_card_roll
-
-        if self._rpg_service is None or self._state is None:
-            return
-        campaign_id = self._rpg_campaign_id or self._state.dungeon_id
-        card_roll = resolve_card_roll(
-            card,
-            campaign_id=campaign_id,
-            actor={"actor_id": actor.actor_id, "actions": actor.actions},
-        )
-        resolution = card_roll.resolution
-        # Resolve the acted-upon object once and share it: the obstacle check
-        # reads its (pre-resolution) contested transitions, and the world
-        # reaction reads its state-independent policy + bindings.
-        acted_object = self._resolve_acted_object(card.noun_id)
-        obstacle = self._maybe_resolve_obstacle(
-            card, actor, resolution.outcome, acted_object=acted_object
-        )
-        reaction = self._apply_world_reaction(resolution, acted_object=acted_object)
-        self._run_proposal_pipeline(resolution, campaign_id)
-        self._chat.add_message(
-            "system",
-            format_mechanical_bubble(actor.display_name, card.verb, resolution, reaction),
-        )
-        if self._dungeon is not None and self._state.current_room_id:
-            room = self._session.current_room()
-            if room is not None:
-                noun_label = self._rpg_vna.noun_label_for(card.noun_id) or card.noun_id
-                msg = (
-                    f"{actor.display_name} [{card.verb.upper()}] {noun_label}"
-                    f" ({card.adverb}) — {resolution.outcome.upper()}"
-                )
-                if obstacle is not None:
-                    t = obstacle.transition
-                    msg += f" [{noun_label}: {t.from_state} → {t.to_state}]"
-                    if obstacle.complication:
-                        msg += " (resolved, but with a complication)"
-                self._narration.request_narration(msg)
-        self._refresh_right_panel_from_actors(actor.actor_id)
+        self._actions.resolve_vna_roll(card, actor)
 
     def _resolve_acted_object(self, noun_id: str) -> RoomObject | None:
-        """Resolve a card's noun to its :class:`RoomObject`, or ``None``.
-
-        Phase 51.6 Slice 8: only room *objects* carry a ``reaction_policy`` +
-        scripted ``reaction_bindings``, so the world-reaction engine can branch
-        on them. Item/actor/exit nouns (and anything unknown) return ``None`` —
-        the reaction then falls to the ambient rule.
-        """
-        if self._mem_repo is None:
-            return None
-        obj_dict = self._mem_repo.get_room_object(noun_id)
-        if obj_dict is None:
-            return None
-        from dungeon_daddy.rpg.models import RoomObject
-        return RoomObject(**obj_dict)
+        return self._actions.resolve_acted_object(noun_id)
 
     def _maybe_resolve_obstacle(
         self,
@@ -1748,38 +1436,9 @@ class PlayView(arcade.View):
         outcome: Outcome,
         acted_object: RoomObject | None = None,
     ) -> ObstacleRollResolution | None:
-        """Apply a successful contested-approach roll to the target's state (Phase 51.5 Part A).
-
-        When ``card.verb`` matches one of the target object's contested approaches
-        and ``outcome`` resolves it (crit/full clean, partial with a complication;
-        miss fails — locked mapping), route the matched transition through the
-        deterministic ``ActivateObject`` pipeline so its state change + side-effects
-        apply and objectives re-advance. Returns the
-        :class:`ObstacleRollResolution` applied, or ``None`` if nothing changed.
-
-        ``acted_object`` is the pre-resolved target (shared with the world
-        reaction to avoid a second fetch); it is re-resolved from ``card.noun_id``
-        when the caller does not supply it.
-        """
-        from dungeon_daddy.rpg.command import ActivateObject
-        from dungeon_daddy.rpg.obstacles import resolve_obstacle_with_roll
-
-        if self._mem_repo is None or self._rpg_campaign_id is None:
-            return None
-        obj = acted_object if acted_object is not None else self._resolve_acted_object(card.noun_id)
-        if obj is None:
-            return None
-        resolved = resolve_obstacle_with_roll(obj, verb=card.verb, outcome=outcome)
-        if resolved is None:
-            return None
-        command = ActivateObject(
-            actor_id=actor.actor_id,
-            object_id=card.noun_id,
-            trigger=resolved.transition.trigger,
+        return self._actions.maybe_resolve_obstacle(
+            card, actor, outcome, acted_object=acted_object
         )
-        if self._apply_vna_command(command):
-            return resolved
-        return None
 
     def _on_exit_move(self, exit_id: str, how: str, *, item_slug: str | None = None) -> None:
         """Apply an engine-validated party move, then narrate the result."""
@@ -1829,150 +1488,12 @@ class PlayView(arcade.View):
             )
 
     def _run_proposal_pipeline(self, resolution: ActionResolution, campaign_id: str) -> None:
-        if self._dm_agent is None or self._mem_repo is None or self._rpg_debug is None:
-            return
-        raw_clocks = self._mem_repo.get_clocks(campaign_id)
-        known_clocks = [
-            {"clock_id": r["clock_id"], "label": r["label"],
-             "filled": r["filled"], "segments": r["segments"]}
-            for r in raw_clocks
-        ]
-        known_clock_ids = [c["clock_id"] for c in known_clocks]
-        all_actors = self._session.actors
-        known_actors = [{"actor_id": a.actor_id, "display_name": a.display_name} for a in all_actors]
-        known_actor_ids = [a["actor_id"] for a in known_actors]
-        player_actor_ids = [a.actor_id for a in filter_player_actors(all_actors)]
-
-        room_name = ""
-        room_note = ""
-        if self._dungeon is not None and self._state is not None and self._state.current_room_id:
-            idx = self._state.current_level_idx
-            rooms = {r.id: r for r in self._dungeon.levels[idx].rooms}
-            room = rooms.get(self._state.current_room_id)
-            if room is not None:
-                room_name = room.name
-                room_note = room.note or ""
-
-        raw = self._dm_agent.request_proposal(
-            resolution=resolution,
-            context_bundle=None,
-            known_clocks=known_clocks,
-            known_actors=known_actors,
-            player_actor_ids=player_actor_ids,
-            room_name=room_name,
-            room_note=room_note,
-        )
-        proposal = parse_proposal(raw)
-        if proposal is not None:
-            validation_result = validate_proposal(
-                proposal,
-                known_clock_ids=set(known_clock_ids),
-                known_actor_ids=set(known_actor_ids),
-                player_actor_ids=set(player_actor_ids),
-                obstacle_resolved_states=self._obstacle_resolved_states(campaign_id),
-            )
-            apply_result = apply_low_risk_proposals(
-                validation_result,
-                self._mem_repo,
-                campaign_id,
-                action_key=resolution.action_key,
-                intent=resolution.intent,
-            )
-            # A validated ResolveObstacleChange is applied through the deterministic
-            # ActivateObject seam (not apply_low_risk_proposals, which skips it), gated
-            # on a resolving roll outcome — the constrained Part B object-state authority.
-            actor_id = player_actor_ids[0] if player_actor_ids else (
-                known_actor_ids[0] if known_actor_ids else None
-            )
-            self._apply_obstacle_proposals(validation_result, resolution.outcome, actor_id)
-        else:
-            validation_result = ValidationResult()
-            apply_result = ApplyResult()
-        self._rpg_debug.set_proposal_result(validation_result, apply_result)
-
-    def _obstacle_resolved_states(self, campaign_id: str) -> dict[str, str]:
-        """Map ``{obstacle slug: authored resolved state}`` for the current room.
-
-        Bounds the DM-ruled ResolveObstacleChange authority to obstacles present in
-        the party's room, each only to its single canonical resolved state.
-        """
-        from dungeon_daddy.rpg.models import RoomObject
-        from dungeon_daddy.rpg.obstacles import obstacle_resolved_state
-
-        if self._mem_repo is None or self._state is None or not self._state.current_room_id:
-            return {}
-        states: dict[str, str] = {}
-        for od in self._mem_repo.get_objects_by_room(campaign_id, self._state.current_room_id):
-            resolved = obstacle_resolved_state(RoomObject(**od))
-            if resolved is not None:
-                states[od["slug"]] = resolved
-        return states
-
-    def _apply_obstacle_proposals(
-        self, validation_result: ValidationResult, outcome: Outcome, actor_id: str | None
-    ) -> None:
-        """Apply accepted DM-ruled obstacle resolutions (Phase 51.5 Part B Slice 6).
-
-        For each accepted :class:`ResolveObstacleChange`, on a resolving roll outcome
-        (locked mapping), route the obstacle to its authored resolved state through
-        the deterministic ``ActivateObject`` pipeline so ``update_object_state`` +
-        side-effects fire and objectives re-advance. The validator already guarantees
-        ``to_state`` is the obstacle's authored resolved state.
-        """
-        from dungeon_daddy.rpg.command import ActivateObject
-        from dungeon_daddy.rpg.models import RoomObject
-        from dungeon_daddy.rpg.obstacles import is_resolving_outcome, resolving_trigger
-        from dungeon_daddy.rpg.proposal import ResolveObstacleChange
-
-        if self._mem_repo is None or actor_id is None or self._state is None:
-            return
-        if not is_resolving_outcome(outcome):
-            return
-        room_id = self._state.current_room_id
-        if not room_id:
-            return
-        campaign_id = self._rpg_campaign_id
-        if campaign_id is None:
-            return
-        by_slug = {
-            od["slug"]: RoomObject(**od)
-            for od in self._mem_repo.get_objects_by_room(campaign_id, room_id)
-        }
-        for change in validation_result.accepted:
-            if not isinstance(change, ResolveObstacleChange):
-                continue
-            obj = by_slug.get(change.object_slug)
-            if obj is None:
-                continue
-            trigger = resolving_trigger(obj, change.to_state)
-            if trigger is None:
-                continue
-            self._apply_vna_command(
-                ActivateObject(
-                    actor_id=actor_id, object_id=obj.object_id, trigger=trigger,
-                )
-            )
+        self._actions.run_proposal_pipeline(resolution, campaign_id)
 
     def _apply_world_reaction(
         self, resolution: ActionResolution, acted_object: RoomObject | None = None
     ) -> WorldReaction | None:
-        """Delegate to :class:`ReactionApplier` (Phase 51.7, Slice 1).
-
-        The applier reads the session/clocks/stress from ``self._session``,
-        persists the clock + stress writes atomically, and posts a system line
-        if the reaction cannot be fully applied.
-        """
-        from dungeon_daddy.play.reaction_applier import ReactionApplier
-
-        applier = ReactionApplier(
-            self._session,
-            self._rpg_service,
-            post_system=lambda text: self._chat.add_message("system", text),
-            on_reaction=(
-                self._rpg_debug.set_reaction if self._rpg_debug is not None else None
-            ),
-        )
-        return applier.apply(resolution, acted_object)
+        return self._actions.apply_world_reaction(resolution, acted_object)
 
     # ------------------------------------------------------------------
     # Map variant switching

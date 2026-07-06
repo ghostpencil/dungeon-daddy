@@ -873,13 +873,15 @@ def test_resolve_vna_roll_passes_acted_object_to_world_reaction(tmp_path):
     view._refresh_vna_panel()
 
     captured = {}
-    real = view._apply_world_reaction
+    # The action logic lives on the orchestrator (Phase 51.7 Slice 4) — spy at
+    # that seam; the view method is now a thin delegator.
+    real = view._actions.apply_world_reaction
 
     def _spy(resolution, acted_object=None):
         captured["acted_object"] = acted_object
         return real(resolution, acted_object=acted_object)
 
-    view._apply_world_reaction = _spy  # type: ignore[method-assign]
+    view._actions.apply_world_reaction = _spy  # type: ignore[method-assign]
 
     view._on_vna_submit(ActionCard(verb="study", noun_id="obj-statue", adverb="cautiously"))
 
@@ -1100,7 +1102,9 @@ def test_sway_on_willing_npc_opens_dialogue_not_roll(tmp_path):
     from dungeon_daddy.rpg.action_options import SOURCE_NPC, ActionCard, NounOption
 
     view = _make_view(tmp_path)
-    view._resolve_vna_roll = MagicMock()
+    # The dispatch lives on the orchestrator (Phase 51.7 Slice 4) — mock the
+    # roll at that seam; the view method is now a thin delegator.
+    view._actions.resolve_vna_roll = MagicMock()
     view._rpg_vna._nouns = [
         NounOption(noun_id="npc-1", label="Warden", target_type="npc", source=SOURCE_NPC),
     ]
@@ -1111,7 +1115,7 @@ def test_sway_on_willing_npc_opens_dialogue_not_roll(tmp_path):
     view._on_vna_submit(ActionCard(verb="sway", noun_id="npc-1", adverb="cautiously"))
 
     view._chat.set_dialogue_mode.assert_called_once_with(True)
-    view._resolve_vna_roll.assert_not_called()
+    view._actions.resolve_vna_roll.assert_not_called()
 
 
 def test_sway_on_hostile_creature_rolls_not_dialogue(tmp_path):
@@ -1119,7 +1123,9 @@ def test_sway_on_hostile_creature_rolls_not_dialogue(tmp_path):
     from dungeon_daddy.rpg.action_options import SOURCE_MONSTER, ActionCard, NounOption
 
     view = _make_view(tmp_path)
-    view._resolve_vna_roll = MagicMock()
+    # The dispatch lives on the orchestrator (Phase 51.7 Slice 4) — mock the
+    # roll at that seam; the view method is now a thin delegator.
+    view._actions.resolve_vna_roll = MagicMock()
     view._rpg_vna._nouns = [
         NounOption(noun_id="mon-1", label="Gnoll", target_type="monster", source=SOURCE_MONSTER),
     ]
@@ -1129,7 +1135,7 @@ def test_sway_on_hostile_creature_rolls_not_dialogue(tmp_path):
 
     view._on_vna_submit(ActionCard(verb="sway", noun_id="mon-1", adverb="cautiously"))
 
-    view._resolve_vna_roll.assert_called_once()
+    view._actions.resolve_vna_roll.assert_called_once()
     view._chat.set_dialogue_mode.assert_not_called()
 
 

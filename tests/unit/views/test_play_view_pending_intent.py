@@ -89,7 +89,7 @@ class TestActionableTextCreatesPendingIntent:
         """RPG service is not called when pending intent framing is shown."""
         view = _make_view()
         captured: list = []
-        view._apply_world_reaction = lambda r: captured.append(r)  # type: ignore[method-assign]
+        view._actions.apply_world_reaction = lambda r: captured.append(r)  # type: ignore[method-assign]
         view._on_chat_send("I study the mural to understand its secrets")
         assert captured == []
 
@@ -281,7 +281,7 @@ class TestNoRollPath:
         view = _no_roll_view()
         view._narration.spawn_dm_thread = MagicMock()
         captured: list = []
-        view._apply_world_reaction = lambda r: captured.append(r)  # type: ignore[method-assign]
+        view._actions.apply_world_reaction = lambda r: captured.append(r)  # type: ignore[method-assign]
         view._on_chat_send("")
         assert captured == []
 

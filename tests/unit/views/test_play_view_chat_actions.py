@@ -103,7 +103,9 @@ class TestChatSendNoActionKey:
         def _spy(resolution):
             captured.append(resolution)
 
-        view._apply_world_reaction = _spy  # type: ignore[method-assign]
+        # The action logic lives on the orchestrator (Phase 51.7 Slice 4) —
+        # spy at that seam; the view method is now a thin delegator.
+        view._actions.apply_world_reaction = _spy  # type: ignore[method-assign]
         view._on_chat_send("I look around the room")
         assert len(captured) == 0
 
@@ -121,7 +123,7 @@ class TestChatTextBecomesIntent:
         def _spy(resolution):
             captured.append(resolution)
 
-        view._apply_world_reaction = _spy  # type: ignore[method-assign]
+        view._actions.apply_world_reaction = _spy  # type: ignore[method-assign]
         view._on_chat_send("I study the mural to resist its pull.")
         assert len(captured) == 1
         assert captured[0].intent == "I study the mural to resist its pull."
@@ -140,7 +142,7 @@ class TestActorIdFromActionState:
         def _spy(resolution):
             captured.append(resolution)
 
-        view._apply_world_reaction = _spy  # type: ignore[method-assign]
+        view._actions.apply_world_reaction = _spy  # type: ignore[method-assign]
         view._on_chat_send("I attack the warden.")
         assert len(captured) == 1
         assert captured[0].actor_id == "a1"
@@ -212,7 +214,7 @@ class TestNoRoomWithChip:
         def _spy(resolution):
             captured.append(resolution)
 
-        view._apply_world_reaction = _spy  # type: ignore[method-assign]
+        view._actions.apply_world_reaction = _spy  # type: ignore[method-assign]
         view._on_chat_send("I study the mural.")
         assert len(captured) == 0
         msgs = [(c.args[0], c.args[1]) for c in view._chat.add_message.call_args_list]

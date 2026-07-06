@@ -40,15 +40,59 @@ Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_
 
 **PR #88 merged to `main` 2026-07-05 (`c0e1cba`) — Phase 51.6 fully closed.** Current work:
 **Phase 51.7 — PlayView Decomposition** on `feat/phase-51.7-playview-decomp` — spec + slice plan
-in `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Both PR #88 deferred review items are resolved
-or scheduled: the spec-language item is **closed** (owner ruled 2026-07-05: only noun-carrying
-paths pass `acted_object`; `spec/WORLD_REACTION_POLICY.md` §7 amended), and the non-atomic
-`_apply_world_reaction` write landed as **Slice 1** of 51.7. Next slice to build: **Slice 4 —
-`ActionOrchestrator` (`play/actions.py`)** — the `_on_vna_submit` dispatch tree, look/activate/use
-branches, `_resolve_vna_roll`, `_run_chat_action`/`_on_resolve_action`, `_apply_vna_command`,
-`_maybe_resolve_obstacle`, `_run_proposal_pipeline` + `_apply_obstacle_proposals`,
-`_advance_objectives` (uses Slice 1's `ReactionApplier`). The biggest slice. Slices 0–3 landed
-2026-07-06. After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice (item 2 below).
+in `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Slices 0–3 landed 2026-07-06.
+
+**⏸ RESUME HERE — Slice 4 (`ActionOrchestrator`) is BUILT & GREEN but UNCOMMITTED; review
+fixes pending (2026-07-06).** The extraction itself is done in the working tree: new
+`dungeon_daddy/play/actions.py` (746 lines, `ActionOrchestrator`, 16 late-bound ports, no
+`arcade`, `describe_spawned_loot` moved in) + 25 new TDD tests
+(`tests/unit/play/test_actions.py`); `play_view.py` 2478 → 2030 lines (delegators + lazy
+`_ensure_actions` bridge, the Slice 0/2/3 pattern); 5 view-test files' spies migrated to the
+`view._actions` seam. **Full suite 3498 passed, ruff + mypy(strict) clean.** An 8-angle
+`/code-review high` then ran; findings verified. **Next session: apply this fix list, re-run
+suite + ruff + mypy, commit as the Slice 4 commit:**
+1. **Migrate the remaining stale spies to the `view._actions` seam** (they patch view methods
+   the orchestrator no longer calls — the negative assertions are now vacuous):
+   `tests/unit/views/test_play_view_vna.py:1105+1116` (willing-NPC test →
+   `view._actions.resolve_vna_roll`); `tests/unit/views/test_play_view_chat_actions.py:217`;
+   `tests/unit/views/test_play_view_pending_intent.py:92 + :284`;
+   `tests/unit/views/test_play_view_proposals.py:136 + :161` (use
+   `patch.object(view._actions, "apply_world_reaction")`); **`tools/smoke_test_phase38.py:413`
+   (Behavior 14 — empirically CONFIRMED broken by the finder agent, fails with the diff)**.
+   (`test_play_view_bundle.py`'s direct `view._apply_world_reaction(...)` *calls* are fine —
+   the delegator works; only spy *assignments* are stale.)
+2. **Guard the `get_nouns` port** in `play_view._ensure_actions` (~line 607): restore the old
+   look-branch fallback — `self._rpg_vna._nouns` if the attr exists else `[]` (a
+   `PlayView.__new__` view without `_rpg_vna` must degrade, not AttributeError).
+3. **Delete the 7 dead delegators** in `play_view.py` (verified zero callers in
+   dungeon_daddy/tests/tools): `_on_look_submit`, `_look_up_noun_description`,
+   `_on_activate_submit`, `_narrate_object_transition`, `_advance_objectives`,
+   `_obstacle_resolved_states`, `_apply_obstacle_proposals` (+ their now-unneeded imports).
+   Keep the delegators with real callers: `_on_vna_submit`, `_run_chat_action`,
+   `_on_resolve_action`, `_apply_vna_command`, `_resolve_vna_roll`, `_resolve_acted_object`,
+   `_maybe_resolve_obstacle`, `_run_proposal_pipeline`, `_apply_world_reaction`.
+4. `play/actions.py` `on_look_submit`: replace the inline noun-label loop with
+   `self._noun_label_for(card.noun_id) or card.noun_id` (kills the third copy of the lookup).
+5. `on_exit_move` port: make it keyword-shaped (`Callable[..., None]`; view lambda takes
+   `item_slug=None` default; orchestrator calls `item_slug=` by keyword; MoveParty branch
+   omits the arg) — restores the original call shapes.
+6. `tests/unit/play/test_actions.py` `test_run_proposal_pipeline_feeds_the_debug_sink`:
+   `DebugControls(RpgService())` not `DebugControls(MagicMock())` (TESTING.md mock policy).
+7. Move the 3 `describe_spawned_loot` tests from `tests/unit/views/test_play_view.py:91-107`
+   to `tests/unit/play/test_actions.py` (tests mirror modules; the function moved).
+   **Verified non-issues / accepted:** stale-session-capture REFUTED (`_session` assigned only
+   once in `__init__`, before any coordinator materializes — same as Slices 2/3);
+   `run_proposal_pipeline`'s `current_room()` swap accepted (the Slice 0-blessed idiom; only
+   changes corrupt-state edge behavior, more robust). **Optional follow-ups (not this slice):**
+   play→ui `format_mechanical_bubble` runtime import (arcade-free today; consider moving the
+   module or porting it — exit criterion 3 still satisfied); `get_debug` port hands play a UI
+   panel type (TYPE_CHECKING-only; two narrow callables would be cleaner but the
+   debug-gates-proposal-pipeline coupling is pre-existing behavior); consolidate duplicated
+   test helpers into `tests/unit/play/conftest.py` (3rd copy of `MIGRATIONS_DIR` etc., mirror
+   `tests/unit/rpg/conftest.py`); shared `_post_chat(role, text)` view method for the 4
+   identical chat-post lambdas. After Slice 4: **Slice 5 — `NavigationCoordinator`**.
+
+After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice (item 2 below).
 
 **Phase 51.7 slice progress (branch `feat/phase-51.7-playview-decomp`):**
 - ✅ **Slice 0 — `PlaySessionContext`** (2026-07-06). New `dungeon_daddy/play/` package
@@ -124,6 +168,11 @@ branches, `_resolve_vna_roll`, `_run_chat_action`/`_on_resolve_action`, `_apply_
   `MemoryRepository` + a recording chat port. **`/code-review high` clean** (2 correctness finder
   angles — port-fidelity line-by-line + cross-file/threading tracer — no findings). Full suite green
   (**3473 passed**), ruff + mypy(strict) clean.
+- 🚧 **Slice 4 — `ActionOrchestrator`** (2026-07-06, **UNCOMMITTED — see RESUME HERE above**).
+  Extraction built & fully green (3498 passed, ruff + mypy(strict) clean); 8-angle
+  `/code-review high` ran; the verified fix list in RESUME HERE must be applied before the
+  slice commit. TDD via vertical cycles; 25 new tests exercise the orchestrator directly
+  (real `MemoryRepository`, real `RpgService`, recording ports).
 
 1. **Phase 51.6 — World Reaction Policy — ✅ COMPLETE (PR #88 open, review-hardened).** Fixed a
    real bug (a STUDY-miss moved 3 clocks incl. `dungeon_intimacy`, violating D5). Per-object

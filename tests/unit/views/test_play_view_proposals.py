@@ -133,7 +133,7 @@ def test_on_resolve_action_sets_proposal_result_after_valid_proposal(tmp_path: P
     view._dm_agent = DungeonMasterAgent(provider=_MockProvider(raw_json))
     view._rpg_debug = DebugControls(view._rpg_service)
 
-    with patch.object(view, "_apply_world_reaction"):
+    with patch.object(view._actions, "apply_world_reaction"):
         view._on_resolve_action(
             campaign_id="camp-1", actor_id="a-pc", intent="disarm the guard",
             action_key="skirmish", push_yourself=False, momentum_spend=0, dice_pool=2,
@@ -158,7 +158,7 @@ def test_on_resolve_action_sets_proposal_result_when_parse_fails(tmp_path: Path)
     view._dm_agent = DungeonMasterAgent(provider=_MockProvider("not valid json {{{"))
     view._rpg_debug = DebugControls(view._rpg_service)
 
-    with patch.object(view, "_apply_world_reaction"):
+    with patch.object(view._actions, "apply_world_reaction"):
         view._on_resolve_action(
             campaign_id="camp-1", actor_id="a-pc", intent="disarm the guard",
             action_key="skirmish", push_yourself=False, momentum_spend=0, dice_pool=2,

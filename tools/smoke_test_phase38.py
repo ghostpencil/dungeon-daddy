@@ -117,6 +117,7 @@ def _make_view_with_chip(
     panel = PlayerActionPanel()
     panel.set_actors([_make_actor(actor_id=actor_id)])
     view._rpg_action = panel
+    view._session.set_actors(panel._actors)
     view._rpg_campaign_id = "c1"
     view._rpg_debug = None
     view._rpg_char = MagicMock()
@@ -410,7 +411,7 @@ def run_pipeline() -> int:
     def _spy_reaction(resolution):
         captured_resolutions.append(resolution)
 
-    view14._apply_world_reaction = _spy_reaction  # type: ignore[method-assign]
+    view14._actions.apply_world_reaction = _spy_reaction  # type: ignore[method-assign]
     view14._on_chat_send("I study the mural to resist its pull.")
     intent_ok = (
         len(captured_resolutions) == 1
