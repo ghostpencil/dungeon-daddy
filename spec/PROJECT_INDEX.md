@@ -43,11 +43,12 @@ Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_
 in `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Both PR #88 deferred review items are resolved
 or scheduled: the spec-language item is **closed** (owner ruled 2026-07-05: only noun-carrying
 paths pass `acted_object`; `spec/WORLD_REACTION_POLICY.md` §7 amended), and the non-atomic
-`_apply_world_reaction` write landed as **Slice 1** of 51.7. Next slice to build: **Slice 3 —
-`DialogueCoordinator` (`play/dialogue.py`)** — `DialogueSession`, begin/end, room-change close,
-dungeon/NPC line routing, `_dungeon_agent_inputs` + its 8 context assemblers, `_apply_dungeon_reply`
-(the voice-agent thread hands results through the narration queue path it already uses). Slices 0–2
-landed 2026-07-06. After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice (item 2 below).
+`_apply_world_reaction` write landed as **Slice 1** of 51.7. Next slice to build: **Slice 4 —
+`ActionOrchestrator` (`play/actions.py`)** — the `_on_vna_submit` dispatch tree, look/activate/use
+branches, `_resolve_vna_roll`, `_run_chat_action`/`_on_resolve_action`, `_apply_vna_command`,
+`_maybe_resolve_obstacle`, `_run_proposal_pipeline` + `_apply_obstacle_proposals`,
+`_advance_objectives` (uses Slice 1's `ReactionApplier`). The biggest slice. Slices 0–3 landed
+2026-07-06. After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice (item 2 below).
 
 **Phase 51.7 slice progress (branch `feat/phase-51.7-playview-decomp`):**
 - ✅ **Slice 0 — `PlaySessionContext`** (2026-07-06). New `dungeon_daddy/play/` package
@@ -102,6 +103,27 @@ landed 2026-07-06. After 51.7: Tag Hygiene → Narrator Lookup remains the seque
   fragility); `spawn_dm_thread` restored the original `assert state/dungeon` + non-optional `repo`
   (no silent stranded-spinner path); the `history` setter aliases the assigned list (preserving the
   old `_dm_history = <list>` semantics). Full suite green (**3444 passed**), ruff + mypy(strict) clean.
+- ✅ **Slice 3 — `DialogueCoordinator`** (2026-07-06, `9eff1d6`). New `play/dialogue.py` (no
+  `arcade`) — `DialogueCoordinator` + `DialogueSession` (moved out of `play_view`, re-exported for
+  the `from …play_view import DialogueSession` sites). Owns the dungeon-voice + NPC dialogue seam:
+  the open channel, begin/end + room-change close, per-`kind` line routing (`send_line`/
+  `send_npc_line`/`send_dungeon_line`), the §4.4 `agent_inputs` context assembly + its
+  subsystem/objective/knowledge/room-label helpers, the intimacy-clock read, `begin_dungeon_dialogue`
+  gate, `set_persona`, and the `apply_dungeon_reply` engine side-effect (reply bubble +
+  engine-authored exchange memory). Side effects flow through narrow **late-bound ports**
+  (`post_message`/`set_dialogue_mode`/`set_busy`/`get_room_context`/`get_acting_actor`/
+  `get_voice_agent`/`get_narration`); no `PlayView` reference. The dungeon-voice call still runs on a
+  worker thread handed to the **Slice 2 `NarrationCoordinator`** (`spawn`); its dungeon-marked
+  `DMResult` routes back through `poll()` → `on_dungeon_reply` port → the view's `_apply_dungeon_reply`
+  delegator → `apply_dungeon_reply` (no narration change). `PlayView` keeps thin **delegators** (its
+  input-routing surface: call sites, the `window.set_dungeon_persona` API, the narration port) + the
+  bridged state (`_dialogue`/`_dungeon_voice`/`_dungeon_knowledge`) so the existing view tests and the
+  `__new__` factories stay unchanged; coordinator lazily materialized (the Slice 0/2 pattern).
+  Behavior-preserving; `play_view.py` 2679 → 2478 lines. 29 new unit tests
+  (`tests/unit/play/test_dialogue.py`) exercise the coordinator directly against a real
+  `MemoryRepository` + a recording chat port. **`/code-review high` clean** (2 correctness finder
+  angles — port-fidelity line-by-line + cross-file/threading tracer — no findings). Full suite green
+  (**3473 passed**), ruff + mypy(strict) clean.
 
 1. **Phase 51.6 — World Reaction Policy — ✅ COMPLETE (PR #88 open, review-hardened).** Fixed a
    real bug (a STUDY-miss moved 3 clocks incl. `dungeon_intimacy`, violating D5). Per-object
