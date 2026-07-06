@@ -5,7 +5,6 @@ import logging
 import queue
 import re
 import threading
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -35,6 +34,7 @@ from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.play.actions import ActionOrchestrator
 from dungeon_daddy.play.dialogue import DialogueCoordinator, DialogueSession
 from dungeon_daddy.play.narration import DMResult, NarrationCoordinator
+from dungeon_daddy.play.navigation import NavigationCoordinator
 from dungeon_daddy.play.session_context import PlaySessionContext
 from dungeon_daddy.rpg.actor_control import filter_player_actors
 from dungeon_daddy.rpg.classifier import classify_intent
@@ -84,21 +84,7 @@ from dungeon_daddy.ui.theme import (
 # ``from dungeon_daddy.views.play_view import DMResult`` import sites.
 # describe_spawned_loot moved to dungeon_daddy/play/actions.py (Slice 4) —
 # import it from there.
-
-
-@dataclass(frozen=True)
-class _PositionedRoom:
-    """A room's rendered-layout geometry + name, for exit compass labels.
-
-    Exposes the same ``x``/``y``/``w``/``h``/``name`` surface a ``Room`` does so
-    :func:`dungeon_daddy.rpg.exit_labels.exit_noun_label` can consume it, but the
-    coordinates are the layout-pipeline positions the map actually draws.
-    """
-    x: float
-    y: float
-    w: float
-    h: float
-    name: str
+# _PositionedRoom moved to dungeon_daddy/play/navigation.py (Slice 5).
 
 _log = logging.getLogger(__name__)
 
@@ -635,6 +621,48 @@ class PlayView(arcade.View):
         return self._ensure_actions()
 
     # ------------------------------------------------------------------
+    # Navigation bridge (Phase 51.7, Slice 5)
+    #
+    # The navigation seam — exit moves, the graph room-select branch,
+    # party-room focus, and the layout-label helpers — lives in
+    # ``NavigationCoordinator``. Lazily materialized so ``PlayView.__new__``
+    # test setups still work; the coordinator is stateless (ports + shared
+    # session), so the view keeps thin delegators as its input-routing surface.
+    # Ports are late-bound lambdas reading live view state (the Slice 2/3/4
+    # pattern); the coordinator holds no ``PlayView`` reference. The one bit of
+    # view-only state it drives is ``_viewed_level_idx`` (map paging), set via
+    # the ``set_viewed_level`` port.
+    # ------------------------------------------------------------------
+
+    def _ensure_navigation(self) -> NavigationCoordinator:
+        coord = self.__dict__.get("_navigation_coord")
+        if coord is None:
+            coord = NavigationCoordinator(
+                self._session,
+                post_message=self._post_chat,
+                request_narration=lambda text: self._narration.request_narration(text),
+                set_selected_room=lambda room_id: self._map.set_selected_room(room_id),
+                set_current_room=lambda name, note, room_id: self._chat.set_current_room(
+                    name, note, room_id=room_id
+                ),
+                set_scene=lambda name, level_id: self._rpg_scene.set_scene(name, level_id),
+                load_level=lambda level, state, total: self._map.load(level, state, total),
+                update_map_state=lambda state, total: self._map.update_state(state, total),
+                set_viewed_level=lambda idx: setattr(self, "_viewed_level_idx", idx),
+                end_dialogue_on_room_change=lambda: (
+                    self._maybe_end_dialogue_on_room_change()
+                ),
+                refresh_vna_panel=lambda: self._refresh_vna_panel(),
+                save_session=lambda: self._save_session(),
+            )
+            self.__dict__["_navigation_coord"] = coord
+        return coord
+
+    @property
+    def _navigation(self) -> NavigationCoordinator:
+        return self._ensure_navigation()
+
+    # ------------------------------------------------------------------
     # View lifecycle
     # ------------------------------------------------------------------
 
@@ -1126,24 +1154,7 @@ class PlayView(arcade.View):
     # ------------------------------------------------------------------
 
     def _focus_party_room(self) -> None:
-        """Reflect the party's current room in the map + side panels.
-
-        Used on load/resume so the player always opens a save where the party
-        actually is: the room is selected on the map (selection frame + detail
-        overlay) and the chat/scene panels are populated. No narration.
-        """
-        if self._dungeon is None or self._state is None:
-            return
-        room_id = self._state.current_room_id
-        if not room_id:
-            return
-        level = self._dungeon.levels[self._state.current_level_idx]
-        room = {r.id: r for r in level.rooms}.get(room_id)
-        if room is None:
-            return
-        self._map.set_selected_room(room.id)
-        self._chat.set_current_room(room.name, room.note or "", room_id=room.id)
-        self._rpg_scene.set_scene(room.name, str(level.id))
+        self._navigation.focus_party_room()
 
     def _clear_dungeon_connection_lock(self, from_room: str, to_room: str) -> None:
         """Clear lock styling on the dungeon model connection so the map re-renders it open."""
@@ -1312,62 +1323,7 @@ class PlayView(arcade.View):
         self._push_things_here_overlay()
 
     def _prepare_vna_exits(self, room_context: dict[str, Any], room_id: str) -> dict[str, Any]:
-        """Player-facing exit nouns: drop unknown exits and disambiguate labels.
-
-        Hidden/sealed exits aren't surfaced as move targets. Same-type exits
-        ('Door' x2) are relabelled with a compass direction, upgrading to the
-        destination room name once that room has been visited (immersion-safe —
-        see :func:`dungeon_daddy.rpg.exit_labels.exit_noun_label`).
-        """
-        from dungeon_daddy.rpg.exit_labels import exit_noun_label
-        from dungeon_daddy.rpg.room_context import PLAYER_KNOWN_EXIT_STATUSES
-
-        rooms_by_id, from_room = self._current_level_rooms(room_id)
-        visited = set(self._state.visited_rooms) if self._state else set()
-        prepared = [
-            {
-                **ext,
-                "label": exit_noun_label(
-                    ext, from_room=from_room,
-                    rooms_by_id=rooms_by_id, visited_rooms=visited,
-                ),
-            }
-            for ext in room_context.get("exits", [])
-            if ext.get("status") in PLAYER_KNOWN_EXIT_STATUSES
-        ]
-        return {**room_context, "exits": prepared}
-
-    def _current_level_rooms(self, room_id: str) -> tuple[dict[str, Any], Any]:
-        """``({room_id: positioned room}, current room)`` for the active level.
-
-        Positions come from the **rendered layout** (the same
-        ``run_layout_pipeline`` output the map draws), so exit compass
-        directions match what the player sees — the layout re-grids rooms by
-        their connections, which can move a raw "far east" room directly south
-        of the hub. Falls back to raw geometry if the layout can't be built,
-        and to ``({}, None)`` when no dungeon is loaded.
-        """
-        if self._dungeon is None or self._state is None:
-            return {}, None
-        idx = self._state.current_level_idx
-        if not (0 <= idx < len(self._dungeon.levels)):
-            return {}, None
-        from dungeon_daddy.map.dungeon_layout import run_layout_pipeline
-
-        level = self._dungeon.levels[idx]
-        names = {r.id: r.name for r in level.rooms}
-        try:
-            result = run_layout_pipeline(level)
-        except Exception:
-            raw_rooms = {r.id: r for r in level.rooms}
-            return raw_rooms, raw_rooms.get(room_id)
-        positioned = {
-            rid: _PositionedRoom(
-                x=rect.x, y=rect.y, w=rect.w, h=rect.h, name=names.get(rid, ""),
-            )
-            for rid, rect in result.rooms.items()
-        }
-        return positioned, positioned.get(room_id)
+        return self._navigation.prepare_vna_exits(room_context, room_id)
 
     def _on_vna_submit(self, card: ActionCard) -> None:
         self._actions.on_vna_submit(card)
@@ -1445,51 +1401,7 @@ class PlayView(arcade.View):
         )
 
     def _on_exit_move(self, exit_id: str, how: str, *, item_slug: str | None = None) -> None:
-        """Apply an engine-validated party move, then narrate the result."""
-        from dungeon_daddy.rpg.command import MoveParty
-        from dungeon_daddy.rpg.move_party import apply_move_party
-
-        if self._mem_repo is None or self._rpg_campaign_id is None or self._state is None:
-            return
-
-        new_session, result = apply_move_party(
-            MoveParty(exit_id=exit_id, how=how),
-            self._mem_repo, self._rpg_campaign_id, self._state,
-            extra_inventory_slugs=[item_slug] if item_slug else None,
-        )
-        if not result.accepted:
-            self._chat.add_message("system", f"⚠ Can't move: {result.rejection_reason}")
-            return
-
-        old_level_idx = self._state.current_level_idx
-        self._state = new_session
-        # Walking out of the room closes any open dialogue channel (§4.3).
-        self._maybe_end_dialogue_on_room_change()
-        room = None
-        level = None
-        if self._dungeon is not None:
-            level = self._dungeon.levels[self._state.current_level_idx]
-            room = self._session.current_room()
-            if self._state.current_level_idx != old_level_idx:
-                self._viewed_level_idx = self._state.current_level_idx
-                self._map.load(level, self._state, len(self._dungeon.levels))
-            else:
-                self._map.update_state(self._state, len(self._dungeon.levels))
-            if room is not None:
-                # Move the selection cursor with the party so the selected frame
-                # and detail/info overlay follow — same treatment as a click.
-                self._map.set_selected_room(room.id)
-                self._chat.set_current_room(room.name, room.note or "", room_id=room.id)
-                self._rpg_scene.set_scene(room.name, str(level.id))
-
-        self._refresh_vna_panel()
-        self._save_session()
-
-        if room is not None and level is not None:
-            flags = ", ".join(sorted(result.modifier_flags)) or "none"
-            self._narration.request_narration(
-                f"We move {how} through the exit into {room.name}. (effects: {flags})"
-            )
+        self._navigation.on_exit_move(exit_id, how, item_slug=item_slug)
 
     def _run_proposal_pipeline(self, resolution: ActionResolution, campaign_id: str) -> None:
         self._actions.run_proposal_pipeline(resolution, campaign_id)
@@ -1913,23 +1825,7 @@ class PlayView(arcade.View):
         self._rpg_toggle_rect = self._compute_rpg_toggle_rect(w, content_h)
 
     def _on_graph_room_select(self, room_id: str) -> None:
-        if self._dungeon is None or self._state is None:
-            return
-        level = self._dungeon.levels[self._state.current_level_idx]
-        room_map = {r.id: r for r in level.rooms}
-        room = room_map.get(room_id)
-        if room is None:
-            return
-        self._state.current_room_id = room.id
-        if room.id not in self._state.visited_rooms:
-            self._state.visited_rooms.append(room.id)
-        total = len(self._dungeon.levels)
-        self._map.update_state(self._state, total)
-        self._chat.set_current_room(room.name, room.note or "", room_id=room.id)
-        self._rpg_scene.set_scene(room.name, str(level.id))
-        _log.debug("Graph: selected room %s", room.id)
-        self._narration.request_narration(f"We enter {room.name}.")
-        self._save_session()
+        self._navigation.on_graph_room_select(room_id)
 
     def _on_graph_connection_select(self, from_room: str, to_room: str) -> None:
         if self._dungeon is None or self._state is None:
