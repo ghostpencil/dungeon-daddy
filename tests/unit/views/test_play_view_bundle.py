@@ -562,7 +562,7 @@ def test_refresh_chat_mini_card_passes_portraits_dir(tmp_path):
     view._session.set_actors([actor])
     view._chat = MagicMock()
 
-    with patch("dungeon_daddy.views.play_view.build_actor_mini_card") as mock_build:
+    with patch("dungeon_daddy.play.controller.build_actor_mini_card") as mock_build:
         mock_build.return_value = MagicMock()
         view._refresh_chat_mini_card()
 

@@ -11,7 +11,6 @@ import arcade
 import arcade.gui
 
 if TYPE_CHECKING:
-    from dungeon_daddy.memory.models import ContextBundle
     from dungeon_daddy.rpg.action_options import ActionCard
     from dungeon_daddy.rpg.command import PlayerCommand
     from dungeon_daddy.rpg.dice import Outcome
@@ -30,17 +29,16 @@ from dungeon_daddy.llm.provider import LLMMessage
 from dungeon_daddy.map.graph_renderer import GraphRenderer
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.play.actions import ActionOrchestrator
+from dungeon_daddy.play.controller import PlaySessionController
 from dungeon_daddy.play.dialogue import DialogueCoordinator, DialogueSession
 from dungeon_daddy.play.memory_coordinator import MemoryCoordinator
 from dungeon_daddy.play.narration import DMResult, NarrationCoordinator
 from dungeon_daddy.play.navigation import NavigationCoordinator
 from dungeon_daddy.play.session_context import PlaySessionContext
-from dungeon_daddy.rpg.actor_control import filter_player_actors
 from dungeon_daddy.rpg.classifier import classify_intent
 from dungeon_daddy.rpg.intent import PendingIntent
-from dungeon_daddy.rpg.models import ActorState, ClockState, StressTrack
+from dungeon_daddy.rpg.models import ActorState, ClockState
 from dungeon_daddy.rpg.service import RpgService
-from dungeon_daddy.ui.actor_mini_card import build_actor_mini_card
 from dungeon_daddy.ui.chrome import PILLS_CLUSTER_W, draw_title_bar, title_bar_mode_at
 from dungeon_daddy.ui.panels.action_builder import InChatActionBuilder
 from dungeon_daddy.ui.panels.character_sheet_panel import CharacterSheetPanel
@@ -438,271 +436,112 @@ class PlayView(arcade.View):
         self._ensure_session().campaign_id = value
 
     # ------------------------------------------------------------------
-    # Narration bridge (Phase 51.7, Slice 2)
+    # Controller bridge (Phase 51.7, Slice 7)
     #
-    # The DM-narration plumbing (history/queue/busy flag/worker thread, context
-    # bundle, DM thread spawn) lives in ``NarrationCoordinator``. It is
-    # lazily materialized so ``PlayView.__new__`` test setups still work, and
-    # the state attributes it owns are bridged so the existing ~8 factory
-    # setups and their content/queue/busy assertions read the single source of
-    # truth without churn. Ports capture ``self`` via lambdas so they read live
-    # view state (mirrors the Slice 1 ReactionApplier wiring).
+    # ``PlaySessionController`` is the composition root: it owns the five play
+    # coordinators + the session-facade methods (bootstrap + the domain→panel
+    # refresh fan-out), wiring every coordinator port against this view (its
+    # ``PlayHost``) + the shared ``PlaySessionContext`` (owned by the Slice 0
+    # session bridge above, passed in so both agree on one source of truth). It
+    # is lazily materialized so ``PlayView.__new__`` test setups still work. The
+    # coordinator + narration/dialogue state bridge properties below delegate to
+    # it so the existing view tests and ``__new__`` factories read the single
+    # source of truth without churn.
     # ------------------------------------------------------------------
 
-    def _ensure_narration(self) -> NarrationCoordinator:
-        coord = self.__dict__.get("_narration_coord")
-        if coord is None:
-            coord = NarrationCoordinator(
-                self._session,
-                get_dm_agent=lambda: self._dm_agent,
-                get_repo=lambda: self._repo,
-                get_rpg_service=lambda: self._rpg_service,
-                on_busy=lambda busy: self._chat.set_busy(busy),
-                post_dm=lambda text: self._post_chat("dm", text),
-                post_system=lambda text: self._post_chat("system", text),
-                on_dungeon_reply=lambda pm, reply: self._apply_dungeon_reply(pm, reply),
-                extract_remember=lambda text: self._extract_remember(text),
-                auto_remember=lambda event: self._auto_remember(event),
-                on_bundle_built=lambda bundle: self._set_debug_bundle(bundle),
-            )
-            self.__dict__["_narration_coord"] = coord
-        return coord
+    def _ensure_controller(self) -> PlaySessionController:
+        controller = self.__dict__.get("_controller_obj")
+        if controller is None:
+            controller = PlaySessionController(self, session=self._session)
+            self.__dict__["_controller_obj"] = controller
+        return controller
 
-    def _set_debug_bundle(self, bundle: ContextBundle) -> None:
-        if self._rpg_debug is not None:
-            self._rpg_debug.set_bundle(bundle)
-
-    def _post_chat(self, role: str, text: str) -> None:
-        """Shared chat-post seam for the coordinator ports (defers ``_chat`` lookup)."""
-        self._chat.add_message(role, text)
+    @property
+    def _controller(self) -> PlaySessionController:
+        return self._ensure_controller()
 
     @property
     def _narration(self) -> NarrationCoordinator:
-        return self._ensure_narration()
+        return self._ensure_controller().narration
 
     @property
     def _dm_history(self) -> list[LLMMessage]:
-        return self._ensure_narration().history
+        return self._ensure_controller().narration.history
 
     @_dm_history.setter
     def _dm_history(self, value: list[LLMMessage]) -> None:
-        self._ensure_narration().history = value
+        self._ensure_controller().narration.history = value
 
     @property
     def _llm_busy(self) -> bool:
-        return self._ensure_narration().is_busy
+        return self._ensure_controller().narration.is_busy
 
     @_llm_busy.setter
     def _llm_busy(self, value: bool) -> None:
-        self._ensure_narration().is_busy = value
+        self._ensure_controller().narration.is_busy = value
 
     @property
     def _result_queue(self) -> queue.Queue[DMResult]:
-        return self._ensure_narration().queue
+        return self._ensure_controller().narration.queue
 
     @_result_queue.setter
     def _result_queue(self, value: queue.Queue[DMResult]) -> None:
-        self._ensure_narration().queue = value
+        self._ensure_controller().narration.queue = value
 
     @property
     def _active_thread(self) -> threading.Thread | None:
-        return self._ensure_narration().active_thread
+        return self._ensure_controller().narration.active_thread
 
     @_active_thread.setter
     def _active_thread(self, value: threading.Thread | None) -> None:
-        self._ensure_narration().active_thread = value
+        self._ensure_controller().narration.active_thread = value
 
-    # ------------------------------------------------------------------
-    # Dialogue bridge (Phase 51.7, Slice 3)
+    # -- Coordinator + dialogue-state bridges (all owned by the controller) --
     #
-    # The dungeon-voice + NPC dialogue seam (open channel, line routing, §4.4
-    # context assembly, the exchange side-effect) lives in
-    # ``DialogueCoordinator``. Lazily materialized so ``PlayView.__new__`` test
-    # setups still work; the open-channel + persona state it owns is bridged so
-    # the existing view tests and the ``window.set_dungeon_persona`` API read the
-    # single source of truth without churn. Ports are late-bound lambdas reading
-    # live view state (mirrors the Slice 2 NarrationCoordinator wiring); the
-    # coordinator holds no ``PlayView`` reference.
-    # ------------------------------------------------------------------
-
-    def _ensure_dialogue(self) -> DialogueCoordinator:
-        coord = self.__dict__.get("_dialogue_coord_obj")
-        if coord is None:
-            coord = DialogueCoordinator(
-                self._session,
-                get_narration=lambda: self._narration,
-                get_voice_agent=lambda: getattr(self, "_dungeon_voice_agent", None),
-                get_acting_actor=lambda: self._acting_actor(),
-                post_message=self._post_chat,
-                set_dialogue_mode=lambda on: self._chat.set_dialogue_mode(on),
-                set_busy=lambda on: self._chat.set_busy(on),
-                get_room_context=lambda: getattr(self, "_last_room_context", {}) or {},
-            )
-            self.__dict__["_dialogue_coord_obj"] = coord
-        return coord
+    # The five coordinators live on ``PlaySessionController``; these properties
+    # are the view's thin accessors. Dialogue's open-channel + persona state is
+    # bridged (get/set) so the existing view tests and the
+    # ``window.set_dungeon_persona`` API read the single source of truth.
 
     @property
     def _dialogue_coord(self) -> DialogueCoordinator:
-        return self._ensure_dialogue()
+        return self._ensure_controller().dialogue
 
     @property
     def _dialogue(self) -> DialogueSession | None:
-        return self._ensure_dialogue().session
+        return self._ensure_controller().dialogue.session
 
     @_dialogue.setter
     def _dialogue(self, value: DialogueSession | None) -> None:
-        self._ensure_dialogue().session = value
+        self._ensure_controller().dialogue.session = value
 
     @property
     def _dungeon_voice(self) -> str | None:
-        return self._ensure_dialogue().dungeon_voice
+        return self._ensure_controller().dialogue.dungeon_voice
 
     @_dungeon_voice.setter
     def _dungeon_voice(self, value: str | None) -> None:
-        self._ensure_dialogue().dungeon_voice = value
+        self._ensure_controller().dialogue.dungeon_voice = value
 
     @property
     def _dungeon_knowledge(self) -> list[str]:
-        return self._ensure_dialogue().dungeon_knowledge
+        return self._ensure_controller().dialogue.dungeon_knowledge
 
     @_dungeon_knowledge.setter
     def _dungeon_knowledge(self, value: list[str]) -> None:
-        self._ensure_dialogue().dungeon_knowledge = value
-
-    # ------------------------------------------------------------------
-    # Actions bridge (Phase 51.7, Slice 4)
-    #
-    # The action seam — the ``_on_vna_submit`` dispatch tree, the roll/command/
-    # obstacle/proposal paths, and objective advancement — lives in
-    # ``ActionOrchestrator``. Lazily materialized so ``PlayView.__new__`` test
-    # setups still work; the orchestrator is stateless (ports + shared session),
-    # so there is no state to bridge — the view keeps thin delegators as its
-    # input-routing surface. Ports are late-bound lambdas reading live view
-    # state (the Slice 2/3 pattern); the orchestrator holds no ``PlayView``
-    # reference.
-    # ------------------------------------------------------------------
-
-    def _ensure_actions(self) -> ActionOrchestrator:
-        orch = self.__dict__.get("_actions_orch")
-        if orch is None:
-            orch = ActionOrchestrator(
-                self._session,
-                get_rpg_service=lambda: self._rpg_service,
-                get_dm_agent=lambda: self._dm_agent,
-                get_debug=lambda: self._rpg_debug,
-                get_narration=lambda: self._narration,
-                get_acting_actor=lambda: self._acting_actor(),
-                get_nouns=lambda: (
-                    self._rpg_vna._nouns if hasattr(self, "_rpg_vna") else []
-                ),
-                get_room_context=lambda: getattr(self, "_last_room_context", {}),
-                post_message=self._post_chat,
-                begin_dialogue=lambda **kw: self._begin_dialogue(**kw),
-                on_exit_move=lambda exit_id, how, item_slug=None: self._on_exit_move(
-                    exit_id, how, item_slug=item_slug
-                ),
-                clear_connection_lock=lambda f, t: (
-                    self._clear_dungeon_connection_lock(f, t)
-                ),
-                refresh_vna_panel=lambda: self._refresh_vna_panel(),
-                refresh_right_panel=lambda actor_id: (
-                    self._refresh_right_panel_from_actors(actor_id)
-                ),
-                build_request=lambda **kw: self._rpg_action._build_request(**kw),
-                format_result=lambda res: self._rpg_action._format_result(res),
-                store_result=lambda summary: self._rpg_action.store_result(summary),
-            )
-            self.__dict__["_actions_orch"] = orch
-        return orch
+        self._ensure_controller().dialogue.dungeon_knowledge = value
 
     @property
     def _actions(self) -> ActionOrchestrator:
-        return self._ensure_actions()
-
-    # ------------------------------------------------------------------
-    # Navigation bridge (Phase 51.7, Slice 5)
-    #
-    # The navigation seam — exit moves, the graph room-select branch,
-    # party-room focus, and the layout-label helpers — lives in
-    # ``NavigationCoordinator``. Lazily materialized so ``PlayView.__new__``
-    # test setups still work; the coordinator is stateless (ports + shared
-    # session), so the view keeps thin delegators as its input-routing surface.
-    # Ports are late-bound lambdas reading live view state (the Slice 2/3/4
-    # pattern); the coordinator holds no ``PlayView`` reference. The one bit of
-    # view-only state it drives is ``_viewed_level_idx`` (map paging), set via
-    # the ``set_viewed_level`` port.
-    # ------------------------------------------------------------------
-
-    def _ensure_navigation(self) -> NavigationCoordinator:
-        coord = self.__dict__.get("_navigation_coord")
-        if coord is None:
-            coord = NavigationCoordinator(
-                self._session,
-                post_message=self._post_chat,
-                request_narration=lambda text: self._narration.request_narration(text),
-                set_selected_room=lambda room_id: self._map.set_selected_room(room_id),
-                set_current_room=lambda name, note, room_id: self._chat.set_current_room(
-                    name, note, room_id=room_id
-                ),
-                set_scene=lambda name, level_id: self._rpg_scene.set_scene(name, level_id),
-                load_level=lambda level, state, total: self._map.load(level, state, total),
-                update_map_state=lambda state, total: self._map.update_state(state, total),
-                set_viewed_level=lambda idx: setattr(self, "_viewed_level_idx", idx),
-                end_dialogue_on_room_change=lambda: (
-                    self._maybe_end_dialogue_on_room_change()
-                ),
-                refresh_vna_panel=lambda: self._refresh_vna_panel(),
-                save_session=lambda: self._save_session(),
-            )
-            self.__dict__["_navigation_coord"] = coord
-        return coord
+        return self._ensure_controller().actions
 
     @property
     def _navigation(self) -> NavigationCoordinator:
-        return self._ensure_navigation()
-
-    # ------------------------------------------------------------------
-    # Memory bridge (Phase 51.7, Slice 6)
-    #
-    # The memory seam — ``/remember`` + the ``[REMEMBER: …]`` auto-hook, MEM-panel
-    # population, MEM-tab commit persistence, and the level-memory overlay's
-    # load/save persistence — lives in ``MemoryCoordinator``. The overlay
-    # *widgets* stay in the view (see ``_open_overlay_ui`` / ``_draw_overlay_*``);
-    # the coordinator owns only the persistence behind them. Lazily materialized
-    # so ``PlayView.__new__`` test setups still work; ports are late-bound lambdas
-    # reading live view state (the Slice 2–5 pattern), so ``_repo`` / ``_rpg_memory``
-    # are resolved at call time. The coordinator holds no ``PlayView`` reference.
-    # ------------------------------------------------------------------
-
-    def _ensure_memory(self) -> MemoryCoordinator:
-        coord = self.__dict__.get("_memory_coord")
-        if coord is None:
-            coord = MemoryCoordinator(
-                self._session,
-                post_message=self._post_chat,
-                append_room_event=(
-                    lambda name, level_id, room_id, room_name, event: (
-                        self._repo.append_room_event(
-                            name, level_id, room_id, room_name, event
-                        )
-                    )
-                ),
-                load_room_memory=lambda name, level_id: (
-                    self._repo.load_room_memory(name, level_id)
-                ),
-                save_room_memory=lambda name, level_id, content: (
-                    self._repo.save_room_memory(name, level_id, content)
-                ),
-                set_entries=lambda entries: self._rpg_memory.set_entries(entries),
-                pop_pending_commit=lambda: self._rpg_memory.pop_pending_commit(),
-                refresh_memory_state=lambda: self._refresh_memory_state(),
-            )
-            self.__dict__["_memory_coord"] = coord
-        return coord
+        return self._ensure_controller().navigation
 
     @property
     def _memory(self) -> MemoryCoordinator:
-        return self._ensure_memory()
+        return self._ensure_controller().memory
 
     # ------------------------------------------------------------------
     # View lifecycle
@@ -880,67 +719,17 @@ class PlayView(arcade.View):
     # ------------------------------------------------------------------
 
     def load_dungeon_transient(self, dungeon: Dungeon) -> None:
-        self._is_test_drive = True
-        self._dungeon = dungeon
-        self._state = SessionState(dungeon_id="__test_drive__", current_level_idx=0)
-        level = dungeon.levels[0]
-        self._map.load(level, self._state, len(dungeon.levels))
-        self._map.set_loops_visible(True)  # loop chips are a test-drive affordance
-        self._map.set_dungeon_title(dungeon.meta.title)
-        self._chat.set_mode_label("Play Mode")
-        self._chat.add_message(
-            "dm",
-            f'Loaded "{dungeon.meta.title}" — Level 1: {level.name}. '
-            "Click rooms on the map to explore.",
-        )
-        _log.info("PlayView: loaded dungeon=%s (test drive)", dungeon.meta.title)
-        self._refresh_memory_state()
-        self._load_player_actors()
-        self._sync_debug_level_id()
-        self._focus_party_room()
+        self._controller.load_dungeon_transient(dungeon)
 
     def load_dungeon_session(self, dungeon: Dungeon) -> None:
-        self._is_test_drive = False
-        self._dungeon = dungeon
-        save_name = dungeon.meta.effective_name
-        existing = self._repo.load_session(save_name)
-        if existing is not None:
-            self._state = existing
-            level = dungeon.levels[existing.current_level_idx]
-            self._map.load(level, self._state, len(dungeon.levels))
-            self._map.set_dungeon_title(dungeon.meta.title)
-            self._chat.set_mode_label("Play Mode")
-            self._chat.add_message(
-                "dm",
-                f"Resuming session — Level {existing.current_level_idx + 1}: {level.name}.",
-            )
-        else:
-            self._state = SessionState(dungeon_id=save_name, current_level_idx=0)
-            level = dungeon.levels[0]
-            self._map.load(level, self._state, len(dungeon.levels))
-            self._map.set_dungeon_title(dungeon.meta.title)
-            self._chat.set_mode_label("Play Mode")
-            self._chat.add_message(
-                "dm",
-                f'Loaded "{dungeon.meta.title}" — Level 1: {level.name}. '
-                "Click rooms on the map to explore.",
-            )
-        # Loop pattern chips are an authoring/test-drive affordance, not shown in
-        # a normal play session.
-        self._map.set_loops_visible(False)
-        _log.info("PlayView: loaded dungeon=%s (session)", dungeon.meta.title)
-        self._refresh_memory_state()
-        self._load_player_actors()
-        self._sync_debug_level_id()
-        self._focus_party_room()
+        self._controller.load_dungeon_session(dungeon)
 
     def load_dungeon(self, dungeon: Dungeon) -> None:
         """Alias for load_dungeon_transient — kept until window.py callers are updated."""
         self.load_dungeon_transient(dungeon)
 
     def _save_session(self) -> None:
-        if not self._is_test_drive and self._state is not None:
-            self._repo.save_session(self._state)
+        self._controller.save_session()
 
     # ------------------------------------------------------------------
     # Player actors
@@ -957,74 +746,13 @@ class PlayView(arcade.View):
         portraits_dir: Path | None = None,
     ) -> None:
         """Update the active RPG repository and campaign id. Closes the previous repo if any."""
-        old = getattr(self, "_mem_repo", None)
-        if old is not None and old is not mem_repo:
-            try:
-                old.close()
-            except Exception:
-                pass
-        self._mem_repo = mem_repo
-        self._rpg_campaign_id = campaign_id
-        self._portraits_dir = portraits_dir
-        self._load_player_actors()
-        # set_rpg_context runs *after* load_dungeon_session (where _focus_party_room
-        # fires while _mem_repo is still None), so this is the first point where the
-        # room, actors, and repo are all available. Populate the in-chat Action
-        # Builder now so it is usable on load.
-        self._refresh_vna_panel()
+        self._controller.set_rpg_context(mem_repo, campaign_id, portraits_dir)
 
     def _sync_debug_level_id(self) -> None:
-        if self._rpg_debug is None or self._state is None:
-            return
-        idx = self._state.current_level_idx
-        level_id = self._session.current_level_id
-        if level_id is not None:
-            self._rpg_debug.set_current_level_id(level_id)
-        if self._dungeon is not None:
-            room_ids = {r.id for r in self._dungeon.levels[idx].rooms}
-            self._rpg_debug.set_current_level_room_ids(room_ids)
+        self._controller.sync_debug_level_id()
 
     def _load_player_actors(self) -> None:
-        if not hasattr(self, "_mem_repo") or self._mem_repo is None:
-            return
-        if not hasattr(self, "_state") or self._state is None:
-            return
-        campaign_id = getattr(self, "_rpg_campaign_id", None) or self._state.dungeon_id
-        raw = self._mem_repo.get_actors_by_campaign(campaign_id)
-        actor_states = []
-        for a in raw:
-            ratings = {
-                r["action_key"]: r["rating"]
-                for r in self._mem_repo.get_actor_action_ratings(a["actor_id"])
-            }
-            stress = {
-                t["track_key"]: StressTrack(
-                    track_key=t["track_key"],
-                    capacity=t["capacity"],
-                    filled=t["filled"],
-                )
-                for t in self._mem_repo.get_actor_stress_tracks(a["actor_id"])
-            }
-            actor_states.append(ActorState(
-                actor_id=a["actor_id"],
-                campaign_id=a["campaign_id"],
-                actor_type=a["actor_type"],
-                slug=a["slug"],
-                display_name=a["display_name"],
-                status=a["status"],
-                actions=ratings,
-                stress=stress,
-                playbook_slug=a.get("playbook_slug"),
-            ))
-        pc_actors = filter_player_actors(actor_states)
-        self._session.set_actors(pc_actors)
-        self._rpg_char.set_party(pc_actors)
-        if pc_actors:
-            self._refresh_right_panel_from_actors(pc_actors[0].actor_id)
-        pc_ids = [a.actor_id for a in pc_actors]
-        if pc_ids and hasattr(self, "_action_state"):
-            self._action_state.set_actor_roster(pc_ids)
-        self._refresh_chat_mini_card()
+        self._controller.load_player_actors()
 
     def _load_memory_entries(self) -> None:
         self._memory.load_memory_entries()
@@ -1047,40 +775,7 @@ class PlayView(arcade.View):
         self._actions.run_chat_action(campaign_id, actor_id, action_key, intent)
 
     def _refresh_right_panel_from_actors(self, actor_id: str) -> None:
-        """Sync right panel inspector with the actor who just acted."""
-        actors = self._session.actors
-        if not actors:
-            return
-        actor = next((a for a in actors if a.actor_id == actor_id), actors[0])
-        self._rpg_char.set_actor(actor)
-        if actor.playbook_slug:
-            from dungeon_daddy.rpg.playbook import PlaybookLibrary
-            try:
-                self._rpg_char.set_playbook(PlaybookLibrary().get(actor.playbook_slug))
-            except KeyError:
-                self._rpg_char.set_playbook(None)
-        else:
-            self._rpg_char.set_playbook(None)
-        if self._mem_repo is not None:
-            self._rpg_char.set_abilities(self._mem_repo.get_actor_abilities(actor.actor_id))
-        self._refresh_chat_mini_card()
-        if self._mem_repo is not None and self._rpg_campaign_id:
-            from dungeon_daddy.rpg.models import FalloutRecord
-            raw = self._mem_repo.get_fallout_records(self._rpg_campaign_id, actor.actor_id)
-            entries = [
-                FalloutRecord(
-                    fallout_id=r["fallout_id"],
-                    campaign_id=r["campaign_id"],
-                    actor_id=r["actor_id"],
-                    track_key=r["track_key"],
-                    severity=r["severity"],
-                    title=r["title"],
-                    summary=r["summary"],
-                    status=r["status"],
-                )
-                for r in raw
-            ]
-            self._rpg_fallout.set_entries(entries)
+        self._controller.refresh_right_panel_from_actors(actor_id)
 
     def _on_action_key_selected(self, action_key: str) -> None:
         try:
@@ -1112,16 +807,7 @@ class PlayView(arcade.View):
         self._run_chat_action(campaign_id, actor_id, action_key, intent_text)
 
     def _refresh_chat_mini_card(self) -> None:
-        if not hasattr(self, "_action_state"):
-            return
-        actor_id = self._action_state.actor_id
-        actors = self._session.actors
-        actor = next((a for a in actors if a.actor_id == actor_id), None) if actor_id else None
-        portraits_dir = getattr(self, "_portraits_dir", None)
-        self._chat.set_actor_mini_card(
-            build_actor_mini_card(actor, portraits_dir=portraits_dir) if actor else None
-        )
-        self._chat.set_has_multiple_actors(self._action_state.has_multiple_actors)
+        self._controller.refresh_chat_mini_card()
 
     def _on_actor_switch(self, direction: str) -> None:
         if self._action_state.awaiting_confirmation:
@@ -1178,21 +864,10 @@ class PlayView(arcade.View):
         self._navigation.focus_party_room()
 
     def _clear_dungeon_connection_lock(self, from_room: str, to_room: str) -> None:
-        """Clear lock styling on the dungeon model connection so the map re-renders it open."""
-        if self._dungeon is None or self._state is None:
-            return
-        level = self._dungeon.levels[self._state.current_level_idx]
-        for conn in level.connections:
-            if conn.from_room == from_room and conn.to_room == to_room:
-                conn.connection_style = None
-                conn.layout_connection_role = None
-                break
+        self._controller.clear_connection_lock(from_room, to_room)
 
     def _acting_actor(self) -> ActorState | None:
-        """The actor a Card acts as: the selected one, else the first PC."""
-        action_state = getattr(self, "_action_state", None)
-        selected_id = action_state.actor_id if action_state else None
-        return self._session.acting_actor(selected_id)
+        return self._controller.acting_actor()
 
     def _set_acting_actor(self, actor_id: str) -> None:
         """Make ``actor_id`` the actor whose Cards/rolls resolve.
@@ -1207,72 +882,10 @@ class PlayView(arcade.View):
         self._refresh_vna_panel()
 
     def _room_world_flags(self, room_id: str) -> set[str]:
-        """World-context flags gating conditional adverbs (mirrors the room-context build)."""
-        flags: set[str] = set()
-        actors = self._session.actors
-        if max((a.actions.get("sense", 0) for a in actors), default=0) >= 1:
-            flags.add("can_sense")
-        if self._mem_repo is None or self._rpg_campaign_id is None:
-            return flags
-        cid = self._rpg_campaign_id
-        exits = self._mem_repo.get_exits_by_room(cid, room_id)
-        if any(e.get("status") == "one_way" for e in exits):
-            flags.add("one_way")
-        if any(e.get("connector_type") == "ritual_gate" for e in exits):
-            flags.add("ritual_connector")
-        if any(
-            o["archetype"] == "trap" and o["current_state"] == "armed"
-            for o in self._mem_repo.get_objects_by_room(cid, room_id)
-        ):
-            flags.add("armed_trap")
-        return flags
+        return self._controller.room_world_flags(room_id)
 
     def _refresh_vna_panel(self) -> None:
-        """Populate the VNA action panel from the current room + acting actor."""
-        from dungeon_daddy.memory.context_bundle import build_room_noun_context
-
-        if (self._mem_repo is None or self._rpg_campaign_id is None
-                or self._state is None or not self._state.current_room_id):
-            return
-        actor = self._acting_actor()
-        if actor is None:
-            return
-        room_id = self._state.current_room_id
-        room_context = build_room_noun_context(self._mem_repo, self._rpg_campaign_id, room_id)
-        room_context = self._prepare_vna_exits(room_context, room_id)
-        # Party PCs move as a group — their location is in session state, not
-        # per-actor room_id, so we inject them here from the loaded actor roster.
-        all_actors = self._session.actors
-        room_context = {
-            **room_context,
-            "party": [
-                {"actor_id": a.actor_id, "display_name": a.display_name}
-                for a in all_actors
-                if a.actor_id != actor.actor_id
-            ],
-        }
-        actor_dict = {
-            "actor_id": actor.actor_id,
-            "display_name": actor.display_name,
-            "carried_items": self._mem_repo.get_items_by_actor(actor.actor_id),
-        }
-        self._rpg_vna.set_context(
-            actor_abilities=self._mem_repo.get_actor_abilities(actor.actor_id),
-            room_context=room_context,
-            actor=actor_dict,
-            playbook_slug=actor.playbook_slug or "",
-            world_flags=self._room_world_flags(room_id),
-        )
-        # Retain the prepared context so the lighter overlay-push path
-        # (_on_overlay_noun_click) can rebuild the "Things Here" view-model
-        # without re-running set_context, which would reset the noun selection.
-        self._last_room_context = room_context
-        self._last_actor_dict = actor_dict
-        # Feed the map's "Things Here" overlay from the same room context, so it
-        # auto-tracks the current room (Phase 50.6 §5). The in-chat Action
-        # Builder reads _rpg_vna's options live each draw, so no widget rebuild
-        # is needed here.
-        self._push_things_here_overlay()
+        self._controller.refresh_vna_panel()
 
     def _push_things_here_overlay(self) -> None:
         """Push the current room contents + builder selection to the map overlay.
@@ -1611,7 +1224,7 @@ class PlayView(arcade.View):
     # ------------------------------------------------------------------
 
     def _refresh_memory_state(self) -> None:
-        self._has_memory = self.has_level_memory()
+        self._controller.refresh_memory_state()
 
     # ------------------------------------------------------------------
     # Overlay UI helpers

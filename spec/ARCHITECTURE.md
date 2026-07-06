@@ -11,7 +11,18 @@ dungeon_daddy/
 ├── views/
 │   ├── __init__.py
 │   ├── design_view.py           # DesignView(arcade.View)
-│   └── play_view.py             # PlayView(arcade.View)
+│   └── play_view.py             # PlayView(arcade.View) — drawing/input/layout/overlay only
+│
+├── play/                        # Play-session coordination (no arcade); views → play → rpg|memory|llm|data
+│   ├── __init__.py
+│   ├── session_context.py       # PlaySessionContext — shared dungeon/session/repo/actor-roster state
+│   ├── controller.py            # PlaySessionController — composition root + session facade; PlayHost protocol
+│   ├── actions.py               # ActionOrchestrator — card dispatch, rolls, proposals, obstacles, world reaction
+│   ├── navigation.py            # NavigationCoordinator — exit moves, room click-to-move, focus, level view
+│   ├── dialogue.py              # DialogueCoordinator — dungeon-voice + NPC channels, agent inputs
+│   ├── memory_coordinator.py    # MemoryCoordinator — /remember, auto-remember, MEM-tab persist, level overlay
+│   ├── narration.py             # NarrationCoordinator — DM history/compaction, context bundle, worker threads, queue
+│   └── reaction_applier.py      # ReactionApplier — atomic clock+stress world-reaction writes
 │
 ├── ui/
 │   ├── __init__.py
@@ -117,13 +128,28 @@ tree showing levels and rooms, coloured by loop path membership.
 
 ### `views/play_view.py` — `PlayView`
 
-Active during a play session. Owns:
-- A `UIManager` containing: `ChatPanel` (left), `MapPanel` + `LevelStepper` (right)
-- The `DungeonMasterAgent` instance
-- Session state: `current_level_idx`, `current_room_id`, `visited_rooms`, `active_loop_id`
+Active during a play session. Since the **Phase 51.7 PlayView decomposition**,
+`PlayView` is a thin `arcade.View` that owns only the **presentation surface** —
+drawing, input routing, layout, and overlay-widget management — and **delegates
+all domain coordination** to `PlaySessionController` (`dungeon_daddy/play/`). It owns:
+- A `UIManager` containing: `ChatPanel` (left), `MapPanel` + `LevelStepper` (right),
+  and the collapsible RPG side panel (`_RpgSidePanel`)
+- The `DungeonMasterAgent` / `DungeonVoiceAgent` / `RpgService` handles (injected,
+  read by the coordinator ports)
 - The active `MapRenderer` instance (swapped when variant changes)
-- `_chat_history: list[ChatMessage]` — the in-memory transcript for this session
-- `_result_queue` and `_llm_busy` — see Threading Model
+- The Edit-Memory overlay widgets + their open/save/close lifecycle
+- Thin `_ensure_controller()` + bridge properties (`_narration`/`_actions`/… and the
+  session/dialogue/narration state) that delegate to the controller
+
+**`PlaySessionController`** is the composition root: it owns the shared
+`PlaySessionContext` (received from the view's Slice 0 session bridge) and the five
+coordinators (Action / Navigation / Dialogue / Memory / Narration), plus the
+session-facade methods (`load_dungeon_*` / `set_rpg_context` / `save_session` /
+`load_player_actors` / `sync_debug_level_id` and the domain→panel refresh fan-out).
+Coordinators hold no `PlayView` reference — they receive narrow port callables the
+controller binds against the view through the `PlayHost` structural protocol. The
+`play/` package imports no `arcade`; dependency direction is
+`views → play → (rpg | memory | llm | data)`.
 
 PlayView draws the map directly to the Arcade canvas each frame and overlays
 the `UIManager` on top.
@@ -214,6 +240,14 @@ through the window.
 Arcade runs a single-threaded game loop. LLM API calls block for seconds.
 To keep the UI responsive, LLM calls run in background threads that post
 results back to the game loop via a thread-safe queue.
+
+> **Play Mode (post Phase 51.7):** the queue + busy flag + worker thread
+> (`_result_queue` / `_llm_busy` / `_active_thread`) are owned by
+> **`NarrationCoordinator`** (`dungeon_daddy/play/narration.py`), not `PlayView`.
+> `PlayView.on_update` drains it by calling `self._narration.poll()`; the view's
+> like-named attributes are thin bridge properties delegating to the coordinator.
+> DuckDB writes still happen only on the main thread. `DesignView` continues to
+> own its queue directly as below.
 
 ### Queue Type
 

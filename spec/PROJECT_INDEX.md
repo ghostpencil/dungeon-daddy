@@ -36,24 +36,54 @@ Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_
 
 ---
 
-## START HERE — Phase 51.7 PlayView Decomposition in BUILD
+## START HERE — Phase 51.7 PlayView Decomposition (all slices built; ⏸ awaiting owner GUI verify)
 
 **PR #88 merged to `main` 2026-07-05 (`c0e1cba`) — Phase 51.6 fully closed.** Current work:
 **Phase 51.7 — PlayView Decomposition** on `feat/phase-51.7-playview-decomp` — spec + slice plan
-in `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Slices 0–6 landed 2026-07-06.
+in `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Slices 0–7 all built 2026-07-06.
 
-**⏸ RESUME HERE — Slice 7 (`PlaySessionController`) — the phase-closing slice.** Slice 6
-(`MemoryCoordinator`) is committed & review-hardened (`df6a2a6`, 2026-07-06). Next & last:
-extract the composition root into `play/controller.py` — `PlaySessionController` wires the five
-coordinators + the `PlaySessionContext` together; `PlayView` keeps only drawing/input/layout +
-overlay-widget management + delegation to the controller (spec §3 Slice 7; target
-`views/play_view.py` ≤ ~900 lines per exit criterion 1). Follow the Slice 0–6 pattern (no
-`arcade`; narrow late-bound ports; lazy `_ensure_*` bridge; thin view delegators; the
-`PlayView.__new__` factories stay unchanged). TDD via the tdd skill (read `spec/TESTING.md`
-first). **Slice 7 also closes the phase:** amend `spec/ARCHITECTURE.md` (module tree, PlayView
-responsibilities, threading section → `NarrationCoordinator`) and owner manual GUI verify on the
-live Crucible (exit criterion 6: an action roll, an exit move, a dungeon-voice exchange,
-`/remember`, and a memory approve all behave as before).
+**⏸ RESUME HERE — Slice 7 code complete & review-hardened; the phase's ONLY open item is the
+owner manual GUI verify (exit criterion 6), then commit.** Slice 7 (`PlaySessionController`) is
+implemented, tested, and 5-angle `/code-review high` clean (no correctness bugs). Remaining to close
+the phase:
+- **Owner manual GUI verify on the live Crucible** (exit criterion 6): an action roll, an exit
+  move, a dungeon-voice exchange, `/remember`, and a memory approve all behave as before. (Not yet
+  done — needs the live app; the automated suite can't cover it.)
+- **Commit after the GUI verify passes** (owner decided 2026-07-06: hold the commit until GUI verify),
+  then open the PR.
+
+**Exit-criterion-1 — ✅ owner accepted 1491 lines (2026-07-06).** `views/play_view.py` landed at
+**1491 lines** (from 1878), above the spec's "≤ ~900" but now containing *only* drawing / input
+routing / layout / overlay-widget management / delegation — **criterion 1 met in spirit** (owner
+ruling). The ~900 figure under-estimated the legitimate **input-routing** weight (the `_on_chat_send`
++ action-state/chip cluster ~250 lines, which criterion 1 explicitly says *stays* in PlayView) plus
+the `_RpgSidePanel` UI class (~132 lines, legitimately "overlay-widget management"). A literal ≤900
+would need an additional input-coordinator extraction that contradicts criterion 1's own "input
+routing stays in PlayView" wording — **not pursued** (owner chose to accept 1491 over that follow-up).
+
+**Slice 7 — what shipped (branch `feat/phase-51.7-playview-decomp`, uncommitted):**
+New `play/controller.py` (`PlaySessionController` + `PlayHost` structural protocol, no `arcade`).
+The controller is the composition root: it **receives** the shared `PlaySessionContext` (still owned
+by the view's Slice 0 session bridge — one instance, verified) and **owns** the five coordinators +
+the session-facade methods extracted from the view (`load_dungeon_*` / `set_rpg_context` /
+`save_session` / `load_player_actors` / `sync_debug_level_id` + the domain→panel refresh fan-out
+`refresh_vna_panel` / `refresh_right_panel_from_actors` / `refresh_chat_mini_card` /
+`refresh_memory_state` / `room_world_flags`). Coordinator ports route through the view's delegators
+(`host._X` — the input-surface seam the view tests spy/stub); facade methods call sibling controller
+methods directly (one documented exception: `set_rpg_context` routes `_load_player_actors` through
+the host because a test stubs that delegator). `PlayView` keeps thin delegators + a lazy
+`_ensure_controller()` bridge; the five `_ensure_*` factory methods collapsed into it. 5 new unit
+tests (`tests/unit/play/test_controller.py`); one test's patch target moved
+(`build_actor_mini_card` now lives in `play.controller`). **`spec/ARCHITECTURE.md` amended** (module
+tree adds `play/`; PlayView responsibilities; threading → `NarrationCoordinator`). Behavior-preserving;
+`play_view.py` 1878 → 1491. Full suite green (**3529 passed**), ruff + mypy(strict, 168 files) clean.
+**5-angle `/code-review high`:** zero correctness bugs (extraction verified "remarkably faithful");
+applied the one converged cleanup (removed the gratuitous `load_dungeon_*` → host bounce). Deferred
+(low, not blocking): a latent context-staleness seam if `view._session` is *reassigned after* the
+controller is built (not reachable today — mirrors the Slice 2–6 pattern; a `_session.setter` guard
+would harden it); the `getattr`/`setattr` seam for 4 view-only attrs kept off `PlayHost` for
+`__new__` ergonomics; two pre-existing smells moved verbatim (`load_dungeon_*` copy-paste; a double
+`refresh_chat_mini_card` on non-empty actor load).
 
 **Deferred follow-ups (not blocking):** the Slice 4 `get_debug` port hands play a UI panel type
 (TYPE_CHECKING-only; two narrow callables would be cleaner, but the debug-gates-proposal-pipeline
@@ -203,6 +233,15 @@ After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice (item 2
   applied inline (the narration `extract_remember`/`auto_remember` ports stay pointed at the view
   delegators, consistent with the other narration ports + the four other memory seams, so the
   wrappers remain production-reachable). Full suite green (**3524 passed**), ruff + mypy(strict) clean.
+- ✅ **Slice 7 — `PlaySessionController`** (2026-07-06, uncommitted; the phase-closing slice). New
+  `play/controller.py` — composition root wiring the five coordinators + the shared
+  `PlaySessionContext` (received, not owned) + the session-facade methods lifted from the view; the
+  `PlayHost` structural protocol keeps `play → views` uncrossed. The view's five `_ensure_*` factory
+  methods collapsed into a lazy `_ensure_controller()` bridge; thin delegators remain the tested input
+  surface. 5 new unit tests; `spec/ARCHITECTURE.md` amended; `play_view.py` 1878 → **1491**
+  (criterion-1 ≤900 not met — see the ⚠ note above). Full suite green (**3529 passed**), ruff +
+  mypy(strict) clean; 5-angle `/code-review high` found no correctness bugs. **Open:** owner GUI
+  verify (criterion 6) + commit/PR.
 
 1. **Phase 51.6 — World Reaction Policy — ✅ COMPLETE (PR #88 open, review-hardened).** Fixed a
    real bug (a STUDY-miss moved 3 clocks incl. `dungeon_intimacy`, violating D5). Per-object
