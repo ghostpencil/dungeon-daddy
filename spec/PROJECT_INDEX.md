@@ -43,11 +43,11 @@ Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_
 in `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Both PR #88 deferred review items are resolved
 or scheduled: the spec-language item is **closed** (owner ruled 2026-07-05: only noun-carrying
 paths pass `acted_object`; `spec/WORLD_REACTION_POLICY.md` §7 amended), and the non-atomic
-`_apply_world_reaction` write landed as **Slice 1** of 51.7. Next slice to build: **Slice 2 —
-`NarrationCoordinator` (`play/narration.py`)** — `_dm_history`/`_compact_history`/
-`_build_context_bundle`/`_spawn_dm_thread` + the `DMResult` queue/`_llm_busy`, exposing
-`request_narration()` (kills the 8× narration-entry idiom) and `poll()`. Slices 0–1 landed
-2026-07-06. After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice (item 2 below).
+`_apply_world_reaction` write landed as **Slice 1** of 51.7. Next slice to build: **Slice 3 —
+`DialogueCoordinator` (`play/dialogue.py`)** — `DialogueSession`, begin/end, room-change close,
+dungeon/NPC line routing, `_dungeon_agent_inputs` + its 8 context assemblers, `_apply_dungeon_reply`
+(the voice-agent thread hands results through the narration queue path it already uses). Slices 0–2
+landed 2026-07-06. After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice (item 2 below).
 
 **Phase 51.7 slice progress (branch `feat/phase-51.7-playview-decomp`):**
 - ✅ **Slice 0 — `PlaySessionContext`** (2026-07-06). New `dungeon_daddy/play/` package
@@ -81,6 +81,27 @@ paths pass `acted_object`; `spec/WORLD_REACTION_POLICY.md` §7 amended), and the
   capacity-correctness regression). 5 new tests (3 applier: compute-fail-silent,
   read-fail-contained, new-track-synced; 2 repo: nested-txn commit/rollback); the one behavioral
   change in the phase. Full suite green (**3431 passed**), ruff + mypy(strict) clean.
+- ✅ **Slice 2 — `NarrationCoordinator`** (2026-07-06). New `play/narration.py` (no `arcade`) —
+  `NarrationCoordinator` + `DMResult` (moved out of `play_view`, re-exported for the existing
+  `from …play_view import DMResult` sites). Owns the DM-narration plumbing: `_dm_history` +
+  `compact_history` (token budget 2000), `build_context_bundle`, `spawn_dm_thread`, the `DMResult`
+  queue + `_llm_busy`. **Public seam:** `request_narration(msg)` collapses the **8× (10 sites)**
+  narration-entry idiom (`_compact_history` → append user → `set_busy(True)` → `_spawn_dm_thread`),
+  and `poll()` drains + routes the queue (error / dungeon-reply / DM narration) — the drain moved
+  out of `on_update`. A generic `spawn(worker)` serves the dungeon-voice channel
+  (`_send_dungeon_line`). Side effects flow through narrow **ports** (all late-bound lambdas reading
+  live view state — `on_busy`/`post_dm`/`post_system`/`on_dungeon_reply`/`extract_remember`/
+  `auto_remember`/`on_bundle_built`); no `PlayView` reference. `play_view` 2759 → 2679 lines.
+  Coordinator is lazily materialized with get+set bridge properties (`_dm_history`/`_llm_busy`/
+  `_result_queue`/`_active_thread`) — the Slice 0 pattern — so the `__new__` test factories stay
+  unchanged. Behavior-preserving (busy-flag ordering, compact-before-append, room/level
+  re-resolution via the session, error-before-dungeon routing all match the original inline code).
+  13 new unit tests (`tests/unit/play/test_narration.py`); the direct-reference view tests migrated
+  to the `view._narration.*` seam. **Review-hardened** (`/code-review high`, 3 findings applied):
+  all four bound-method ports made late-bound lambdas (uniform + fixes a latent test-ordering
+  fragility); `spawn_dm_thread` restored the original `assert state/dungeon` + non-optional `repo`
+  (no silent stranded-spinner path); the `history` setter aliases the assigned list (preserving the
+  old `_dm_history = <list>` semantics). Full suite green (**3444 passed**), ruff + mypy(strict) clean.
 
 1. **Phase 51.6 — World Reaction Policy — ✅ COMPLETE (PR #88 open, review-hardened).** Fixed a
    real bug (a STUDY-miss moved 3 clocks incl. `dungeon_intimacy`, violating D5). Per-object

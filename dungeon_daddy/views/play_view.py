@@ -24,15 +24,15 @@ if TYPE_CHECKING:
     )
     from dungeon_daddy.rpg.obstacles import ObstacleRollResolution
 
-from dungeon_daddy.data.models import Dungeon, Level, Room, SessionState
+from dungeon_daddy.data.models import Dungeon, SessionState
 from dungeon_daddy.data.repository import DungeonRepository
 from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
 from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
 from dungeon_daddy.llm.provider import LLMMessage
 from dungeon_daddy.map.graph_renderer import GraphRenderer
-from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
 from dungeon_daddy.memory.models import MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
+from dungeon_daddy.play.narration import DMResult, NarrationCoordinator
 from dungeon_daddy.play.session_context import PlaySessionContext
 from dungeon_daddy.rpg.actor_control import filter_player_actors
 from dungeon_daddy.rpg.classifier import classify_intent
@@ -81,16 +81,9 @@ from dungeon_daddy.ui.theme import (
     TEXT_SM,
 )
 
-
-@dataclass
-class DMResult:
-    content: str
-    error: str | None = None
-    # Phase 51: a dungeon-channel reply (routed to _apply_dungeon_reply on drain,
-    # not the DM narration path). player_message carries the line for the memory
-    # summary written engine-side after the reply.
-    dungeon: bool = False
-    player_message: str | None = None
+# DMResult + NarrationCoordinator moved to dungeon_daddy/play/narration.py
+# (Phase 51.7, Slice 2). DMResult is re-exported above for the existing
+# ``from dungeon_daddy.views.play_view import DMResult`` import sites.
 
 
 def describe_spawned_loot(transition: dict[str, Any], room_items: list[dict[str, Any]]) -> str:
@@ -390,10 +383,10 @@ class PlayView(arcade.View):
             on_noun_click=self._on_overlay_noun_click,
         )
         self._ui_built = False
-        self._result_queue: queue.Queue[DMResult] = queue.Queue()
-        self._llm_busy = False
-        self._active_thread: threading.Thread | None = None
-        self._dm_history: list[LLMMessage] = []
+        # DM-narration plumbing (queue / busy flag / history / worker thread)
+        # lives in the lazily-materialized NarrationCoordinator (Slice 2); the
+        # ``_result_queue``/``_llm_busy``/``_active_thread``/``_dm_history``
+        # bridge properties below delegate to it.
         # Edit Memory button and overlay state
         self._has_memory: bool = False
         self._overlay_open: bool = False
@@ -499,6 +492,77 @@ class PlayView(arcade.View):
         self._ensure_session().campaign_id = value
 
     # ------------------------------------------------------------------
+    # Narration bridge (Phase 51.7, Slice 2)
+    #
+    # The DM-narration plumbing (history/queue/busy flag/worker thread, context
+    # bundle, DM thread spawn) lives in ``NarrationCoordinator``. It is
+    # lazily materialized so ``PlayView.__new__`` test setups still work, and
+    # the state attributes it owns are bridged so the existing ~8 factory
+    # setups and their content/queue/busy assertions read the single source of
+    # truth without churn. Ports capture ``self`` via lambdas so they read live
+    # view state (mirrors the Slice 1 ReactionApplier wiring).
+    # ------------------------------------------------------------------
+
+    def _ensure_narration(self) -> NarrationCoordinator:
+        coord = self.__dict__.get("_narration_coord")
+        if coord is None:
+            coord = NarrationCoordinator(
+                self._session,
+                get_dm_agent=lambda: self._dm_agent,
+                get_repo=lambda: self._repo,
+                get_rpg_service=lambda: self._rpg_service,
+                on_busy=lambda busy: self._chat.set_busy(busy),
+                post_dm=lambda text: self._chat.add_message("dm", text),
+                post_system=lambda text: self._chat.add_message("system", text),
+                on_dungeon_reply=lambda pm, reply: self._apply_dungeon_reply(pm, reply),
+                extract_remember=lambda text: self._extract_remember(text),
+                auto_remember=lambda event: self._auto_remember(event),
+                on_bundle_built=lambda bundle: self._set_debug_bundle(bundle),
+            )
+            self.__dict__["_narration_coord"] = coord
+        return coord
+
+    def _set_debug_bundle(self, bundle: ContextBundle) -> None:
+        if self._rpg_debug is not None:
+            self._rpg_debug.set_bundle(bundle)
+
+    @property
+    def _narration(self) -> NarrationCoordinator:
+        return self._ensure_narration()
+
+    @property
+    def _dm_history(self) -> list[LLMMessage]:
+        return self._ensure_narration().history
+
+    @_dm_history.setter
+    def _dm_history(self, value: list[LLMMessage]) -> None:
+        self._ensure_narration().history = value
+
+    @property
+    def _llm_busy(self) -> bool:
+        return self._ensure_narration().is_busy
+
+    @_llm_busy.setter
+    def _llm_busy(self, value: bool) -> None:
+        self._ensure_narration().is_busy = value
+
+    @property
+    def _result_queue(self) -> queue.Queue[DMResult]:
+        return self._ensure_narration().queue
+
+    @_result_queue.setter
+    def _result_queue(self, value: queue.Queue[DMResult]) -> None:
+        self._ensure_narration().queue = value
+
+    @property
+    def _active_thread(self) -> threading.Thread | None:
+        return self._ensure_narration().active_thread
+
+    @_active_thread.setter
+    def _active_thread(self, value: threading.Thread | None) -> None:
+        self._ensure_narration().active_thread = value
+
+    # ------------------------------------------------------------------
     # View lifecycle
     # ------------------------------------------------------------------
 
@@ -538,23 +602,7 @@ class PlayView(arcade.View):
 
     def on_update(self, delta_time: float) -> None:
         self._chat.update(delta_time)
-        try:
-            result = self._result_queue.get_nowait()
-        except queue.Empty:
-            return
-        self._llm_busy = False
-        self._chat.set_busy(False)
-        if result.error:
-            self._chat.add_message("system", f"⚠ The dungeon is silent. ({result.error})")
-            return
-        if result.dungeon:
-            self._apply_dungeon_reply(result.player_message or "", result.content)
-            return
-        remembered, display = self._extract_remember(result.content)
-        self._dm_history.append(LLMMessage(role="assistant", content=display))
-        self._chat.add_message("dm", display)
-        if remembered:
-            self._auto_remember(remembered)
+        self._narration.poll()
 
     def on_resize(self, width: int, height: int) -> None:
         self._reposition_panels(width, height)
@@ -591,7 +639,7 @@ class PlayView(arcade.View):
                     if tab_idx == _TAB_MEM:
                         self._load_memory_entries()
                     elif tab_idx == _TAB_DBG:
-                        self._build_context_bundle()
+                        self._narration.build_context_bundle()
                 elif self._rpg_side.active_tab == _TAB_CHAR:
                     delta = self._rpg_char.hit_picker(x, y)
                     if delta:
@@ -638,10 +686,7 @@ class PlayView(arcade.View):
                 self._chat.set_current_room(room.name, room.note or "", room_id=room.id)
                 self._rpg_scene.set_scene(room.name, str(level.id))
                 _log.debug("Selected room: %s", room.id)
-                self._compact_history()
-                self._dm_history.append(LLMMessage(role="user", content=f"We enter {room.name}."))
-                self._chat.set_busy(True)
-                self._spawn_dm_thread(room, level)
+                self._narration.request_narration(f"We enter {room.name}.")
                 self._save_session()
                 return
 
@@ -899,7 +944,6 @@ class PlayView(arcade.View):
                 format_mechanical_bubble(actor_name, action_key, resolution, reaction),
             )
             if self._dungeon is not None and self._state is not None:
-                level = self._dungeon.levels[self._state.current_level_idx]
                 room = self._session.current_room()
                 if room is None:
                     self._chat.add_message("system", "Select a room to get DM narration.")
@@ -909,10 +953,7 @@ class PlayView(arcade.View):
                         f"{actor_name} [{action_key.upper()}] {intent or '(no intent)'}"
                         f" — {outcome}"
                     )
-                    self._compact_history()
-                    self._dm_history.append(LLMMessage(role="user", content=msg))
-                    self._chat.set_busy(True)
-                    self._spawn_dm_thread(room, level)
+                    self._narration.request_narration(msg)
             self._refresh_right_panel_from_actors(actor_id)
         except Exception:
             _log.exception("_run_chat_action failed")
@@ -1024,10 +1065,7 @@ class PlayView(arcade.View):
         if room is None:
             self._chat.add_message("system", "Click a room first to give the DM context.")
             return
-        self._compact_history()
-        self._dm_history.append(LLMMessage(role="user", content=narration_text))
-        self._chat.set_busy(True)
-        self._spawn_dm_thread(room, level)
+        self._narration.request_narration(narration_text)
 
     def _on_resolve_action(
         self,
@@ -1057,7 +1095,6 @@ class PlayView(arcade.View):
             self._apply_world_reaction(resolution)
             self._run_proposal_pipeline(resolution, campaign_id)
             if self._dungeon is not None and self._state is not None:
-                level = self._dungeon.levels[self._state.current_level_idx]
                 room = self._session.current_room()
                 if room is None:
                     self._chat.add_message("system", "Select a room to get DM narration.")
@@ -1072,10 +1109,7 @@ class PlayView(arcade.View):
                         f"{actor_name} [{action_key.upper()}] {intent or '(no intent)'}"
                         f" — {outcome}  dice={dice}"
                     )
-                    self._compact_history()
-                    self._dm_history.append(LLMMessage(role="user", content=msg))
-                    self._chat.set_busy(True)
-                    self._spawn_dm_thread(room, level)
+                    self._narration.request_narration(msg)
             self._refresh_right_panel_from_actors(actor_id)
         except Exception:
             _log.exception("resolve_action failed")
@@ -1513,28 +1547,19 @@ class PlayView(arcade.View):
                 "system", "The dungeon is silent. (voice agent unavailable)"
             )
             return
-        if self._llm_busy:
+        if self._narration.is_busy:
             return
         inputs = self._dungeon_agent_inputs(text)
-        self._llm_busy = True
         self._chat.set_busy(True)
 
-        def _run() -> None:
+        def _worker() -> DMResult:
             try:
                 reply = agent.respond(**inputs)
-                self._result_queue.put(
-                    DMResult(content=reply, dungeon=True, player_message=text)
-                )
+                return DMResult(content=reply, dungeon=True, player_message=text)
             except Exception as exc:
-                self._result_queue.put(
-                    DMResult(content="", error=str(exc), dungeon=True, player_message=text)
-                )
-            finally:
-                self._llm_busy = False
+                return DMResult(content="", error=str(exc), dungeon=True, player_message=text)
 
-        t = threading.Thread(target=_run, daemon=True)
-        self._active_thread = t
-        t.start()
+        self._narration.spawn(_worker)
 
     _INTIMACY_CATEGORY = "dungeon_intimacy"
 
@@ -1803,11 +1828,9 @@ class PlayView(arcade.View):
         """Inject the deterministic transition result into DM history and request narration."""
         if self._dungeon is None or self._state is None:
             return
-        level = self._dungeon.levels[self._state.current_level_idx]
         room = self._session.current_room()
         if room is None:
             return
-        from dungeon_daddy.llm.provider import LLMMessage
         content = (
             f"{actor.display_name} {transition.get('trigger', 'activates')} the {noun_label}. "
             f"[{noun_label}: {from_state} → {to_state}]"
@@ -1819,10 +1842,7 @@ class PlayView(arcade.View):
             loot = describe_spawned_loot(transition, room_items)
             if loot:
                 content += f" [revealed inside: {loot}]"
-        self._compact_history()
-        self._dm_history.append(LLMMessage(role="user", content=content))
-        self._chat.set_busy(True)
-        self._spawn_dm_thread(room, level)
+        self._narration.request_narration(content)
 
     def _apply_vna_command(self, command: PlayerCommand | None) -> bool:
         """Validate + apply a non-move mutation command, then refresh.
@@ -1891,7 +1911,6 @@ class PlayView(arcade.View):
             format_mechanical_bubble(actor.display_name, card.verb, resolution, reaction),
         )
         if self._dungeon is not None and self._state.current_room_id:
-            level = self._dungeon.levels[self._state.current_level_idx]
             room = self._session.current_room()
             if room is not None:
                 noun_label = self._rpg_vna.noun_label_for(card.noun_id) or card.noun_id
@@ -1904,10 +1923,7 @@ class PlayView(arcade.View):
                     msg += f" [{noun_label}: {t.from_state} → {t.to_state}]"
                     if obstacle.complication:
                         msg += " (resolved, but with a complication)"
-                self._compact_history()
-                self._dm_history.append(LLMMessage(role="user", content=msg))
-                self._chat.set_busy(True)
-                self._spawn_dm_thread(room, level)
+                self._narration.request_narration(msg)
         self._refresh_right_panel_from_actors(actor.actor_id)
 
     def _resolve_acted_object(self, noun_id: str) -> RoomObject | None:
@@ -2009,13 +2025,9 @@ class PlayView(arcade.View):
 
         if room is not None and level is not None:
             flags = ", ".join(sorted(result.modifier_flags)) or "none"
-            self._compact_history()
-            self._dm_history.append(LLMMessage(
-                role="user",
-                content=f"We move {how} through the exit into {room.name}. (effects: {flags})",
-            ))
-            self._chat.set_busy(True)
-            self._spawn_dm_thread(room, level)
+            self._narration.request_narration(
+                f"We move {how} through the exit into {room.name}. (effects: {flags})"
+            )
 
     def _run_proposal_pipeline(self, resolution: ActionResolution, campaign_id: str) -> None:
         if self._dm_agent is None or self._mem_repo is None or self._rpg_debug is None:
@@ -2219,80 +2231,6 @@ class PlayView(arcade.View):
         self._close_overlay_ui()
 
     # ------------------------------------------------------------------
-    # DM threading
-    # ------------------------------------------------------------------
-
-    def _build_context_bundle(self) -> ContextBundle | None:
-        """Build a ContextBundle snapshot on the main thread. Returns None when RPG state is unavailable."""
-        if self._rpg_service is None or self._mem_repo is None or self._state is None:
-            return None
-        campaign_id = self._rpg_campaign_id or self._state.dungeon_id
-        raw_actors = self._mem_repo.get_actors_by_campaign(campaign_id)
-        actor_states = [
-            ActorState(
-                actor_id=a["actor_id"],
-                campaign_id=a["campaign_id"],
-                actor_type=a["actor_type"],
-                slug=a["slug"],
-                display_name=a["display_name"],
-                status=a["status"],
-            )
-            for a in raw_actors
-        ]
-        focus_ids = [a.actor_id for a in filter_player_actors(actor_states)]
-        builder = ContextBundleBuilder(
-            campaign_id=campaign_id,
-            scene_id=None,
-            mode="run_scene",
-            focus_actor_ids=focus_ids,
-            token_budget=2000,
-            current_room_id=self._state.current_room_id,
-        )
-        try:
-            bundle = builder.build(self._mem_repo)
-            if self._rpg_debug is not None:
-                self._rpg_debug.set_bundle(bundle)
-            return bundle
-        except Exception:
-            _log.exception("ContextBundle build failed — proceeding without bundle")
-            return None
-
-    def _spawn_dm_thread(self, room: Room, level: Level) -> None:
-        if self._llm_busy:
-            return
-        if self._dm_agent is None:
-            self._result_queue.put(DMResult(content="", error="DM agent unavailable — OPENAI_API_KEY not set."))
-            return
-        assert self._state is not None
-        assert self._dungeon is not None
-        memory = self._repo.load_room_memory(self._state.dungeon_id, level.id)
-        bundle = self._build_context_bundle()
-        self._llm_busy = True
-        _history = list(self._dm_history)
-        _agent = self._dm_agent
-        _dungeon = self._dungeon
-
-        def _run() -> None:
-            try:
-                response = _agent.respond(
-                    history=_history,
-                    room=room,
-                    level=level,
-                    dungeon=_dungeon,
-                    room_memory=memory,
-                    context_bundle=bundle,
-                )
-                self._result_queue.put(DMResult(content=response))
-            except Exception as exc:
-                self._result_queue.put(DMResult(content="", error=str(exc)))
-            finally:
-                self._llm_busy = False
-
-        t = threading.Thread(target=_run, daemon=True)
-        self._active_thread = t
-        t.start()
-
-    # ------------------------------------------------------------------
     # Callbacks
     # ------------------------------------------------------------------
 
@@ -2314,7 +2252,7 @@ class PlayView(arcade.View):
             return
         self._chat.add_message("gm", text)
         if text.strip() == "/clear":
-            self._dm_history = []
+            self._narration.clear_history()
             self._chat.add_message("system", "💬 Conversation cleared.")
             return
         if text.startswith("/remember "):
@@ -2353,10 +2291,7 @@ class PlayView(arcade.View):
             if room is None:
                 self._chat.add_message("system", "Click a room first to give the DM context.")
                 return
-            self._compact_history()
-            self._dm_history.append(LLMMessage(role="user", content=narration_text))
-            self._chat.set_busy(True)
-            self._spawn_dm_thread(room, level)
+            self._narration.request_narration(narration_text)
             return
         level = self._dungeon.levels[self._state.current_level_idx]
         room = None
@@ -2387,10 +2322,7 @@ class PlayView(arcade.View):
                 [k.upper() for k in suggestions[:3]] + ["No Roll"],
             )
             return
-        self._compact_history()
-        self._dm_history.append(LLMMessage(role="user", content=text))
-        self._chat.set_busy(True)
-        self._spawn_dm_thread(room, level)
+        self._narration.request_narration(text)
 
     def _handle_remember(self, event: str) -> None:
         if self._dungeon is None or self._state is None:
@@ -2434,15 +2366,6 @@ class PlayView(arcade.View):
             self._state.current_room_id, room_name, event,
         )
         self._chat.add_message("system", f"📝 Noted: {event}")
-
-    def _compact_history(self) -> None:
-        _TOKEN_BUDGET = 2000
-        while len(self._dm_history) >= 2:
-            tokens = sum(len(m.content) for m in self._dm_history) // 4
-            if tokens <= _TOKEN_BUDGET:
-                break
-            self._dm_history.pop(0)
-            self._dm_history.pop(0)
 
     # ------------------------------------------------------------------
     # MEM tab click routing
@@ -2681,10 +2604,7 @@ class PlayView(arcade.View):
         self._chat.set_current_room(room.name, room.note or "", room_id=room.id)
         self._rpg_scene.set_scene(room.name, str(level.id))
         _log.debug("Graph: selected room %s", room.id)
-        self._compact_history()
-        self._dm_history.append(LLMMessage(role="user", content=f"We enter {room.name}."))
-        self._chat.set_busy(True)
-        self._spawn_dm_thread(room, level)
+        self._narration.request_narration(f"We enter {room.name}.")
         self._save_session()
 
     def _on_graph_connection_select(self, from_room: str, to_room: str) -> None:

@@ -219,7 +219,7 @@ def test_on_resolve_action_spawns_dm_narration(tmp_path: Path):
     action_panel = MagicMock()
     action_panel._format_result.return_value = {"outcome": "full", "dice": [6], "stress_cost": 0, "notes": None}
     view._rpg_action = action_panel
-    with patch.object(view, "_spawn_dm_thread") as mock_spawn:
+    with patch.object(view._narration, "spawn_dm_thread") as mock_spawn:
         view._on_resolve_action(
             campaign_id="camp-1", actor_id="a1", intent="search for traps",
             action_key="sense", push_yourself=False, momentum_spend=0, dice_pool=1,
@@ -245,7 +245,7 @@ def test_on_resolve_action_dm_message_includes_actor_name(tmp_path: Path):
         ActorState(actor_id="a-talvas", campaign_id="camp-1", actor_type="pc",
                    slug="talvas", display_name="Talvas the Wanderer"),
     ])
-    with patch.object(view, "_spawn_dm_thread"):
+    with patch.object(view._narration, "spawn_dm_thread"):
         view._on_resolve_action(
             campaign_id="camp-1", actor_id="a-talvas", intent="look for threats",
             action_key="sense", push_yourself=False, momentum_spend=0, dice_pool=1,
@@ -292,7 +292,7 @@ def test_on_resolve_action_no_op_without_service(tmp_path: Path):
 
 def test_dm_agent_receives_context_bundle_when_rpg_available(tmp_path: Path):
     view, room, level = _make_view(tmp_path, with_rpg=True)
-    view._spawn_dm_thread(room, level)
+    view._narration.spawn_dm_thread(room, level)
     assert view._active_thread is not None
     view._active_thread.join(timeout=5.0)
 
@@ -307,7 +307,7 @@ def test_dm_agent_receives_context_bundle_when_rpg_available(tmp_path: Path):
 
 def test_dm_agent_receives_no_bundle_when_rpg_unavailable(tmp_path: Path):
     view, room, level = _make_view(tmp_path, with_rpg=False)
-    view._spawn_dm_thread(room, level)
+    view._narration.spawn_dm_thread(room, level)
     assert view._active_thread is not None
     view._active_thread.join(timeout=5.0)
 

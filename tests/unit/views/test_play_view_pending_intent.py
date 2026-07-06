@@ -97,7 +97,7 @@ class TestActionableTextCreatesPendingIntent:
         """DM narration thread is not spawned during framing."""
         view = _make_view()
         spawned: list = []
-        view._spawn_dm_thread = lambda room, level: spawned.append((room, level))  # type: ignore[method-assign]
+        view._narration.spawn_dm_thread = lambda room, level: spawned.append((room, level))  # type: ignore[method-assign]
         view._on_chat_send("I study the mural to understand its secrets")
         assert spawned == []
 
@@ -149,16 +149,16 @@ class TestNonActionableTextUsesPlainNarration:
     def test_no_pending_intent_for_unclassifiable_text(self):
         """Text with no classifier matches creates no pending intent."""
         view = _make_view()
-        view._spawn_dm_thread = MagicMock()  # type: ignore[method-assign]
+        view._narration.spawn_dm_thread = MagicMock()  # type: ignore[method-assign]
         view._on_chat_send("I wander aimlessly and think about nothing")
         assert view._action_state.pending_intent is None
 
     def test_dm_thread_spawned_for_unclassifiable_text(self):
         """Text with no classifier matches routes to DM narration."""
         view = _make_view()
-        view._spawn_dm_thread = MagicMock()  # type: ignore[method-assign]
+        view._narration.spawn_dm_thread = MagicMock()  # type: ignore[method-assign]
         view._on_chat_send("I wander aimlessly and think about nothing")
-        view._spawn_dm_thread.assert_called_once()  # type: ignore[attr-defined]
+        view._narration.spawn_dm_thread.assert_called_once()  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
@@ -264,14 +264,14 @@ class TestNoRollPath:
     def test_spawn_dm_thread_called_on_no_roll(self):
         """When awaiting_confirmation and no chip, plain narration fires."""
         view = _no_roll_view()
-        view._spawn_dm_thread = MagicMock()
+        view._narration.spawn_dm_thread = MagicMock()
         view._on_chat_send("")
-        view._spawn_dm_thread.assert_called_once()
+        view._narration.spawn_dm_thread.assert_called_once()
 
     def test_raw_text_used_for_narration(self):
         """No-roll uses the original pending intent text for DM history, not the typed text."""
         view = _no_roll_view()
-        view._spawn_dm_thread = MagicMock()
+        view._narration.spawn_dm_thread = MagicMock()
         view._on_chat_send("never mind, no roll")
         contents = [m.content for m in view._dm_history]
         assert "I study the mural to understand its secrets" in contents
@@ -279,7 +279,7 @@ class TestNoRollPath:
     def test_world_reaction_not_called_on_no_roll(self):
         """No-roll does not trigger world reaction."""
         view = _no_roll_view()
-        view._spawn_dm_thread = MagicMock()
+        view._narration.spawn_dm_thread = MagicMock()
         captured: list = []
         view._apply_world_reaction = lambda r: captured.append(r)  # type: ignore[method-assign]
         view._on_chat_send("")
@@ -288,14 +288,14 @@ class TestNoRollPath:
     def test_pending_intent_cleared_on_no_roll(self):
         """No-roll clears the pending intent from action state."""
         view = _no_roll_view()
-        view._spawn_dm_thread = MagicMock()
+        view._narration.spawn_dm_thread = MagicMock()
         view._on_chat_send("")
         assert view._action_state.pending_intent is None
 
     def test_awaiting_confirmation_false_on_no_roll(self):
         """No-roll resets awaiting_confirmation to False."""
         view = _no_roll_view()
-        view._spawn_dm_thread = MagicMock()
+        view._narration.spawn_dm_thread = MagicMock()
         view._on_chat_send("")
         assert view._action_state.awaiting_confirmation is False
 
@@ -361,14 +361,14 @@ class TestNoRollChipFiresNarration:
     def test_spawn_dm_thread_called_on_no_roll_chip(self):
         """Clicking 'No Roll' chip spawns the DM narration thread."""
         view, callback = _make_view_with_pending()
-        view._spawn_dm_thread = MagicMock()  # type: ignore[method-assign]
+        view._narration.spawn_dm_thread = MagicMock()  # type: ignore[method-assign]
         callback("No Roll")
-        view._spawn_dm_thread.assert_called_once()  # type: ignore[attr-defined]
+        view._narration.spawn_dm_thread.assert_called_once()  # type: ignore[attr-defined]
 
     def test_no_roll_chip_uses_pending_intent_raw_text(self):
         """'No Roll' chip places the original intent text into DM history."""
         view, callback = _make_view_with_pending()
-        view._spawn_dm_thread = MagicMock()  # type: ignore[method-assign]
+        view._narration.spawn_dm_thread = MagicMock()  # type: ignore[method-assign]
         callback("No Roll")
         contents = [m.content for m in view._dm_history]
         assert "I study the mural to understand its secrets" in contents
@@ -376,7 +376,7 @@ class TestNoRollChipFiresNarration:
     def test_no_roll_chip_does_not_call_run_chat_action(self):
         """'No Roll' chip does not trigger RPG resolution."""
         view, callback = _make_view_with_pending()
-        view._spawn_dm_thread = MagicMock()  # type: ignore[method-assign]
+        view._narration.spawn_dm_thread = MagicMock()  # type: ignore[method-assign]
         calls: list = []
         view._run_chat_action = lambda *a, **kw: calls.append(a)  # type: ignore[method-assign]
         callback("No Roll")
@@ -385,7 +385,7 @@ class TestNoRollChipFiresNarration:
     def test_action_state_cleared_after_no_roll_chip(self):
         """Action state is fully reset after 'No Roll' chip click."""
         view, callback = _make_view_with_pending()
-        view._spawn_dm_thread = MagicMock()  # type: ignore[method-assign]
+        view._narration.spawn_dm_thread = MagicMock()  # type: ignore[method-assign]
         callback("No Roll")
         assert view._action_state.pending_intent is None
         assert view._action_state.awaiting_confirmation is False
@@ -563,7 +563,7 @@ class TestInChatActionCard:
     def test_resolve_active_card_called_on_no_roll_chip(self):
         """resolve_active_card is called with 'No Roll' after no-roll chip click."""
         view, callback = _make_view_with_pending()
-        view._spawn_dm_thread = MagicMock()  # type: ignore[method-assign]
+        view._narration.spawn_dm_thread = MagicMock()  # type: ignore[method-assign]
         view._chat.reset_mock()
         callback("No Roll")
         view._chat.resolve_active_card.assert_called_once_with("No Roll")
