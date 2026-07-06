@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Callable
-from typing import NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 import arcade
 import arcade.gui
@@ -43,6 +43,9 @@ from dungeon_daddy.ui.theme import (
 )
 from dungeon_daddy.ui.widgets.markdown_label import MarkdownLabel
 
+if TYPE_CHECKING:
+    from dungeon_daddy.ui.panels.action_builder import InChatActionBuilder
+
 HEADER_H = 38
 ROOM_BANNER_H = 80   # play mode only: CURRENT ROOM banner below header
 INPUT_AREA_H = 122   # design mode: chips (20) + gap (6) + input (62) + padding (8+8+16)
@@ -71,10 +74,10 @@ _ACTION_ORDER = ["fight", "move", "tinker", "study", "focus", "sway", "sense", "
 
 
 class _BubbleStyle(NamedTuple):
-    fill: tuple
-    stroke: tuple
+    fill: tuple[Any, ...]
+    stroke: tuple[Any, ...]
     label: str
-    label_color: tuple
+    label_color: tuple[Any, ...]
 
 
 def _bubble_style(role: str) -> _BubbleStyle:
@@ -151,7 +154,7 @@ class ChatPanel:
         self._actor_switch_callback: Callable[[str], None] | None = None
         self._mini_card_prev_rect: tuple[float, float, float, float] | None = None
         self._mini_card_next_rect: tuple[float, float, float, float] | None = None
-        self._action_builder = None  # InChatActionBuilder (play mode, Phase 50.6)
+        self._action_builder: InChatActionBuilder | None = None  # (play mode, Phase 50.6)
         # Play mode defaults to the Action Builder; the free-text SAY/ASK box is
         # contextual (shown only during dialogue — Phase 50.6 Slice 10, §6).
         self._dialogue_mode = False
@@ -348,7 +351,7 @@ class ChatPanel:
     def set_actor_switch_callback(self, fn: Callable[[str], None]) -> None:
         self._actor_switch_callback = fn
 
-    def set_action_builder(self, builder) -> None:
+    def set_action_builder(self, builder: InChatActionBuilder | None) -> None:
         """Attach the in-chat Action Builder (play mode). ``None`` detaches it."""
         self._action_builder = builder
         self._apply_input_visibility()
@@ -418,7 +421,7 @@ class ChatPanel:
     ) -> None:
         """Add an interactive action card as a chat message. Only one card is active."""
         msg_index = len(self._messages)
-        self._messages.append(ChatMessage(role="action_card", content=""))  # type: ignore[arg-type]
+        self._messages.append(ChatMessage(role="action_card", content=""))
         truncated = intent_text[:60] if len(intent_text) > 60 else intent_text
         self._action_cards[msg_index] = _ActionCardData(
             actor_name=actor_name,
@@ -457,7 +460,9 @@ class ChatPanel:
         # In-chat Action Builder takes priority in play mode (its open popup is
         # drawn on top and may overlap the mini-card / message area). Skipped
         # while it is swapped out for the SAY/ASK box (dialogue mode).
-        if self._builder_visible() and self._action_builder.on_mouse_press(x, y):
+        if self._builder_visible() and cast(
+            "InChatActionBuilder", self._action_builder
+        ).on_mouse_press(x, y):
             return True
         if self._mini_card_prev_rect is not None:
             left, bot, right, top = self._mini_card_prev_rect
@@ -515,7 +520,9 @@ class ChatPanel:
         while the builder is swapped out for the SAY/ASK box (dialogue mode).
         """
         if self._builder_visible():
-            return self._action_builder.content_height(self._w) + _BUILDER_BAND_GAP
+            return cast(
+                "InChatActionBuilder", self._action_builder
+            ).content_height(self._w) + _BUILDER_BAND_GAP
         return 0.0
 
     def _apply_builder_auto_collapse(self) -> None:
@@ -525,7 +532,9 @@ class ChatPanel:
         so the user's choice wins once they click the ▾/▴ caret.
         """
         if self._builder_visible():
-            self._action_builder.apply_auto_collapse(self._h < _BUILDER_AUTOCOLLAPSE_H)
+            cast(
+                "InChatActionBuilder", self._action_builder
+            ).apply_auto_collapse(self._h < _BUILDER_AUTOCOLLAPSE_H)
 
     @property
     def _card_bot_off(self) -> float:
@@ -669,8 +678,9 @@ class ChatPanel:
         # the actor mini-card. Drawn last so its open popup overlays the card
         # and message area above it. Hidden while the SAY/ASK box is shown.
         if self._builder_visible():
-            band_h = self._action_builder.content_height(w)
-            self._action_builder.draw(x, y + _BUILDER_BOTTOM_PAD, w, band_h)
+            builder = cast("InChatActionBuilder", self._action_builder)
+            band_h = builder.content_height(w)
+            builder.draw(x, y + _BUILDER_BOTTOM_PAD, w, band_h)
 
     def _draw_character_card(self, x: float, y: float, w: float) -> None:
         """Render the character card above the input field (play mode only)."""

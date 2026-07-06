@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from typing import Any
+
 from dungeon_daddy.memory.repository import MemoryRepository
 
 
 def build_curation_report(
     repo: MemoryRepository, campaign_ids: list[str]
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     report = []
     for campaign_id in campaign_ids:
         counts = repo.count_by_status(campaign_id)

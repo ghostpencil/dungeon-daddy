@@ -4,6 +4,85 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+ClockCategory = Literal[
+    "objective",
+    "relationship",
+    "faction_pressure",
+    "dungeon_intimacy",
+    "danger",
+    "pursuit",
+    "ritual",
+]
+
+_ADVERSE_CATEGORIES = frozenset({"danger", "pursuit", "ritual"})
+
+# The canonical ClockCategory members, as a runtime-iterable tuple (the Literal
+# type itself is not iterable). Order matches the Literal above.
+CLOCK_CATEGORIES: tuple[ClockCategory, ...] = (
+    "objective",
+    "relationship",
+    "faction_pressure",
+    "dungeon_intimacy",
+    "danger",
+    "pursuit",
+    "ritual",
+)
+_CLOCK_CATEGORY_MEMBERS = frozenset(CLOCK_CATEGORIES)
+
+# Non-enum category strings that appear in seeded/authored data (e.g. the
+# campaign manifests) mapped onto their canonical ClockCategory. "threat" and
+# "environment" are generic adverse buckets → danger; "escalation" is an
+# alert/detection ramp → pursuit.
+_CLOCK_CATEGORY_SYNONYMS: dict[str, ClockCategory] = {
+    "threat": "danger",
+    "environment": "danger",
+    "escalation": "pursuit",
+}
+
+# Fallback for an unrecognized category. Deliberately a firewall-protected,
+# non-adverse member: an unknown clock must never become ambient-eligible
+# (that fail-safe asymmetry is the whole point of the firewall). Unknowns are
+# reported via is_known_clock_category rather than coerced silently.
+_UNKNOWN_CLOCK_CATEGORY_FALLBACK: ClockCategory = "faction_pressure"
+
+
+def is_adverse(category: ClockCategory | None) -> bool:
+    """A clock is adverse iff its category is danger, pursuit, or ritual.
+
+    Takes an already-normalized ``ClockCategory`` (or ``None``). The narrowed
+    signature is deliberate: callers must run raw strings through
+    ``normalize_clock_category`` first, or a synonym like ``"threat"`` would be
+    read as non-adverse and silently drop out of the ambient tier.
+    """
+    return category in _ADVERSE_CATEGORIES
+
+
+def is_known_clock_category(category: str | None) -> bool:
+    """True if the raw category is None, a canonical member, or a known synonym.
+
+    A False result is the explicit "unknown category" signal — a data pass can
+    flag the clock instead of silently coercing it to the fallback.
+    """
+    if category is None:
+        return True
+    return category in _CLOCK_CATEGORY_MEMBERS or category in _CLOCK_CATEGORY_SYNONYMS
+
+
+def normalize_clock_category(category: str | None) -> ClockCategory | None:
+    """Map a raw clock category string onto the ClockCategory enum.
+
+    None stays None; canonical members pass through unchanged (idempotent);
+    known synonyms map to their canonical member; anything else falls back to
+    _UNKNOWN_CLOCK_CATEGORY_FALLBACK. Every non-None result is a valid enum member.
+    """
+    if category is None:
+        return None
+    if category in _CLOCK_CATEGORY_MEMBERS:
+        return category
+    if category in _CLOCK_CATEGORY_SYNONYMS:
+        return _CLOCK_CATEGORY_SYNONYMS[category]
+    return _UNKNOWN_CLOCK_CATEGORY_FALLBACK
+
 
 class StressTrack(BaseModel):
     track_key: str
@@ -18,7 +97,7 @@ class StressTrack(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def filled_within_capacity(self) -> "StressTrack":
+    def filled_within_capacity(self) -> StressTrack:
         if self.filled > self.capacity:
             raise ValueError("filled cannot exceed capacity")
         return self
@@ -34,7 +113,10 @@ class ClockState(BaseModel):
     scope_room_id: str | None = None
     action_tags: list[str] = Field(default_factory=list)
     clock_level: Literal["room", "level", "dungeon", "quest", "character", "faction"] = "dungeon"
-    category: str | None = None
+    # Typed with ClockCategory for the firewall (Phase 51.6), but `str` is still
+    # accepted so pre-normalization saves/seeds (e.g. "threat") load; Slice 2 maps
+    # those onto the enum.
+    category: ClockCategory | str | None = None
     level_id: str | None = None
     owner_actor_id: str | None = None
     stakes: str | None = None
@@ -43,7 +125,7 @@ class ClockState(BaseModel):
     monotonic: bool = True
 
     @model_validator(mode="after")
-    def filled_within_segments(self) -> "ClockState":
+    def filled_within_segments(self) -> ClockState:
         if self.filled > self.segments:
             raise ValueError("filled cannot exceed segments")
         return self
@@ -136,8 +218,8 @@ class WorldReaction(BaseModel):
     campaign_id: str
     source_resolution_id: str
     outcome: Literal["critical", "full", "partial", "miss"]
-    clock_lines: list["ReactionClockLine"] = Field(default_factory=list)
-    stress_lines: list["ReactionStressLine"] = Field(default_factory=list)
+    clock_lines: list[ReactionClockLine] = Field(default_factory=list)
+    stress_lines: list[ReactionStressLine] = Field(default_factory=list)
     summary_lines: list[str] = Field(default_factory=list)
 
 
@@ -176,7 +258,7 @@ class ItemFeature(BaseModel):
     modifier: int | None = None
 
     @model_validator(mode="after")
-    def check_modifier_consistency(self) -> "ItemFeature":
+    def check_modifier_consistency(self) -> ItemFeature:
         if self.feature_type == "rating_modifier" and self.modifier is None:
             raise ValueError("rating_modifier feature requires a non-null modifier")
         if self.feature_type == "new_action" and self.modifier is not None:
@@ -210,7 +292,7 @@ class Item(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def check_item_invariants(self) -> "Item":
+    def check_item_invariants(self) -> Item:
         if self.item_type == "class_kit":
             if self.charges_max is None or self.charges_max < 1:
                 raise ValueError("class_kit requires charges_max >= 1")
@@ -247,6 +329,45 @@ class ObjectTransition(BaseModel):
     action_verb: str | None = None
 
 
+class ObjectReactionBinding(BaseModel):
+    """A scripted world-reaction consequence for a `scripted` RoomObject (Phase 51.6 §5).
+
+    Authored, engine-owned mapping ``action_verb × outcome → consequence`` for the
+    miss/partial tiers only (success/critical flow through transitions and the
+    objective service, D5). ``action_verb`` may be ``"*"`` to match any verb.
+    A binding may advance a clock, apply stress, or both.
+    """
+
+    binding_id: str
+    object_id: str
+    action_verb: str
+    outcome: Literal["miss", "partial"]
+    clock_slug: str | None = None
+    clock_delta: int = 0
+    stress_track: str | None = None
+    stress_amount: int = 0
+
+    @model_validator(mode="after")
+    def check_effect_consistency(self) -> ObjectReactionBinding:
+        """Reject silent-no-op shapes: a target without a magnitude (or vice versa).
+
+        A ``clock_slug`` with a zero ``clock_delta`` (or a nonzero delta with no
+        slug) matches a verb/outcome and then advances nothing — the exact silent
+        failure this phase exists to prevent. Same for the stress pair. An
+        all-empty binding stays legal (flavor-only), but a half-specified effect
+        is always an authoring error.
+        """
+        if (self.clock_slug is not None) != (self.clock_delta != 0):
+            raise ValueError(
+                "clock_slug and a nonzero clock_delta must be set together"
+            )
+        if (self.stress_track is not None) != (self.stress_amount != 0):
+            raise ValueError(
+                "stress_track and a nonzero stress_amount must be set together"
+            )
+        return self
+
+
 class RoomObject(BaseModel):
     object_id: str
     campaign_id: str
@@ -258,6 +379,11 @@ class RoomObject(BaseModel):
     description: str
     current_state: str
     transitions: list[ObjectTransition] = Field(default_factory=list)
+    # Phase 51.6 World Reaction Policy: how a miss/partial on this object reacts.
+    # `ambient` = one locally-scoped adverse clock (§4); `scripted` = only the
+    # authored `reaction_bindings` (§5); `inert` = no mechanics.
+    reaction_policy: Literal["scripted", "ambient", "inert"] = "ambient"
+    reaction_bindings: list[ObjectReactionBinding] = Field(default_factory=list)
 
     @field_validator("description")
     @classmethod
@@ -280,7 +406,7 @@ class ObjectiveCompletion(BaseModel):
     required_state: str | None = None
 
     @model_validator(mode="after")
-    def object_state_requires_required_state(self) -> "ObjectiveCompletion":
+    def object_state_requires_required_state(self) -> ObjectiveCompletion:
         if self.kind == "object_state" and not self.required_state:
             raise ValueError("object_state completion requires required_state")
         return self

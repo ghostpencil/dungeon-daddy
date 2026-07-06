@@ -1,8 +1,6 @@
 """Unit tests for play_view module-level utilities."""
 from __future__ import annotations
 
-import pytest
-
 from dungeon_daddy.views.play_view import _wrap_debug_line
 
 

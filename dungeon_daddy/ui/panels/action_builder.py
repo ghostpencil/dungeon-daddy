@@ -14,6 +14,8 @@ rect-list pattern as :mod:`chat_panel`.
 """
 from __future__ import annotations
 
+from typing import Any, cast
+
 from dungeon_daddy.rpg.action_options import DIALOGUE_VERBS, VERB_LOOK, VERB_MOVE
 from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
 
@@ -220,7 +222,7 @@ class InChatActionBuilder:
         return False
 
     # Deterministic verbs that read calmer than a generic "DO" (spec §4.6).
-    _DETERMINISTIC_BUTTON_LABELS = {VERB_MOVE: "MOVE", VERB_LOOK: "LOOK"}
+    _DETERMINISTIC_BUTTON_LABELS: dict[str | None, str] = {VERB_MOVE: "MOVE", VERB_LOOK: "LOOK"}
 
     def is_dialogue_action(self) -> bool:
         """True when the current selection opens dialogue (Slice 10, §6).
@@ -525,13 +527,13 @@ class InChatActionBuilder:
                 cur_x = left
             cy = top_y - line * self._LINE_H
             if utype == "text":
-                s, color = payload  # type: ignore[misc]
+                s, color = cast("tuple[str, Any]", payload)
                 arcade.draw_text(
                     s, cur_x, cy, color,
                     font_size=TEXT_SM, font_name=FONT_UI, anchor_y="center",
                 )
             else:
-                kind, text, tint, chip_w = payload  # type: ignore[misc]
+                kind, text, tint, chip_w = cast("tuple[str, str, Any, float]", payload)
                 draw_rounded_rect(
                     cur_x + chip_w / 2, cy, chip_w, self._CHIP_H, RADIUS_SM,
                     BG_3, border_color=tint, border_width=1,

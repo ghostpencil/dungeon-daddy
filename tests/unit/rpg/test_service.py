@@ -1,6 +1,20 @@
-from dungeon_daddy.rpg.service import RpgService, compute_effective_ratings, mark_level_items_inert, refresh_kits
-from dungeon_daddy.rpg.models import ActorState, ActionRequest, ActionResolution, ClockState, Item, ItemFeature, StressTrack, WorldReaction
 from dungeon_daddy.memory.models import DomainEvent
+from dungeon_daddy.rpg.models import (
+    ActionRequest,
+    ActionResolution,
+    ActorState,
+    ClockState,
+    Item,
+    ItemFeature,
+    StressTrack,
+    WorldReaction,
+)
+from dungeon_daddy.rpg.service import (
+    RpgService,
+    compute_effective_ratings,
+    mark_level_items_inert,
+    refresh_kits,
+)
 
 
 def test_resolve_action_emits_domain_event() -> None:
@@ -33,11 +47,16 @@ def test_apply_stress_emits_domain_event() -> None:
 
 
 def test_react_to_resolution_returns_world_reaction_and_event() -> None:
+    # Phase 51.6: a non-object action falls to the ambient rule — one +1 tick on
+    # the nearest local adverse clock, and no stress (stress is scripted-only).
     svc = RpgService()
     req = ActionRequest(campaign_id="c1", actor_id="a1", action_key="fight", dice_pool=1)
     resolution, _ = svc.resolve_action(req, fixed=[2])
     assert resolution.outcome == "miss"
-    clock = ClockState(clock_id="ck1", campaign_id="c1", label="Heat", segments=6, filled=1)
+    clock = ClockState(
+        clock_id="ck1", campaign_id="c1", label="Heat", segments=6, filled=1,
+        clock_level="room", scope_room_id="room_a", category="danger",
+    )
     actor = ActorState(
         actor_id="a1", campaign_id="c1", actor_type="pc",
         slug="hero", display_name="Hero",
@@ -45,12 +64,14 @@ def test_react_to_resolution_returns_world_reaction_and_event() -> None:
     tracks = {
         "body": StressTrack(track_key="body", capacity=4, filled=0),
     }
-    reaction, event = svc.react_to_resolution(resolution, [clock], [(actor, tracks)])
+    reaction, event = svc.react_to_resolution(
+        resolution, [clock], [(actor, tracks)], current_room_id="room_a"
+    )
     assert isinstance(reaction, WorldReaction)
     assert reaction.outcome == "miss"
     assert len(reaction.clock_lines) == 1
-    assert reaction.clock_lines[0].ticks == 2
-    assert len(reaction.stress_lines) == 1
+    assert reaction.clock_lines[0].ticks == 1
+    assert reaction.stress_lines == []
     assert isinstance(event, DomainEvent)
     assert event.event_type == "world.reacted"
 
@@ -62,7 +83,7 @@ def test_react_to_resolution_respects_current_room_id() -> None:
     assert resolution.outcome == "miss"
     clock = ClockState(
         clock_id="ck_scoped", campaign_id="c1", label="Scoped",
-        segments=4, filled=0, scope_room_id="room_a",
+        segments=4, filled=0, clock_level="room", scope_room_id="room_a", category="danger",
     )
     actor = ActorState(actor_id="a1", campaign_id="c1", actor_type="pc", slug="h", display_name="H")
     tracks = {"body": StressTrack(track_key="body", capacity=4, filled=0)}
@@ -74,6 +95,47 @@ def test_react_to_resolution_respects_current_room_id() -> None:
         resolution, [clock], [(actor, tracks)], current_room_id="room_a"
     )
     assert len(reaction_right_room.clock_lines) == 1
+
+
+def test_react_to_resolution_threads_acted_object_to_scripted_path() -> None:
+    # Phase 51.6 Slice 8: passing the acted-upon object routes the reaction to
+    # its reaction_policy. A `scripted` object fires only its authored bindings —
+    # its bound clock moves and the locally-scoped ambient clock does not.
+    from dungeon_daddy.rpg.models import ObjectReactionBinding, RoomObject
+
+    svc = RpgService()
+    req = ActionRequest(campaign_id="c1", actor_id="a1", action_key="study", dice_pool=1)
+    resolution, _ = svc.resolve_action(req, fixed=[2])
+    assert resolution.outcome == "miss"
+
+    ambient = ClockState(
+        clock_id="ck_ambient", campaign_id="c1", label="Ambient",
+        segments=6, filled=0, clock_level="room", scope_room_id="room_a", category="danger",
+    )
+    scripted = ClockState(
+        clock_id="ck_scripted", campaign_id="c1", label="Scripted",
+        segments=6, filled=0, clock_level="dungeon", category="faction_pressure",
+    )
+    obj = RoomObject(
+        object_id="obj:c1:statue", campaign_id="c1", room_id="room_a", level_id="lvl",
+        slug="statue", display_name="Statue", archetype="lore_fixture",
+        description="A toppled statue.", current_state="idle", reaction_policy="scripted",
+        reaction_bindings=[
+            ObjectReactionBinding(
+                binding_id="b1", object_id="obj:c1:statue", action_verb="study",
+                outcome="miss", clock_slug="ck_scripted", clock_delta=1,
+            )
+        ],
+    )
+    actor = ActorState(actor_id="a1", campaign_id="c1", actor_type="pc", slug="h", display_name="H")
+    tracks = {"body": StressTrack(track_key="body", capacity=4, filled=0)}
+
+    reaction, _ = svc.react_to_resolution(
+        resolution, [ambient, scripted], [(actor, tracks)],
+        current_room_id="room_a", acted_object=obj,
+    )
+    moved = {line.clock_id for line in reaction.clock_lines}
+    assert moved == {"ck_scripted"}
 
 
 def test_create_actor_returns_actor_state_with_default_stress() -> None:

@@ -3,7 +3,11 @@ from pathlib import Path
 import pytest
 
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.rpg.models import ObjectTransition, RoomObject
+from dungeon_daddy.rpg.models import (
+    ObjectReactionBinding,
+    ObjectTransition,
+    RoomObject,
+)
 
 MIGRATIONS_DIR = (
     Path(__file__).parent.parent.parent.parent
@@ -82,6 +86,79 @@ class TestTransitions:
         assert result is not None
         assert len(result["transitions"]) == 1
         assert result["transitions"][0]["transition_id"] == "tr:test:2"
+
+
+def _binding(
+    binding_id: str = "rb:test:1",
+    object_id: str = "obj:test:chest",
+    action_verb: str = "force",
+    outcome: str = "miss",
+) -> ObjectReactionBinding:
+    return ObjectReactionBinding(
+        binding_id=binding_id,
+        object_id=object_id,
+        action_verb=action_verb,
+        outcome=outcome,
+        clock_slug="scorpion-nest-agitated",
+        clock_delta=1,
+        stress_track="wear",
+        stress_amount=2,
+    )
+
+
+class TestReactionPolicy:
+    def test_defaults_when_not_authored(self, repo: MemoryRepository) -> None:
+        repo.save_room_object(_room_object())
+        result = repo.get_room_object("obj:test:chest")
+        assert result is not None
+        assert result["reaction_policy"] == "ambient"
+        assert result["reaction_bindings"] == []
+
+    def test_reaction_policy_and_bindings_round_trip(
+        self, repo: MemoryRepository
+    ) -> None:
+        obj = _room_object().model_copy(
+            update={
+                "reaction_policy": "scripted",
+                "reaction_bindings": [_binding()],
+            }
+        )
+        repo.save_room_object(obj)
+        result = repo.get_room_object("obj:test:chest")
+        assert result is not None
+        assert result["reaction_policy"] == "scripted"
+        assert len(result["reaction_bindings"]) == 1
+        b = result["reaction_bindings"][0]
+        assert b["binding_id"] == "rb:test:1"
+        assert b["object_id"] == "obj:test:chest"
+        assert b["action_verb"] == "force"
+        assert b["outcome"] == "miss"
+        assert b["clock_slug"] == "scorpion-nest-agitated"
+        assert b["clock_delta"] == 1
+        assert b["stress_track"] == "wear"
+        assert b["stress_amount"] == 2
+        # nested dicts must rebuild into the model
+        rebuilt = RoomObject.model_validate(result)
+        assert rebuilt.reaction_policy == "scripted"
+        assert rebuilt.reaction_bindings[0].binding_id == "rb:test:1"
+
+    def test_upsert_replaces_bindings(self, repo: MemoryRepository) -> None:
+        obj = _room_object().model_copy(
+            update={"reaction_policy": "scripted", "reaction_bindings": [_binding()]}
+        )
+        repo.save_room_object(obj)
+        updated = _room_object().model_copy(
+            update={
+                "reaction_policy": "inert",
+                "reaction_bindings": [_binding(binding_id="rb:test:2")],
+            }
+        )
+        repo.save_room_object(updated)
+        result = repo.get_room_object("obj:test:chest")
+        assert result is not None
+        assert result["reaction_policy"] == "inert"
+        assert len(result["reaction_bindings"]) == 1
+        assert result["reaction_bindings"][0]["binding_id"] == "rb:test:2"
 
 
 class TestUpdateObjectState:

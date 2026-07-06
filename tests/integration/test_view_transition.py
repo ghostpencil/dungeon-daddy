@@ -134,7 +134,7 @@ def test_room_memory_writes_to_saves_dir(tmp_path):
     saves_dir = tmp_path / "saves"
     saves_dir.mkdir()
     save_repo = DungeonRepository(saves_dir)
-    dungeon = _make_dungeon(save_name="my-save")
+    _make_dungeon(save_name="my-save")
 
     view = _make_play_view(DungeonRepository(tmp_path))
     view.set_session_repo(save_repo)

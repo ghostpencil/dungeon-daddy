@@ -2,18 +2,30 @@
 from __future__ import annotations
 
 import uuid
+from typing import TYPE_CHECKING
 
 from dungeon_daddy.memory.models import ContextBundle, MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.rpg.models import ActionRequest, ActionResolution, ClockState, StressTrack, WorldReaction
+from dungeon_daddy.rpg.models import (
+    ActionRequest,
+    ActionResolution,
+    ClockState,
+    StressTrack,
+    WorldReaction,
+)
 from dungeon_daddy.rpg.service import RpgService
+
+if TYPE_CHECKING:
+    from dungeon_daddy.memory.sync import SyncIssue, SyncReporter
+    from dungeon_daddy.rpg.proposal_applier import ApplyResult
+    from dungeon_daddy.rpg.proposal_validator import ValidationResult
 
 
 class DebugControls:
     def __init__(
         self,
         rpg_service: RpgService,
-        sync_reporter=None,
+        sync_reporter: SyncReporter | None = None,
         mem_repo: MemoryRepository | None = None,
     ) -> None:
         self._rpg = rpg_service
@@ -22,12 +34,12 @@ class DebugControls:
         self._last_resolution: ActionResolution | None = None
         self._last_stress_track: StressTrack | None = None
         self._last_clock: ClockState | None = None
-        self._last_sync_issues: list | None = None
+        self._last_sync_issues: list[SyncIssue] | None = None
         self._last_memory_note: MemoryEntry | None = None
         self._last_bundle: ContextBundle | None = None
         self._last_reaction: WorldReaction | None = None
-        self._last_validation = None
-        self._last_apply_result = None
+        self._last_validation: ValidationResult | None = None
+        self._last_apply_result: ApplyResult | None = None
         self._current_level_id: str | None = None
         self._current_level_room_ids: set[str] = set()
 
@@ -187,14 +199,16 @@ class DebugControls:
             )
         return updated
 
-    def generate_sync_report(self) -> list:
+    def generate_sync_report(self) -> list[SyncIssue]:
         if self._sync_reporter is None:
             return []
         issues = self._sync_reporter.check()
         self._last_sync_issues = issues
         return issues
 
-    def set_proposal_result(self, validation, apply_result=None) -> None:
+    def set_proposal_result(
+        self, validation: ValidationResult, apply_result: ApplyResult | None = None
+    ) -> None:
         self._last_validation = validation
         self._last_apply_result = apply_result
 

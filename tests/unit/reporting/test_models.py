@@ -1,3 +1,7 @@
+from datetime import UTC, datetime
+
+import pytest
+
 from dungeon_daddy.reporting.models import (
     ActionUsageRow,
     ClockActivityRow,
@@ -8,8 +12,6 @@ from dungeon_daddy.reporting.models import (
     ProposalStats,
     StressDistributionRow,
 )
-import pytest
-from datetime import datetime, timezone
 
 
 def test_outcome_breakdown_defaults_to_zero():
@@ -35,7 +37,7 @@ def test_action_usage_row_rejects_missing_action_key():
 def test_playtest_report_validates_with_all_sub_models():
     report = PlaytestReport(
         campaign_id="camp:test",
-        generated_at=datetime(2026, 6, 13, 0, 0, tzinfo=timezone.utc),
+        generated_at=datetime(2026, 6, 13, 0, 0, tzinfo=UTC),
         action_usage=[ActionUsageRow(action_key="fight", count=3)],
         outcome_breakdown=OutcomeBreakdown(full=2, partial=1),
         stress_distribution=[StressDistributionRow(actor_id="a1", track_key="body", total_marks=2)],

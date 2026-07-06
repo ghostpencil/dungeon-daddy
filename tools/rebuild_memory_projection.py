@@ -43,7 +43,6 @@ def rebuild_memory_projection(repo: MemoryRepository) -> int:
 
 if __name__ == "__main__":
     import argparse
-    import sys
 
     parser = argparse.ArgumentParser(
         description="Rebuild the memory search projection from raw rows"

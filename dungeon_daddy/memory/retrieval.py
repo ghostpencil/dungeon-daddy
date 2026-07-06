@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from dungeon_daddy.memory.models import MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
 
@@ -90,16 +92,16 @@ class MemoryRetrieval:
     def __init__(self, repo: MemoryRepository) -> None:
         self._repo = repo
 
-    def by_actor(self, actor_tag: str) -> list[dict]:
+    def by_actor(self, actor_tag: str) -> list[dict[str, Any]]:
         return self._by_tag_query(actor_tag)
 
-    def by_location(self, location_tag: str) -> list[dict]:
+    def by_location(self, location_tag: str) -> list[dict[str, Any]]:
         return self._by_tag_query(location_tag)
 
-    def by_tag(self, tag: str) -> list[dict]:
+    def by_tag(self, tag: str) -> list[dict[str, Any]]:
         return self._by_tag_query(tag)
 
-    def _by_tag_query(self, tag: str) -> list[dict]:
+    def _by_tag_query(self, tag: str) -> list[dict[str, Any]]:
         assert self._repo._conn is not None
         rows = self._repo._conn.execute(
             """

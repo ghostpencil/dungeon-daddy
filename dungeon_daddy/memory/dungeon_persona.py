@@ -8,7 +8,7 @@ state and do no DB work.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dungeon_daddy.memory.markdown_store import read_memory, write_memory
@@ -24,11 +24,11 @@ def write_dungeon_voice(dungeon_dir: Path, campaign_id: str, voice: str) -> Path
     """Write the dungeon's static persona prompt to ``voice.md``; return its path."""
     dungeon_dir.mkdir(parents=True, exist_ok=True)
     path = dungeon_dir / _VOICE_FILENAME
-    fm = {
+    fm: dict[str, object] = {
         "id": _VOICE_TYPE,
         "type": _VOICE_TYPE,
         "campaign_id": campaign_id,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }
     write_memory(path, fm, voice)
     return path
@@ -48,11 +48,11 @@ def write_dungeon_knowledge(
     """Write seed secrets to ``knowledge.md`` (one ``- secret`` bullet each)."""
     dungeon_dir.mkdir(parents=True, exist_ok=True)
     path = dungeon_dir / _KNOWLEDGE_FILENAME
-    fm = {
+    fm: dict[str, object] = {
         "id": _KNOWLEDGE_TYPE,
         "type": _KNOWLEDGE_TYPE,
         "campaign_id": campaign_id,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }
     body = "\n".join(f"- {secret}" for secret in knowledge)
     write_memory(path, fm, body)

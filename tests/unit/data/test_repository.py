@@ -382,6 +382,7 @@ def test_get_last_played_returns_none_when_no_session(tmp_path):
 
 def test_get_last_played_returns_datetime_when_session_exists(tmp_path):
     from datetime import datetime
+
     from dungeon_daddy.data.models import SessionState
     from dungeon_daddy.data.repository import DungeonRepository
     repo = DungeonRepository(campaigns_dir=tmp_path)

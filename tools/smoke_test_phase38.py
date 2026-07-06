@@ -46,7 +46,6 @@ _ARTIFACTS_DIR = _PROJECT_ROOT / "artifacts" / "play_mode" / "phase38"
 
 from smoke_helpers import fail, ok  # type: ignore[import]
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
@@ -56,7 +55,7 @@ def _make_actor(
     display_name: str = "Mara",
     actions: dict | None = None,
     stress: dict | None = None,
-) -> "ActorState":
+) -> ActorState:  # noqa: F821  deferred import under `from __future__ import annotations`
     from dungeon_daddy.rpg.models import ActorState, StressTrack
     if actions is None:
         actions = {"fight": 1, "study": 2, "move": 1}
@@ -78,7 +77,7 @@ def _make_resolution(
     actor_id: str = "a1",
     action_key: str = "study",
     intent: str = "I study the mural",
-) -> "ActionResolution":
+) -> ActionResolution:  # noqa: F821  deferred import under `from __future__ import annotations`
     from dungeon_daddy.rpg.models import ActionResolution
     return ActionResolution(
         resolution_id="res-1",
@@ -96,7 +95,7 @@ def _make_view_with_chip(
     action_key: str = "study",
     actor_id: str = "a1",
     room_id: str = "r1",
-) -> "PlayView":
+) -> PlayView:  # noqa: F821  deferred import under `from __future__ import annotations`
     from dungeon_daddy.data.models import Level, Room
     from dungeon_daddy.rpg.service import RpgService
     from dungeon_daddy.ui.panels.player_action_panel import PlayerActionPanel
@@ -149,7 +148,10 @@ def run_pipeline() -> int:
     failures = 0
 
     from dungeon_daddy.rpg.models import (
-        ActorState, ReactionClockLine, ReactionStressLine, StressTrack, WorldReaction,
+        ReactionClockLine,
+        ReactionStressLine,
+        StressTrack,
+        WorldReaction,
     )
     from dungeon_daddy.ui.action_chips import build_action_chips
     from dungeon_daddy.ui.actor_mini_card import build_actor_mini_card
@@ -460,7 +462,6 @@ def run_pipeline() -> int:
     # Behavior 17 — _refresh_right_panel_from_actors called after _run_chat_action
     # ------------------------------------------------------------------
     print("\nBehavior 17 — _refresh_right_panel_from_actors called after _run_chat_action")
-    from dungeon_daddy.views.play_view import PlayView
 
     view17 = _make_view_with_chip(action_key="study")
     refresh_calls: list = []

@@ -339,3 +339,45 @@ def test_completing_a_subsystem_advances_the_ladder(repo, tmp_path: Path):
     unlocked = unlocked_knowledge(repo.get_objectives(CAMPAIGN_ID))
     assert any("red sand" in s for s in unlocked)  # tier-0 secret revealed
     assert not any("elemental heart" in s for s in unlocked)  # deep tiers stay gated
+
+
+# --- Slice 9: the World Reaction Policy map (design §6) --------------------
+
+
+def _obj_by_slug(repo: MemoryRepository, slug: str) -> RoomObject:
+    return next(
+        RoomObject(**o)
+        for o in repo.get_objects_for_campaign(CAMPAIGN_ID)
+        if o["slug"] == slug
+    )
+
+
+def test_subsystems_are_scripted_with_arcane_overload_miss_bindings(repo, tmp_path: Path):
+    # Arcane subsystem obstacles: a miss misfires power → the dungeon-level
+    # `arcane-overload-building` ritual clock ticks (design §5 example); no fan-out.
+    seed_dungeon_channel(repo, tmp_path, CAMPAIGN_ID)
+    for slug, delta in [("coolant-loop", 1), ("arcane-conduits", 1), ("core-containment", 2)]:
+        obj = _obj_by_slug(repo, slug)
+        assert obj.reaction_policy == "scripted", slug
+        assert [
+            (b.action_verb, b.outcome, b.clock_slug, b.clock_delta)
+            for b in obj.reaction_bindings
+        ] == [("*", "miss", "arcane-overload-building", delta)], slug
+
+
+def test_resonance_node_is_scripted_with_a_weird_stress_binding(repo, tmp_path: Path):
+    # Reaching into the failing forge-mind and slipping costs Weird stress.
+    seed_dungeon_channel(repo, tmp_path, CAMPAIGN_ID)
+    node = _obj_by_slug(repo, "arcane-resonance-node")
+    assert node.reaction_policy == "scripted"
+    assert [
+        (b.action_verb, b.outcome, b.stress_track, b.stress_amount)
+        for b in node.reaction_bindings
+    ] == [("*", "miss", "weird", 1)]
+
+
+def test_reseed_does_not_duplicate_bindings(repo, tmp_path: Path):
+    seed_dungeon_channel(repo, tmp_path, CAMPAIGN_ID)
+    seed_dungeon_channel(repo, tmp_path, CAMPAIGN_ID)
+    assert len(_obj_by_slug(repo, "coolant-loop").reaction_bindings) == 1
+    assert len(_obj_by_slug(repo, "arcane-resonance-node").reaction_bindings) == 1

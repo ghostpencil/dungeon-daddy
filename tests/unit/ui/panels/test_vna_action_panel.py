@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dungeon_daddy.rpg.models import ActorAbility
-
 
 def _panel():
     from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel

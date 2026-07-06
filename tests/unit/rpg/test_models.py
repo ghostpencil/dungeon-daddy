@@ -2,16 +2,19 @@ import pytest
 from pydantic import ValidationError
 
 from dungeon_daddy.rpg.models import (
+    CLOCK_CATEGORIES,
     ActionRating,
     ActionRequest,
     ActionResolution,
     ActorState,
+    ClockCategory,
     ClockState,
     FalloutRecord,
     Item,
     ItemFeature,
     Objective,
     ObjectiveCompletion,
+    ObjectReactionBinding,
     ObjectTransition,
     ReactionClockLine,
     ReactionStressLine,
@@ -19,6 +22,9 @@ from dungeon_daddy.rpg.models import (
     RoomObject,
     StressTrack,
     WorldReaction,
+    is_adverse,
+    is_known_clock_category,
+    normalize_clock_category,
 )
 
 
@@ -218,6 +224,21 @@ class TestClockState:
         assert c.stakes == "The room floods."
         assert c.completion_effect == "All future rolls here are harder."
 
+    def test_category_accepts_and_round_trips_a_clock_category(self) -> None:
+        c = ClockState(
+            clock_id="c", campaign_id="x", label="L", segments=4, category="danger"
+        )
+        assert c.category == "danger"
+        assert ClockState.model_validate(c.model_dump()).category == "danger"
+
+    def test_category_preserves_unknown_string_for_back_compat(self) -> None:
+        # Live/seeded clocks carry categories not yet in the enum (e.g. "threat",
+        # "escalation", "environment"); Slice 2 normalizes them. Loading must not crash.
+        c = ClockState(
+            clock_id="c", campaign_id="x", label="L", segments=4, category="threat"
+        )
+        assert c.category == "threat"
+
     def test_optional_level_metadata_defaults(self) -> None:
         c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4)
         assert c.category is None
@@ -226,6 +247,75 @@ class TestClockState:
         assert c.stakes is None
         assert c.completion_effect is None
         assert c.visible_to_player is True
+
+
+class TestIsAdverse:
+    def test_danger_pursuit_ritual_are_adverse(self) -> None:
+        assert is_adverse("danger") is True
+        assert is_adverse("pursuit") is True
+        assert is_adverse("ritual") is True
+
+    def test_firewalled_categories_are_not_adverse(self) -> None:
+        firewalled: tuple[ClockCategory, ...] = (
+            "objective", "relationship", "faction_pressure", "dungeon_intimacy",
+        )
+        for cat in firewalled:
+            assert is_adverse(cat) is False
+
+    def test_none_is_not_adverse(self) -> None:
+        assert is_adverse(None) is False
+
+    def test_raw_synonyms_must_be_normalized_before_asking(self) -> None:
+        # is_adverse takes a normalized ClockCategory (the narrowed signature
+        # makes passing a raw string a type error). A synonym like "threat" is
+        # adverse only *after* normalization maps it onto danger; an unknown
+        # category normalizes to the non-adverse faction_pressure fallback.
+        assert is_adverse(normalize_clock_category("threat")) is True
+        assert is_adverse(normalize_clock_category("mystery-category")) is False
+
+
+class TestNormalizeClockCategory:
+    def test_none_stays_none(self) -> None:
+        assert normalize_clock_category(None) is None
+
+    def test_canonical_members_pass_through_unchanged(self) -> None:
+        for cat in CLOCK_CATEGORIES:
+            assert normalize_clock_category(cat) == cat
+
+    def test_is_idempotent(self) -> None:
+        for cat in (None, "danger", "threat", "environment", "escalation", "mystery"):
+            once = normalize_clock_category(cat)
+            assert normalize_clock_category(once) == once
+
+    def test_known_synonyms_map_to_canonical_members(self) -> None:
+        assert normalize_clock_category("threat") == "danger"
+        assert normalize_clock_category("environment") == "danger"
+        assert normalize_clock_category("escalation") == "pursuit"
+
+    def test_unknown_string_falls_back_to_a_protected_non_adverse_member(self) -> None:
+        result = normalize_clock_category("mystery-category")
+        assert result in CLOCK_CATEGORIES
+        # Fail-safe: an unrecognized clock must never become ambient-eligible.
+        assert is_adverse(result) is False
+
+    def test_every_normalized_result_is_a_valid_enum_member(self) -> None:
+        for raw in (None, "danger", "threat", "environment", "escalation", "???"):
+            result = normalize_clock_category(raw)
+            assert result is None or result in CLOCK_CATEGORIES
+
+
+class TestIsKnownClockCategory:
+    def test_canonical_members_and_known_synonyms_are_known(self) -> None:
+        for cat in (*CLOCK_CATEGORIES, "threat", "environment", "escalation"):
+            assert is_known_clock_category(cat) is True
+
+    def test_none_is_known(self) -> None:
+        assert is_known_clock_category(None) is True
+
+    def test_unrecognized_string_is_not_known(self) -> None:
+        # This is the "explicit, not silent" signal: a data pass can flag the
+        # clock instead of coercing it invisibly.
+        assert is_known_clock_category("mystery-category") is False
 
 
 class TestActionRating:
@@ -640,6 +730,167 @@ class TestObjectTransition:
         )
         assert t.contested is True
         assert t.action_verb == "scrap"
+
+
+class TestRoomObjectReactionPolicy:
+    def _obj(self, **overrides: object) -> RoomObject:
+        kwargs: dict[str, object] = dict(
+            object_id="obj:c:statue",
+            campaign_id="c",
+            room_id="room:r1",
+            level_id="level:1",
+            slug="statue",
+            display_name="Toppled Artificer Statue",
+            archetype="lore_fixture",
+            description="A toppled statue of the artificer.",
+            current_state="intact",
+        )
+        kwargs.update(overrides)
+        return RoomObject(**kwargs)  # type: ignore[arg-type]
+
+    def test_reaction_policy_defaults_to_ambient(self) -> None:
+        obj = self._obj()
+        assert obj.reaction_policy == "ambient"
+
+    def test_reaction_bindings_default_empty(self) -> None:
+        obj = self._obj()
+        assert obj.reaction_bindings == []
+
+    def test_all_reaction_policies_accepted(self) -> None:
+        for policy in ("scripted", "ambient", "inert"):
+            obj = self._obj(reaction_policy=policy)
+            assert obj.reaction_policy == policy
+
+    def test_unknown_reaction_policy_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            self._obj(reaction_policy="chaotic")
+
+    def test_round_trip_preserves_policy_and_bindings(self) -> None:
+        obj = self._obj(
+            reaction_policy="scripted",
+            reaction_bindings=[
+                ObjectReactionBinding(
+                    binding_id="rb:1",
+                    object_id="obj:c:statue",
+                    action_verb="study",
+                    outcome="miss",
+                    clock_slug="scorpion-nest-agitated",
+                    clock_delta=1,
+                )
+            ],
+        )
+        restored = RoomObject.model_validate(obj.model_dump())
+        assert restored.reaction_policy == "scripted"
+        assert len(restored.reaction_bindings) == 1
+        assert restored.reaction_bindings[0].binding_id == "rb:1"
+        assert restored.reaction_bindings[0].clock_slug == "scorpion-nest-agitated"
+
+
+class TestObjectReactionBinding:
+    def test_constructs_with_required_fields_optional_defaults(self) -> None:
+        b = ObjectReactionBinding(
+            binding_id="rb:1",
+            object_id="obj:c:statue",
+            action_verb="study",
+            outcome="miss",
+        )
+        assert b.binding_id == "rb:1"
+        assert b.action_verb == "study"
+        assert b.outcome == "miss"
+        assert b.clock_slug is None
+        assert b.clock_delta == 0
+        assert b.stress_track is None
+        assert b.stress_amount == 0
+
+    def test_wildcard_verb_accepted(self) -> None:
+        b = ObjectReactionBinding(
+            binding_id="rb:2",
+            object_id="obj:c:statue",
+            action_verb="*",
+            outcome="partial",
+        )
+        assert b.action_verb == "*"
+
+    def test_both_outcome_tiers_accepted(self) -> None:
+        for outcome in ("miss", "partial"):
+            b = ObjectReactionBinding(
+                binding_id="rb:x",
+                object_id="obj:c:statue",
+                action_verb="study",
+                outcome=outcome,
+            )
+            assert b.outcome == outcome
+
+    def test_unknown_outcome_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            ObjectReactionBinding(
+                binding_id="rb:3",
+                object_id="obj:c:statue",
+                action_verb="study",
+                outcome="success",
+            )
+
+    def test_clock_and_stress_consequences_stored(self) -> None:
+        b = ObjectReactionBinding(
+            binding_id="rb:4",
+            object_id="obj:c:statue",
+            action_verb="force",
+            outcome="miss",
+            clock_slug="scorpion-nest-agitated",
+            clock_delta=2,
+            stress_track="body",
+            stress_amount=1,
+        )
+        assert b.clock_slug == "scorpion-nest-agitated"
+        assert b.clock_delta == 2
+        assert b.stress_track == "body"
+        assert b.stress_amount == 1
+
+    def test_round_trip(self) -> None:
+        b = ObjectReactionBinding(
+            binding_id="rb:5",
+            object_id="obj:c:statue",
+            action_verb="*",
+            outcome="partial",
+            clock_slug="the-factory-learns",
+            clock_delta=1,
+        )
+        restored = ObjectReactionBinding.model_validate(b.model_dump())
+        assert restored == b
+
+    def test_clock_slug_without_delta_rejected(self) -> None:
+        # Silent-no-op guard: a slug with a zero delta matches a verb/outcome
+        # and then advances nothing — reject it at authoring time.
+        with pytest.raises(ValidationError):
+            ObjectReactionBinding(
+                binding_id="rb:6", object_id="obj:c:statue",
+                action_verb="study", outcome="miss",
+                clock_slug="scorpion-nest-agitated", clock_delta=0,
+            )
+
+    def test_clock_delta_without_slug_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            ObjectReactionBinding(
+                binding_id="rb:7", object_id="obj:c:statue",
+                action_verb="study", outcome="miss",
+                clock_delta=2,
+            )
+
+    def test_stress_track_without_amount_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            ObjectReactionBinding(
+                binding_id="rb:8", object_id="obj:c:statue",
+                action_verb="study", outcome="miss",
+                stress_track="body", stress_amount=0,
+            )
+
+    def test_stress_amount_without_track_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            ObjectReactionBinding(
+                binding_id="rb:9", object_id="obj:c:statue",
+                action_verb="study", outcome="miss",
+                stress_amount=2,
+            )
 
 
 class TestRoomExit:

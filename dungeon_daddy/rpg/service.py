@@ -3,20 +3,21 @@ from __future__ import annotations
 import uuid
 from typing import Literal
 
-from dungeon_daddy.rpg.actions import resolve_action
-from dungeon_daddy.rpg.clocks import advance_clock, create_clock
-from dungeon_daddy.rpg.stress import create_default_stress_tracks, is_track_filled, mark_stress
-from dungeon_daddy.rpg.world_reaction import compute_world_reaction
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.memory.repository import MemoryRepository
+from dungeon_daddy.rpg.actions import resolve_action
+from dungeon_daddy.rpg.clocks import advance_clock
 from dungeon_daddy.rpg.models import (
     ActionRequest,
     ActionResolution,
     ActorState,
     ClockState,
+    RoomObject,
     StressTrack,
     WorldReaction,
 )
+from dungeon_daddy.rpg.stress import create_default_stress_tracks, is_track_filled, mark_stress
+from dungeon_daddy.rpg.world_reaction import compute_world_reaction
 
 
 class RpgService:
@@ -74,11 +75,13 @@ class RpgService:
         pc_actors: list[tuple[ActorState, dict[str, StressTrack]]],
         current_room_id: str | None = None,
         current_level_id: str | None = None,
+        acted_object: RoomObject | None = None,
     ) -> tuple[WorldReaction, DomainEvent]:
         reaction = compute_world_reaction(
             resolution, threat_clocks, pc_actors,
             current_room_id=current_room_id,
             current_level_id=current_level_id,
+            acted_object=acted_object,
         )
         event = DomainEvent(
             event_id=str(uuid.uuid4()),

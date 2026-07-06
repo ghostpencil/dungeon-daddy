@@ -5,8 +5,6 @@ import queue
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-
 from dungeon_daddy.data.models import Level, Room
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.models import ActorState, FalloutRecord

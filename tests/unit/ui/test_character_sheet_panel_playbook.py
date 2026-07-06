@@ -1,12 +1,14 @@
 """Slice 6 — CharacterSheetPanel playbook section (Cycles 43–50)."""
 from __future__ import annotations
 
-import pytest
-
-from dungeon_daddy.rpg.playbook import (
-    Playbook, PlaybookKit, PlaybookAbility, PlaybookStressTrack, SignatureAdverb,
-)
 from dungeon_daddy.rpg.models import ActorAbility, ActorState
+from dungeon_daddy.rpg.playbook import (
+    Playbook,
+    PlaybookAbility,
+    PlaybookKit,
+    PlaybookStressTrack,
+    SignatureAdverb,
+)
 
 
 def _panel():

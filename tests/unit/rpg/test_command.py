@@ -1,4 +1,12 @@
-from dungeon_daddy.rpg.command import ActivateObject, ConsumeItem, ConsumeKitCharge, EquipItem, GiveItem, TakeItem, UnequipItem
+from dungeon_daddy.rpg.command import (
+    ActivateObject,
+    ConsumeItem,
+    ConsumeKitCharge,
+    EquipItem,
+    GiveItem,
+    TakeItem,
+    UnequipItem,
+)
 
 
 def test_consume_kit_charge_instantiates() -> None:

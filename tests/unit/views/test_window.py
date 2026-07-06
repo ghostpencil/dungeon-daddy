@@ -5,13 +5,13 @@ from unittest.mock import MagicMock
 
 from dungeon_daddy.window import DungeonDaddyWindow
 
-
 # ---------------------------------------------------------------------------
 # _attach_rpg_context passes portraits_dir
 # ---------------------------------------------------------------------------
 
 def test_attach_rpg_context_passes_portraits_dir(tmp_path):
     from unittest.mock import MagicMock
+
     from dungeon_daddy.window import DungeonDaddyWindow
 
     save_name = "The Crucible"
@@ -47,10 +47,11 @@ MIGRATIONS_DIR = (
 
 def _build_campaign(campaign_dir, *, voice=None, knowledge=None):
     """Create a campaign.duckdb (and optional persona docs) for save_name."""
-    from dungeon_daddy.memory.repository import MemoryRepository
     from dungeon_daddy.memory.dungeon_persona import (
-        write_dungeon_voice, write_dungeon_knowledge,
+        write_dungeon_knowledge,
+        write_dungeon_voice,
     )
+    from dungeon_daddy.memory.repository import MemoryRepository
     from dungeon_daddy.window import _slugify
 
     campaign_dir.mkdir(parents=True, exist_ok=True)

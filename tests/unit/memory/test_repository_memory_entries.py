@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dungeon_daddy.memory.repository import MemoryRepository
 
-
 # ---------------------------------------------------------------------------
 # Campaign persistence
 # ---------------------------------------------------------------------------

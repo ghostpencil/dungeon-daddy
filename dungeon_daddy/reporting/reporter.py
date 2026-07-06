@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.reporting.models import PlaytestReport
@@ -17,7 +17,7 @@ def build_report(repo: MemoryRepository, campaign_id: str) -> PlaytestReport:
     events = repo.get_domain_events(campaign_id)
     return PlaytestReport(
         campaign_id=campaign_id,
-        generated_at=datetime.now(timezone.utc),
+        generated_at=datetime.now(UTC),
         action_usage=action_usage(events),
         outcome_breakdown=outcome_breakdown(events),
         stress_distribution=stress_distribution(events),

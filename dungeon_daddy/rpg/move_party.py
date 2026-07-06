@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
+from typing import Any
 
 from dungeon_daddy.data.models import SessionState
 from dungeon_daddy.memory.models import DomainEvent
@@ -82,7 +83,7 @@ def apply_move_party(
     if to_room_id not in visited:
         visited.append(to_room_id)
 
-    session_update: dict = {"current_room_id": to_room_id, "visited_rooms": visited}
+    session_update: dict[str, Any] = {"current_room_id": to_room_id, "visited_rooms": visited}
 
     to_level_id: str | None = exit_row.get("to_level_id")
     if exit_row.get("connector_type") and to_level_id:

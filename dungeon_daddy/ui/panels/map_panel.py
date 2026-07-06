@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import arcade
 import arcade.gui
@@ -40,6 +41,11 @@ from dungeon_daddy.ui.theme import (
     draw_chip,
     draw_kicker,
 )
+
+if TYPE_CHECKING:
+    from dungeon_daddy.map.dungeon_layout.models import RoomRect
+    from dungeon_daddy.map.dungeon_layout.panel_placement import ScreenRect
+    from dungeon_daddy.map.map_art_assets import MapArtAssets
 
 _HEADER_H = 38   # map panel header bar
 _TAB_H = 32
@@ -160,7 +166,7 @@ class MapPanel:
         self._things_here: RoomThings | None = None  # play-mode overlay content
         self._things_selected_noun_id: str | None = None
         self._dungeon_channel_open: bool = False  # Phase 51 Slice 9 entry affordance
-        self._art = None  # MapArtAssets, lazy-loaded on first draw
+        self._art: MapArtAssets | None = None  # lazy-loaded on first draw
 
         from dungeon_daddy.ui.widgets.level_stepper import LevelStepper
         self._stepper = LevelStepper(on_level_change)
@@ -348,6 +354,7 @@ class MapPanel:
 
     def handle_mouse_press(self, x: float, y: float, button: int) -> bool:
         """Handle map clicks: loop strip pills first, then pan tool."""
+        rect: RoomRect | ScreenRect
         if button == arcade.MOUSE_BUTTON_LEFT:
             for loop_id, (x1, y1, x2, y2) in self._loop_strip_rects.items():
                 if x1 <= x <= x2 and y1 <= y <= y2:

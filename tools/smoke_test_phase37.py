@@ -46,7 +46,6 @@ _ARTIFACTS_DIR = _PROJECT_ROOT / "artifacts" / "play_mode" / "phase37"
 
 from smoke_helpers import fail, ok  # type: ignore[import]
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

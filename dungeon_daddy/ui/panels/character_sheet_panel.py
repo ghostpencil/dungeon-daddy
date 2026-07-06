@@ -1,9 +1,14 @@
 """Character sheet panel — displays actor state in Play Mode."""
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 import arcade
 
 from dungeon_daddy.rpg.models import ActorAbility, ActorState, FalloutRecord
+
+if TYPE_CHECKING:
+    from dungeon_daddy.rpg.playbook import Playbook
 
 _ACTION_ORDER = [
     "fight", "move", "tinker", "study",
@@ -23,10 +28,10 @@ class CharacterSheetPanel:
         self._actor: ActorState | None = None
         self._fallout: list[FalloutRecord] = []
         self._momentum: int = 0
-        self._kits: list[dict] = []
-        self._dungeon_items: list[dict] = []
-        self._equipped: list[dict] = []
-        self._playbook = None
+        self._kits: list[dict[str, Any]] = []
+        self._dungeon_items: list[dict[str, Any]] = []
+        self._equipped: list[dict[str, Any]] = []
+        self._playbook: Playbook | None = None
         self._abilities: list[ActorAbility] = []
         self._x = self._y = self._w = self._h = 0.0
         self._party: list[ActorState] = []
@@ -71,15 +76,15 @@ class CharacterSheetPanel:
 
     def set_inventory(
         self,
-        kits: list[dict],
-        dungeon_items: list[dict],
-        equipped: list[dict],
+        kits: list[dict[str, Any]],
+        dungeon_items: list[dict[str, Any]],
+        equipped: list[dict[str, Any]],
     ) -> None:
         self._kits = list(kits)
         self._dungeon_items = list(dungeon_items)
         self._equipped = list(equipped)
 
-    def set_playbook(self, playbook) -> None:
+    def set_playbook(self, playbook: Playbook | None) -> None:
         self._playbook = playbook
 
     def set_abilities(self, abilities: list[ActorAbility]) -> None:
@@ -90,10 +95,20 @@ class CharacterSheetPanel:
 
     def draw(self) -> None:
         from dungeon_daddy.ui.theme import (
-            BG_1, BG_2, BG_3,
-            EMBER, INK_1, INK_2, INK_3, INK_4,
-            TEAL, VIOLET,
-            FONT_UI, TEXT_SM, TEXT_MD, PAD_MD, PAD_SM,
+            BG_1,
+            BG_3,
+            EMBER,
+            FONT_UI,
+            INK_1,
+            INK_2,
+            INK_3,
+            INK_4,
+            PAD_MD,
+            PAD_SM,
+            TEAL,
+            TEXT_MD,
+            TEXT_SM,
+            VIOLET,
         )
 
         x, y, w, h = self._x, self._y, self._w, self._h

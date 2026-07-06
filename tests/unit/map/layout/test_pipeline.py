@@ -4,7 +4,6 @@ from __future__ import annotations
 from dungeon_daddy.map.dungeon_layout import run_layout_pipeline
 from tests.unit.map.layout._factories import _conn, _level, _room
 
-
 # ---------------------------------------------------------------------------
 # Cycle 1 — one RoomRect per room
 # ---------------------------------------------------------------------------

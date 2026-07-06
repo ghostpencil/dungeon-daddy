@@ -1,12 +1,13 @@
 """Campaign List Panel — center item card list for Campaign Mode."""
 from __future__ import annotations
 
+from typing import Any
+
 import arcade
 
 from dungeon_daddy.ui.theme import (
     BG_0,
     BG_2,
-    BG_3,
     EMBER,
     FONT_MONO,
     FONT_SERIF,
@@ -17,14 +18,10 @@ from dungeon_daddy.ui.theme import (
     INK_4,
     LINE,
     PAD_MD,
-    PAD_SM,
     TEAL,
     TEXT_2XL,
     TEXT_BASE,
     TEXT_SM,
-    TEAL_DIM,
-    VIOLET,
-    VIOLET_DIM,
     draw_chip,
     draw_kicker,
     draw_rounded_rect,
@@ -146,7 +143,7 @@ class CampaignListPanel:
     def draw(
         self,
         section: str | None,
-        items: list,
+        items: list[Any],
         hovered_index: int | None = None,
         breadcrumb: str | None = None,
     ) -> None:
@@ -365,9 +362,9 @@ class CampaignListPanel:
         pip_gap = 10
         for seg in range(segments):
             if seg < filled:
-                arcade.draw_circle_filled(pip_x, pip_y, pip_r, TEAL)  # type: ignore[arg-type]
+                arcade.draw_circle_filled(pip_x, pip_y, pip_r, TEAL)
             else:
-                arcade.draw_circle_outline(pip_x, pip_y, pip_r, INK_4, 1)  # type: ignore[arg-type]
+                arcade.draw_circle_outline(pip_x, pip_y, pip_r, INK_4, 1)
             pip_x += pip_gap + pip_r * 2
 
     def _draw_threat_card(

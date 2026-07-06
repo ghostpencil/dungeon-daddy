@@ -227,7 +227,7 @@ def test_validate_proposal_accepts_block_exit_known_id() -> None:
 # ---------------------------------------------------------------------------
 
 def test_apply_block_exit_sets_status_blocked_and_emits_event(repo: MemoryRepository) -> None:
-    from dungeon_daddy.rpg.proposal import BlockExitChange, LLMReactionProposal
+    from dungeon_daddy.rpg.proposal import BlockExitChange
     from dungeon_daddy.rpg.proposal_applier import apply_low_risk_proposals
     from dungeon_daddy.rpg.proposal_validator import ValidationResult
 

@@ -98,7 +98,6 @@ def import_campaign_fixture(repo: MemoryRepository, bundle: dict) -> None:
 
 if __name__ == "__main__":
     import argparse
-    import sys
 
     parser = argparse.ArgumentParser(description="Import a campaign JSON bundle")
     parser.add_argument("db_path", help="Path to target campaign.duckdb (will be created)")

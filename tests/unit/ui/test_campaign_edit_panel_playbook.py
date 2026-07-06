@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 from dungeon_daddy.campaign.manifest import ActorManifest
 from dungeon_daddy.ui.panels.campaign_edit_panel import CampaignEditPanel
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

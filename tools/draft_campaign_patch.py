@@ -23,8 +23,8 @@ if __name__ == "__main__":
     import argparse
     import os
 
-    from dungeon_daddy.campaign.drafter import CampaignDrafter
     from dungeon_daddy.campaign.draft_flow import run_draft_flow
+    from dungeon_daddy.campaign.drafter import CampaignDrafter
     from dungeon_daddy.llm.openai_provider import OpenAIProvider
 
     parser = argparse.ArgumentParser(description="Draft and apply an AI-assisted campaign patch.")

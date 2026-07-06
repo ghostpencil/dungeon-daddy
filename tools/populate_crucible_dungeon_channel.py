@@ -31,6 +31,7 @@ from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.models import (
     Objective,
     ObjectiveCompletion,
+    ObjectReactionBinding,
     ObjectTransition,
     RoomObject,
 )
@@ -118,6 +119,13 @@ class _Rung:
     archetype: str | None = None
     broken_state: str | None = None
     broken_description: str | None = None
+    # Phase 51.6 World Reaction Policy (§6): the subsystem obstacles are `scripted`
+    # — success completes the objective (intimacy via the service, D5); a miss
+    # misfires arcane power into the dungeon-level Overload clock (§5), never a
+    # fan-out across unrelated clocks. Tier 0 (no subsystem here) is authored on
+    # the adopted gearworks by the Level-1 seed.
+    miss_clock_slug: str | None = None
+    miss_clock_delta: int = 0
 
 
 LADDER: list[_Rung] = [
@@ -163,6 +171,8 @@ LADDER: list[_Rung] = [
             "A burst ring of arcane coolant piping, weeping frost and steam. "
             "Resealed, it would carry the dungeon's heat away once more."
         ),
+        miss_clock_slug="arcane-overload-building",
+        miss_clock_delta=1,
     ),
     _Rung(
         tier=2,
@@ -190,6 +200,8 @@ LADDER: list[_Rung] = [
             "A lattice of cold arcane conduits, their runes faded to grey. "
             "Recharged, they would carry power back into the citadel's mind."
         ),
+        miss_clock_slug="arcane-overload-building",
+        miss_clock_delta=1,
     ),
     _Rung(
         tier=3,
@@ -220,6 +232,9 @@ LADDER: list[_Rung] = [
             "The containment ring around the dungeon's bound heart, its wards "
             "guttering. Stabilized, it would hold the core together a while longer."
         ),
+        # Climax subsystem — a slip here is dangerous: +2 on the Overload clock.
+        miss_clock_slug="arcane-overload-building",
+        miss_clock_delta=2,
     ),
 ]
 
@@ -238,6 +253,20 @@ def _subsystem_object(rung: _Rung) -> RoomObject:
     assert rung.room_id and rung.level_id and rung.archetype and rung.broken_state
     assert rung.approaches, f"tier {rung.tier} subsystem needs contested approaches"
     object_id = f"object:the-crucible:{rung.room_id}:{rung.subsystem_slug}"
+    # Phase 51.6 §6: `scripted` control — a miss ticks one authored adverse clock,
+    # never the intimacy/objective/relationship/faction clocks (firewall, §3).
+    bindings: list[ObjectReactionBinding] = []
+    if rung.miss_clock_slug is not None:
+        bindings.append(
+            ObjectReactionBinding(
+                binding_id=f"{object_id}:miss",
+                object_id=object_id,
+                action_verb="*",
+                outcome="miss",
+                clock_slug=rung.miss_clock_slug,
+                clock_delta=rung.miss_clock_delta,
+            )
+        )
     return RoomObject(
         object_id=object_id,
         campaign_id=CAMPAIGN_ID,
@@ -261,6 +290,8 @@ def _subsystem_object(rung: _Rung) -> RoomObject:
             )
             for verb in rung.approaches
         ],
+        reaction_policy="scripted" if bindings else "ambient",
+        reaction_bindings=bindings,
     )
 
 
@@ -299,6 +330,19 @@ def _resonance_object() -> RoomObject:
         ),
         current_state="attuned",
         transitions=[],
+        # Phase 51.6 §6: the channel site is `scripted` — reaching into the failing
+        # forge-mind and slipping costs authored Weird stress, nothing else.
+        reaction_policy="scripted",
+        reaction_bindings=[
+            ObjectReactionBinding(
+                binding_id=f"{RESONANCE_OBJECT_ID}:miss",
+                object_id=RESONANCE_OBJECT_ID,
+                action_verb="*",
+                outcome="miss",
+                stress_track="weird",
+                stress_amount=1,
+            )
+        ],
     )
 
 

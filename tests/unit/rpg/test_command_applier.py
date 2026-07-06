@@ -1,6 +1,16 @@
 from __future__ import annotations
 
-from dungeon_daddy.rpg.command import ActivateObject, ConsumeItem, ConsumeKitCharge, DropItem, EquipItem, GiveItem, PickUpItem, TakeItem, UnequipItem
+from dungeon_daddy.rpg.command import (
+    ActivateObject,
+    ConsumeItem,
+    ConsumeKitCharge,
+    DropItem,
+    EquipItem,
+    GiveItem,
+    PickUpItem,
+    TakeItem,
+    UnequipItem,
+)
 from dungeon_daddy.rpg.command_applier import apply_command
 from dungeon_daddy.rpg.command_validator import CommandValidationResult
 from dungeon_daddy.rpg.models import Item, ObjectTransition, RoomObject
@@ -124,7 +134,7 @@ class TestTakeItemApplier:
         assert item["status"] == "active"
 
 
-def _gear(owner: str = ACTOR_A) -> "Item":
+def _gear(owner: str = ACTOR_A) -> Item:
     from dungeon_daddy.rpg.models import Item
     return Item(
         item_id=GEAR_ID,
@@ -293,7 +303,7 @@ LOOSE_ID = "item:test:gem"
 ROOM_A = "room:test:vault"
 
 
-def _loose(item_id: str = LOOSE_ID, owner: str | None = None, room_id: str | None = ROOM_A) -> "Item":
+def _loose(item_id: str = LOOSE_ID, owner: str | None = None, room_id: str | None = ROOM_A) -> Item:
     from dungeon_daddy.rpg.models import Item
     return Item(
         item_id=item_id,

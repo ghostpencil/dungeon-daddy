@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
+from typing import Any
 
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.memory.repository import MemoryRepository
@@ -32,7 +33,7 @@ def apply_low_risk_proposals(
     campaign_id: str,
     action_key: str | None = None,
     intent: str | None = None,
-    matched_clocks: list | None = None,
+    matched_clocks: list[Any] | None = None,
 ) -> ApplyResult:
     result = ApplyResult()
 

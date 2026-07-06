@@ -1,21 +1,28 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
+
 from dungeon_daddy.rpg.models import ActionRequest, ActionResolution, ActorState
+
+if TYPE_CHECKING:
+    import arcade.gui
 
 
 class PlayerActionPanel:
     def __init__(self) -> None:
         self._actors: list[ActorState] = []
-        self._last_result: dict | None = None
-        self._on_resolve = None
-        self._on_action_select = None
+        self._last_result: dict[str, Any] | None = None
+        self._on_resolve: Callable[..., None] | None = None
+        self._on_action_select: Callable[[str], None] | None = None
         self._actor_idx: int = 0
         self._action_key: str = "fight"
         self._push_yourself: bool = False
         self._momentum_spend: int = 0
-        self._all_widgets: list = []
-        self._action_btn_refs: dict[str, object] = {}
-        self._widget_params: tuple | None = None  # (manager, x, y, w, h)
+        self._all_widgets: list[arcade.gui.UIWidget] = []
+        self._action_btn_refs: dict[str, arcade.gui.UIFlatButton] = {}
+        self._widget_params: tuple[arcade.gui.UIManager, float, float, float, float] | None = None
+        self._intent_widget: arcade.gui.UIInputText | None = None
 
     def set_actors(self, actors: list[ActorState]) -> None:
         self._actors = actors
@@ -40,7 +47,7 @@ class PlayerActionPanel:
             intent=intent,
         )
 
-    def _format_result(self, resolution: ActionResolution) -> dict:
+    def _format_result(self, resolution: ActionResolution) -> dict[str, Any]:
         return {
             "outcome": resolution.outcome,
             "dice": resolution.dice_rolled,
@@ -48,23 +55,36 @@ class PlayerActionPanel:
             "notes": resolution.notes,
         }
 
-    def store_result(self, summary: dict) -> None:
+    def store_result(self, summary: dict[str, Any]) -> None:
         self._last_result = summary
 
-    def set_resolve_callback(self, fn) -> None:
+    def set_resolve_callback(self, fn: Callable[..., None]) -> None:
         self._on_resolve = fn
 
-    def set_action_select_callback(self, fn) -> None:
+    def set_action_select_callback(self, fn: Callable[[str], None]) -> None:
         self._on_action_select = fn
 
-    def setup_widget(self, manager: object | None, x: float, y: float, w: float, h: float) -> None:
+    def setup_widget(self, manager: arcade.gui.UIManager | None, x: float, y: float, w: float, h: float) -> None:
         if manager is None:
             return
         import arcade
         import arcade.gui
+
         from dungeon_daddy.ui.theme import (
-            BG_2, BG_3, BG_HI, FONT_UI, FONT_UI_MED, FONT_MONO, INK_1, INK_2, INK_3, INK_4,
-            LINE, LINE_HI, PAD_MD, TEXT_SM, TEAL,
+            BG_2,
+            BG_3,
+            BG_HI,
+            FONT_MONO,
+            FONT_UI,
+            INK_1,
+            INK_2,
+            INK_3,
+            INK_4,
+            LINE,
+            LINE_HI,
+            PAD_MD,
+            TEAL,
+            TEXT_SM,
         )
         self._widget_params = (manager, x, y, w, h)
         self.teardown_widget(manager)
@@ -73,7 +93,7 @@ class PlayerActionPanel:
         _BTN_H = 22
         _BTN_W = int((w - PAD_MD * 2) / 3) - 2
 
-        def _btn_style(active: bool) -> dict:
+        def _btn_style(active: bool) -> dict[str, arcade.gui.UIFlatButton.UIStyle]:
             fg = (*TEAL, 255) if active else (*INK_3, 255)
             bg = (*BG_HI, 255) if active else (*BG_2, 255)
             border = (*TEAL, 255) if active else (*LINE, 255)
@@ -117,21 +137,21 @@ class PlayerActionPanel:
         )
 
         @prev_btn.event
-        def on_click(event) -> None:
+        def on_click(event: arcade.gui.UIOnClickEvent) -> None:
             if self._actors:
                 self._actor_idx = (self._actor_idx - 1) % len(self._actors)
                 if self._widget_params:
                     self.setup_widget(*self._widget_params)
 
-        @next_btn.event
-        def on_click(event) -> None:  # type: ignore[no-redef]
+        @next_btn.event  # type: ignore[no-redef]
+        def on_click(event: arcade.gui.UIOnClickEvent) -> None:  # noqa: F811  arcade @event requires this name
             if self._actors:
                 self._actor_idx = (self._actor_idx + 1) % len(self._actors)
                 if self._widget_params:
                     self.setup_widget(*self._widget_params)
 
-        manager.add(prev_btn)  # type: ignore[union-attr]
-        manager.add(next_btn)  # type: ignore[union-attr]
+        manager.add(prev_btn)
+        manager.add(next_btn)
         self._all_widgets.extend([prev_btn, next_btn])
 
         cur_y -= 18  # actor name row matches draw()
@@ -149,7 +169,7 @@ class PlayerActionPanel:
             text_color=(*INK_2, 255),
             multiline=False,
         )
-        manager.add(intent_widget)  # type: ignore[union-attr]
+        manager.add(intent_widget)
         self._all_widgets.append(intent_widget)
         self._intent_widget = intent_widget
 
@@ -174,15 +194,15 @@ class PlayerActionPanel:
             _key = key
             self._action_btn_refs[key] = btn
 
-            @btn.event
-            def on_click(event, k=_key) -> None:
+            @btn.event  # type: ignore[no-redef]
+            def on_click(event: arcade.gui.UIOnClickEvent, k: str = _key) -> None:  # noqa: F811  arcade @event requires this name
                 self._action_key = k
                 for bk, b in self._action_btn_refs.items():
-                    b.style = _btn_style(bk == k)  # type: ignore[union-attr]
+                    b.style = _btn_style(bk == k)
                 if self._on_action_select:
                     self._on_action_select(k)
 
-            manager.add(btn)  # type: ignore[union-attr]
+            manager.add(btn)
             self._all_widgets.append(btn)
 
         rows = (len(_ACTION_KEYS) + 2) // 3
@@ -197,11 +217,11 @@ class PlayerActionPanel:
             style=_btn_style(self._push_yourself),
         )
 
-        @push_btn.event
-        def on_click(event) -> None:  # type: ignore[no-redef]
+        @push_btn.event  # type: ignore[no-redef]
+        def on_click(event: arcade.gui.UIOnClickEvent) -> None:  # noqa: F811  arcade @event requires this name
             self._push_yourself = not self._push_yourself
 
-        manager.add(push_btn)  # type: ignore[union-attr]
+        manager.add(push_btn)
         self._all_widgets.append(push_btn)
         cur_y -= _BTN_H + PAD_MD
 
@@ -215,12 +235,12 @@ class PlayerActionPanel:
             style=_btn_style(False),
         )
 
-        @resolve_btn.event
-        def on_click(event) -> None:  # type: ignore[no-redef]
+        @resolve_btn.event  # type: ignore[no-redef]
+        def on_click(event: arcade.gui.UIOnClickEvent) -> None:  # noqa: F811  arcade @event requires this name
             if not self._on_resolve or not self._actors:
                 return
             actor = self._actors[min(self._actor_idx, len(self._actors) - 1)]
-            intent = self._intent_widget.text if self._intent_widget else ""  # type: ignore[union-attr]
+            intent = self._intent_widget.text if self._intent_widget else ""
             dice_pool = max(1, actor.actions.get(self._action_key, 1))
             self._on_resolve(
                 campaign_id=actor.campaign_id,
@@ -232,16 +252,16 @@ class PlayerActionPanel:
                 dice_pool=dice_pool,
             )
 
-        manager.add(resolve_btn)  # type: ignore[union-attr]
+        manager.add(resolve_btn)
         self._all_widgets.append(resolve_btn)
         self._intent_widget = intent_widget
 
-    def teardown_widget(self, manager: object | None) -> None:
+    def teardown_widget(self, manager: arcade.gui.UIManager | None) -> None:
         if manager is None:
             return
         for w in self._all_widgets:
             try:
-                manager.remove(w)  # type: ignore[union-attr]
+                manager.remove(w)
             except Exception:
                 pass
         self._all_widgets.clear()
@@ -250,7 +270,8 @@ class PlayerActionPanel:
 
     def draw(self, x: float, y: float, width: float, height: float) -> None:
         import arcade
-        from dungeon_daddy.ui.theme import BG_1, INK_3, INK_4, FONT_UI, FONT_MONO, PAD_MD, TEXT_SM
+
+        from dungeon_daddy.ui.theme import BG_1, FONT_MONO, FONT_UI, INK_3, INK_4, PAD_MD, TEXT_SM
 
         _ACTION_KEYS = ["fight", "move", "tinker", "study", "focus", "sway", "sense", "channel", "endure"]
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from typing import Any
 
 from dungeon_daddy.rpg.models import ClockState
 
@@ -31,7 +32,7 @@ REASON_NOT_INTIMATE = "The dungeon does not yet know you well enough to speak."
 SUBSYSTEM_ARCHETYPES = ("mechanism", "structure")
 
 
-def dungeon_systems_status(room_objects: list[dict]) -> list[tuple[str, str]]:
+def dungeon_systems_status(room_objects: list[dict[str, Any]]) -> list[tuple[str, str]]:
     """Return a deterministic snapshot of the dungeon's subsystems (spec §4.2).
 
     ``room_objects`` are repo dicts (the ``get_objects_for_campaign`` shape, each
@@ -48,7 +49,7 @@ def dungeon_systems_status(room_objects: list[dict]) -> list[tuple[str, str]]:
 
 
 def located_systems_status(
-    room_objects: list[dict], room_labels: dict[str, str]
+    room_objects: list[dict[str, Any]], room_labels: dict[str, str]
 ) -> list[tuple[str, str, str]]:
     """Like :func:`dungeon_systems_status`, but each tuple also carries the
     subsystem's human location so the dungeon can tell the player where to go.
@@ -58,14 +59,14 @@ def located_systems_status(
     rather than being dropped — the dungeon still reports its state truthfully.
     """
     return [
-        (obj["display_name"], obj["current_state"], room_labels.get(obj.get("room_id"), ""))
+        (obj["display_name"], obj["current_state"], room_labels.get(obj.get("room_id") or "", ""))
         for obj in room_objects
         if obj.get("archetype") in SUBSYSTEM_ARCHETYPES
     ]
 
 
 def object_location(
-    target_slug: str, room_objects: list[dict], room_labels: dict[str, str]
+    target_slug: str, room_objects: list[dict[str, Any]], room_labels: dict[str, str]
 ) -> str | None:
     """Resolve a room object's ``slug`` to its human location label.
 
@@ -75,11 +76,11 @@ def object_location(
     """
     for obj in room_objects:
         if obj.get("slug") == target_slug:
-            return room_labels.get(obj.get("room_id")) or None
+            return room_labels.get(obj.get("room_id") or "") or None
     return None
 
 
-def unlocked_knowledge(objectives: list[dict]) -> list[str]:
+def unlocked_knowledge(objectives: list[dict[str, Any]]) -> list[str]:
     """Return the secrets the dungeon may draw on now (spec §4.3.4 / D7).
 
     ``objectives`` are repo dicts (the ``get_objectives`` shape, ordered by
@@ -98,7 +99,7 @@ def unlocked_knowledge(objectives: list[dict]) -> list[str]:
     return unlocked
 
 
-def active_objective(objectives: list[dict]) -> dict | None:
+def active_objective(objectives: list[dict[str, Any]]) -> dict[str, Any] | None:
     """Return the active objective — the dungeon's "what I want next" (spec §4.3.4).
 
     ``objectives`` are repo dicts (the ``get_objectives`` shape, ordered by
@@ -114,7 +115,7 @@ def active_objective(objectives: list[dict]) -> dict | None:
 
 
 def dungeon_channel_available(
-    room_context: dict,
+    room_context: dict[str, Any],
     intimacy_clock: ClockState | None,
 ) -> tuple[bool, str | None]:
     """Decide whether the freeform dungeon-voice channel may open.

@@ -9,7 +9,6 @@ import pytest
 
 from dungeon_daddy.map.map_art_assets import MapArtAssets
 
-
 # ---------------------------------------------------------------------------
 # Cycle 1 — background loads when file exists
 # ---------------------------------------------------------------------------

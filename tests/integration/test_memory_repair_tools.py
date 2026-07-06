@@ -3,19 +3,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import export_campaign as ec_mod
+import import_campaign_fixture as icf_mod
 import pytest
+import validate_campaign as vc_mod
 
 from dungeon_daddy.memory.repository import MemoryRepository
 from tests.fixtures.phase32_campaign import (
-    CAMPAIGN_ID,
-    MEM_SABLE_PACT_ID,
-    SABLE_ID,
     seed_campaign,
 )
-
-import validate_campaign as vc_mod
-import export_campaign as ec_mod
-import import_campaign_fixture as icf_mod
 
 MIGRATIONS_DIR = (
     Path(__file__).parent.parent.parent / "dungeon_daddy" / "data" / "migrations"

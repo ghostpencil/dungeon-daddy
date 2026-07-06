@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 from dungeon_daddy.data.models import SessionState
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.discover_exit import passive_hidden_exit_hint
@@ -20,7 +22,7 @@ def build_room_context(
     repo: MemoryRepository,
     *,
     resonance_point: bool = False,
-) -> dict:
+) -> dict[str, Any]:
     objects = repo.get_objects_by_room(campaign_id, room_id)
     resonance_point = resonance_point or any(
         o["archetype"] == "resonance_point" for o in objects
@@ -63,13 +65,13 @@ def build_room_context(
     }
 
 
-def _missing_condition(exit_row: dict) -> str | None:
+def _missing_condition(exit_row: dict[str, Any]) -> str | None:
     if exit_row.get("requires_item_slug"):
-        return exit_row["requires_item_slug"]
+        return cast(str, exit_row["requires_item_slug"])
     if exit_row.get("requires_memory_slug"):
-        return exit_row["requires_memory_slug"]
+        return cast(str, exit_row["requires_memory_slug"])
     if exit_row.get("requires_clock_slug"):
-        return exit_row["requires_clock_slug"]
+        return cast(str, exit_row["requires_clock_slug"])
     if exit_row.get("requires_object_state"):
-        return exit_row["requires_object_state"]
+        return cast(str, exit_row["requires_object_state"])
     return None

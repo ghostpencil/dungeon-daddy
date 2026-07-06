@@ -2,7 +2,6 @@
 from pathlib import Path
 
 import duckdb
-import pytest
 
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.memory.repository import MemoryRepository, MigrationRunner
@@ -29,6 +28,7 @@ EXPECTED_TABLES = {
     "domain_events",
     "room_objects",
     "object_transitions",
+    "object_reaction_bindings",
     "room_exits",
 }
 
@@ -71,6 +71,64 @@ class TestMigrationRunnerIntegration:
         conn.close()
         tables = {row[0] for row in rows}
         assert EXPECTED_TABLES <= tables
+
+    def test_room_objects_has_reaction_policy_column(self, tmp_path: Path) -> None:
+        db_path = tmp_path / "dungeon.duckdb"
+        runner = MigrationRunner(migrations_dir=MIGRATIONS_DIR, db_path=db_path)
+        runner.run()
+        conn = duckdb.connect(str(db_path))
+        cols = {
+            row[0]
+            for row in conn.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'room_objects'"
+            ).fetchall()
+        }
+        conn.close()
+        assert "reaction_policy" in cols
+
+    def test_019_applies_on_018_head_db(self, tmp_path: Path) -> None:
+        """A DB migrated through 018 then to 019: old rows default to 'ambient'."""
+        db_path = tmp_path / "dungeon.duckdb"
+        # Build an 018-head DB from a migrations dir holding only 001..018.
+        head_dir = tmp_path / "migrations_018"
+        head_dir.mkdir()
+        for sql_file in sorted(MIGRATIONS_DIR.glob("*.sql")):
+            if sql_file.name < "019":
+                (head_dir / sql_file.name).write_text(
+                    sql_file.read_text(encoding="utf-8"), encoding="utf-8"
+                )
+        MigrationRunner(migrations_dir=head_dir, db_path=db_path).run()
+        # Insert a room object with the pre-019 schema (no reaction_policy column).
+        conn = duckdb.connect(str(db_path))
+        conn.execute(
+            """
+            INSERT INTO room_objects (
+                object_id, campaign_id, room_id, level_id, slug,
+                display_name, archetype, description, current_state
+            )
+            VALUES ('obj:old', 'camp:old', 'room:old', 'level:old', 'old-statue',
+                    'Old Statue', 'lore_fixture', 'A weathered statue.', 'intact')
+            """
+        )
+        conn.close()
+        # Now migrate to 019 (full dir) on the same DB.
+        applied = MigrationRunner(migrations_dir=MIGRATIONS_DIR, db_path=db_path).run()
+        assert "019_reaction_policy.sql" in applied
+        conn = duckdb.connect(str(db_path))
+        policy = conn.execute(
+            "SELECT reaction_policy FROM room_objects WHERE object_id = 'obj:old'"
+        ).fetchone()[0]
+        tables = {
+            row[0]
+            for row in conn.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'main'"
+            ).fetchall()
+        }
+        conn.close()
+        assert policy == "ambient"
+        assert "object_reaction_bindings" in tables
 
     def test_items_table_has_room_id_column(self, tmp_path: Path) -> None:
         db_path = tmp_path / "dungeon.duckdb"

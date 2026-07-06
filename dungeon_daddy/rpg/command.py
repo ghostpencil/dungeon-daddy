@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -71,6 +71,6 @@ class MoveParty(BaseModel):
 
 
 PlayerCommand = Annotated[
-    Union[ConsumeKitCharge, ConsumeItem, GiveItem, TakeItem, EquipItem, UnequipItem, PickUpItem, DropItem, ActivateObject, CombineItems, MoveParty],
+    ConsumeKitCharge | ConsumeItem | GiveItem | TakeItem | EquipItem | UnequipItem | PickUpItem | DropItem | ActivateObject | CombineItems | MoveParty,
     Field(discriminator="kind"),
 ]

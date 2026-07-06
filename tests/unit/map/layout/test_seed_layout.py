@@ -1,10 +1,11 @@
 """Tests for dungeon_daddy.map.dungeon_layout.seed_layout."""
 from __future__ import annotations
 
-from dungeon_daddy.data.models import Connection, LayoutMetadata, Level, Room
+from dungeon_daddy.data.models import LayoutMetadata, Level
 from dungeon_daddy.map.dungeon_layout.seed_layout import compute_critical_path, compute_seed_layout
-from tests.unit.map.layout._factories import _conn as _make_conn, _level as _make_level, _room as _make_room
-
+from tests.unit.map.layout._factories import _conn as _make_conn
+from tests.unit.map.layout._factories import _level as _make_level
+from tests.unit.map.layout._factories import _room as _make_room
 
 # ---------------------------------------------------------------------------
 # Cycle 1 — tracer bullet: every room is placed

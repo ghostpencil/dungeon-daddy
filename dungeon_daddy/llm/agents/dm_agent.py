@@ -1,10 +1,16 @@
 """DungeonMasterAgent — Play Mode narration and chat."""
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from dungeon_daddy.data.models import Dungeon, Level, Loop, Room
 from dungeon_daddy.llm.context_builder import ContextBuilder
 from dungeon_daddy.llm.prompts import load_prompt
 from dungeon_daddy.llm.provider import LLMMessage, LLMProvider
+
+if TYPE_CHECKING:
+    from dungeon_daddy.memory.models import ContextBundle
+    from dungeon_daddy.rpg.models import ActionResolution
 
 
 class DungeonMasterAgent:
@@ -19,7 +25,7 @@ class DungeonMasterAgent:
         self._provider = provider
         self._context_builder = context_builder
 
-    def build_prompt(self, context_bundle=None) -> str:
+    def build_prompt(self, context_bundle: ContextBundle | None = None) -> str:
         if context_bundle is None:
             return self.SYSTEM_PROMPT
         lines = [self.SYSTEM_PROMPT]
@@ -67,7 +73,7 @@ class DungeonMasterAgent:
         room_memory: str = "",
         level_id: int | None = None,
         active_loop: Loop | None = None,
-        context_bundle=None,
+        context_bundle: ContextBundle | None = None,
     ) -> str:
         context = self._build_context(room, level, dungeon, room_memory)
         base = self.build_prompt(context_bundle)
@@ -117,10 +123,10 @@ class DungeonMasterAgent:
 
     def request_proposal(
         self,
-        resolution,
-        context_bundle,
-        known_clocks: list[dict],
-        known_actors: list[dict],
+        resolution: ActionResolution,
+        context_bundle: ContextBundle | None,
+        known_clocks: list[dict[str, Any]],
+        known_actors: list[dict[str, Any]],
         player_actor_ids: list[str],
         room_name: str = "",
         room_note: str = "",

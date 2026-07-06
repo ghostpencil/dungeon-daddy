@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dungeon_daddy.rpg.models import ActionRequest, ActionResolution, ActorState
 
-
 # ---------------------------------------------------------------------------
 # Slice 5 — store_result persists formatted summary
 # ---------------------------------------------------------------------------
@@ -32,7 +31,8 @@ class TestResolveCallback:
 
     def test_set_resolve_callback_stores_fn(self):
         panel = _panel()
-        fn = lambda **kw: None
+        def fn(**kw):
+            return None
         panel.set_resolve_callback(fn)
         assert panel._on_resolve is fn
 

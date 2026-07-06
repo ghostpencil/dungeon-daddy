@@ -25,7 +25,7 @@ def _save_path() -> Path:
 
 
 def _great_lift_upper() -> RoomObject:
-    oid = f"object:the-crucible:r01:great-lift-upper"
+    oid = "object:the-crucible:r01:great-lift-upper"
     return RoomObject(
         object_id=oid,
         campaign_id=CAMPAIGN_ID,

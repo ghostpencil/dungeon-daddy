@@ -38,8 +38,8 @@ def _actor(**kw) -> ActorState:
 
 
 def _make_view(tmp_path: Path, actor: ActorState | None = None):
-    from dungeon_daddy.views.play_view import PlayView
     from dungeon_daddy.ui.player_action_state import PlayerActionState
+    from dungeon_daddy.views.play_view import PlayView
 
     mem_repo = MemoryRepository(tmp_path / "test.duckdb")
     mem_repo.initialize_schema(MIGRATIONS_DIR)
@@ -90,7 +90,7 @@ def test_refresh_vna_panel_surfaces_exit_as_noun(tmp_path):
 def test_refresh_vna_panel_feeds_things_here_overlay(tmp_path):
     """Phase 50.6 Slice 7: the same refresh feeds the map overlay, tracking the
     current room — so the overlay updates on load and on every move."""
-    from dungeon_daddy.rpg.action_options import RoomThings, SECTION_EXITS
+    from dungeon_daddy.rpg.action_options import SECTION_EXITS, RoomThings
     view = _make_view(tmp_path)
     view._map = MagicMock()
     _save_exit(view._mem_repo, exit_id="e1", label="North Door", status="open")
@@ -321,7 +321,11 @@ def test_refresh_vna_panel_disambiguates_doors_by_direction(tmp_path):
 
 def _dungeon_with_connected_rooms(rooms, connections):
     from dungeon_daddy.data.models import (
-        Connection, Dungeon, DungeonMeta, Level, Room,
+        Connection,
+        Dungeon,
+        DungeonMeta,
+        Level,
+        Room,
     )
 
     room_models = [
@@ -742,7 +746,7 @@ def test_submit_activate_with_required_item_held_transitions_and_consumes(tmp_pa
 
 def test_submit_use_on_object_routes_as_activate(tmp_path):
     # use [fuse] on [lift] with target SOURCE_OBJECT → same activation path as activate [lift]
-    from dungeon_daddy.rpg.action_options import ActionCard, NounOption, SOURCE_OBJECT
+    from dungeon_daddy.rpg.action_options import SOURCE_OBJECT, ActionCard, NounOption
     from dungeon_daddy.rpg.models import Item, ObjectTransition, RoomObject
 
     view = _make_view(tmp_path)
@@ -837,6 +841,53 @@ def test_skill_card_names_noun_in_dm_message(tmp_path):
     assert "Warden's Notice Board" in sent
 
 
+def test_resolve_vna_roll_passes_acted_object_to_world_reaction(tmp_path):
+    """Phase 51.6 Slice 8: the skill-roll path resolves the card's object noun
+    and threads it into _apply_world_reaction so the reaction can branch on the
+    object's reaction_policy."""
+    from dungeon_daddy.rpg.action_options import ActionCard
+    from dungeon_daddy.rpg.models import ObjectReactionBinding, RoomObject
+    from dungeon_daddy.rpg.service import RpgService
+
+    view = _make_view(tmp_path)
+    view._dungeon = _dungeon_with_rooms([("r1", "Forge Floor", 0, 0)])
+    view._rpg_service = RpgService()
+    view._dm_agent = None
+    view._rpg_debug = None
+    view._rpg_char = MagicMock()
+    view._rpg_fallout = MagicMock()
+    view._spawn_dm_thread = MagicMock()
+    view._compact_history = MagicMock()
+    view._dm_history = []
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-statue", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="statue", display_name="Toppled Statue", archetype="lore_fixture",
+        description="A toppled artificer statue.", current_state="idle",
+        reaction_policy="scripted",
+        reaction_bindings=[ObjectReactionBinding(
+            binding_id="b1", object_id="obj-statue", action_verb="study",
+            outcome="miss", clock_slug="scorpion-nest", clock_delta=1,
+        )],
+    ))
+    view._refresh_vna_panel()
+
+    captured = {}
+    real = view._apply_world_reaction
+
+    def _spy(resolution, acted_object=None):
+        captured["acted_object"] = acted_object
+        return real(resolution, acted_object=acted_object)
+
+    view._apply_world_reaction = _spy  # type: ignore[method-assign]
+
+    view._on_vna_submit(ActionCard(verb="study", noun_id="obj-statue", adverb="cautiously"))
+
+    acted = captured.get("acted_object")
+    assert acted is not None
+    assert acted.object_id == "obj-statue"
+    assert acted.reaction_policy == "scripted"
+
+
 # ---------------------------------------------------------------------------
 # Slice 8 — look verb: read-only description fetch, no roll, no state change
 # ---------------------------------------------------------------------------
@@ -906,7 +957,6 @@ def test_submit_look_card_no_state_change(tmp_path):
 
 def test_give_target_includes_other_party_members(tmp_path):
     """Other party PCs (from _rpg_action._actors) appear as give targets."""
-    from dungeon_daddy.rpg.action_options import ActionCard
     from dungeon_daddy.rpg.models import Item
 
     borin = _actor(actor_id="pc-2", slug="borin", display_name="Borin")
@@ -1046,7 +1096,7 @@ def test_use_non_matching_item_on_exit_does_not_clear_requires_item_slug(tmp_pat
 # ---------------------------------------------------------------------------
 
 def test_sway_on_willing_npc_opens_dialogue_not_roll(tmp_path):
-    from dungeon_daddy.rpg.action_options import ActionCard, NounOption, SOURCE_NPC
+    from dungeon_daddy.rpg.action_options import SOURCE_NPC, ActionCard, NounOption
 
     view = _make_view(tmp_path)
     view._resolve_vna_roll = MagicMock()
@@ -1065,7 +1115,7 @@ def test_sway_on_willing_npc_opens_dialogue_not_roll(tmp_path):
 
 def test_sway_on_hostile_creature_rolls_not_dialogue(tmp_path):
     # Not all creatures will talk — a hostile target stays a contested roll.
-    from dungeon_daddy.rpg.action_options import ActionCard, NounOption, SOURCE_MONSTER
+    from dungeon_daddy.rpg.action_options import SOURCE_MONSTER, ActionCard, NounOption
 
     view = _make_view(tmp_path)
     view._resolve_vna_roll = MagicMock()
@@ -1119,3 +1169,44 @@ def test_build_context_bundle_includes_current_room_objects(tmp_path):
     names = [o["display_name"] for o in objects]
     assert "Warden's Notice Board" in names
     assert any("watch-stall" in o["description"] for o in objects)
+
+
+# ---------------------------------------------------------------------------
+# Phase 51.6 Slice 8 — _resolve_acted_object: card noun → RoomObject (policy)
+# ---------------------------------------------------------------------------
+
+def test_resolve_acted_object_returns_room_object_with_policy(tmp_path):
+    """A card noun that names a room object resolves to its RoomObject,
+    carrying the reaction_policy + bindings loaded from the repo (Slice 4)."""
+    from dungeon_daddy.rpg.models import ObjectReactionBinding, RoomObject
+
+    view = _make_view(tmp_path)
+    view._mem_repo.save_room_object(RoomObject(
+        object_id="obj-statue", campaign_id="camp-1", room_id="r1", level_id="level-1",
+        slug="statue", display_name="Toppled Statue", archetype="lore_fixture",
+        description="A toppled artificer statue.", current_state="idle",
+        reaction_policy="scripted",
+        reaction_bindings=[ObjectReactionBinding(
+            binding_id="b1", object_id="obj-statue", action_verb="study",
+            outcome="miss", clock_slug="scorpion-nest", clock_delta=1,
+        )],
+    ))
+
+    obj = view._resolve_acted_object("obj-statue")
+
+    assert obj is not None
+    assert obj.reaction_policy == "scripted"
+    assert [b.clock_slug for b in obj.reaction_bindings] == ["scorpion-nest"]
+
+
+def test_resolve_acted_object_none_for_non_object_noun(tmp_path):
+    """A noun that is not a room object (item/actor/exit) resolves to None —
+    a non-object action falls to the ambient rule."""
+    view = _make_view(tmp_path)
+    assert view._resolve_acted_object("not-an-object") is None
+
+
+def test_resolve_acted_object_none_without_repo(tmp_path):
+    view = _make_view(tmp_path)
+    view._mem_repo = None
+    assert view._resolve_acted_object("obj-statue") is None

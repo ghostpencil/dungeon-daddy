@@ -17,7 +17,13 @@ import os
 from pathlib import Path
 
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.rpg.models import Item, ObjectTransition, RoomExit, RoomObject
+from dungeon_daddy.rpg.models import (
+    Item,
+    ObjectReactionBinding,
+    ObjectTransition,
+    RoomExit,
+    RoomObject,
+)
 
 CAMPAIGN_ID = "campaign:the-crucible"
 LEVEL_ID = "level:1"
@@ -51,12 +57,24 @@ def _t(obj_id: str, n: int, frm: str, to: str, trigger: str, **kw) -> ObjectTran
     )
 
 
-def _obj(room, slug, name, archetype, state, desc, transitions) -> RoomObject:
+def _rb(obj_id: str, verb: str, outcome: str, **kw) -> ObjectReactionBinding:
+    """A scripted world-reaction binding (Phase 51.6 §5) for ``obj_id``."""
+    return ObjectReactionBinding(
+        binding_id=f"binding:the-crucible:{obj_id.split(':')[-1]}:{verb}:{outcome}",
+        object_id=obj_id, action_verb=verb, outcome=outcome, **kw,
+    )
+
+
+def _obj(
+    room, slug, name, archetype, state, desc, transitions,
+    *, policy: str = "ambient", bindings=None,
+) -> RoomObject:
     oid = _oid(room, slug)
     return RoomObject(
         object_id=oid, campaign_id=CAMPAIGN_ID, room_id=room, level_id=LEVEL_ID,
         slug=slug, display_name=name, archetype=archetype, description=desc,
         current_state=state, transitions=transitions,
+        reaction_policy=policy, reaction_bindings=bindings or [],
     )
 
 
@@ -180,6 +198,10 @@ def _objects() -> list[RoomObject]:
         "A cage of dwarven brass straddling a shaft that plunges into darkness. Its "
         "control podium is dead — a fuse slot gapes empty where a power cell should sit.",
         [_t(o, 1, "unpowered", "powered", "activate", requires_item_slug="lift-fuse")],
+        # Mission gate (§6, scripted): mishandling its arcane power feeds the
+        # Overload clock — no more miss fan-out across unrelated campaign clocks.
+        policy="scripted",
+        bindings=[_rb(o, "*", "miss", clock_slug="arcane-overload-building", clock_delta=1)],
     ))
     o = _oid("R4", "gearworks")
     out.append(_obj(
@@ -192,6 +214,10 @@ def _objects() -> list[RoomObject]:
         [_t(o, 1, "jammed", "cleared", "tinker", contested=True, action_verb="tinker"),
          _t(o, 2, "jammed", "cleared", "fight", contested=True, action_verb="fight"),
          _t(o, 3, "jammed", "cleared", "endure", contested=True, action_verb="endure")],
+        # Tier-0 intimacy obstacle (§6, scripted): forcing/grinding the works is
+        # noisy — a miss draws the sensors, not the dungeon's regard (D5 firewall).
+        policy="scripted",
+        bindings=[_rb(o, "*", "miss", clock_slug="party-detected", clock_delta=1)],
     ))
 
     # --- R5 Trap Room --------------------------------------------------------
@@ -202,6 +228,10 @@ def _objects() -> list[RoomObject]:
         "oiled spikes, primed to drive upward.",
         [_t(o, 1, "armed", "disarmed", "disarm"),
          _t(o, 2, "armed", "sprung", "trigger")],
+        # Trap (§6, scripted): a botched handling springs it — heavy spikes deal
+        # authored Body stress (+2 is reserved for genuinely dangerous fiction, §5).
+        policy="scripted",
+        bindings=[_rb(o, "*", "miss", stress_track="body", stress_amount=2)],
     ))
     o = _oid("R5", "dart-vents")
     out.append(_obj(
@@ -210,6 +240,9 @@ def _objects() -> list[RoomObject]:
         "a needle dart behind a hair-trigger reed.",
         [_t(o, 1, "armed", "disarmed", "disarm"),
          _t(o, 2, "armed", "sprung", "trigger")],
+        # Trap (§6, scripted): lighter needle darts — a botched handling costs +1 Body.
+        policy="scripted",
+        bindings=[_rb(o, "*", "miss", stress_track="body", stress_amount=1)],
     ))
     o = _oid("R5", "trap-lever")
     out.append(_obj(
@@ -217,6 +250,9 @@ def _objects() -> list[RoomObject]:
         "A wall lever stamped with the warden's sigil, set behind a grille at the far "
         "end of the room. Thrown, it cuts power to the chamber's traps.",
         [_t(o, 1, "active", "disabled", "toggle")],
+        # Trap-system control (§6, scripted): pure deterministic gate — it works or
+        # it doesn't. No reaction binding: a fumbled throw moves no world clock.
+        policy="scripted",
     ))
     return out
 

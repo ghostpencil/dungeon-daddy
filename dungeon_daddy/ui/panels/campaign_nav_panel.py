@@ -14,7 +14,6 @@ from dungeon_daddy.ui.theme import (
     INK_4,
     LINE,
     PAD_MD,
-    PAD_SM,
     TEXT_LG,
     TEXT_SM,
     draw_chip,

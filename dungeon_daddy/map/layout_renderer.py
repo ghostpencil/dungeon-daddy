@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
 import arcade
 
@@ -32,9 +33,12 @@ from dungeon_daddy.map.dungeon_layout.room_style import GraphRoomStyle, GraphRoo
 from dungeon_daddy.map.dungeon_layout.style_resolver import resolve_room_render_style
 from dungeon_daddy.map.dungeon_layout.visual_hierarchy_config import VisualHierarchyConfig
 from dungeon_daddy.map.layout_debug_renderer import LayoutDebugRenderer
-from dungeon_daddy.ui.fog_of_war import HIDDEN_LABEL, fog_of_war_label
 from dungeon_daddy.rpg.action_options import RoomThings
+from dungeon_daddy.ui.fog_of_war import HIDDEN_LABEL, fog_of_war_label
 from dungeon_daddy.ui.theme import FONT_MONO, FONT_UI, GOLD, TEAL, TEXT_XS, VIOLET, draw_chip
+
+if TYPE_CHECKING:
+    from dungeon_daddy.map.map_art_assets import MapArtAssets
 
 _ROOM_FILL = (30, 35, 45)
 _ROOM_BORDER = (100, 120, 140)
@@ -132,13 +136,13 @@ class LayoutRenderer:
         self._room_resolver = GraphRoomStyleResolver()
         self._conn_resolver = GraphConnectionStyleResolver()
         self._cp_presenter = CriticalPathPresenter()
-        self._art = None  # MapArtAssets, lazy-loaded on first draw
+        self._art: MapArtAssets | None = None  # lazy-loaded on first draw
         # Screen-space rects of the play-mode "Things Here" rows, keyed by
         # noun_id — populated each draw so the map panel can hit-test clicks and
         # feed the action builder (Phase 50.6 §5.3). Empty in graph mode.
         self._thing_rects: dict[str, ScreenRect] = {}
 
-    def thing_rects(self) -> dict[str, "ScreenRect"]:
+    def thing_rects(self) -> dict[str, ScreenRect]:
         """Screen-space row rects from the last play-mode draw, by noun_id."""
         return self._thing_rects
 

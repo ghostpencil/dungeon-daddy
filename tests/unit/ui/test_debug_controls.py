@@ -3,7 +3,14 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from dungeon_daddy.rpg.models import ActionRequest, ActorState, ClockState, ReactionClockLine, ReactionStressLine, StressTrack, WorldReaction
+from dungeon_daddy.rpg.models import (
+    ActionRequest,
+    ClockState,
+    ReactionClockLine,
+    ReactionStressLine,
+    StressTrack,
+    WorldReaction,
+)
 from dungeon_daddy.rpg.service import RpgService
 
 
@@ -452,7 +459,7 @@ def test_clock_section_non_level_clocks_unaffected_by_level_filter():
     ])
     ctrl.set_bundle(b)
     lines = ctrl.clock_section_lines()
-    assert any("chapel" in l for l in lines)
+    assert any("chapel" in line for line in lines)
     assert "Clocks: 2 active" in lines[0]
 
 

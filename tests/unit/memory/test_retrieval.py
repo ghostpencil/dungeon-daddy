@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC
+
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.memory.retrieval import MemoryRetrieval, MemoryRetriever
 
@@ -10,8 +12,8 @@ class TestMemoryRetriever:
         assert retriever._campaign_id == "camp_abc"
 
     def test_query_ranked_by_importance_desc_then_recency(self, repo: MemoryRepository) -> None:
-        from datetime import datetime, timezone, timedelta
-        base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        from datetime import datetime, timedelta
+        base = datetime(2026, 1, 1, tzinfo=UTC)
         repo.save_memory_entry("mem_lo", "camp_001", "event", "Low", importance=2, status="approved")
         repo.add_memory_tag("mem_lo", "theme:guilt")
         repo.save_memory_entry("mem_hi", "camp_001", "event", "High", importance=9, status="approved")

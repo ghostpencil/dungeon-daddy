@@ -18,7 +18,7 @@ class PlayerActionState:
     intent: str = ""
     awaiting_confirmation: bool = False
     resolution_summary: str | None = None
-    pending_intent: "PendingIntent | None" = None
+    pending_intent: PendingIntent | None = None
     _actor_roster: list[str] = field(default_factory=list)
     _roster_index: int = 0
 
@@ -64,7 +64,7 @@ class PlayerActionState:
     def set_resolution_summary(self, summary: str | None) -> None:
         self.resolution_summary = summary
 
-    def set_pending_intent(self, pi: "PendingIntent | None") -> None:
+    def set_pending_intent(self, pi: PendingIntent | None) -> None:
         self.pending_intent = pi
 
     def reset(self) -> None:

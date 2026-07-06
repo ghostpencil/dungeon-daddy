@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from dungeon_daddy.campaign.manifest import ActorManifest, CampaignManifest, ClockManifest
@@ -11,7 +13,7 @@ class ManifestPatch(BaseModel):
     remove_actor_slugs: list[str] = Field(default_factory=list)
     add_clocks: list[ClockManifest] = Field(default_factory=list)
     remove_clock_slugs: list[str] = Field(default_factory=list)
-    add_room_threats: list[dict] = Field(default_factory=list)
+    add_room_threats: list[dict[str, Any]] = Field(default_factory=list)
     remove_room_threat_locations: list[str] = Field(default_factory=list)
     add_memory_seeds: list[str] = Field(default_factory=list)
     remove_memory_seeds: list[str] = Field(default_factory=list)

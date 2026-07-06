@@ -16,15 +16,15 @@ plus the actor playbook's signature adverbs filtered by the noun's ``target_type
 """
 from __future__ import annotations
 
+from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Collection, Iterable, Mapping
+from typing import Any
 
 from pydantic import BaseModel
 
 from dungeon_daddy.rpg.models import ActorAbility
 from dungeon_daddy.rpg.move_party import HOW_MODIFIER_FLAGS
-from dungeon_daddy.rpg.playbook import PlaybookLibrary, _UNIVERSAL_VERBS
-
+from dungeon_daddy.rpg.playbook import _UNIVERSAL_VERBS, PlaybookLibrary
 
 # Canonical verb slugs. ``move`` is one of the 9 universal skill verbs but is
 # also an engine mutation; the interaction verbs below are *not* skill verbs —
@@ -116,8 +116,8 @@ def target_sources_for_verb(verb: str) -> set[str] | None:
 
 
 def verbs_for_noun(
-    noun: "NounOption", all_verbs: Iterable["VerbOption"]
-) -> list["VerbOption"]:
+    noun: NounOption, all_verbs: Iterable[VerbOption]
+) -> list[VerbOption]:
     """The verbs from ``all_verbs`` that may target ``noun`` — inverse of
     :func:`noun_sources_for_verb`.
 
@@ -141,7 +141,7 @@ def verbs_for_noun(
 _SPEAKABLE_DISPOSITIONS: frozenset[str] = frozenset({"willing"})
 
 
-def is_speakable(noun: "NounOption", room_context: Mapping) -> bool:
+def is_speakable(noun: NounOption, room_context: Mapping[str, Any]) -> bool:
     """True when ``noun`` is a creature the party can open dialogue with (§6).
 
     A noun is speakable only when it is an NPC or monster present in
@@ -218,7 +218,7 @@ class ActionPreview:
 
 
 def action_preview(
-    card: "ActionCard", room_context: Mapping, actor: Mapping
+    card: ActionCard, room_context: Mapping[str, Any], actor: Mapping[str, Any]
 ) -> ActionPreview:
     """Build the deterministic Preview box for an action Card (spec §4.5).
 
@@ -247,7 +247,7 @@ def action_preview(
     )
 
 
-def _templated_risk(room_context: Mapping) -> str | None:
+def _templated_risk(room_context: Mapping[str, Any]) -> str | None:
     """Template a risk line from threats present in the room, or ``None``.
 
     Active creatures may stir; disturbed objects are named hazards. Forgiving of
@@ -339,7 +339,7 @@ class RoomThings:
     sections: list[ThingsSection] = field(default_factory=list)
 
 
-def room_things(room_context: Mapping, actor: Mapping) -> RoomThings:
+def room_things(room_context: Mapping[str, Any], actor: Mapping[str, Any]) -> RoomThings:
     """Group the room's :func:`available_nouns` into the overlay's EXITS / OBJECTS /
     CREATURES / ITEMS sections with per-row status chips (spec §5.2).
 
@@ -376,11 +376,11 @@ def room_things(room_context: Mapping, actor: Mapping) -> RoomThings:
 
 
 def _room_thing(
-    noun: "NounOption",
-    objects_by_id: Mapping,
-    exits_by_id: Mapping,
-    creatures_by_id: Mapping,
-    loose_by_id: Mapping,
+    noun: NounOption,
+    objects_by_id: Mapping[str, Any],
+    exits_by_id: Mapping[str, Any],
+    creatures_by_id: Mapping[str, Any],
+    loose_by_id: Mapping[str, Any],
 ) -> RoomThing:
     src = noun.source
     if src in (SOURCE_EXIT, SOURCE_LOCKED_EXIT):
@@ -401,9 +401,9 @@ def _room_thing(
     return RoomThing(noun.noun_id, noun.label, GLYPH_ITEM, status, "gold")
 
 
-def _exit_status(exit_row: Mapping) -> str:
+def _exit_status(exit_row: Mapping[str, Any]) -> str:
     """Display status for an exit row: explicit blocked states, else key-gated → ``locked``."""
-    status = exit_row.get("status", "open")
+    status: str = exit_row.get("status", "open")
     if status in _LOCKED_EXIT_STATUSES:
         return status
     if exit_row.get("requires_item_slug"):
@@ -573,7 +573,7 @@ def available_adverbs(
 
 
 def available_nouns(
-    room_context: Mapping, actor: Mapping
+    room_context: Mapping[str, Any], actor: Mapping[str, Any]
 ) -> list[NounOption]:
     """Surface the targets the player may pick for the **Noun** slot of an action Card.
 

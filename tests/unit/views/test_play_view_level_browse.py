@@ -5,7 +5,7 @@ the party's canonical session fields (current_level_idx, current_room_id).
 """
 from __future__ import annotations
 
-from dungeon_daddy.data.models import Level, Loop, Room, SessionState
+from dungeon_daddy.data.models import Level, Room
 from tests.unit.views._factories import _dungeon, _state
 
 

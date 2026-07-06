@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from dungeon_daddy.rpg.exit_validator import validate_exit_conditions
 from dungeon_daddy.rpg.models import RoomExit
 

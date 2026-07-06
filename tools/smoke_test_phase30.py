@@ -55,7 +55,6 @@ def _load_dotenv() -> None:
 _load_dotenv()
 
 from smoke_helpers import (
-    BG_0,
     BG_1,
     CHROME_TOTAL_H,
     PAD_MD,

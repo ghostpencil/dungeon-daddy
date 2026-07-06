@@ -14,6 +14,7 @@ from dungeon_daddy.ui.theme import (
     BG_2,
     CHROME_MENUBAR_HEIGHT,
     CHROME_TITLEBAR_HEIGHT,
+    EMBER,
     FONT_UI_MED,
     GOLD,
     INK_3,
@@ -22,7 +23,6 @@ from dungeon_daddy.ui.theme import (
     TEAL,
     TEXT_MD,
     TEXT_SM,
-    EMBER,
     VIOLET,
 )
 
@@ -35,7 +35,7 @@ _PILL_H = 22
 _PILL_GAP = 8
 _PILL_MODES = ["library"]
 PILLS_CLUSTER_W = len(_PILL_MODES) * _PILL_W + (len(_PILL_MODES) - 1) * _PILL_GAP
-_PILL_FILL: dict[str, tuple[int, ...]] = {
+_PILL_FILL: dict[str, tuple[int, int, int]] = {
     "library":  EMBER,
     "design":   VIOLET,
     "campaign": GOLD,

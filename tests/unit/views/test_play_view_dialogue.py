@@ -31,9 +31,9 @@ def _actor(**kw) -> ActorState:
 
 
 def _make_view(tmp_path: Path, actor: ActorState | None = None):
-    from dungeon_daddy.views.play_view import PlayView
-    from dungeon_daddy.ui.player_action_state import PlayerActionState
     from dungeon_daddy.ui.panels.vna_action_panel import VnaActionPanel
+    from dungeon_daddy.ui.player_action_state import PlayerActionState
+    from dungeon_daddy.views.play_view import PlayView
 
     mem_repo = MemoryRepository(tmp_path / "test.duckdb")
     mem_repo.initialize_schema(MIGRATIONS_DIR)
@@ -271,6 +271,7 @@ def test_apply_dungeon_reply_posts_bubble_and_records_exchange(tmp_path):
 
 def test_send_dungeon_line_threads_agent_and_queues_reply(tmp_path):
     import queue as _queue
+
     from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
     from dungeon_daddy.views.play_view import DialogueSession
 
@@ -300,6 +301,7 @@ def test_send_dungeon_line_threads_agent_and_queues_reply(tmp_path):
 
 def test_on_update_routes_dungeon_result_to_apply(tmp_path):
     import queue as _queue
+
     from dungeon_daddy.views.play_view import DMResult
 
     view = _make_view(tmp_path)

@@ -143,7 +143,6 @@ def _dry_run_report(campaign_dir: Path, result: SeedResult) -> None:
 
 
 def _apply_seed(campaign_dir: Path, result: SeedResult) -> None:
-    import duckdb
     from dungeon_daddy.memory.repository import MemoryRepository
 
     db_path = campaign_dir / "campaign.duckdb"
@@ -382,8 +381,8 @@ def seed_campaign_with_pack(
     _upsert_session(repo, campaign_id, campaign_slug, result)
     _upsert_scene(repo, campaign_id, campaign_slug, result)
 
-    from dungeon_daddy.rpg.seed_pack import derive_actor_id, derive_faction_id
     from dungeon_daddy.rpg.models import FactionState
+    from dungeon_daddy.rpg.seed_pack import derive_actor_id, derive_faction_id
 
     all_actors = pack.player_side.actors + pack.dungeon_side.actors
     faction_slugs = {a.slug for a in all_actors if a.actor_type == "faction"}
@@ -440,7 +439,8 @@ def seed_campaign_with_pack(
         else:
             result.skipped += 1
 
-    from dungeon_daddy.rpg.seed_pack import derive_clock_id, derive_actor_id as _derive_actor_id
+    from dungeon_daddy.rpg.seed_pack import derive_actor_id as _derive_actor_id
+    from dungeon_daddy.rpg.seed_pack import derive_clock_id
 
     existing_clock_ids = {c["clock_id"] for c in repo.get_clocks(campaign_id)}
     seed_clock_ids: set[str] = set()

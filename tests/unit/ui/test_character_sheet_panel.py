@@ -1,8 +1,6 @@
 """Unit tests for CharacterSheetPanel — Phase 30 step 30-2."""
 from __future__ import annotations
 
-import pytest
-
 from dungeon_daddy.rpg.models import ActorState, FalloutRecord, StressTrack
 
 
