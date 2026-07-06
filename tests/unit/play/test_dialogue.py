@@ -18,21 +18,8 @@ from dungeon_daddy.play.dialogue import DialogueCoordinator, DialogueSession
 from dungeon_daddy.play.narration import DMResult
 from dungeon_daddy.play.session_context import PlaySessionContext
 from dungeon_daddy.rpg.models import ActorState
-
-MIGRATIONS_DIR = (
-    Path(__file__).parent.parent.parent.parent
-    / "dungeon_daddy" / "data" / "migrations"
-)
-
-
-def _actor(**kw) -> ActorState:
-    defaults = dict(
-        actor_id="pc-1", campaign_id="camp-1", actor_type="pc",
-        slug="elara", display_name="Elara", status="active",
-        actions={"fight": 2, "sense": 1}, playbook_slug="fighter",
-    )
-    defaults.update(kw)
-    return ActorState(**defaults)
+from tests.unit.play._factories import MIGRATIONS_DIR
+from tests.unit.play._factories import make_actor as _actor
 
 
 class _Chat:

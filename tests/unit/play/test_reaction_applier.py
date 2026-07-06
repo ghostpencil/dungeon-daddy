@@ -14,13 +14,7 @@ from dungeon_daddy.rpg.models import (
     StressTrack,
     WorldReaction,
 )
-
-MIGRATIONS_DIR = (
-    Path(__file__).parent.parent.parent.parent
-    / "dungeon_daddy"
-    / "data"
-    / "migrations"
-)
+from tests.unit.play._factories import MIGRATIONS_DIR
 
 
 def _resolution() -> ActionResolution:

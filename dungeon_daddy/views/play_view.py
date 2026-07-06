@@ -473,8 +473,8 @@ class PlayView(arcade.View):
                 get_repo=lambda: self._repo,
                 get_rpg_service=lambda: self._rpg_service,
                 on_busy=lambda busy: self._chat.set_busy(busy),
-                post_dm=lambda text: self._chat.add_message("dm", text),
-                post_system=lambda text: self._chat.add_message("system", text),
+                post_dm=lambda text: self._post_chat("dm", text),
+                post_system=lambda text: self._post_chat("system", text),
                 on_dungeon_reply=lambda pm, reply: self._apply_dungeon_reply(pm, reply),
                 extract_remember=lambda text: self._extract_remember(text),
                 auto_remember=lambda event: self._auto_remember(event),
@@ -486,6 +486,10 @@ class PlayView(arcade.View):
     def _set_debug_bundle(self, bundle: ContextBundle) -> None:
         if self._rpg_debug is not None:
             self._rpg_debug.set_bundle(bundle)
+
+    def _post_chat(self, role: str, text: str) -> None:
+        """Shared chat-post seam for the coordinator ports (defers ``_chat`` lookup)."""
+        self._chat.add_message(role, text)
 
     @property
     def _narration(self) -> NarrationCoordinator:
@@ -544,7 +548,7 @@ class PlayView(arcade.View):
                 get_narration=lambda: self._narration,
                 get_voice_agent=lambda: getattr(self, "_dungeon_voice_agent", None),
                 get_acting_actor=lambda: self._acting_actor(),
-                post_message=lambda role, text: self._chat.add_message(role, text),
+                post_message=self._post_chat,
                 set_dialogue_mode=lambda on: self._chat.set_dialogue_mode(on),
                 set_busy=lambda on: self._chat.set_busy(on),
                 get_room_context=lambda: getattr(self, "_last_room_context", {}) or {},
@@ -607,7 +611,7 @@ class PlayView(arcade.View):
                     self._rpg_vna._nouns if hasattr(self, "_rpg_vna") else []
                 ),
                 get_room_context=lambda: getattr(self, "_last_room_context", {}),
-                post_message=lambda role, text: self._chat.add_message(role, text),
+                post_message=self._post_chat,
                 begin_dialogue=lambda **kw: self._begin_dialogue(**kw),
                 on_exit_move=lambda exit_id, how, item_slug=None: self._on_exit_move(
                     exit_id, how, item_slug=item_slug

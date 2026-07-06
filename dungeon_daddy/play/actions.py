@@ -17,6 +17,11 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+# ``ui.mechanical_bubble`` is arcade-free (imports only ``rpg.models``) and
+# ``ui/__init__`` is empty, so this module-level import keeps the play package
+# arcade-free — no need for the per-call runtime import.
+from dungeon_daddy.ui.mechanical_bubble import format_mechanical_bubble
+
 if TYPE_CHECKING:
     from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
     from dungeon_daddy.play.narration import NarrationCoordinator
@@ -347,8 +352,6 @@ class ActionOrchestrator:
         action_key: str,
         intent: str,
     ) -> None:
-        from dungeon_daddy.ui.mechanical_bubble import format_mechanical_bubble
-
         session = self._session
         rpg_service = self._get_rpg_service()
         if rpg_service is None:
@@ -448,7 +451,6 @@ class ActionOrchestrator:
     def resolve_vna_roll(self, card: ActionCard, actor: ActorState) -> None:
         """Resolve a skill-verb Card as an action roll and narrate the outcome."""
         from dungeon_daddy.rpg.action_resolution import resolve_card_roll
-        from dungeon_daddy.ui.mechanical_bubble import format_mechanical_bubble
 
         session = self._session
         rpg_service = self._get_rpg_service()
