@@ -21,13 +21,13 @@ Phase **51.6 — World Reaction Policy: COMPLETE & merged to `main`** (PR #88, m
 clock +2" fan-out. Spec `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` (design
 `spec/WORLD_REACTION_POLICY.md`).
 
-Phase **51.7 — PlayView Decomposition: BUILD, started 2026-07-05** on
-`feat/phase-51.7-playview-decomp`. Incremental seam extraction of `views/play_view.py`
-(2,765 lines / ~110 methods / 7 responsibility clusters) into a new `dungeon_daddy/play/`
-package (`PlaySessionContext` + Action/Navigation/Dialogue/Memory/Narration coordinators;
-`PlaySessionController` composition root last). Folds in the two PR #88 deferred review items:
-Slice 1 fixes the non-atomic world-reaction write; the WRP "all three call sites" spec language
-is corrected (owner ruling 2026-07-05, `spec/WORLD_REACTION_POLICY.md` §7). Spec + slice plan:
+Phase **51.7 — PlayView Decomposition: COMPLETE, PR #89 open** (`feat/phase-51.7-playview-decomp`
+→ `main`, opened 2026-07-06; owner GUI-verified). Incremental seam extraction of
+`views/play_view.py` (2,765 → 1,491 lines) into a new `dungeon_daddy/play/` package
+(`PlaySessionContext` + Action/Navigation/Dialogue/Memory/Narration coordinators;
+`PlaySessionController` composition root, Slice 7). Folded in the two PR #88 deferred review items:
+Slice 1 fixed the non-atomic world-reaction write; the WRP "all three call sites" spec language
+was corrected (owner ruling 2026-07-05, `spec/WORLD_REACTION_POLICY.md` §7). Spec + slice plan:
 `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`.
 
 Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` ·
@@ -42,14 +42,13 @@ Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_
 **Phase 51.7 — PlayView Decomposition** on `feat/phase-51.7-playview-decomp` — spec + slice plan
 in `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Slices 0–7 all built 2026-07-06.
 
-**✅ Slice 7 committed (`c5fd44e`, 2026-07-06) — Phase 51.7 all slices done; ready to PR.** Slice 7
-(`PlaySessionController`) is implemented, tested, 5-angle `/code-review high` clean (no correctness
-bugs), and **owner GUI-verified on the live Crucible** (2026-07-06): exit move, dungeon-voice
-exchange, and memory (auto-approve) all pass; the action-roll flow behaves as before (a partial FIGHT
-vs. a creature ticks the world-reaction clock + DM fiction but no Body stress — that is **Phase 53
-Threat Behavior**, not a 51.7 regression); `/remember` not typed directly but its
-`MemoryCoordinator._record_room_event` seam is the same path the verified auto-approve memory uses.
-**Remaining: open the PR** (`feat/phase-51.7-playview-decomp` → `main`), then start the next phase.
+**✅ Phase 51.7 COMPLETE — PR #89 open (`c5fd44e`, GUI-verified, 2026-07-06).** All slices 0–7 landed
+on `feat/phase-51.7-playview-decomp`; Slice 7 (`PlaySessionController`) is 5-angle `/code-review high`
+clean (no correctness bugs) and **owner GUI-verified on the live Crucible**: exit move, dungeon-voice
+exchange, and memory (auto-approve) pass; the action-roll flow behaves as before (a partial FIGHT vs.
+a creature ticks the world-reaction clock + DM fiction but no Body stress — that is **Phase 53 Threat
+Behavior**, not a 51.7 regression). **Next: merge PR #89, then start the next phase — Tag Hygiene →
+Narrator Lookup** (the sequenced choice; item 2 below), `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
 
 **Exit-criterion-1 — ✅ owner accepted 1491 lines (2026-07-06).** `views/play_view.py` landed at
 **1491 lines** (from 1878), above the spec's "≤ ~900" but now containing *only* drawing / input
