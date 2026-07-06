@@ -42,15 +42,14 @@ Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_
 **Phase 51.7 — PlayView Decomposition** on `feat/phase-51.7-playview-decomp` — spec + slice plan
 in `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Slices 0–7 all built 2026-07-06.
 
-**⏸ RESUME HERE — Slice 7 code complete & review-hardened; the phase's ONLY open item is the
-owner manual GUI verify (exit criterion 6), then commit.** Slice 7 (`PlaySessionController`) is
-implemented, tested, and 5-angle `/code-review high` clean (no correctness bugs). Remaining to close
-the phase:
-- **Owner manual GUI verify on the live Crucible** (exit criterion 6): an action roll, an exit
-  move, a dungeon-voice exchange, `/remember`, and a memory approve all behave as before. (Not yet
-  done — needs the live app; the automated suite can't cover it.)
-- **Commit after the GUI verify passes** (owner decided 2026-07-06: hold the commit until GUI verify),
-  then open the PR.
+**✅ Slice 7 committed (`c5fd44e`, 2026-07-06) — Phase 51.7 all slices done; ready to PR.** Slice 7
+(`PlaySessionController`) is implemented, tested, 5-angle `/code-review high` clean (no correctness
+bugs), and **owner GUI-verified on the live Crucible** (2026-07-06): exit move, dungeon-voice
+exchange, and memory (auto-approve) all pass; the action-roll flow behaves as before (a partial FIGHT
+vs. a creature ticks the world-reaction clock + DM fiction but no Body stress — that is **Phase 53
+Threat Behavior**, not a 51.7 regression); `/remember` not typed directly but its
+`MemoryCoordinator._record_room_event` seam is the same path the verified auto-approve memory uses.
+**Remaining: open the PR** (`feat/phase-51.7-playview-decomp` → `main`), then start the next phase.
 
 **Exit-criterion-1 — ✅ owner accepted 1491 lines (2026-07-06).** `views/play_view.py` landed at
 **1491 lines** (from 1878), above the spec's "≤ ~900" but now containing *only* drawing / input
