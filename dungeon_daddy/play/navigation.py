@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from dungeon_daddy.data.models import Level, Room
     from dungeon_daddy.play.session_context import PlaySessionContext
 
 _log = logging.getLogger(__name__)
@@ -85,7 +86,18 @@ class NavigationCoordinator:
         room = session.current_room()
         if level is None or room is None:
             return
-        self._set_selected_room(room.id)
+        self._reflect_room(room, level, select=True)
+
+    def _reflect_room(self, room: Room, level: Level, *, select: bool) -> None:
+        """Reflect the party's room in the chat + scene panels (and map cursor).
+
+        ``select`` moves the map selection cursor to the room so the selected
+        frame and detail/info overlay follow the party — used on load/resume and
+        after an exit move (same treatment as a click). A graph room-select
+        already carries its own cursor, so it passes ``select=False``.
+        """
+        if select:
+            self._set_selected_room(room.id)
         self._set_current_room(room.name, room.note or "", room.id)
         self._set_scene(room.name, str(level.id))
 
@@ -118,19 +130,17 @@ class NavigationCoordinator:
             room = session.current_room()
             total = len(session.dungeon.levels)
             if session.state.current_level_idx != old_level_idx:
-                self._set_viewed_level(session.state.current_level_idx)
+                # Advance the viewed level only when the map actually reloads,
+                # so paging can't point at a level the map never loaded.
                 if level is not None:
+                    self._set_viewed_level(session.state.current_level_idx)
                     self._load_level(level, session.state, total)
             else:
                 self._update_map_state(session.state, total)
             # ``current_room`` only resolves once ``current_level`` does, so a
             # non-None room implies a non-None level.
             if room is not None and level is not None:
-                # Move the selection cursor with the party so the selected frame
-                # and detail/info overlay follow — same treatment as a click.
-                self._set_selected_room(room.id)
-                self._set_current_room(room.name, room.note or "", room.id)
-                self._set_scene(room.name, str(level.id))
+                self._reflect_room(room, level, select=True)
 
         self._refresh_vna_panel()
         self._save_session()
@@ -155,8 +165,7 @@ class NavigationCoordinator:
             session.state.visited_rooms.append(room.id)
         total = len(session.dungeon.levels)
         self._update_map_state(session.state, total)
-        self._set_current_room(room.name, room.note or "", room.id)
-        self._set_scene(room.name, str(level.id))
+        self._reflect_room(room, level, select=False)
         _log.debug("Graph: selected room %s", room.id)
         self._request_narration(f"We enter {room.name}.")
         self._save_session()
