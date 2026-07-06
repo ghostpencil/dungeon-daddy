@@ -15,14 +15,20 @@ per-tier knowledge) plus the puzzle-obstacle multi-approach feature (Part A clas
 approaches; Part B the constrained DM-ruled obstacle authority) and container-loot. Decisions locked
 D1–D8 (below). Spec `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md`.
 
-Phase **51.6 — World Reaction Policy: COMPLETE on `feat/phase-51.6-wrp` — ready to PR to `main`**
-(2026-07-05). All 10 slices done + Slice 10 GUI verify **green** (owner, 2026-07-05: an ambient
-statue miss/partial in R1 ticks **only** "Scorpion Nest Agitated" +1; Power Core / Factory-Learns /
-Mira / `dungeon_intimacy` stay put). Per-object `reaction_policy` (`scripted`/`ambient`/`inert`) +
-`ClockCategory` firewall replace the blunt "miss = every tagged clock +2" fan-out. Suite green
-(3430 passed), ruff + mypy(strict) clean. Commits: `e9a3383` (Slice 9 seed), `f5ab7b1` (uuid5
-clock-id fix), `1abe178`/index. Branch also carries the mypy 348→0 sweep. Spec
-`spec/PHASE_51_6_WORLD_REACTION_POLICY.md` (design `spec/WORLD_REACTION_POLICY.md`).
+Phase **51.6 — World Reaction Policy: COMPLETE & merged to `main`** (PR #88, merged 2026-07-05,
+`c0e1cba`; also landed the mypy 348→0 sweep). Per-object `reaction_policy`
+(`scripted`/`ambient`/`inert`) + `ClockCategory` firewall replace the blunt "miss = every tagged
+clock +2" fan-out. Spec `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` (design
+`spec/WORLD_REACTION_POLICY.md`).
+
+Phase **51.7 — PlayView Decomposition: COMPLETE, PR #89 open** (`feat/phase-51.7-playview-decomp`
+→ `main`, opened 2026-07-06; owner GUI-verified). Incremental seam extraction of
+`views/play_view.py` (2,765 → 1,491 lines) into a new `dungeon_daddy/play/` package
+(`PlaySessionContext` + Action/Navigation/Dialogue/Memory/Narration coordinators;
+`PlaySessionController` composition root, Slice 7). Folded in the two PR #88 deferred review items:
+Slice 1 fixed the non-atomic world-reaction write; the WRP "all three call sites" spec language
+was corrected (owner ruling 2026-07-05, `spec/WORLD_REACTION_POLICY.md` §7). Spec + slice plan:
+`spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`.
 
 Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` ·
 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` · current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`
@@ -30,12 +36,230 @@ Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_
 
 ---
 
-## START HERE — Phase 51.6 PR'd + review-hardened; pick the next phase
+## START HERE — Phase 51.7 PlayView Decomposition (all slices built; ⏸ awaiting owner GUI verify)
 
-**Phase 51.6 is DONE, GUI-verified, PR'd (#88), and post-review-hardened on `feat/phase-51.6-wrp`
-(2026-07-05).** Immediate next action: **merge PR #88 → `main`** (also lands the mypy 348→0 sweep),
-then pick the next phase (Tag Hygiene → Narrator Lookup is the sequenced choice). Two review items
-were **deliberately deferred** to a later pass — see "Deferred from PR #88 review" below.
+**PR #88 merged to `main` 2026-07-05 (`c0e1cba`) — Phase 51.6 fully closed.** Current work:
+**Phase 51.7 — PlayView Decomposition** on `feat/phase-51.7-playview-decomp` — spec + slice plan
+in `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Slices 0–7 all built 2026-07-06.
+
+**✅ Phase 51.7 COMPLETE — PR #89 open (`c5fd44e`, GUI-verified, 2026-07-06).** All slices 0–7 landed
+on `feat/phase-51.7-playview-decomp`; Slice 7 (`PlaySessionController`) is 5-angle `/code-review high`
+clean (no correctness bugs) and **owner GUI-verified on the live Crucible**: exit move, dungeon-voice
+exchange, and memory (auto-approve) pass; the action-roll flow behaves as before (a partial FIGHT vs.
+a creature ticks the world-reaction clock + DM fiction but no Body stress — that is **Phase 53 Threat
+Behavior**, not a 51.7 regression). **Next: merge PR #89, then start the next phase — Tag Hygiene →
+Narrator Lookup** (the sequenced choice; item 2 below), `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
+
+**Exit-criterion-1 — ✅ owner accepted 1491 lines (2026-07-06).** `views/play_view.py` landed at
+**1491 lines** (from 1878), above the spec's "≤ ~900" but now containing *only* drawing / input
+routing / layout / overlay-widget management / delegation — **criterion 1 met in spirit** (owner
+ruling). The ~900 figure under-estimated the legitimate **input-routing** weight (the `_on_chat_send`
++ action-state/chip cluster ~250 lines, which criterion 1 explicitly says *stays* in PlayView) plus
+the `_RpgSidePanel` UI class (~132 lines, legitimately "overlay-widget management"). A literal ≤900
+would need an additional input-coordinator extraction that contradicts criterion 1's own "input
+routing stays in PlayView" wording — **not pursued** (owner chose to accept 1491 over that follow-up).
+
+**Slice 7 — what shipped (branch `feat/phase-51.7-playview-decomp`, uncommitted):**
+New `play/controller.py` (`PlaySessionController` + `PlayHost` structural protocol, no `arcade`).
+The controller is the composition root: it **receives** the shared `PlaySessionContext` (still owned
+by the view's Slice 0 session bridge — one instance, verified) and **owns** the five coordinators +
+the session-facade methods extracted from the view (`load_dungeon_*` / `set_rpg_context` /
+`save_session` / `load_player_actors` / `sync_debug_level_id` + the domain→panel refresh fan-out
+`refresh_vna_panel` / `refresh_right_panel_from_actors` / `refresh_chat_mini_card` /
+`refresh_memory_state` / `room_world_flags`). Coordinator ports route through the view's delegators
+(`host._X` — the input-surface seam the view tests spy/stub); facade methods call sibling controller
+methods directly (one documented exception: `set_rpg_context` routes `_load_player_actors` through
+the host because a test stubs that delegator). `PlayView` keeps thin delegators + a lazy
+`_ensure_controller()` bridge; the five `_ensure_*` factory methods collapsed into it. 5 new unit
+tests (`tests/unit/play/test_controller.py`); one test's patch target moved
+(`build_actor_mini_card` now lives in `play.controller`). **`spec/ARCHITECTURE.md` amended** (module
+tree adds `play/`; PlayView responsibilities; threading → `NarrationCoordinator`). Behavior-preserving;
+`play_view.py` 1878 → 1491. Full suite green (**3529 passed**), ruff + mypy(strict, 168 files) clean.
+**5-angle `/code-review high`:** zero correctness bugs (extraction verified "remarkably faithful");
+applied the one converged cleanup (removed the gratuitous `load_dungeon_*` → host bounce). Deferred
+(low, not blocking): a latent context-staleness seam if `view._session` is *reassigned after* the
+controller is built (not reachable today — mirrors the Slice 2–6 pattern; a `_session.setter` guard
+would harden it); the `getattr`/`setattr` seam for 4 view-only attrs kept off `PlayHost` for
+`__new__` ergonomics; two pre-existing smells moved verbatim (`load_dungeon_*` copy-paste; a double
+`refresh_chat_mini_card` on non-empty actor load).
+
+**Deferred follow-ups (not blocking):** the Slice 4 `get_debug` port hands play a UI panel type
+(TYPE_CHECKING-only; two narrow callables would be cleaner, but the debug-gates-proposal-pipeline
+coupling is pre-existing); Slice 5 `set_viewed_level` is a write-only `setattr` port poking
+view-only map-paging state (the deliberate documented seam — could be tightened when the
+controller lands in Slice 7); Slice 5 `current_level_rooms -> tuple[dict[str, Any], Any]` erases
+the x/y/w/h/name structural contract (`_PositionedRoom`) — a `Protocol` return type would restore
+it (pre-existing, moved verbatim).
+
+**PR #89 parallel review (6 agents, 2026-07-06) — 1 fixed, 2 deferred to next phase:**
+- ✅ **Fixed (regression):** `reaction_applier.apply` had broadened its guard to swallow repo
+  *read* failures (`get_clocks` / `get_actor_stress_tracks`) that pre-51.7 propagated — silently
+  skipping the world reaction with no GM feedback. Split reads into their own guard that surfaces
+  `REACTION_FAILURE_LINE` (compute stays contained-silent). Test
+  `test_read_failure_is_contained_and_posts_failure_line`; full suite green.
+- ⏳ **Deferred → next phase:** (2) the two broad `except Exception` catches in `actions.py`
+  (`run_chat_action` ~L375, `on_resolve_action` ~L423) log but post no user line — a failed
+  resolve/proposal/LLM call is invisible to the GM (pre-existing from `main`; add a system line +
+  narrow the catch). (3) the `(mem_repo, campaign_id)` co-presence guard is hand-checked 15+ times
+  across `reaction_applier`/`dialogue`/`actions`/`controller`/`navigation` — extract an
+  `ActiveCampaign(repo, campaign_id)` value / `context.active_campaign()` accessor (both the
+  type-design and simplify agents flagged this independently; highest-value low-risk cleanup).
+- Other review notes (non-blocking, candidates for a Slice 8 follow-up): drop
+  `NarrationCoordinator.is_busy`'s public setter; promote `PlayHost`'s panel-private reach-ins
+  (`_rpg_vna._nouns`, `_rpg_action._build_request`) to public methods; add logging to the silent
+  swallows in `navigation.current_level_rooms` and `controller.set_rpg_context`; add `ui` to the
+  repeated dependency-direction docstring; controller.py test gaps (`room_world_flags`,
+  contested `on_activate_submit`, repo-close-on-swap).
+
+After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice (item 2 below).
+
+**Phase 51.7 slice progress (branch `feat/phase-51.7-playview-decomp`):**
+- ✅ **Slice 0 — `PlaySessionContext`** (2026-07-06). New `dungeon_daddy/play/` package
+  (imports no `arcade`); `play/session_context.py` owns dungeon/session-state/`mem_repo`/
+  `campaign_id`/actor roster + `current_level()`/`current_room()`/`current_level_id`/
+  `acting_actor()`. Kills audit findings 1–2: the roster moved out of `PlayerActionPanel._actors`
+  (~9 reach-ins now read `self._session.actors`); the `dungeon→level→room` current-room idiom
+  (6 sites) + both `f"level-{idx+1}"` synth sites route through the context. `PlayView` bridges
+  via lazy properties (`_dungeon`/`_state`/`_mem_repo`/`_rpg_campaign_id` delegate to
+  `self._session`) so the context is the single source of truth without churning ~60 read sites
+  or breaking the `__new__` test pattern; mypy strict still narrows them. Pure mechanical, no
+  behavior change. 13 new unit tests (`tests/unit/play/test_session_context.py`); ~10 view-test
+  files migrated their roster setup to `view._session.set_actors(...)`. Full suite green
+  (**3421 passed**), ruff + mypy(strict) clean.
+- ✅ **Slice 1 — `ReactionApplier` + atomic world-reaction writes** (2026-07-06, `415b880`).
+  `PlayView._apply_world_reaction` (~80 lines) extracted to `play/reaction_applier.py`
+  (`ReactionApplier`, no `arcade`); the view keeps a thin per-call delegator wiring the
+  `post_system`/`on_reaction` ports. **Folds in the deferred PR #88 fix:** clock + stress writes
+  run in one DuckDB transaction — a mid-write failure rolls back (no partial state) and posts
+  `"⚠ Reaction could not be fully applied."`. New re-entrant `MemoryRepository.transaction()`
+  (the one repo seam the non-goals permit): nested calls join the outer txn (no nested `BEGIN` —
+  safe for Slice 4's reuse), `_in_transaction` always cleared. **Review-hardened** (`/code-review
+  high`, 7 findings): precise failure-line semantics (reads + compute are guarded but degrade
+  silently → a read-time DB error no longer escapes uncaught at the `_resolve_vna_roll` call site;
+  only an atomic *write* failure posts the line, fixing the misleading "not fully applied" wording
+  on compute failures); `_sync_actor_stress` creates a missing track so an unseeded-track binding
+  shows in the panel without reload; `ClockState(**r)` (stops silently dropping `monotonic`);
+  magic capacity `4` → `_DEFAULT_STRESS_CAPACITY` + dict lookup. Deliberately **kept the
+  authoritative per-actor DB read** (`StressTrack(**t)`) over reusing in-memory `actor.stress` —
+  capacity lives in the DB and the two can diverge (a low-value efficiency finding not worth a
+  capacity-correctness regression). 5 new tests (3 applier: compute-fail-silent,
+  read-fail-contained, new-track-synced; 2 repo: nested-txn commit/rollback); the one behavioral
+  change in the phase. Full suite green (**3431 passed**), ruff + mypy(strict) clean.
+- ✅ **Slice 2 — `NarrationCoordinator`** (2026-07-06). New `play/narration.py` (no `arcade`) —
+  `NarrationCoordinator` + `DMResult` (moved out of `play_view`, re-exported for the existing
+  `from …play_view import DMResult` sites). Owns the DM-narration plumbing: `_dm_history` +
+  `compact_history` (token budget 2000), `build_context_bundle`, `spawn_dm_thread`, the `DMResult`
+  queue + `_llm_busy`. **Public seam:** `request_narration(msg)` collapses the **8× (10 sites)**
+  narration-entry idiom (`_compact_history` → append user → `set_busy(True)` → `_spawn_dm_thread`),
+  and `poll()` drains + routes the queue (error / dungeon-reply / DM narration) — the drain moved
+  out of `on_update`. A generic `spawn(worker)` serves the dungeon-voice channel
+  (`_send_dungeon_line`). Side effects flow through narrow **ports** (all late-bound lambdas reading
+  live view state — `on_busy`/`post_dm`/`post_system`/`on_dungeon_reply`/`extract_remember`/
+  `auto_remember`/`on_bundle_built`); no `PlayView` reference. `play_view` 2759 → 2679 lines.
+  Coordinator is lazily materialized with get+set bridge properties (`_dm_history`/`_llm_busy`/
+  `_result_queue`/`_active_thread`) — the Slice 0 pattern — so the `__new__` test factories stay
+  unchanged. Behavior-preserving (busy-flag ordering, compact-before-append, room/level
+  re-resolution via the session, error-before-dungeon routing all match the original inline code).
+  13 new unit tests (`tests/unit/play/test_narration.py`); the direct-reference view tests migrated
+  to the `view._narration.*` seam. **Review-hardened** (`/code-review high`, 3 findings applied):
+  all four bound-method ports made late-bound lambdas (uniform + fixes a latent test-ordering
+  fragility); `spawn_dm_thread` restored the original `assert state/dungeon` + non-optional `repo`
+  (no silent stranded-spinner path); the `history` setter aliases the assigned list (preserving the
+  old `_dm_history = <list>` semantics). Full suite green (**3444 passed**), ruff + mypy(strict) clean.
+- ✅ **Slice 3 — `DialogueCoordinator`** (2026-07-06, `9eff1d6`). New `play/dialogue.py` (no
+  `arcade`) — `DialogueCoordinator` + `DialogueSession` (moved out of `play_view`, re-exported for
+  the `from …play_view import DialogueSession` sites). Owns the dungeon-voice + NPC dialogue seam:
+  the open channel, begin/end + room-change close, per-`kind` line routing (`send_line`/
+  `send_npc_line`/`send_dungeon_line`), the §4.4 `agent_inputs` context assembly + its
+  subsystem/objective/knowledge/room-label helpers, the intimacy-clock read, `begin_dungeon_dialogue`
+  gate, `set_persona`, and the `apply_dungeon_reply` engine side-effect (reply bubble +
+  engine-authored exchange memory). Side effects flow through narrow **late-bound ports**
+  (`post_message`/`set_dialogue_mode`/`set_busy`/`get_room_context`/`get_acting_actor`/
+  `get_voice_agent`/`get_narration`); no `PlayView` reference. The dungeon-voice call still runs on a
+  worker thread handed to the **Slice 2 `NarrationCoordinator`** (`spawn`); its dungeon-marked
+  `DMResult` routes back through `poll()` → `on_dungeon_reply` port → the view's `_apply_dungeon_reply`
+  delegator → `apply_dungeon_reply` (no narration change). `PlayView` keeps thin **delegators** (its
+  input-routing surface: call sites, the `window.set_dungeon_persona` API, the narration port) + the
+  bridged state (`_dialogue`/`_dungeon_voice`/`_dungeon_knowledge`) so the existing view tests and the
+  `__new__` factories stay unchanged; coordinator lazily materialized (the Slice 0/2 pattern).
+  Behavior-preserving; `play_view.py` 2679 → 2478 lines. 29 new unit tests
+  (`tests/unit/play/test_dialogue.py`) exercise the coordinator directly against a real
+  `MemoryRepository` + a recording chat port. **`/code-review high` clean** (2 correctness finder
+  angles — port-fidelity line-by-line + cross-file/threading tracer — no findings). Full suite green
+  (**3473 passed**), ruff + mypy(strict) clean.
+- ✅ **Slice 4 — `ActionOrchestrator`** (2026-07-06, `c15dd65`). New `play/actions.py` (no
+  `arcade`) — `ActionOrchestrator` (16 late-bound ports) owns the action seam: the
+  `on_vna_submit` dispatch tree (dialogue gate, look/activate/use branches), the card-roll path,
+  validated-command application + objective advancement, the obstacle seams (contested approaches
+  + DM-ruled resolutions), the LLM proposal pipeline, and world-reaction application (via the
+  Slice 1 `ReactionApplier`); `describe_spawned_loot` moved here. `PlayView` keeps thin delegators
+  for real callers + a lazy `_ensure_actions` bridge (the Slice 0/2/3 pattern) so the view tests +
+  `__new__` factories stay unchanged; behavior-preserving, `play_view.py` 2478 → ~2030 lines.
+  25 new unit tests (`tests/unit/play/test_actions.py`) exercise the orchestrator directly (real
+  `MemoryRepository`, real `RpgService`, recording ports). **Review-hardened** (8-angle
+  `/code-review high`, verified fix list applied): stale view-method spies migrated to the
+  `view._actions` seam (the negative asserts were vacuous post-extraction, incl. the Phase 38
+  smoke Behavior 14 spy); `get_nouns` port guarded so a `__new__` view degrades to `[]`; 7 dead
+  view delegators (+ unused `ValidationResult` import) deleted; `on_look_submit` noun-label loop
+  collapsed into `_noun_label_for`; `on_exit_move` port made keyword-shaped (`item_slug=`);
+  `DebugControls(RpgService())` over `MagicMock()` (TESTING.md); the 3 `describe_spawned_loot`
+  tests moved to mirror the module. Also folded in a **Slice 0 carryover**: the smoke
+  `_make_view_with_chip` never migrated its roster to the `_session` seam (Behavior 13 read the
+  actor id, not the display name — red on the WIP commit); one-line `view._session.set_actors(...)`
+  fix, phase-38 smoke now all-green. Full suite green (**3498 passed**), ruff + mypy(strict) clean.
+- ✅ **Slice 5 — `NavigationCoordinator`** (2026-07-06, `c99007c` + review `9801650`). New
+  `play/navigation.py` (no `arcade`) — `NavigationCoordinator` (11 late-bound ports) owns the
+  navigation seam: `on_exit_move` (engine-validated party move via `apply_move_party`, reject
+  warning, map/scene/selection follow, vna refresh, save, move narration, incl. the level-change
+  `map.load` + viewed-level tracking), `on_graph_room_select` (enter a clicked room + "We enter …"
+  narration), `focus_party_room` (reflect the saved room on load/resume, no narration), and the
+  layout-label helpers `prepare_vna_exits`/`current_level_rooms` (`_PositionedRoom` moved here).
+  Side effects flow through narrow ports (`post_message`/`request_narration`/`set_selected_room`/
+  `set_current_room`/`set_scene`/`load_level`/`update_map_state`/`set_viewed_level`/
+  `end_dialogue_on_room_change`/`refresh_vna_panel`/`save_session`); no `PlayView` reference.
+  `PlayView` keeps thin delegators (its input-routing surface — the `on_room_select` wiring,
+  `_refresh_vna_panel`'s exit-label call) + a lazy `_ensure_navigation` bridge; the direct-index
+  level lookups became bounds-checked `session.current_level()`/`current_room()` accessors.
+  Behavior-preserving; `play_view.py` 2030 → 1899 lines (dropped the now-unused `dataclass`
+  import). 9 new unit tests (`tests/unit/play/test_navigation.py`) exercise the coordinator
+  directly (real `MemoryRepository`, recording ports); existing view tests stay green via the
+  delegators. **`/code-review high` — no correctness bugs** (3 angles converged: the extraction is
+  faithful); 2 low-severity quality fixes applied (`9801650`): a `_reflect_room(room, level, *,
+  select)` helper for the map-cursor + chat + scene trio duplicated across 3 methods, and
+  `set_viewed_level` moved inside the `level is not None` guard so paging can't point at a level the
+  map never loaded. Full suite green (**3507 passed**), ruff + mypy(strict) clean.
+- ✅ **Slice 6 — `MemoryCoordinator`** (2026-07-06, `df6a2a6`). New `play/memory_coordinator.py`
+  (no `arcade`, 7 late-bound ports) owns the memory seam: `extract_remember`, `handle_remember`
+  (`/remember`), `auto_remember` (`[REMEMBER: …]` hook), `load_memory_entries` (MEM-panel
+  population), `persist_pending_commit` (MEM-tab approve/reject), and the level-memory overlay
+  persistence (`has_level_memory`/`load_level_memory`/`save_level_memory`). The two remember paths
+  are de-duped behind a `_record_room_event` helper. The overlay *widgets* (`_open_overlay_ui`/
+  `_draw_overlay_*`) stay in the view — the coordinator owns only the persistence behind them. Side
+  effects flow through narrow ports (`post_message`/`append_room_event`/`load_room_memory`/
+  `save_room_memory`/`set_entries`/`pop_pending_commit`/`refresh_memory_state`); no `PlayView`
+  reference. `PlayView` keeps thin delegators (its input-routing surface — `/remember` routing, the
+  MEM-click handler, the overlay open/save/close widget lifecycle) + a lazy `_ensure_memory` bridge;
+  dropped the now-dead `import re`, `_REMEMBER_RE`, and the `MemoryEntry` import. Direct-index level
+  lookups became bounds-checked `session.current_level()`/`current_room()` accessors (crash →
+  graceful no-op on a corrupt out-of-range save; the accepted Slice 5 approach). Behavior-preserving;
+  `play_view.py` 1899 → 1878 lines. 17 new unit tests (`tests/unit/play/test_memory_coordinator.py`)
+  exercise the coordinator directly (real `DungeonRepository` + `MemoryRepository` + recording
+  ports); existing view tests stay green via the delegators. **`/code-review high` — extraction
+  verified faithful** (2 finder angles: line-by-line/removed-behavior + reuse/conventions —
+  message strings, `_refresh_memory_state`-only-on-`/remember` ordering, `save_memory_overlay`
+  no-close-on-null-state, campaign_id fallback, port arg shapes all byte-checked); 1 quality fix
+  applied inline (the narration `extract_remember`/`auto_remember` ports stay pointed at the view
+  delegators, consistent with the other narration ports + the four other memory seams, so the
+  wrappers remain production-reachable). Full suite green (**3524 passed**), ruff + mypy(strict) clean.
+- ✅ **Slice 7 — `PlaySessionController`** (2026-07-06, uncommitted; the phase-closing slice). New
+  `play/controller.py` — composition root wiring the five coordinators + the shared
+  `PlaySessionContext` (received, not owned) + the session-facade methods lifted from the view; the
+  `PlayHost` structural protocol keeps `play → views` uncrossed. The view's five `_ensure_*` factory
+  methods collapsed into a lazy `_ensure_controller()` bridge; thin delegators remain the tested input
+  surface. 5 new unit tests; `spec/ARCHITECTURE.md` amended; `play_view.py` 1878 → **1491**
+  (criterion-1 ≤900 not met — see the ⚠ note above). Full suite green (**3529 passed**), ruff +
+  mypy(strict) clean; 5-angle `/code-review high` found no correctness bugs. **Open:** owner GUI
+  verify (criterion 6) + commit/PR.
 
 1. **Phase 51.6 — World Reaction Policy — ✅ COMPLETE (PR #88 open, review-hardened).** Fixed a
    real bug (a STUDY-miss moved 3 clocks incl. `dungeon_intimacy`, violating D5). Per-object
@@ -60,19 +284,20 @@ were **deliberately deferred** to a later pass — see "Deferred from PR #88 rev
    its only production import). Suite green (**3408 passed** — the 3430→3408 delta is the removed
    `test_stress_routing.py`, offset by +8 new hardening tests), ruff + mypy(strict) clean.
 
-   **Deferred from PR #88 review (address in a later pass, NOT before merge):**
+   **Deferred from PR #88 review — both now dispositioned (2026-07-05):** item 1 is Phase 51.7
+   Slice 1; item 2 is closed (spec corrected). Historical detail:
    - **Non-atomic, user-silent write** in `play_view._apply_world_reaction` (`:2133-2170`):
      pre-existing broad `try/except Exception → return None` spans compute **and** multiple
      sequential DB writes (clock + stress). A mid-loop DB error half-applies state and shows the
      GM nothing (it does log a traceback). WRP newly routes scripted clock+stress writes through
      it, raising the stakes. Fix = wrap the writes in one transaction and/or surface a user-facing
      "reaction could not be fully applied" line. Own change (behavioral), not a hardening tweak.
-   - **Spec-language decision (code-reviewer #1):** §7/§8 say "all THREE `_apply_world_reaction`
-     call sites must pass `acted_object`," but only the VNA path (`play_view:1829`) is wired; the
-     two chat paths (`:829`, `:994`) have no noun so they correctly fall to the ambient rule with
-     `acted_object=None`. **Not a functional bug** (firewall intact; no old fan-out). Decide: (a)
-     accept + correct the spec's "all three" language, or (b) confirm no future chat path carries
-     an object. Owner call — no code change required for correctness.
+   - **Spec-language decision (code-reviewer #1) — ✅ CLOSED (owner ruled (a), 2026-07-05):**
+     §7 said "all THREE `_apply_world_reaction` call sites must pass `acted_object`," but only
+     noun-carrying paths can — the two chat paths (`:829`, `:994`) have no noun by construction
+     and correctly fall to the ambient rule with `acted_object=None`. Spec corrected
+     (`spec/WORLD_REACTION_POLICY.md` §7 seam bullet, amended 2026-07-05); any future
+     noun-carrying chat path must wire the object per the Slice 8 pattern. No code change.
    - Minor (nice-to-have): `CLOCK_CATEGORIES` via `get_args(ClockCategory)` to kill the
      Literal/tuple duplication; a `RoomObject` validator rejecting non-empty `reaction_bindings`
      when `reaction_policy != "scripted"`; move `derive_clock_id` to a shared id helper so the

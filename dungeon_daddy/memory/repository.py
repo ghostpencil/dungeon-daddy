@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -75,6 +77,7 @@ class MemoryRepository:
     def __init__(self, db_path: Path) -> None:
         self._db_path = db_path
         self._conn: duckdb.DuckDBPyConnection | None = duckdb.connect(str(db_path))
+        self._in_transaction = False
 
     def health_check(self) -> bool:
         if self._conn is None:
@@ -88,6 +91,36 @@ class MemoryRepository:
     def initialize_schema(self, migrations_dir: Path) -> None:
         assert self._conn is not None
         _apply_migrations(self._conn, migrations_dir)
+
+    @contextmanager
+    def transaction(self) -> Iterator[None]:
+        """Group writes into one DuckDB transaction; roll back on any error.
+
+        Statements inside the ``with`` block commit together, or — if the block
+        raises — roll back atomically so no partial state is persisted, and the
+        exception is re-raised for the caller to handle.
+
+        Re-entrant: a nested ``transaction()`` on the same repo joins the
+        outer one (DuckDB has no nested transactions) — the single BEGIN/COMMIT
+        happens at the outermost level, so a failure anywhere rolls back the
+        whole batch. The ``_in_transaction`` flag is always cleared, so a failed
+        COMMIT/ROLLBACK does not wedge the connection for the next caller.
+        """
+        assert self._conn is not None
+        if self._in_transaction:
+            yield  # join the open outer transaction — no nested BEGIN
+            return
+        self._in_transaction = True
+        self._conn.execute("BEGIN TRANSACTION")
+        try:
+            yield
+        except Exception:
+            self._conn.execute("ROLLBACK")
+            raise
+        else:
+            self._conn.execute("COMMIT")
+        finally:
+            self._in_transaction = False
 
     def list_tables(self) -> list[str]:
         assert self._conn is not None

@@ -12,7 +12,8 @@ criteria in `spec/PHASE_51_6_WORLD_REACTION_POLICY.md`. This file remains the ca
 bindings get a **sibling table** (not a transition extension), the §3 firewall gets a
 **`ClockCategory` enum prerequisite**, "adverse" is **derived from category** (no new field),
 and the seam fix covers **all three** `_apply_world_reaction` call sites. Audit findings the
-original draft missed are in §10.
+original draft missed are in §10. *(Superseded on the "all three" point — see the 2026-07-05
+amendment at the §7 seam bullet: only noun-carrying paths pass the object.)*
 
 ---
 
@@ -205,12 +206,17 @@ Stall (R2), Sealed Dwarven Cargo Crate (R3).
 - **Stress routing:** `rpg/stress_routing.py` — stress becomes a scripted consequence
   (`stress_track`/`stress_amount` on a binding), not an incidental byproduct of the first
   matched clock's category.
-- **Seam (all THREE call sites, resolved 2026-07-04):** `_apply_world_reaction` is called
-  from `play_view._resolve_vna_roll` (`play_view.py:1799`) **and** from the two chat-action
-  paths (`play_view.py:818`, `:983`). All three must pass the acted-upon `RoomObject` (policy
-  + bindings), or the untouched paths silently keep the old fan-out. Note the object is
-  already resolved one line above the VNA call site (`_maybe_resolve_obstacle`,
-  `play_view.py:1798`) — the wiring exists; it is dropped at the seam today.
+- **Seam (amended 2026-07-05, owner ruling — PR #88 review item):** `_apply_world_reaction`
+  is called from `play_view._resolve_vna_roll` **and** from the two chat-action paths. Only
+  **noun-carrying** paths pass the acted-upon `RoomObject` (policy + bindings) — today that is
+  the VNA path alone. The two chat-action paths are intent/action-key based (no noun **by
+  construction**) and correctly fall to the ambient rule with `acted_object=None`; this is the
+  designed "non-object action → ambient" case, not a gap. The old fan-out cannot survive on
+  any path — the tag-matching code was removed in Slice 7, so `acted_object=None` can only
+  produce the §4 ambient selection. *(The original 2026-07-04 wording required all three call
+  sites to pass the object; that predated the Slice 7 removal of the fan-out path and is
+  superseded. Any **future** chat path that does carry an object noun must resolve and pass
+  it, per the Slice 8 pattern.)*
 - **Level-scope caveat:** the seam synthesizes `current_level_id` as `f"level-{idx+1}"`
   (`play_view.py:2071-2073`); the §4 level-scope match inherits this string convention.
   Cover it with an integration test so a level-id format change can't silently break

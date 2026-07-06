@@ -123,7 +123,7 @@ def test_busy_flag_cleared_after_thread_completes():
     room = view._dungeon.levels[0].rooms[0]
     level = view._dungeon.levels[0]
 
-    view._spawn_dm_thread(room, level)
+    view._narration.spawn_dm_thread(room, level)
     assert view._active_thread is not None
     view._active_thread.join(timeout=5.0)
 
@@ -138,8 +138,8 @@ def test_second_send_while_thread_running_is_dropped():
     room = view._dungeon.levels[0].rooms[0]
     level = view._dungeon.levels[0]
 
-    view._spawn_dm_thread(room, level)   # first — thread starts, _llm_busy = True
-    view._spawn_dm_thread(room, level)   # second — dropped because busy
+    view._narration.spawn_dm_thread(room, level)   # first — thread starts, _llm_busy = True
+    view._narration.spawn_dm_thread(room, level)   # second — dropped because busy
     view._active_thread.join(timeout=5.0)
 
     assert provider.call_count == 1

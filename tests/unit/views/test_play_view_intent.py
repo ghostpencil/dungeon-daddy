@@ -15,7 +15,7 @@ from dungeon_daddy.views.play_view import PlayView
 def _make_view() -> PlayView:
     view = PlayView.__new__(PlayView)
     view._rpg_action = PlayerActionPanel()
-    view._rpg_action.set_actors([
+    view._session.set_actors([
         ActorState(
             actor_id="a1", campaign_id="c1", actor_type="pc",
             slug="hero", display_name="Hero",
@@ -39,7 +39,9 @@ def test_on_resolve_action_threads_intent_to_resolution():
     def _capture(resolution):
         captured["resolution"] = resolution
 
-    view._apply_world_reaction = _capture  # type: ignore[method-assign]
+    # The action logic lives on the orchestrator (Phase 51.7 Slice 4) — spy at
+    # that seam; the view method is now a thin delegator.
+    view._actions.apply_world_reaction = _capture  # type: ignore[method-assign]
 
     view._on_resolve_action(
         campaign_id="c1",
@@ -64,7 +66,7 @@ def test_on_resolve_action_threads_empty_intent():
     def _capture(resolution):
         captured["resolution"] = resolution
 
-    view._apply_world_reaction = _capture  # type: ignore[method-assign]
+    view._actions.apply_world_reaction = _capture  # type: ignore[method-assign]
 
     view._on_resolve_action(
         campaign_id="c1",

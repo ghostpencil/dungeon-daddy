@@ -56,7 +56,8 @@ def _make_view(tmp_path: Path, actor: ActorState | None = None):
     view._dungeon = None
     view._rpg_vna = VnaActionPanel()
     view._rpg_vna.set_submit_callback(view._on_vna_submit)
-    view._rpg_action = MagicMock(_actors=[actor])
+    view._rpg_action = MagicMock()
+    view._session.set_actors([actor])
     view._action_state = PlayerActionState()
     view._action_state.set_actor_roster([actor.actor_id])
     view._chat = MagicMock()
@@ -194,8 +195,8 @@ def test_overlay_click_on_open_exit_auto_moves(tmp_path):
     _save_exit(view._mem_repo, exit_id="e1", from_room_id="r1", to_room_id="r2", status="open")
     view._map = MagicMock()
     view._rpg_scene = MagicMock()
-    view._spawn_dm_thread = MagicMock()
-    view._compact_history = MagicMock()
+    view._narration.spawn_dm_thread = MagicMock()
+    view._narration.compact_history = MagicMock()
     view._save_session = MagicMock()
     view._dm_history = []
     view._refresh_vna_panel()
@@ -395,8 +396,8 @@ def test_submit_move_card_moves_party(tmp_path):
     _save_exit(view._mem_repo, exit_id="e1", status="open")
     view._map = MagicMock()
     view._rpg_scene = MagicMock()
-    view._spawn_dm_thread = MagicMock()
-    view._compact_history = MagicMock()
+    view._narration.spawn_dm_thread = MagicMock()
+    view._narration.compact_history = MagicMock()
     view._save_session = MagicMock()
     view._dm_history = []
 
@@ -415,8 +416,8 @@ def test_move_refreshes_vna_panel_to_new_room(tmp_path):
     _save_exit(view._mem_repo, exit_id="e2", from_room_id="r2", to_room_id="r3", status="open")
     view._map = MagicMock()
     view._rpg_scene = MagicMock()
-    view._spawn_dm_thread = MagicMock()
-    view._compact_history = MagicMock()
+    view._narration.spawn_dm_thread = MagicMock()
+    view._narration.compact_history = MagicMock()
     view._save_session = MagicMock()
     view._dm_history = []
 
@@ -468,7 +469,7 @@ def test_set_acting_actor_syncs_action_state_and_panel(tmp_path):
     """Cycling the CHAR picker makes that PC the actor the ACTION tab acts as."""
     view = _make_view(tmp_path)
     borin = _actor(actor_id="pc-2", slug="borin", display_name="Borin")
-    view._rpg_action = MagicMock(_actors=[view._rpg_action._actors[0], borin])
+    view._session.set_actors([view._session.actors[0], borin])
     view._action_state.set_actor_roster(["pc-1", "pc-2"])
     view._rpg_char = MagicMock()
 
@@ -525,8 +526,8 @@ def test_submit_activate_deterministic_spawns_dm_narration(tmp_path):
 
     view = _make_view(tmp_path)
     view._dungeon = _dungeon_with_rooms([("r1", "Forge Floor", 0, 0)])
-    view._spawn_dm_thread = MagicMock()
-    view._compact_history = MagicMock()
+    view._narration.spawn_dm_thread = MagicMock()
+    view._narration.compact_history = MagicMock()
     view._dm_history = []
     view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
     view._mem_repo.save_room_object(RoomObject(
@@ -541,7 +542,7 @@ def test_submit_activate_deterministic_spawns_dm_narration(tmp_path):
 
     view._on_vna_submit(ActionCard(verb="activate", noun_id="obj-lever", adverb="cautiously"))
 
-    assert view._spawn_dm_thread.called
+    assert view._narration.spawn_dm_thread.called
     sent = " ".join(m.content for m in view._dm_history)
     assert "Iron Lever" in sent
     assert "pulled" in sent
@@ -825,8 +826,8 @@ def test_skill_card_names_noun_in_dm_message(tmp_path):
     view._rpg_debug = None
     view._rpg_char = MagicMock()
     view._rpg_fallout = MagicMock()
-    view._spawn_dm_thread = MagicMock()
-    view._compact_history = MagicMock()
+    view._narration.spawn_dm_thread = MagicMock()
+    view._narration.compact_history = MagicMock()
     view._dm_history = []
     view._mem_repo.save_room_object(RoomObject(
         object_id="obj-board", campaign_id="camp-1", room_id="r1", level_id="level-1",
@@ -856,8 +857,8 @@ def test_resolve_vna_roll_passes_acted_object_to_world_reaction(tmp_path):
     view._rpg_debug = None
     view._rpg_char = MagicMock()
     view._rpg_fallout = MagicMock()
-    view._spawn_dm_thread = MagicMock()
-    view._compact_history = MagicMock()
+    view._narration.spawn_dm_thread = MagicMock()
+    view._narration.compact_history = MagicMock()
     view._dm_history = []
     view._mem_repo.save_room_object(RoomObject(
         object_id="obj-statue", campaign_id="camp-1", room_id="r1", level_id="level-1",
@@ -872,13 +873,15 @@ def test_resolve_vna_roll_passes_acted_object_to_world_reaction(tmp_path):
     view._refresh_vna_panel()
 
     captured = {}
-    real = view._apply_world_reaction
+    # The action logic lives on the orchestrator (Phase 51.7 Slice 4) — spy at
+    # that seam; the view method is now a thin delegator.
+    real = view._actions.apply_world_reaction
 
     def _spy(resolution, acted_object=None):
         captured["acted_object"] = acted_object
         return real(resolution, acted_object=acted_object)
 
-    view._apply_world_reaction = _spy  # type: ignore[method-assign]
+    view._actions.apply_world_reaction = _spy  # type: ignore[method-assign]
 
     view._on_vna_submit(ActionCard(verb="study", noun_id="obj-statue", adverb="cautiously"))
 
@@ -956,13 +959,13 @@ def test_submit_look_card_no_state_change(tmp_path):
 
 
 def test_give_target_includes_other_party_members(tmp_path):
-    """Other party PCs (from _rpg_action._actors) appear as give targets."""
+    """Other party PCs (from the session roster) appear as give targets."""
     from dungeon_daddy.rpg.models import Item
 
     borin = _actor(actor_id="pc-2", slug="borin", display_name="Borin")
     view = _make_view(tmp_path)
     # Two-member party: default actor (pc-1) + Borin (pc-2)
-    view._rpg_action = MagicMock(_actors=[view._rpg_action._actors[0], borin])
+    view._session.set_actors([view._session.actors[0], borin])
     view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
     view._mem_repo.save_item(Item(
         item_id="itm-1", campaign_id="camp-1", slug="ration",
@@ -1099,7 +1102,9 @@ def test_sway_on_willing_npc_opens_dialogue_not_roll(tmp_path):
     from dungeon_daddy.rpg.action_options import SOURCE_NPC, ActionCard, NounOption
 
     view = _make_view(tmp_path)
-    view._resolve_vna_roll = MagicMock()
+    # The dispatch lives on the orchestrator (Phase 51.7 Slice 4) — mock the
+    # roll at that seam; the view method is now a thin delegator.
+    view._actions.resolve_vna_roll = MagicMock()
     view._rpg_vna._nouns = [
         NounOption(noun_id="npc-1", label="Warden", target_type="npc", source=SOURCE_NPC),
     ]
@@ -1110,7 +1115,7 @@ def test_sway_on_willing_npc_opens_dialogue_not_roll(tmp_path):
     view._on_vna_submit(ActionCard(verb="sway", noun_id="npc-1", adverb="cautiously"))
 
     view._chat.set_dialogue_mode.assert_called_once_with(True)
-    view._resolve_vna_roll.assert_not_called()
+    view._actions.resolve_vna_roll.assert_not_called()
 
 
 def test_sway_on_hostile_creature_rolls_not_dialogue(tmp_path):
@@ -1118,7 +1123,9 @@ def test_sway_on_hostile_creature_rolls_not_dialogue(tmp_path):
     from dungeon_daddy.rpg.action_options import SOURCE_MONSTER, ActionCard, NounOption
 
     view = _make_view(tmp_path)
-    view._resolve_vna_roll = MagicMock()
+    # The dispatch lives on the orchestrator (Phase 51.7 Slice 4) — mock the
+    # roll at that seam; the view method is now a thin delegator.
+    view._actions.resolve_vna_roll = MagicMock()
     view._rpg_vna._nouns = [
         NounOption(noun_id="mon-1", label="Gnoll", target_type="monster", source=SOURCE_MONSTER),
     ]
@@ -1128,7 +1135,7 @@ def test_sway_on_hostile_creature_rolls_not_dialogue(tmp_path):
 
     view._on_vna_submit(ActionCard(verb="sway", noun_id="mon-1", adverb="cautiously"))
 
-    view._resolve_vna_roll.assert_called_once()
+    view._actions.resolve_vna_roll.assert_called_once()
     view._chat.set_dialogue_mode.assert_not_called()
 
 
@@ -1163,7 +1170,7 @@ def test_build_context_bundle_includes_current_room_objects(tmp_path):
         current_state="default",
     ))
 
-    bundle = view._build_context_bundle()
+    bundle = view._narration.build_context_bundle()
 
     objects = bundle.current_room.get("objects", [])
     names = [o["display_name"] for o in objects]

@@ -49,7 +49,8 @@ def _make_view(tmp_path: Path, actor: ActorState | None = None):
     )
     view._dungeon = None
     view._rpg_vna = VnaActionPanel()
-    view._rpg_action = MagicMock(_actors=[actor])
+    view._rpg_action = MagicMock()
+    view._session.set_actors([actor])
     view._action_state = PlayerActionState()
     view._action_state.set_actor_roster([actor.actor_id])
     view._chat = MagicMock()

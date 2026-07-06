@@ -49,9 +49,9 @@ def _make_view(tmp_path: Path):
     view._chat = MagicMock()
     view._map = MagicMock()
     view._rpg_scene = MagicMock()
-    view._rpg_action = MagicMock(_actors=[])
-    view._spawn_dm_thread = MagicMock()
-    view._compact_history = MagicMock()
+    view._rpg_action = MagicMock()
+    view._narration.spawn_dm_thread = MagicMock()
+    view._narration.compact_history = MagicMock()
     view._save_session = MagicMock()
     view._dm_history = []
     return view
