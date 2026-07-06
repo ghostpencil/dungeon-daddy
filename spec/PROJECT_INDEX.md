@@ -40,19 +40,20 @@ Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_
 
 **PR #88 merged to `main` 2026-07-05 (`c0e1cba`) — Phase 51.6 fully closed.** Current work:
 **Phase 51.7 — PlayView Decomposition** on `feat/phase-51.7-playview-decomp` — spec + slice plan
-in `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Slices 0–5 landed 2026-07-06.
+in `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Slices 0–6 landed 2026-07-06.
 
-**⏸ RESUME HERE — Slice 6 (`MemoryCoordinator`).** Slice 5 (`NavigationCoordinator`) is
-committed & review-hardened (`c99007c` + review `9801650`, 2026-07-06). The Slice 4 deferred
-follow-ups were also committed (`43e3783`: module-level `format_mechanical_bubble` import, shared
-`PlayView._post_chat` seam, `tests/unit/play/_factories.py`). Next: extract the memory seam into
-`play/memory_coordinator.py` — `/remember`, `_extract_remember`/`_auto_remember`,
-`_load_memory_entries`, MEM-tab commit persistence, level-memory overlay load/save (the overlay
-*widgets* stay in the view) — following the Slice 0–5 pattern (no `arcade`; narrow late-bound
-ports; lazy `_ensure_*` bridge; thin view delegators; the `PlayView.__new__` factories stay
-unchanged). TDD via the tdd skill (read `spec/TESTING.md` first). After Slice 6, Slice 7 is the
-`PlaySessionController` composition root that closes the phase (+ amend `spec/ARCHITECTURE.md` +
-owner GUI verify).
+**⏸ RESUME HERE — Slice 7 (`PlaySessionController`) — the phase-closing slice.** Slice 6
+(`MemoryCoordinator`) is committed & review-hardened (`df6a2a6`, 2026-07-06). Next & last:
+extract the composition root into `play/controller.py` — `PlaySessionController` wires the five
+coordinators + the `PlaySessionContext` together; `PlayView` keeps only drawing/input/layout +
+overlay-widget management + delegation to the controller (spec §3 Slice 7; target
+`views/play_view.py` ≤ ~900 lines per exit criterion 1). Follow the Slice 0–6 pattern (no
+`arcade`; narrow late-bound ports; lazy `_ensure_*` bridge; thin view delegators; the
+`PlayView.__new__` factories stay unchanged). TDD via the tdd skill (read `spec/TESTING.md`
+first). **Slice 7 also closes the phase:** amend `spec/ARCHITECTURE.md` (module tree, PlayView
+responsibilities, threading section → `NarrationCoordinator`) and owner manual GUI verify on the
+live Crucible (exit criterion 6: an action roll, an exit move, a dungeon-voice exchange,
+`/remember`, and a memory approve all behave as before).
 
 **Deferred follow-ups (not blocking):** the Slice 4 `get_debug` port hands play a UI panel type
 (TYPE_CHECKING-only; two narrow callables would be cleaner, but the debug-gates-proposal-pipeline
@@ -179,6 +180,29 @@ After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice (item 2
   select)` helper for the map-cursor + chat + scene trio duplicated across 3 methods, and
   `set_viewed_level` moved inside the `level is not None` guard so paging can't point at a level the
   map never loaded. Full suite green (**3507 passed**), ruff + mypy(strict) clean.
+- ✅ **Slice 6 — `MemoryCoordinator`** (2026-07-06, `df6a2a6`). New `play/memory_coordinator.py`
+  (no `arcade`, 7 late-bound ports) owns the memory seam: `extract_remember`, `handle_remember`
+  (`/remember`), `auto_remember` (`[REMEMBER: …]` hook), `load_memory_entries` (MEM-panel
+  population), `persist_pending_commit` (MEM-tab approve/reject), and the level-memory overlay
+  persistence (`has_level_memory`/`load_level_memory`/`save_level_memory`). The two remember paths
+  are de-duped behind a `_record_room_event` helper. The overlay *widgets* (`_open_overlay_ui`/
+  `_draw_overlay_*`) stay in the view — the coordinator owns only the persistence behind them. Side
+  effects flow through narrow ports (`post_message`/`append_room_event`/`load_room_memory`/
+  `save_room_memory`/`set_entries`/`pop_pending_commit`/`refresh_memory_state`); no `PlayView`
+  reference. `PlayView` keeps thin delegators (its input-routing surface — `/remember` routing, the
+  MEM-click handler, the overlay open/save/close widget lifecycle) + a lazy `_ensure_memory` bridge;
+  dropped the now-dead `import re`, `_REMEMBER_RE`, and the `MemoryEntry` import. Direct-index level
+  lookups became bounds-checked `session.current_level()`/`current_room()` accessors (crash →
+  graceful no-op on a corrupt out-of-range save; the accepted Slice 5 approach). Behavior-preserving;
+  `play_view.py` 1899 → 1878 lines. 17 new unit tests (`tests/unit/play/test_memory_coordinator.py`)
+  exercise the coordinator directly (real `DungeonRepository` + `MemoryRepository` + recording
+  ports); existing view tests stay green via the delegators. **`/code-review high` — extraction
+  verified faithful** (2 finder angles: line-by-line/removed-behavior + reuse/conventions —
+  message strings, `_refresh_memory_state`-only-on-`/remember` ordering, `save_memory_overlay`
+  no-close-on-null-state, campaign_id fallback, port arg shapes all byte-checked); 1 quality fix
+  applied inline (the narration `extract_remember`/`auto_remember` ports stay pointed at the view
+  delegators, consistent with the other narration ports + the four other memory seams, so the
+  wrappers remain production-reachable). Full suite green (**3524 passed**), ruff + mypy(strict) clean.
 
 1. **Phase 51.6 — World Reaction Policy — ✅ COMPLETE (PR #88 open, review-hardened).** Fixed a
    real bug (a STUDY-miss moved 3 clocks incl. `dungeon_intimacy`, violating D5). Per-object
