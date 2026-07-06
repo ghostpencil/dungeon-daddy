@@ -43,9 +43,11 @@ Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_
 in `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Both PR #88 deferred review items are resolved
 or scheduled: the spec-language item is **closed** (owner ruled 2026-07-05: only noun-carrying
 paths pass `acted_object`; `spec/WORLD_REACTION_POLICY.md` §7 amended), and the non-atomic
-`_apply_world_reaction` write is **Slice 1** of 51.7. Next slice to build: **Slice 1 —
-`play/reaction_applier.py` + the deferred PR #88 atomicity fix** (Slice 0 landed 2026-07-06).
-After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice (item 2 below).
+`_apply_world_reaction` write landed as **Slice 1** of 51.7. Next slice to build: **Slice 2 —
+`NarrationCoordinator` (`play/narration.py`)** — `_dm_history`/`_compact_history`/
+`_build_context_bundle`/`_spawn_dm_thread` + the `DMResult` queue/`_llm_busy`, exposing
+`request_narration()` (kills the 8× narration-entry idiom) and `poll()`. Slices 0–1 landed
+2026-07-06. After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice (item 2 below).
 
 **Phase 51.7 slice progress (branch `feat/phase-51.7-playview-decomp`):**
 - ✅ **Slice 0 — `PlaySessionContext`** (2026-07-06). New `dungeon_daddy/play/` package
@@ -60,6 +62,25 @@ After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice (item 2
   behavior change. 13 new unit tests (`tests/unit/play/test_session_context.py`); ~10 view-test
   files migrated their roster setup to `view._session.set_actors(...)`. Full suite green
   (**3421 passed**), ruff + mypy(strict) clean.
+- ✅ **Slice 1 — `ReactionApplier` + atomic world-reaction writes** (2026-07-06, `415b880`).
+  `PlayView._apply_world_reaction` (~80 lines) extracted to `play/reaction_applier.py`
+  (`ReactionApplier`, no `arcade`); the view keeps a thin per-call delegator wiring the
+  `post_system`/`on_reaction` ports. **Folds in the deferred PR #88 fix:** clock + stress writes
+  run in one DuckDB transaction — a mid-write failure rolls back (no partial state) and posts
+  `"⚠ Reaction could not be fully applied."`. New re-entrant `MemoryRepository.transaction()`
+  (the one repo seam the non-goals permit): nested calls join the outer txn (no nested `BEGIN` —
+  safe for Slice 4's reuse), `_in_transaction` always cleared. **Review-hardened** (`/code-review
+  high`, 7 findings): precise failure-line semantics (reads + compute are guarded but degrade
+  silently → a read-time DB error no longer escapes uncaught at the `_resolve_vna_roll` call site;
+  only an atomic *write* failure posts the line, fixing the misleading "not fully applied" wording
+  on compute failures); `_sync_actor_stress` creates a missing track so an unseeded-track binding
+  shows in the panel without reload; `ClockState(**r)` (stops silently dropping `monotonic`);
+  magic capacity `4` → `_DEFAULT_STRESS_CAPACITY` + dict lookup. Deliberately **kept the
+  authoritative per-actor DB read** (`StressTrack(**t)`) over reusing in-memory `actor.stress` —
+  capacity lives in the DB and the two can diverge (a low-value efficiency finding not worth a
+  capacity-correctness regression). 5 new tests (3 applier: compute-fail-silent,
+  read-fail-contained, new-track-synced; 2 repo: nested-txn commit/rollback); the one behavioral
+  change in the phase. Full suite green (**3431 passed**), ruff + mypy(strict) clean.
 
 1. **Phase 51.6 — World Reaction Policy — ✅ COMPLETE (PR #88 open, review-hardened).** Fixed a
    real bug (a STUDY-miss moved 3 clocks incl. `dungeon_intimacy`, violating D5). Per-object
