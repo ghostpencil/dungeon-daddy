@@ -43,9 +43,23 @@ Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_
 in `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Both PR #88 deferred review items are resolved
 or scheduled: the spec-language item is **closed** (owner ruled 2026-07-05: only noun-carrying
 paths pass `acted_object`; `spec/WORLD_REACTION_POLICY.md` §7 amended), and the non-atomic
-`_apply_world_reaction` write is **Slice 1** of 51.7. Next slice to build: **Slice 0 —
-`PlaySessionContext`**. After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice
-(item 2 below).
+`_apply_world_reaction` write is **Slice 1** of 51.7. Next slice to build: **Slice 1 —
+`play/reaction_applier.py` + the deferred PR #88 atomicity fix** (Slice 0 landed 2026-07-06).
+After 51.7: Tag Hygiene → Narrator Lookup remains the sequenced choice (item 2 below).
+
+**Phase 51.7 slice progress (branch `feat/phase-51.7-playview-decomp`):**
+- ✅ **Slice 0 — `PlaySessionContext`** (2026-07-06). New `dungeon_daddy/play/` package
+  (imports no `arcade`); `play/session_context.py` owns dungeon/session-state/`mem_repo`/
+  `campaign_id`/actor roster + `current_level()`/`current_room()`/`current_level_id`/
+  `acting_actor()`. Kills audit findings 1–2: the roster moved out of `PlayerActionPanel._actors`
+  (~9 reach-ins now read `self._session.actors`); the `dungeon→level→room` current-room idiom
+  (6 sites) + both `f"level-{idx+1}"` synth sites route through the context. `PlayView` bridges
+  via lazy properties (`_dungeon`/`_state`/`_mem_repo`/`_rpg_campaign_id` delegate to
+  `self._session`) so the context is the single source of truth without churning ~60 read sites
+  or breaking the `__new__` test pattern; mypy strict still narrows them. Pure mechanical, no
+  behavior change. 13 new unit tests (`tests/unit/play/test_session_context.py`); ~10 view-test
+  files migrated their roster setup to `view._session.set_actors(...)`. Full suite green
+  (**3421 passed**), ruff + mypy(strict) clean.
 
 1. **Phase 51.6 — World Reaction Policy — ✅ COMPLETE (PR #88 open, review-hardened).** Fixed a
    real bug (a STUDY-miss moved 3 clocks incl. `dungeon_intimacy`, violating D5). Per-object

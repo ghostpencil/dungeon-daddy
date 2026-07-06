@@ -56,6 +56,7 @@ def _make_view(*, room_id: str | None = "r1") -> PlayView:
         )
     ])
     view._rpg_action = panel
+    view._session.set_actors(panel._actors)
     view._rpg_campaign_id = "c1"
     view._rpg_debug = None
     view._dm_agent = None

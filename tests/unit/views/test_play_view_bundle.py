@@ -128,21 +128,18 @@ def _make_view(tmp_path: Path, with_rpg: bool = True):
 # Slice 8 — _load_player_actors populates the action panel
 # ---------------------------------------------------------------------------
 
-def test_load_player_actors_calls_set_actors(tmp_path: Path):
+def test_load_player_actors_populates_session_roster(tmp_path: Path):
     from unittest.mock import MagicMock
 
     view, _, _ = _make_view(tmp_path, with_rpg=True)
     # Seed one pc and one npc into mem_repo
     view._mem_repo.save_actor("a-pc", "camp-1", "pc", "hero", "Elara")
     view._mem_repo.save_actor("a-npc", "camp-1", "npc", "goblin", "Gob")
-    action_panel = MagicMock()
-    action_panel.set_actors.side_effect = lambda a: setattr(action_panel, "_actors", list(a))
-    view._rpg_action = action_panel
+    view._rpg_action = MagicMock()
     view._rpg_char = MagicMock()
     view._rpg_fallout = MagicMock()
     view._load_player_actors()
-    action_panel.set_actors.assert_called_once()
-    actors = action_panel.set_actors.call_args[0][0]
+    actors = view._session.actors
     assert len(actors) == 1
     assert actors[0].actor_id == "a-pc"
 
@@ -150,10 +147,9 @@ def test_load_player_actors_calls_set_actors(tmp_path: Path):
 def test_load_player_actors_no_op_without_rpg(tmp_path: Path):
     from unittest.mock import MagicMock
     view, _, _ = _make_view(tmp_path, with_rpg=False)
-    action_panel = MagicMock()
-    view._rpg_action = action_panel
+    view._rpg_action = MagicMock()
     view._load_player_actors()
-    action_panel.set_actors.assert_not_called()
+    assert view._session.actors == []
 
 
 # ---------------------------------------------------------------------------
@@ -168,14 +164,11 @@ def test_load_player_actors_excludes_faction_and_dungeon_presence(tmp_path: Path
     view._mem_repo.save_actor("a-monster",  "camp-1", "monster",          "warden",  "Bone Warden")
     view._mem_repo.save_actor("a-faction",  "camp-1", "faction",          "cult",    "The Cult")
     view._mem_repo.save_actor("a-presence", "camp-1", "dungeon_presence", "spirit",  "The Spirit")
-    action_panel = MagicMock()
-    action_panel.set_actors.side_effect = lambda a: setattr(action_panel, "_actors", list(a))
-    view._rpg_action = action_panel
+    view._rpg_action = MagicMock()
     view._rpg_char = MagicMock()
     view._rpg_fallout = MagicMock()
     view._load_player_actors()
-    action_panel.set_actors.assert_called_once()
-    actors = action_panel.set_actors.call_args[0][0]
+    actors = view._session.actors
     assert len(actors) == 1
     assert actors[0].actor_id == "a-pc"
 
@@ -247,11 +240,11 @@ def test_on_resolve_action_dm_message_includes_actor_name(tmp_path: Path):
     view._rpg_service.resolve_action.return_value = (resolution, MagicMock())
     action_panel = MagicMock()
     action_panel._format_result.return_value = {"outcome": "full", "dice": [6], "stress_cost": 0, "notes": None}
-    action_panel._actors = [
+    view._rpg_action = action_panel
+    view._session.set_actors([
         ActorState(actor_id="a-talvas", campaign_id="camp-1", actor_type="pc",
                    slug="talvas", display_name="Talvas the Wanderer"),
-    ]
-    view._rpg_action = action_panel
+    ])
     with patch.object(view, "_spawn_dm_thread"):
         view._on_resolve_action(
             campaign_id="camp-1", actor_id="a-talvas", intent="look for threats",
@@ -398,8 +391,8 @@ def test_apply_world_reaction_persists_weird_track_with_correct_capacity(tmp_pat
         slug="hero", display_name="Elara",
     )
     action_panel = MagicMock()
-    action_panel._actors = [actor]
     view._rpg_action = action_panel
+    view._session.set_actors([actor])
 
     resolution = ActionResolution(
         resolution_id="r1", campaign_id="camp-1", actor_id=actor_id,
@@ -445,7 +438,8 @@ def _reaction_view(tmp_path: Path):
         slug="hero", display_name="Elara",
     )
     view._mem_repo.save_actor("a-pc", "camp-1", "pc", "hero", "Elara")
-    view._rpg_action = MagicMock(_actors=[actor])
+    view._rpg_action = MagicMock()
+    view._session.set_actors([actor])
     return view
 
 
@@ -564,8 +558,8 @@ def test_refresh_chat_mini_card_passes_portraits_dir(tmp_path):
         slug="mara", display_name="Mara",
     )
     action_panel = MagicMock()
-    action_panel._actors = [actor]
     view._rpg_action = action_panel
+    view._session.set_actors([actor])
     view._chat = MagicMock()
 
     with patch("dungeon_daddy.views.play_view.build_actor_mini_card") as mock_build:

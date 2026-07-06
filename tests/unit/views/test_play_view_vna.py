@@ -56,7 +56,8 @@ def _make_view(tmp_path: Path, actor: ActorState | None = None):
     view._dungeon = None
     view._rpg_vna = VnaActionPanel()
     view._rpg_vna.set_submit_callback(view._on_vna_submit)
-    view._rpg_action = MagicMock(_actors=[actor])
+    view._rpg_action = MagicMock()
+    view._session.set_actors([actor])
     view._action_state = PlayerActionState()
     view._action_state.set_actor_roster([actor.actor_id])
     view._chat = MagicMock()
@@ -468,7 +469,7 @@ def test_set_acting_actor_syncs_action_state_and_panel(tmp_path):
     """Cycling the CHAR picker makes that PC the actor the ACTION tab acts as."""
     view = _make_view(tmp_path)
     borin = _actor(actor_id="pc-2", slug="borin", display_name="Borin")
-    view._rpg_action = MagicMock(_actors=[view._rpg_action._actors[0], borin])
+    view._session.set_actors([view._session.actors[0], borin])
     view._action_state.set_actor_roster(["pc-1", "pc-2"])
     view._rpg_char = MagicMock()
 
@@ -956,13 +957,13 @@ def test_submit_look_card_no_state_change(tmp_path):
 
 
 def test_give_target_includes_other_party_members(tmp_path):
-    """Other party PCs (from _rpg_action._actors) appear as give targets."""
+    """Other party PCs (from the session roster) appear as give targets."""
     from dungeon_daddy.rpg.models import Item
 
     borin = _actor(actor_id="pc-2", slug="borin", display_name="Borin")
     view = _make_view(tmp_path)
     # Two-member party: default actor (pc-1) + Borin (pc-2)
-    view._rpg_action = MagicMock(_actors=[view._rpg_action._actors[0], borin])
+    view._session.set_actors([view._session.actors[0], borin])
     view._mem_repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara", "active", room_id="r1")
     view._mem_repo.save_item(Item(
         item_id="itm-1", campaign_id="camp-1", slug="ration",

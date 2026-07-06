@@ -15,7 +15,7 @@ from dungeon_daddy.views.play_view import PlayView
 def _make_view() -> PlayView:
     view = PlayView.__new__(PlayView)
     view._rpg_action = PlayerActionPanel()
-    view._rpg_action.set_actors([
+    view._session.set_actors([
         ActorState(
             actor_id="a1", campaign_id="c1", actor_type="pc",
             slug="hero", display_name="Hero",

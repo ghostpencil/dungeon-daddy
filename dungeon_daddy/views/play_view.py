@@ -33,6 +33,7 @@ from dungeon_daddy.map.graph_renderer import GraphRenderer
 from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
 from dungeon_daddy.memory.models import MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
+from dungeon_daddy.play.session_context import PlaySessionContext
 from dungeon_daddy.rpg.actor_control import filter_player_actors
 from dungeon_daddy.rpg.classifier import classify_intent
 from dungeon_daddy.rpg.intent import PendingIntent
@@ -365,12 +366,17 @@ class PlayView(arcade.View):
         mem_repo: MemoryRepository | None = None,
     ) -> None:
         super().__init__()
+        # The play session's shared domain state (dungeon, session state, repo
+        # handles, actor roster). `_dungeon`/`_state`/`_mem_repo`/
+        # `_rpg_campaign_id` are thin properties delegating here, so the context
+        # is the single source of truth (Phase 51.7, Slice 0).
+        self._session = PlaySessionContext()
         self._repo = repo
         self._dm_agent = dm_agent
         self._rpg_service = rpg_service
         self._mem_repo = mem_repo
-        self._dungeon: Dungeon | None = None
-        self._state: SessionState | None = None
+        self._dungeon = None
+        self._state = None
         self._manager = arcade.gui.UIManager()
         self._renderer = GraphRenderer(cell_px=_CELL_PX)
         self._chat = ChatPanel(self._on_chat_send, mode="play")
@@ -420,7 +426,7 @@ class PlayView(arcade.View):
         # _refresh_vna_panel feeds it and submit() routes through _on_vna_submit.
         self._chat_action_builder = InChatActionBuilder(self._rpg_vna)
         self._chat.set_action_builder(self._chat_action_builder)
-        self._rpg_campaign_id: str | None = None
+        self._rpg_campaign_id = None
         self._action_state = PlayerActionState()
         self._chat.set_actor_switch_callback(self._on_actor_switch)
         # Open dialogue channel, or None when the Action Builder is active.
@@ -433,6 +439,64 @@ class PlayView(arcade.View):
         )
         self._dungeon_voice: str | None = None
         self._dungeon_knowledge: list[str] = []
+
+    # ------------------------------------------------------------------
+    # Session context bridge (Phase 51.7, Slice 0)
+    #
+    # These four attributes historically lived directly on the view and are
+    # read/written from ~60 call sites (and set on `__new__`-constructed test
+    # views). They now delegate to the shared ``PlaySessionContext`` so the
+    # context is the single source of truth without churning every call site.
+    # ``_session`` lazily materializes so ``PlayView.__new__`` test setups that
+    # assign ``view._dungeon``/``view._state`` before anything else still work.
+    # ------------------------------------------------------------------
+
+    def _ensure_session(self) -> PlaySessionContext:
+        ctx = self.__dict__.get("_session_ctx")
+        if ctx is None:
+            ctx = PlaySessionContext()
+            self.__dict__["_session_ctx"] = ctx
+        return ctx
+
+    @property
+    def _session(self) -> PlaySessionContext:
+        return self._ensure_session()
+
+    @_session.setter
+    def _session(self, ctx: PlaySessionContext) -> None:
+        self.__dict__["_session_ctx"] = ctx
+
+    @property
+    def _dungeon(self) -> Dungeon | None:
+        return self._ensure_session().dungeon
+
+    @_dungeon.setter
+    def _dungeon(self, value: Dungeon | None) -> None:
+        self._ensure_session().dungeon = value
+
+    @property
+    def _state(self) -> SessionState | None:
+        return self._ensure_session().state
+
+    @_state.setter
+    def _state(self, value: SessionState | None) -> None:
+        self._ensure_session().state = value
+
+    @property
+    def _mem_repo(self) -> MemoryRepository | None:
+        return self._ensure_session().mem_repo
+
+    @_mem_repo.setter
+    def _mem_repo(self, value: MemoryRepository | None) -> None:
+        self._ensure_session().mem_repo = value
+
+    @property
+    def _rpg_campaign_id(self) -> str | None:
+        return self._ensure_session().campaign_id
+
+    @_rpg_campaign_id.setter
+    def _rpg_campaign_id(self, value: str | None) -> None:
+        self._ensure_session().campaign_id = value
 
     # ------------------------------------------------------------------
     # View lifecycle
@@ -726,7 +790,9 @@ class PlayView(arcade.View):
         if self._rpg_debug is None or self._state is None:
             return
         idx = self._state.current_level_idx
-        self._rpg_debug.set_current_level_id(f"level-{idx + 1}")
+        level_id = self._session.current_level_id
+        if level_id is not None:
+            self._rpg_debug.set_current_level_id(level_id)
         if self._dungeon is not None:
             room_ids = {r.id for r in self._dungeon.levels[idx].rooms}
             self._rpg_debug.set_current_level_room_ids(room_ids)
@@ -764,7 +830,7 @@ class PlayView(arcade.View):
                 playbook_slug=a.get("playbook_slug"),
             ))
         pc_actors = filter_player_actors(actor_states)
-        self._rpg_action.set_actors(pc_actors)
+        self._session.set_actors(pc_actors)
         self._rpg_char.set_party(pc_actors)
         if pc_actors:
             self._refresh_right_panel_from_actors(pc_actors[0].actor_id)
@@ -808,7 +874,7 @@ class PlayView(arcade.View):
             self._chat.add_message("system", "RPG service unavailable.")
             return
         actor = next(
-            (a for a in self._rpg_action._actors if a.actor_id == actor_id),
+            (a for a in self._session.actors if a.actor_id == actor_id),
             None,
         )
         dice_pool = (actor.actions.get(action_key) or 1) if actor else 1
@@ -834,10 +900,7 @@ class PlayView(arcade.View):
             )
             if self._dungeon is not None and self._state is not None:
                 level = self._dungeon.levels[self._state.current_level_idx]
-                room = None
-                if self._state.current_room_id:
-                    room_map = {r.id: r for r in level.rooms}
-                    room = room_map.get(self._state.current_room_id)
+                room = self._session.current_room()
                 if room is None:
                     self._chat.add_message("system", "Select a room to get DM narration.")
                 else:
@@ -856,7 +919,7 @@ class PlayView(arcade.View):
 
     def _refresh_right_panel_from_actors(self, actor_id: str) -> None:
         """Sync right panel inspector with the actor who just acted."""
-        actors = getattr(self._rpg_action, "_actors", [])
+        actors = self._session.actors
         if not actors:
             return
         actor = next((a for a in actors if a.actor_id == actor_id), actors[0])
@@ -923,7 +986,7 @@ class PlayView(arcade.View):
         if not hasattr(self, "_action_state"):
             return
         actor_id = self._action_state.actor_id
-        actors = getattr(self._rpg_action, "_actors", [])
+        actors = self._session.actors
         actor = next((a for a in actors if a.actor_id == actor_id), None) if actor_id else None
         portraits_dir = getattr(self, "_portraits_dir", None)
         self._chat.set_actor_mini_card(
@@ -995,17 +1058,14 @@ class PlayView(arcade.View):
             self._run_proposal_pipeline(resolution, campaign_id)
             if self._dungeon is not None and self._state is not None:
                 level = self._dungeon.levels[self._state.current_level_idx]
-                room = None
-                if self._state.current_room_id:
-                    room_map = {r.id: r for r in level.rooms}
-                    room = room_map.get(self._state.current_room_id)
+                room = self._session.current_room()
                 if room is None:
                     self._chat.add_message("system", "Select a room to get DM narration.")
                 else:
                     outcome = summary.get("outcome", "?").upper()
                     dice = summary.get("dice", [])
                     actor_name = next(
-                        (a.display_name for a in self._rpg_action._actors if a.actor_id == actor_id),
+                        (a.display_name for a in self._session.actors if a.actor_id == actor_id),
                         actor_id,
                     )
                     msg = (
@@ -1057,11 +1117,9 @@ class PlayView(arcade.View):
 
     def _acting_actor(self) -> ActorState | None:
         """The actor a Card acts as: the selected one, else the first PC."""
-        actors = getattr(self._rpg_action, "_actors", []) or []
-        actor_id = getattr(self, "_action_state", None) and self._action_state.actor_id
-        if actor_id:
-            return next((a for a in actors if a.actor_id == actor_id), actors[0] if actors else None)
-        return actors[0] if actors else None
+        action_state = getattr(self, "_action_state", None)
+        selected_id = action_state.actor_id if action_state else None
+        return self._session.acting_actor(selected_id)
 
     def _set_acting_actor(self, actor_id: str) -> None:
         """Make ``actor_id`` the actor whose Cards/rolls resolve.
@@ -1078,7 +1136,7 @@ class PlayView(arcade.View):
     def _room_world_flags(self, room_id: str) -> set[str]:
         """World-context flags gating conditional adverbs (mirrors the room-context build)."""
         flags: set[str] = set()
-        actors = getattr(self._rpg_action, "_actors", []) or []
+        actors = self._session.actors
         if max((a.actions.get("sense", 0) for a in actors), default=0) >= 1:
             flags.add("can_sense")
         if self._mem_repo is None or self._rpg_campaign_id is None:
@@ -1111,7 +1169,7 @@ class PlayView(arcade.View):
         room_context = self._prepare_vna_exits(room_context, room_id)
         # Party PCs move as a group — their location is in session state, not
         # per-actor room_id, so we inject them here from the loaded actor roster.
-        all_actors = getattr(self._rpg_action, "_actors", []) or []
+        all_actors = self._session.actors
         room_context = {
             **room_context,
             "party": [
@@ -1746,7 +1804,7 @@ class PlayView(arcade.View):
         if self._dungeon is None or self._state is None:
             return
         level = self._dungeon.levels[self._state.current_level_idx]
-        room = {r.id: r for r in level.rooms}.get(self._state.current_room_id or "")
+        room = self._session.current_room()
         if room is None:
             return
         from dungeon_daddy.llm.provider import LLMMessage
@@ -1834,7 +1892,7 @@ class PlayView(arcade.View):
         )
         if self._dungeon is not None and self._state.current_room_id:
             level = self._dungeon.levels[self._state.current_level_idx]
-            room = {r.id: r for r in level.rooms}.get(self._state.current_room_id)
+            room = self._session.current_room()
             if room is not None:
                 noun_label = self._rpg_vna.noun_label_for(card.noun_id) or card.noun_id
                 msg = (
@@ -1933,7 +1991,7 @@ class PlayView(arcade.View):
         level = None
         if self._dungeon is not None:
             level = self._dungeon.levels[self._state.current_level_idx]
-            room = {r.id: r for r in level.rooms}.get(self._state.current_room_id or "")
+            room = self._session.current_room()
             if self._state.current_level_idx != old_level_idx:
                 self._viewed_level_idx = self._state.current_level_idx
                 self._map.load(level, self._state, len(self._dungeon.levels))
@@ -1969,7 +2027,7 @@ class PlayView(arcade.View):
             for r in raw_clocks
         ]
         known_clock_ids = [c["clock_id"] for c in known_clocks]
-        all_actors = getattr(self._rpg_action, "_actors", []) or []
+        all_actors = self._session.actors
         known_actors = [{"actor_id": a.actor_id, "display_name": a.display_name} for a in all_actors]
         known_actor_ids = [a["actor_id"] for a in known_actors]
         player_actor_ids = [a.actor_id for a in filter_player_actors(all_actors)]
@@ -2115,7 +2173,7 @@ class PlayView(arcade.View):
             for r in raw_clocks
         ]
         pc_pairs = []
-        for actor in self._rpg_action._actors:
+        for actor in self._session.actors:
             raw_tracks = self._mem_repo.get_actor_stress_tracks(actor.actor_id)
             tracks = {
                 t["track_key"]: StressTrack(
@@ -2127,9 +2185,7 @@ class PlayView(arcade.View):
             }
             pc_pairs.append((actor, tracks))
         current_room_id = self._state.current_room_id if self._state else None
-        current_level_id = (
-            f"level-{self._state.current_level_idx + 1}" if self._state else None
-        )
+        current_level_id = self._session.current_level_id
         try:
             reaction, _evt = self._rpg_service.react_to_resolution(
                 resolution, threat_clocks, pc_pairs,
@@ -2159,7 +2215,7 @@ class PlayView(arcade.View):
                 )
             # Sync in-memory actors so _refresh_right_panel_from_actors sees new values
             for sl in reaction.stress_lines:
-                for actor in self._rpg_action._actors:
+                for actor in self._session.actors:
                     if actor.actor_id == sl.actor_id and sl.track_key in actor.stress:
                         actor.stress[sl.track_key].filled = sl.new_filled
             if self._rpg_debug is not None:
@@ -2376,7 +2432,7 @@ class PlayView(arcade.View):
         suggestions = classify_intent(text)
         if suggestions:
             actor_id = self._action_state.actor_id or ""
-            actor = next((a for a in self._rpg_action._actors if a.actor_id == actor_id), None)
+            actor = next((a for a in self._session.actors if a.actor_id == actor_id), None)
             pending = PendingIntent(
                 actor_id=actor_id,
                 raw_text=text,
