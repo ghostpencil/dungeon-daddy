@@ -67,8 +67,17 @@ finished, dup refresh-tail folded away, `objective_location` param shadow rename
 (**3536 passed**), ruff + mypy(strict) clean.
 
 **✅ Taxonomy gate cleared — T1–T6 ratified as proposed (2026-07-08).** All of Part 1 is now
-owner-decided (T7 was already decided 2026-07-04); spec §13 + header updated. **▶ Now building
-Slice A1** (`validate_tag` + namespace vocabulary, `memory/tags.py`) — pure unit slice, TDD.
+owner-decided (T7 was already decided 2026-07-04); spec §13 + header updated.
+
+**✅ Slice A1 — `validate_tag` + namespace vocabulary: COMPLETE (2026-07-08).** New pure module
+`dungeon_daddy/memory/tags.py`: `validate_tag(tag) -> str` enforces T1 (must be namespaced),
+T2 (namespace ∈ `TAG_NAMESPACES`, 14 families), the `actor:<pc|npc|dungeon>:<slug>` three-segment
+rule (`ACTOR_SUBTYPES`), and T3 shape (non-empty slug); returns the tag verbatim when valid.
+Deliberately does **not** force lowercase slugs — room-ids may be mixed-case (`location:R1`); §4.3
+validates room-id consistency separately. Read paths stay permissive (they simply don't call it).
+TDD, 23 tests (`tests/unit/memory/test_tags.py`), full suite green (**3559 passed**), ruff +
+mypy(strict) clean. **▶ Next — Slice A2:** migration `020` + model/repo `tags` for
+objects/items/objectives.
 
 **Exit-criterion-1 — ✅ owner accepted 1491 lines (2026-07-06).** `views/play_view.py` landed at
 **1491 lines** (from 1878), above the spec's "≤ ~900" but now containing *only* drawing / input
