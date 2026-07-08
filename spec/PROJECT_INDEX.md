@@ -76,8 +76,20 @@ rule (`ACTOR_SUBTYPES`), and T3 shape (non-empty slug); returns the tag verbatim
 Deliberately does **not** force lowercase slugs — room-ids may be mixed-case (`location:R1`); §4.3
 validates room-id consistency separately. Read paths stay permissive (they simply don't call it).
 TDD, 23 tests (`tests/unit/memory/test_tags.py`), full suite green (**3559 passed**), ruff +
-mypy(strict) clean. **▶ Next — Slice A2:** migration `020` + model/repo `tags` for
-objects/items/objectives.
+mypy(strict) clean.
+
+**✅ Slice A2 — migration `020` + model/repo `tags`: COMPLETE (2026-07-08, `3ed3986`).** Added
+`tags: list[str] = []` to `Item`, `RoomObject`, `Objective` (`rpg/models.py`, mirroring
+`ActorState.tags`/`FactionState.tags`) and threaded it through the repo save/get paths
+(`memory/repository.py`, mirroring the faction pattern — `json.dumps`/`json.loads`, NULL/absent →
+`[]`). New migration `020_tag_taxonomy.sql` adds `tags TEXT DEFAULT '[]'` to `room_objects`,
+`items`, `objectives` (`actors`/`factions` already had it from migrations `011`/`007`). Pure
+persistence/model slice — **no behavior change**; `validate_tag` (A1) not yet wired into writes,
+read paths stay permissive. TDD, 13 tests (5 model, 2 migration incl. 020-on-019-head back-compat,
+6 repo round-trip/default). Full suite green (**3572 passed**), ruff + mypy(strict) clean.
+**▶ Next — Slice A3 (spec §12 Phase A.3):** seed-path fixes — the actor-tags drop
+(`rpg/seed_pack.py:140` + both `seed_rpg_state` call sites pass `tags=` through to `save_actor`),
+`threat_tags`/`trigger_tags` removal (T5), and seed-time room-ID validation (§4.3).
 
 **Exit-criterion-1 — ✅ owner accepted 1491 lines (2026-07-06).** `views/play_view.py` landed at
 **1491 lines** (from 1878), above the spec's "≤ ~900" but now containing *only* drawing / input
