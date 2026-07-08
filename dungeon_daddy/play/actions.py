@@ -42,6 +42,12 @@ if TYPE_CHECKING:
 
 _log = logging.getLogger(__name__)
 
+# Posted when a chat-side roll path fails mid-turn (resolve / world-reaction /
+# proposal / LLM). The broad ``except`` is a deliberate turn-guard — one bad
+# call must not crash the GM's turn — but the failure must be *visible*, not
+# only logged (deferred PR #89 review finding).
+_ACTION_FAILURE_LINE = "⚠ Action could not be completed (see log for details)."
+
 
 def describe_spawned_loot(transition: dict[str, Any], room_items: list[dict[str, Any]]) -> str:
     """Deterministic note naming the item a transition reveals, for the narrator.
@@ -250,11 +256,11 @@ class ActionOrchestrator:
         from dungeon_daddy.rpg.action_options import ActionCard
         from dungeon_daddy.rpg.action_resolution import resolve_card
 
-        repo = self._session.mem_repo
-        if repo is None or self._session.campaign_id is None:
+        active = self._session.active_campaign()
+        if active is None:
             return
 
-        obj = repo.get_room_object(card.noun_id)
+        obj = active.repo.get_room_object(card.noun_id)
         if obj is None:
             self._post_message("system", f"⚠ Object not found: {card.noun_id}")
             return
@@ -324,21 +330,20 @@ class ActionOrchestrator:
 
         if command is None:
             return False
-        repo = self._session.mem_repo
-        campaign_id = self._session.campaign_id
-        if repo is None or campaign_id is None:
+        active = self._session.active_campaign()
+        if active is None:
             return False
         state = self._session.state
         room_id = state.current_room_id if state else None
         validation = validate_command(
-            command, repo, campaign_id, party_room_id=room_id,
+            command, active.repo, active.campaign_id, party_room_id=room_id,
         )
         if not validation.accepted:
             self._post_message(
                 "system", f"⚠ Can't do that: {validation.rejection_reason}"
             )
             return False
-        apply_command(command, validation, repo, campaign_id)
+        apply_command(command, validation, active.repo, active.campaign_id)
         self.advance_objectives()
         self._refresh_vna_panel()
         return True
@@ -382,6 +387,15 @@ class ActionOrchestrator:
                 "system",
                 format_mechanical_bubble(actor_name, action_key, resolution, reaction),
             )
+        except Exception:
+            _log.exception("_run_chat_action failed")
+            self._post_message("system", _ACTION_FAILURE_LINE)
+            return
+        # Post-commit narration + UI-sync. The action already resolved and
+        # persisted (and its result bubble is posted above), so a failure here
+        # is logged — never mislabelled as an action failure, which would
+        # contradict the success bubble the GM just saw.
+        try:
             if session.dungeon is not None and session.state is not None:
                 room = session.current_room()
                 if room is None:
@@ -395,7 +409,7 @@ class ActionOrchestrator:
                     self._get_narration().request_narration(msg)
             self._refresh_right_panel(actor_id)
         except Exception:
-            _log.exception("_run_chat_action failed")
+            _log.exception("post-action narration/refresh failed (chat action)")
 
     def on_resolve_action(
         self,
@@ -426,6 +440,14 @@ class ActionOrchestrator:
             self._store_result(summary)
             self.apply_world_reaction(resolution)
             self.run_proposal_pipeline(resolution, campaign_id)
+        except Exception:
+            _log.exception("resolve_action failed")
+            self._post_message("system", _ACTION_FAILURE_LINE)
+            return
+        # Post-commit narration + UI-sync. The action already resolved and
+        # persisted, so a failure here is logged — never mislabelled as an
+        # action failure.
+        try:
             if session.dungeon is not None and session.state is not None:
                 room = session.current_room()
                 if room is None:
@@ -444,7 +466,7 @@ class ActionOrchestrator:
                     self._get_narration().request_narration(msg)
             self._refresh_right_panel(actor_id)
         except Exception:
-            _log.exception("resolve_action failed")
+            _log.exception("post-action narration/refresh failed (resolve action)")
 
     # -- skill-roll path ---------------------------------------------------------
 
@@ -538,7 +560,7 @@ class ActionOrchestrator:
         from dungeon_daddy.rpg.command import ActivateObject
         from dungeon_daddy.rpg.obstacles import resolve_obstacle_with_roll
 
-        if self._session.mem_repo is None or self._session.campaign_id is None:
+        if self._session.active_campaign() is None:
             return None
         obj = acted_object if acted_object is not None else self.resolve_acted_object(card.noun_id)
         if obj is None:
@@ -692,21 +714,18 @@ class ActionOrchestrator:
         from dungeon_daddy.rpg.obstacles import is_resolving_outcome, resolving_trigger
         from dungeon_daddy.rpg.proposal import ResolveObstacleChange
 
-        repo = self._session.mem_repo
+        active = self._session.active_campaign()
         state = self._session.state
-        if repo is None or actor_id is None or state is None:
+        if active is None or actor_id is None or state is None:
             return
         if not is_resolving_outcome(outcome):
             return
         room_id = state.current_room_id
         if not room_id:
             return
-        campaign_id = self._session.campaign_id
-        if campaign_id is None:
-            return
         by_slug = {
             od["slug"]: RoomObject(**od)
-            for od in repo.get_objects_by_room(campaign_id, room_id)
+            for od in active.repo.get_objects_by_room(active.campaign_id, room_id)
         }
         for change in validation_result.accepted:
             if not isinstance(change, ResolveObstacleChange):
@@ -734,11 +753,10 @@ class ActionOrchestrator:
         """
         from dungeon_daddy.rpg.objectives import advance_objectives
 
-        repo = self._session.mem_repo
-        campaign_id = self._session.campaign_id
-        if repo is None or campaign_id is None:
+        active = self._session.active_campaign()
+        if active is None:
             return
-        for _ in advance_objectives(repo, campaign_id):
+        for _ in advance_objectives(active.repo, active.campaign_id):
             self._post_message(
                 "dungeon", "◆ The Crucible stirs — its bond with you deepens."
             )

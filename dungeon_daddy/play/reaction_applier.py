@@ -52,11 +52,10 @@ class ReactionApplier:
         self, resolution: ActionResolution, acted_object: RoomObject | None = None
     ) -> WorldReaction | None:
         session = self._session
-        mem_repo = session.mem_repo
-        if self._rpg_service is None or mem_repo is None:
+        active = session.active_campaign()
+        if self._rpg_service is None or active is None:
             return None
-        if session.campaign_id is None:
-            return None
+        mem_repo = active.repo
         # Reads: fetch persisted world state. A repo read failure is contained
         # (never crashes the caller) but IS surfaced to the GM — the reaction
         # cannot be applied, the same user-visible outcome as a write failure.
@@ -64,7 +63,7 @@ class ReactionApplier:
         # them silently was a regression.)
         try:
             threat_clocks = [
-                ClockState(**r) for r in mem_repo.get_clocks(session.campaign_id)
+                ClockState(**r) for r in mem_repo.get_clocks(active.campaign_id)
             ]
             # Per-actor stress from the repo (the authoritative capacity source —
             # capacity varies per track and can differ from a stale in-memory copy).

@@ -48,11 +48,27 @@ to this next phase (see the review block below). Full 51.7 slice history + defer
 retained further down for reference.
 
 **▶ NEXT — Phase: Tag Hygiene → Narrator Lookup.** Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`
-(the sequenced choice; item 2 below). Start by reading that spec for the slice plan. **Carry in the
-two deferred PR #89 review findings** as early cleanup candidates: (2) the broad silent
-`except Exception` catches in `actions.py` (`run_chat_action`, `on_resolve_action`) that hide
-failed resolves/LLM calls from the GM; (3) extract an `ActiveCampaign(repo, campaign_id)` value /
-`context.active_campaign()` accessor to collapse the 15+ hand-copied co-presence guards.
+(the sequenced choice; item 2 below). Branch `feat/phase-51.8-tag-hygiene`.
+
+**✅ Slice 0 — cleanup warm-up: COMPLETE (2026-07-08, uncommitted→committed).** Both deferred PR #89
+review findings landed. (a) New frozen `ActiveCampaign(repo, campaign_id)` value +
+`PlaySessionContext.active_campaign()` accessor; **14** hand-copied `(mem_repo, campaign_id)`
+co-presence guards collapsed to consume it (`dialogue.py` ×6, `actions.py` ×5, `controller.py` ×2,
+`navigation.py` ×1, `reaction_applier.py` ×1) — the `campaign_id or state.dungeon_id` **fallback**
+sites (`controller.load_player_actors`, `memory_coordinator.load_memory_entries`,
+`narration.build_context_bundle`, `actions.run_proposal_pipeline`) are deliberately left (different
+semantics). (b) The two broad `except Exception` catches in `actions.py`
+(`run_chat_action`/`on_resolve_action`) now post a GM-visible `_ACTION_FAILURE_LINE` instead of only
+logging, with the narration+`_refresh_right_panel` post-commit steps split into their own guarded
+block so a post-commit failure is logged, never mislabelled "action could not be completed" (would
+contradict the success bubble). TDD; 7 new tests. **6-finding `/code-review high`** (5 angles) all
+fixed inline (post-commit mislabel, weak assertions pinned to the exact line, 2 half-migrated guards
+finished, dup refresh-tail folded away, `objective_location` param shadow renamed). Full suite green
+(**3536 passed**), ruff + mypy(strict) clean.
+
+**▶ Next gate before Phase A slices:** ratify the taxonomy decision points **T1–T6** (still marked
+"proposed, owner to confirm" in the spec §13) — only T7/L3/L7 are owner-decided. Slice A1
+(`validate_tag` + namespace vocabulary) waits on that.
 
 **Exit-criterion-1 — ✅ owner accepted 1491 lines (2026-07-06).** `views/play_view.py` landed at
 **1491 lines** (from 1878), above the spec's "≤ ~900" but now containing *only* drawing / input

@@ -196,11 +196,10 @@ class DialogueCoordinator:
         Read live from the repo (D3: the clock must pre-exist in the seed; the
         channel is locked when absent). Identified by ``category``.
         """
-        repo = self._session.mem_repo
-        campaign_id = self._session.campaign_id
-        if repo is None or campaign_id is None:
+        active = self._session.active_campaign()
+        if active is None:
             return None
-        for row in repo.get_clocks(campaign_id):
+        for row in active.repo.get_clocks(active.campaign_id):
             if row.get("category") == self._INTIMACY_CATEGORY:
                 return ClockState(**row)
         return None
@@ -240,13 +239,12 @@ class DialogueCoordinator:
 
     def recent_memories(self) -> list[Any]:
         """Last few approved memories, for the dungeon-voice context (§4.4)."""
-        repo = self._session.mem_repo
-        campaign_id = self._session.campaign_id
-        if repo is None or campaign_id is None:
+        active = self._session.active_campaign()
+        if active is None:
             return []
         from dungeon_daddy.memory.retrieval import MemoryRetriever
 
-        retriever = MemoryRetriever(repo, campaign_id)
+        retriever = MemoryRetriever(active.repo, active.campaign_id)
         return retriever.query()[: self._RECENT_MEMORY_LIMIT]
 
     def agent_inputs(self, text: str) -> dict[str, Any]:
@@ -292,11 +290,10 @@ class DialogueCoordinator:
         }
 
     def dungeon_objectives(self) -> list[dict[str, Any]]:
-        repo = self._session.mem_repo
-        campaign_id = self._session.campaign_id
-        if repo is None or campaign_id is None:
+        active = self._session.active_campaign()
+        if active is None:
             return []
-        return repo.get_objectives(campaign_id)
+        return active.repo.get_objectives(active.campaign_id)
 
     def room_labels(self) -> dict[str, str]:
         """Map each ``room_id`` to a human ``"Level N — Room Name"`` label.
@@ -319,27 +316,25 @@ class DialogueCoordinator:
         Each tuple is ``(display_name, current_state, location)`` (§4.2) so the
         dungeon can both report state and say where a subsystem sits.
         """
-        repo = self._session.mem_repo
-        campaign_id = self._session.campaign_id
-        if repo is None or campaign_id is None:
+        active = self._session.active_campaign()
+        if active is None:
             return []
         from dungeon_daddy.rpg.dungeon_channel import located_systems_status
 
-        objects = repo.get_objects_for_campaign(campaign_id)
+        objects = active.repo.get_objects_for_campaign(active.campaign_id)
         return located_systems_status(objects, self.room_labels())
 
-    def objective_location(self, active: dict[str, Any] | None) -> str | None:
+    def objective_location(self, objective: dict[str, Any] | None) -> str | None:
         """Resolve the active objective's target object to a room label (or None)."""
-        repo = self._session.mem_repo
-        campaign_id = self._session.campaign_id
-        if not active or repo is None or campaign_id is None:
+        active = self._session.active_campaign()
+        if not objective or active is None:
             return None
-        target_slug = (active.get("completion") or {}).get("target_slug")
+        target_slug = (objective.get("completion") or {}).get("target_slug")
         if not target_slug:
             return None
         from dungeon_daddy.rpg.dungeon_channel import object_location
 
-        objects = repo.get_objects_for_campaign(campaign_id)
+        objects = active.repo.get_objects_for_campaign(active.campaign_id)
         return object_location(target_slug, objects, self.room_labels())
 
     @staticmethod
@@ -370,14 +365,13 @@ class DialogueCoordinator:
         session = self.session
         if session is not None:
             session.turns.append(("dungeon", reply))
-        repo = self._session.mem_repo
-        campaign_id = self._session.campaign_id
-        if repo is None or campaign_id is None:
+        active = self._session.active_campaign()
+        if active is None:
             return
         actor = self._get_acting_actor()
         record_dungeon_exchange(
-            repo,
-            campaign_id=campaign_id,
+            active.repo,
+            campaign_id=active.campaign_id,
             actor=actor.slug if actor else "",
             player_message=player_message,
             dungeon_reply=reply,
