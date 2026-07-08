@@ -87,9 +87,35 @@ mypy(strict) clean.
 persistence/model slice — **no behavior change**; `validate_tag` (A1) not yet wired into writes,
 read paths stay permissive. TDD, 13 tests (5 model, 2 migration incl. 020-on-019-head back-compat,
 6 repo round-trip/default). Full suite green (**3572 passed**), ruff + mypy(strict) clean.
-**▶ Next — Slice A3 (spec §12 Phase A.3):** seed-path fixes — the actor-tags drop
-(`rpg/seed_pack.py:140` + both `seed_rpg_state` call sites pass `tags=` through to `save_actor`),
-`threat_tags`/`trigger_tags` removal (T5), and seed-time room-ID validation (§4.3).
+**✅ Slice A3 — seed-path fixes: COMPLETE (2026-07-08, `64a242a`).** All three §12 Phase A.3
+fixes, TDD, +18 tests (full suite green **3590**, ruff + mypy(strict, 169) clean). (a) **Actor-tags
+drop:** `apply_seed_pack` + `seed_campaign_with_pack` (create **and** force) now thread
+`tags=actor.tags` through `save_actor` — seeded NPC/PC tags no longer land as `[]`. (b) **T5
+`threat_tags`:** a `SeedActor` `mode="before"` validator folds the legacy `threat_tags`
+(boss/construct/undead — descriptive actor traits) into `tags` as `trait:<slug>` and drops the field;
+it absorbs legacy seed JSON on load (no hand-edit of the shipped seeds needed), back-compat. (c) **T5
+`trigger_tags`:** migration `021_clock_tags.sql` adds `clocks.tags`; `ClockState.tags` +
+`save_clock`/`get_clocks`/`update_clock_scope` thread it; `apply_seed_pack` routes room-threat
+`trigger_tags` onto the clock's `tags` as `trait:<slug>` and stops writing them into `action_tags`
+(they could never match a verb there → those clocks silently never advanced). (d) **§4.3 room-ID
+validation:** new pure `validate_seed_room_ids(pack, valid_room_ids)` raises loudly on
+`r1`-vs-`R1`/zero-padding mismatches; `apply_seed_pack` gains an opt-in `valid_room_ids` param
+(`None` = skip — back-compat for the tool/test callers that lack a dungeon; `apply_seed_pack` has no
+production `dungeon_daddy/` caller).
+
+**Owner decisions this session (2026-07-08), resolving a T5 spec-vs-reality gap** (T5 said "convert
+`trigger_tags` to `trait:` tags on the clock," but clocks had no `tags` column — A2's migration `020`
+scoped `tags` to objects/items/objectives only): the two dead vocabularies were split — **`threat_tags`
+folds onto actors** (descriptive traits; `actors.tags` already existed) and **`trigger_tags` route to
+clocks** (a different entity → owner chose to add `clocks.tags` via migration `021` rather than drop
+them). Note: migration runner can't parse `--` comments (splits on `;`, skips `--`-leading chunks), so
+`021` is bare SQL per convention.
+
+**▶ Next — Slice A4 (spec §12 Phase A.4):** seed-data normalization + Crucible world tagging —
+memory-tag T6 canonicalization in the seed JSONs and taxonomy `tags` on every object/item/objective in
+the `populate_crucible_*` scripts (idempotent, preserves play progress). The shipped seed JSONs still
+carry legacy `threat_tags` keys (harmlessly folded by the A3 validator) — A4 may strip them during its
+normalization pass.
 
 **Exit-criterion-1 — ✅ owner accepted 1491 lines (2026-07-06).** `views/play_view.py` landed at
 **1491 lines** (from 1878), above the spec's "≤ ~900" but now containing *only* drawing / input
