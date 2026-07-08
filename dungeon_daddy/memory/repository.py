@@ -583,6 +583,7 @@ class MemoryRepository:
         completion_effect: str | None = None,
         visible_to_player: bool = True,
         monotonic: bool = True,
+        tags: list[str] | None = None,
     ) -> None:
         assert self._conn is not None
         self._conn.execute(
@@ -591,9 +592,9 @@ class MemoryRepository:
                 clock_id, campaign_id, label, segments, filled, status,
                 scope_room_id, action_tags,
                 clock_level, category, level_id, owner_actor_id,
-                stakes, completion_effect, visible_to_player, monotonic
+                stakes, completion_effect, visible_to_player, monotonic, tags
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (clock_id) DO UPDATE SET
                 label             = excluded.label,
                 segments          = excluded.segments,
@@ -608,12 +609,14 @@ class MemoryRepository:
                 stakes            = excluded.stakes,
                 completion_effect = excluded.completion_effect,
                 visible_to_player = excluded.visible_to_player,
-                monotonic         = excluded.monotonic
+                monotonic         = excluded.monotonic,
+                tags              = excluded.tags
             """,
             [clock_id, campaign_id, label, segments, filled, status,
              scope_room_id, json.dumps(action_tags or []),
              clock_level, category, level_id, owner_actor_id,
-             stakes, completion_effect, visible_to_player, monotonic],
+             stakes, completion_effect, visible_to_player, monotonic,
+             json.dumps(tags or [])],
         )
 
     def delete_clock(self, clock_id: str) -> None:
@@ -637,15 +640,25 @@ class MemoryRepository:
         clock_id: str,
         scope_room_id: str | None,
         action_tags: list[str],
+        tags: list[str] | None = None,
     ) -> None:
         assert self._conn is not None
-        self._conn.execute(
-            """
-            UPDATE clocks SET scope_room_id = ?, action_tags = ?
-            WHERE clock_id = ?
-            """,
-            [scope_room_id, json.dumps(action_tags), clock_id],
-        )
+        if tags is None:
+            self._conn.execute(
+                """
+                UPDATE clocks SET scope_room_id = ?, action_tags = ?
+                WHERE clock_id = ?
+                """,
+                [scope_room_id, json.dumps(action_tags), clock_id],
+            )
+        else:
+            self._conn.execute(
+                """
+                UPDATE clocks SET scope_room_id = ?, action_tags = ?, tags = ?
+                WHERE clock_id = ?
+                """,
+                [scope_room_id, json.dumps(action_tags), json.dumps(tags), clock_id],
+            )
 
     def get_clocks(self, campaign_id: str) -> list[dict[str, Any]]:
         assert self._conn is not None
@@ -654,7 +667,7 @@ class MemoryRepository:
             SELECT clock_id, campaign_id, label, segments, filled, status,
                    scope_room_id, action_tags,
                    clock_level, category, level_id, owner_actor_id,
-                   stakes, completion_effect, visible_to_player, monotonic
+                   stakes, completion_effect, visible_to_player, monotonic, tags
             FROM clocks WHERE campaign_id = ?
             """,
             [campaign_id],
@@ -677,6 +690,7 @@ class MemoryRepository:
                 "completion_effect": r[13],
                 "visible_to_player": bool(r[14]) if r[14] is not None else True,
                 "monotonic": bool(r[15]) if r[15] is not None else True,
+                "tags": json.loads(r[16]) if r[16] else [],
             }
             for r in rows
         ]

@@ -21,6 +21,7 @@ from dungeon_daddy.rpg.seed_pack import (
     derive_clock_id,
     derive_faction_id,
     load_seed_pack,
+    validate_seed_room_ids,
 )
 
 MIGRATIONS_DIR = (
@@ -105,7 +106,30 @@ class TestSeedPackParse:
         actor = pack.dungeon_side.actors[0]
         assert actor.slug == "bone-warden"
         assert actor.instinct == "Pursue those who disturb the dead"
-        assert "pursuit" in actor.threat_tags
+        assert "trait:pursuit" in actor.tags  # threat_tags folded to trait: (T5)
+
+    def test_seed_actor_folds_threat_tags_into_trait_tags(self) -> None:
+        # T5: threat_tags (boss/construct/undead) are descriptive actor traits;
+        # they fold into the actor's tags as trait:<slug>, and the field is gone.
+        actor = SeedActor.model_validate({
+            "slug": "bone-warden",
+            "display_name": "The Bone Warden",
+            "actor_type": "monster",
+            "tags": ["level:level-1"],
+            "threat_tags": ["undead", "boss"],
+        })
+        assert "trait:undead" in actor.tags
+        assert "trait:boss" in actor.tags
+        assert "level:level-1" in actor.tags  # existing tags preserved
+        assert not hasattr(actor, "threat_tags")
+
+    def test_seed_actor_folds_threat_tags_without_duplicating(self) -> None:
+        actor = SeedActor.model_validate({
+            "slug": "x", "display_name": "X", "actor_type": "monster",
+            "tags": ["trait:undead"],
+            "threat_tags": ["undead"],
+        })
+        assert actor.tags.count("trait:undead") == 1
 
     def test_clocks_parsed(self) -> None:
         data = {
@@ -375,7 +399,34 @@ class TestApplySeedPack:
         clocks = {c["clock_id"]: c for c in repo.get_clocks("campaign-123")}
         assert clock_id in clocks
         assert clocks[clock_id]["scope_room_id"] == "room_boiler"
-        assert clocks[clock_id]["action_tags"] == ["fight", "move"]
+        # T5: trigger_tags route to clock tags as trait:, not action_tags.
+        assert clocks[clock_id]["action_tags"] == []
+        assert set(clocks[clock_id]["tags"]) == {"trait:fight", "trait:move"}
+
+    def test_apply_routes_trigger_tags_to_clock_trait_tags(self, repo: MemoryRepository) -> None:
+        # T5: room-threat trigger_tags become descriptive trait: tags ON THE CLOCK,
+        # not action_tags (where they could never match a verb, so the clock never
+        # advanced).
+        data = {
+            **_MINIMAL_PACK,
+            "clocks": [
+                {"slug": "trap-primed", "label": "Trap Primed", "segments": 4, "category": "danger"}
+            ],
+            "room_threats": [
+                {
+                    "location_slug": "room_boiler",
+                    "trigger_tags": ["noise", "touch_artifact"],
+                    "related_clock_slugs": ["trap-primed"],
+                }
+            ],
+        }
+        pack = SeedPack.model_validate(data)
+        apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR)
+        clock_id = derive_clock_id("test-campaign", "trap-primed")
+        clock = {c["clock_id"]: c for c in repo.get_clocks("campaign-123")}[clock_id]
+        assert clock["scope_room_id"] == "room_boiler"
+        assert set(clock["tags"]) == {"trait:noise", "trait:touch_artifact"}
+        assert clock["action_tags"] == []
 
     def test_apply_persists_clock_level_metadata(self, repo: MemoryRepository) -> None:
         data = {
@@ -400,6 +451,52 @@ class TestApplySeedPack:
         assert clocks[clock_id]["category"] == "objective"
         assert clocks[clock_id]["stakes"] == "Elevator needed to descend."
         assert clocks[clock_id]["completion_effect"] == "Elevator operational."
+
+    def test_apply_validates_room_ids_when_provided(self, repo: MemoryRepository) -> None:
+        data = {
+            **_MINIMAL_PACK,
+            "clocks": [
+                {"slug": "trap", "label": "Trap", "segments": 4, "category": "danger",
+                 "clock_level": "room", "scope_room_id": "r1"}
+            ],
+        }
+        pack = SeedPack.model_validate(data)
+        with pytest.raises(ValueError, match="r1"):
+            apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR, valid_room_ids={"R1"})
+
+    def test_apply_skips_room_id_validation_by_default(self, repo: MemoryRepository) -> None:
+        data = {
+            **_MINIMAL_PACK,
+            "clocks": [
+                {"slug": "trap", "label": "Trap", "segments": 4, "category": "danger",
+                 "clock_level": "room", "scope_room_id": "r1"}
+            ],
+        }
+        pack = SeedPack.model_validate(data)
+        # No valid_room_ids → no validation (back-compat for callers without a dungeon).
+        apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR)
+        assert len(repo.get_clocks("campaign-123")) == 1
+
+    def test_apply_persists_actor_tags(self, repo: MemoryRepository) -> None:
+        data = {
+            **_MINIMAL_PACK,
+            "player_side": {
+                "label": "The Party",
+                "actors": [
+                    {
+                        "slug": "mara",
+                        "display_name": "Mara",
+                        "actor_type": "pc",
+                        "tags": ["trait:veteran", "level:level-1"],
+                    }
+                ],
+            },
+        }
+        pack = SeedPack.model_validate(data)
+        apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR)
+        actor = repo.get_actor(derive_actor_id("test-campaign", "mara"))
+        assert actor is not None
+        assert set(actor["tags"]) >= {"trait:veteran", "level:level-1"}
 
     def test_apply_derives_owner_actor_id_from_slug(self, repo: MemoryRepository) -> None:
         data = {
@@ -547,6 +644,37 @@ class TestCampaignSeedFilesValidate:
                 assert clock.scope_room_id is not None, (
                     f"{campaign_dir.name}: room clock {clock.slug!r} missing scope_room_id"
                 )
+
+
+class TestValidateSeedRoomIds:
+    def _pack(self, *, clock_scope: str | None = None, threat_loc: str | None = None) -> SeedPack:
+        data: dict = {**_MINIMAL_PACK}
+        if clock_scope is not None:
+            data["clocks"] = [{
+                "slug": "trap", "label": "Trap", "segments": 4, "category": "danger",
+                "clock_level": "room", "scope_room_id": clock_scope,
+            }]
+        if threat_loc is not None:
+            data["room_threats"] = [{"location_slug": threat_loc, "related_clock_slugs": []}]
+        return SeedPack.model_validate(data)
+
+    def test_passes_when_all_room_ids_match(self) -> None:
+        pack = self._pack(clock_scope="R1", threat_loc="R2")
+        validate_seed_room_ids(pack, {"R1", "R2", "R3"})  # no raise
+
+    def test_none_scope_is_skipped(self) -> None:
+        pack = self._pack()  # no room references
+        validate_seed_room_ids(pack, {"R1"})  # no raise
+
+    def test_raises_on_clock_scope_mismatch(self) -> None:
+        pack = self._pack(clock_scope="r1")  # lowercase, not in the model
+        with pytest.raises(ValueError, match="r1"):
+            validate_seed_room_ids(pack, {"R1"})
+
+    def test_raises_on_threat_location_mismatch(self) -> None:
+        pack = self._pack(threat_loc="r04")
+        with pytest.raises(ValueError, match="r04"):
+            validate_seed_room_ids(pack, {"R4"})
 
 
 class TestDeriveFactionId:

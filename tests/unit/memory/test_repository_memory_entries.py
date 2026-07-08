@@ -210,6 +210,28 @@ class TestClockPersistence:
         assert clocks[0]["stakes"] == "Factory activates."
         assert clocks[0]["scope_room_id"] == "room_control"
 
+    def test_save_clock_persists_tags(self, repo: MemoryRepository) -> None:
+        repo.save_clock(
+            "clk_tags", "camp_tags", "Trap", 4, 0,
+            tags=["trait:noise", "trait:combat"],
+        )
+        clocks = repo.get_clocks("camp_tags")
+        assert clocks[0]["tags"] == ["trait:noise", "trait:combat"]
+
+    def test_save_clock_tags_default_to_empty(self, repo: MemoryRepository) -> None:
+        repo.save_clock("clk_notags", "camp_notags", "Trap", 4, 0)
+        assert repo.get_clocks("camp_notags")[0]["tags"] == []
+
+    def test_update_clock_scope_can_set_tags(self, repo: MemoryRepository) -> None:
+        repo.save_clock("clk_st", "camp_st", "Trap", 4, 0)
+        repo.update_clock_scope(
+            "clk_st", scope_room_id="room_x", action_tags=[], tags=["trait:noise"]
+        )
+        clocks = repo.get_clocks("camp_st")
+        assert clocks[0]["scope_room_id"] == "room_x"
+        assert clocks[0]["action_tags"] == []
+        assert clocks[0]["tags"] == ["trait:noise"]
+
 
 # ---------------------------------------------------------------------------
 # Action resolution persistence

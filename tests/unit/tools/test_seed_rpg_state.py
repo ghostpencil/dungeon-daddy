@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from dungeon_daddy.rpg.seed_pack import derive_actor_id
 from seed_rpg_state import SeedResult, seed_campaign, seed_campaign_with_pack
 
 
@@ -290,6 +291,47 @@ class TestSeedCampaignWithPack:
         pack_path = _write_pack(tmp_path)
         result = seed_campaign_with_pack(campaign_dir, pack_path, dry_run=True)
         assert isinstance(result, SeedResult)
+
+    def test_apply_persists_actor_tags(self, tmp_path: Path) -> None:
+        pack_data = {
+            **_PACK_DATA,
+            "player_side": {
+                "label": "The Party",
+                "actors": [
+                    {"slug": "mara", "display_name": "Mara", "actor_type": "pc",
+                     "tags": ["trait:veteran", "level:level-1"]},
+                ],
+            },
+        }
+        campaign_dir = _make_campaign_dir(tmp_path)
+        pack_path = _write_pack(tmp_path, pack_data)
+        seed_campaign_with_pack(campaign_dir, pack_path)
+        repo = _open_repo(campaign_dir)
+        mara = repo.get_actor(derive_actor_id("test-campaign", "mara"))
+        repo.close()
+        assert mara is not None
+        assert set(mara["tags"]) >= {"trait:veteran", "level:level-1"}
+
+    def test_force_reseed_persists_actor_tags(self, tmp_path: Path) -> None:
+        pack_data = {
+            **_PACK_DATA,
+            "player_side": {
+                "label": "The Party",
+                "actors": [
+                    {"slug": "mara", "display_name": "Mara", "actor_type": "pc",
+                     "tags": ["trait:veteran"]},
+                ],
+            },
+        }
+        campaign_dir = _make_campaign_dir(tmp_path)
+        pack_path = _write_pack(tmp_path, pack_data)
+        seed_campaign_with_pack(campaign_dir, pack_path)
+        seed_campaign_with_pack(campaign_dir, pack_path, force=True)
+        repo = _open_repo(campaign_dir)
+        mara = repo.get_actor(derive_actor_id("test-campaign", "mara"))
+        repo.close()
+        assert mara is not None
+        assert "trait:veteran" in mara["tags"]
 
     def test_force_reseed_preserves_playbook_and_room(self, tmp_path: Path) -> None:
         # The seed pack does not own playbook_slug or room_id (assigned by the

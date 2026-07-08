@@ -123,6 +123,7 @@ class ClockState(BaseModel):
     completion_effect: str | None = None
     visible_to_player: bool = True
     monotonic: bool = True
+    tags: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def filled_within_segments(self) -> ClockState:

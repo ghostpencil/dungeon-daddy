@@ -239,6 +239,17 @@ class TestClockState:
         )
         assert c.category == "threat"
 
+    def test_tags_default_to_empty_and_round_trip(self) -> None:
+        c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4)
+        assert c.tags == []
+        tagged = ClockState(
+            clock_id="c", campaign_id="x", label="L", segments=4,
+            tags=["trait:noise", "trait:combat"],
+        )
+        assert ClockState.model_validate(tagged.model_dump()).tags == [
+            "trait:noise", "trait:combat"
+        ]
+
     def test_optional_level_metadata_defaults(self) -> None:
         c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4)
         assert c.category is None

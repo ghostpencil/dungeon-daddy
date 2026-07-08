@@ -414,7 +414,10 @@ def seed_campaign_with_pack(
         actor_id = derive_actor_id(pack.campaign_slug, actor.slug)
         existing = repo.get_actor(actor_id)
         if existing is None:
-            repo.save_actor(actor_id, campaign_id, actor.actor_type, actor.slug, actor.display_name)
+            repo.save_actor(
+                actor_id, campaign_id, actor.actor_type, actor.slug, actor.display_name,
+                tags=actor.tags,
+            )
             for action_key, rating in actor.actions.items():
                 repo.save_actor_action_rating(actor_id, action_key, rating)
             for track_key in actor.stress_tracks:
@@ -430,6 +433,7 @@ def seed_campaign_with_pack(
                 status=existing.get("status", "active"),
                 playbook_slug=existing.get("playbook_slug"),
                 room_id=existing.get("room_id"),
+                tags=actor.tags,
             )
             for action_key, rating in actor.actions.items():
                 repo.save_actor_action_rating(actor_id, action_key, rating)
