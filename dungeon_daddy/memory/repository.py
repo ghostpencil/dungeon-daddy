@@ -1354,7 +1354,7 @@ class MemoryRepository:
             "description": r[7],
             "current_state": r[8],
             "reaction_policy": r[9] if r[9] is not None else "ambient",
-            "tags": json.loads(r[10]) if len(r) > 10 and r[10] else [],
+            "tags": json.loads(r[10]) if r[10] else [],
             "transitions": transitions,
             "reaction_bindings": reaction_bindings,
         }
@@ -1459,7 +1459,7 @@ class MemoryRepository:
                 "required_state": r[9],
             },
             "advances_clock_slug": r[10],
-            "tags": json.loads(r[11]) if len(r) > 11 and r[11] else [],
+            "tags": json.loads(r[11]) if r[11] else [],
             "reveals_knowledge": [kr[0] for kr in k_rows],
         }
 

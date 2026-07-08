@@ -180,6 +180,16 @@ class TestMigrationRunnerIntegration:
         ).fetchone()[0]
         conn.close()
         assert tags == "[]"
+        # Back-compat read through the models/repo: the legacy row loads with an
+        # empty tags list, no crash (spec/TESTING.md Migration Tests §3).
+        repo = MemoryRepository(db_path)
+        repo.initialize_schema(MIGRATIONS_DIR)
+        try:
+            loaded = repo.get_objectives("camp:old")
+        finally:
+            repo.close()
+        assert [o["objective_id"] for o in loaded] == ["obj:old"]
+        assert loaded[0]["tags"] == []
 
     def test_items_table_has_room_id_column(self, tmp_path: Path) -> None:
         db_path = tmp_path / "dungeon.duckdb"
