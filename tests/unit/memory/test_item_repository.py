@@ -61,6 +61,13 @@ class TestSaveAndGetItems:
         assert r["owner_actor_id"] == "actor:test:hero"
         assert r["status"] == "active"
         assert r["features"] == []
+        assert r["tags"] == []
+
+    def test_tags_round_trip(self, repo: MemoryRepository) -> None:
+        tags = ["item:sword", "theme:the-machine-remembers"]
+        repo.save_item(_dungeon_item().model_copy(update={"tags": tags}))
+        r = repo.get_items("campaign:test")[0]
+        assert r["tags"] == tags
 
     def test_upsert_updates_fields_no_duplicate(self, repo: MemoryRepository) -> None:
         item = _dungeon_item()

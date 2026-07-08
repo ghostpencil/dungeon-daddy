@@ -130,6 +130,57 @@ class TestMigrationRunnerIntegration:
         assert policy == "ambient"
         assert "object_reaction_bindings" in tables
 
+    def test_tags_columns_present_on_all_three_tables(self, tmp_path: Path) -> None:
+        """Migration 020 adds a `tags` column to room_objects, items, objectives."""
+        db_path = tmp_path / "dungeon.duckdb"
+        MigrationRunner(migrations_dir=MIGRATIONS_DIR, db_path=db_path).run()
+        conn = duckdb.connect(str(db_path))
+        for table in ("room_objects", "items", "objectives"):
+            cols = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = ?",
+                    [table],
+                ).fetchall()
+            }
+            assert "tags" in cols, f"{table} missing tags column"
+        conn.close()
+
+    def test_020_applies_on_019_head_db(self, tmp_path: Path) -> None:
+        """A DB migrated through 019 then to 020: old rows default to '[]'."""
+        db_path = tmp_path / "dungeon.duckdb"
+        head_dir = tmp_path / "migrations_019"
+        head_dir.mkdir()
+        for sql_file in sorted(MIGRATIONS_DIR.glob("*.sql")):
+            if sql_file.name < "020":
+                (head_dir / sql_file.name).write_text(
+                    sql_file.read_text(encoding="utf-8"), encoding="utf-8"
+                )
+        MigrationRunner(migrations_dir=head_dir, db_path=db_path).run()
+        # Insert a pre-020 objective (no tags column).
+        conn = duckdb.connect(str(db_path))
+        conn.execute(
+            """
+            INSERT INTO objectives (
+                objective_id, campaign_id, slug, title, description,
+                tier_index, status, completion_kind, completion_target_slug,
+                completion_required_state, advances_clock_slug
+            )
+            VALUES ('obj:old', 'camp:old', 'old-goal', 'Old Goal', 'A pre-020 goal.',
+                    0, 'active', 'object_state', 'coolant-loop', 'restored', NULL)
+            """
+        )
+        conn.close()
+        applied = MigrationRunner(migrations_dir=MIGRATIONS_DIR, db_path=db_path).run()
+        assert "020_tag_taxonomy.sql" in applied
+        conn = duckdb.connect(str(db_path))
+        tags = conn.execute(
+            "SELECT tags FROM objectives WHERE objective_id = 'obj:old'"
+        ).fetchone()[0]
+        conn.close()
+        assert tags == "[]"
+
     def test_items_table_has_room_id_column(self, tmp_path: Path) -> None:
         db_path = tmp_path / "dungeon.duckdb"
         runner = MigrationRunner(migrations_dir=MIGRATIONS_DIR, db_path=db_path)

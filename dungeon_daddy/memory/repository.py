@@ -973,9 +973,9 @@ class MemoryRepository:
                 item_id, campaign_id, slug, display_name, item_type,
                 description, owner_actor_id, level_id, status,
                 charges_current, charges_max, is_equipped, room_id,
-                combines_with_slug, combination_result_slug
+                combines_with_slug, combination_result_slug, tags
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (item_id) DO UPDATE SET
                 slug                   = excluded.slug,
                 display_name           = excluded.display_name,
@@ -989,7 +989,8 @@ class MemoryRepository:
                 is_equipped            = excluded.is_equipped,
                 room_id                = excluded.room_id,
                 combines_with_slug     = excluded.combines_with_slug,
-                combination_result_slug = excluded.combination_result_slug
+                combination_result_slug = excluded.combination_result_slug,
+                tags                   = excluded.tags
             """,
             [
                 item.item_id,
@@ -1007,6 +1008,7 @@ class MemoryRepository:
                 item.room_id,
                 item.combines_with_slug,
                 item.combination_result_slug,
+                json.dumps(item.tags),
             ],
         )
         self._conn.execute(
@@ -1028,7 +1030,7 @@ class MemoryRepository:
             SELECT item_id, campaign_id, slug, display_name, item_type,
                    description, owner_actor_id, level_id, status,
                    charges_current, charges_max, is_equipped, room_id,
-                   combines_with_slug, combination_result_slug
+                   combines_with_slug, combination_result_slug, tags
             FROM items WHERE campaign_id = ?
             ORDER BY display_name
             """,
@@ -1043,7 +1045,7 @@ class MemoryRepository:
             SELECT item_id, campaign_id, slug, display_name, item_type,
                    description, owner_actor_id, level_id, status,
                    charges_current, charges_max, is_equipped, room_id,
-                   combines_with_slug, combination_result_slug
+                   combines_with_slug, combination_result_slug, tags
             FROM items WHERE owner_actor_id = ?
             ORDER BY display_name
             """,
@@ -1058,7 +1060,7 @@ class MemoryRepository:
             SELECT item_id, campaign_id, slug, display_name, item_type,
                    description, owner_actor_id, level_id, status,
                    charges_current, charges_max, is_equipped, room_id,
-                   combines_with_slug, combination_result_slug
+                   combines_with_slug, combination_result_slug, tags
             FROM items
             WHERE campaign_id = ? AND room_id = ? AND owner_actor_id IS NULL
             ORDER BY display_name
@@ -1104,6 +1106,7 @@ class MemoryRepository:
             "room_id": r[12] if len(r) > 12 else None,
             "combines_with_slug": r[13] if len(r) > 13 else None,
             "combination_result_slug": r[14] if len(r) > 14 else None,
+            "tags": json.loads(r[15]) if len(r) > 15 and r[15] else [],
             "features": features,
         }
 
@@ -1158,9 +1161,10 @@ class MemoryRepository:
             """
             INSERT INTO room_objects (
                 object_id, campaign_id, room_id, level_id, slug,
-                display_name, archetype, description, current_state, reaction_policy
+                display_name, archetype, description, current_state, reaction_policy,
+                tags
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (object_id) DO UPDATE SET
                 room_id      = excluded.room_id,
                 level_id     = excluded.level_id,
@@ -1169,7 +1173,8 @@ class MemoryRepository:
                 archetype    = excluded.archetype,
                 description  = excluded.description,
                 current_state = excluded.current_state,
-                reaction_policy = excluded.reaction_policy
+                reaction_policy = excluded.reaction_policy,
+                tags = excluded.tags
             """,
             [
                 obj.object_id,
@@ -1182,6 +1187,7 @@ class MemoryRepository:
                 obj.description,
                 obj.current_state,
                 obj.reaction_policy,
+                json.dumps(obj.tags),
             ],
         )
         self._conn.execute(
@@ -1239,7 +1245,8 @@ class MemoryRepository:
         row = self._conn.execute(
             """
             SELECT object_id, campaign_id, room_id, level_id, slug,
-                   display_name, archetype, description, current_state, reaction_policy
+                   display_name, archetype, description, current_state, reaction_policy,
+                   tags
             FROM room_objects WHERE object_id = ?
             """,
             [object_id],
@@ -1253,7 +1260,8 @@ class MemoryRepository:
         rows = self._conn.execute(
             """
             SELECT object_id, campaign_id, room_id, level_id, slug,
-                   display_name, archetype, description, current_state, reaction_policy
+                   display_name, archetype, description, current_state, reaction_policy,
+                   tags
             FROM room_objects
             WHERE campaign_id = ? AND room_id = ?
             ORDER BY display_name
@@ -1268,7 +1276,8 @@ class MemoryRepository:
         rows = self._conn.execute(
             """
             SELECT object_id, campaign_id, room_id, level_id, slug,
-                   display_name, archetype, description, current_state, reaction_policy
+                   display_name, archetype, description, current_state, reaction_policy,
+                   tags
             FROM room_objects
             WHERE campaign_id = ?
             ORDER BY slug
@@ -1345,6 +1354,7 @@ class MemoryRepository:
             "description": r[7],
             "current_state": r[8],
             "reaction_policy": r[9] if r[9] is not None else "ambient",
+            "tags": json.loads(r[10]) if len(r) > 10 and r[10] else [],
             "transitions": transitions,
             "reaction_bindings": reaction_bindings,
         }
@@ -1360,9 +1370,9 @@ class MemoryRepository:
             INSERT INTO objectives (
                 objective_id, campaign_id, slug, title, description,
                 tier_index, status, completion_kind, completion_target_slug,
-                completion_required_state, advances_clock_slug
+                completion_required_state, advances_clock_slug, tags
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (objective_id) DO UPDATE SET
                 campaign_id               = excluded.campaign_id,
                 slug                      = excluded.slug,
@@ -1373,7 +1383,8 @@ class MemoryRepository:
                 completion_kind           = excluded.completion_kind,
                 completion_target_slug    = excluded.completion_target_slug,
                 completion_required_state = excluded.completion_required_state,
-                advances_clock_slug       = excluded.advances_clock_slug
+                advances_clock_slug       = excluded.advances_clock_slug,
+                tags                      = excluded.tags
             """,
             [
                 obj.objective_id,
@@ -1387,6 +1398,7 @@ class MemoryRepository:
                 obj.completion.target_slug,
                 obj.completion.required_state,
                 obj.advances_clock_slug,
+                json.dumps(obj.tags),
             ],
         )
         self._conn.execute(
@@ -1407,7 +1419,7 @@ class MemoryRepository:
             """
             SELECT objective_id, campaign_id, slug, title, description,
                    tier_index, status, completion_kind, completion_target_slug,
-                   completion_required_state, advances_clock_slug
+                   completion_required_state, advances_clock_slug, tags
             FROM objectives
             WHERE campaign_id = ?
             ORDER BY tier_index, slug
@@ -1447,6 +1459,7 @@ class MemoryRepository:
                 "required_state": r[9],
             },
             "advances_clock_slug": r[10],
+            "tags": json.loads(r[11]) if len(r) > 11 and r[11] else [],
             "reveals_knowledge": [kr[0] for kr in k_rows],
         }
 
