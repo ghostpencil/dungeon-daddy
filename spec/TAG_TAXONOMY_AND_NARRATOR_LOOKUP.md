@@ -1,10 +1,12 @@
 # Tag Taxonomy & Narrator Lookup Tool — Implementation Spec (proposed)
 
 **Status:** Draft 2026-07-04. Decision points **T1–T7** (taxonomy & pre-fetch) and **L1–L7**
-(lookup tool) — most *proposed*, owner to confirm before build. **Two are OWNER-DECIDED
-(2026-07-04):** the tool loop is **agent-owned** (provider stays pure transport, L3) and
-retrieval is **two-tier** — deterministic pre-fetch by default, the tool reserved for topics
-not scoped by the nouns/lore in the room (T7 + L7). **Not yet scheduled.**
+(lookup tool). **All of Part 1 is now OWNER-DECIDED: T1–T6 ratified 2026-07-08** (as proposed,
+no changes); T7 was already owner-decided 2026-07-04. The tool loop is **agent-owned** (provider
+stays pure transport, L3) and retrieval is **two-tier** — deterministic pre-fetch by default, the
+tool reserved for topics not scoped by the nouns/lore in the room (T7 + L7). Part 2's L1/L2/L4–L7
+remain *proposed* (ratify at Phase B start). **Phase A in progress** (branch
+`feat/phase-51.8-tag-hygiene`).
 
 > **⚠ Post-51.7 reference remap (added 2026-07-08).** This spec was drafted **2026-07-04**,
 > two days before the **Phase 51.7 PlayView decomposition** (merged 2026-07-06, PR #89) moved the
@@ -83,11 +85,11 @@ covering **four unrelated concepts**, and most of the pipeline broken at write- 
 
 ## 2. One taxonomy, all entities
 
-**T1 (proposed): a single namespaced, colon-delimited controlled vocabulary applies to the
+**T1 (ratified 2026-07-08): a single namespaced, colon-delimited controlled vocabulary applies to the
 descriptive `tags` field of every entity** — memories, actors, factions, objects, items,
 objectives, and clocks. Bare un-namespaced tags (`"fighter"`, `"boss"`) are invalid.
 
-**T2 (proposed): canonical namespace families** (extends `RPG_MEMORY_DATA_MODEL.md`):
+**T2 (ratified 2026-07-08): canonical namespace families** (extends `RPG_MEMORY_DATA_MODEL.md`):
 
 | Family | Form | Notes |
 |---|---|---|
@@ -104,7 +106,7 @@ objectives, and clocks. Bare un-namespaced tags (`"fighter"`, `"boss"`) are inva
 | `trait:` | `trait:<slug>` | new — replaces bare descriptive tags (`trait:boss`, `trait:construct`, `trait:veteran`) |
 | `fallout:` / `track:` / `emotion:` | per existing spec | unchanged |
 
-**T3 (proposed): validation at write time.** A `validate_tag(tag: str) -> str` helper
+**T3 (ratified 2026-07-08): validation at write time.** A `validate_tag(tag: str) -> str` helper
 (`memory/tags.py`, new) checks namespace membership and shape; repo save paths call it.
 Unknown namespaces raise on save in dev/seed paths; on *read*, unknown tags are passed
 through (old saves must still load).
@@ -113,11 +115,11 @@ through (old saves must still load).
 verb gate consumed by the world-reaction engine, slated for retirement outside the ambient
 tier by `spec/WORLD_REACTION_POLICY.md`. This spec does not touch it beyond the seed fix (§4).
 
-**T5 (proposed): kill the dead vocabularies.** Delete `SeedActor.threat_tags` (never read);
+**T5 (ratified 2026-07-08): kill the dead vocabularies.** Delete `SeedActor.threat_tags` (never read);
 stop writing `trigger_tags` into clock `action_tags` (`seed_pack.py:181`) — instead convert
 them to descriptive `trait:` tags on the threat's clock. Aligns with WORLD_REACTION_POLICY §10.5.
 
-**T6 (proposed): memory-tag normalization migration** (`020_tag_taxonomy.sql` + a Python data
+**T6 (ratified 2026-07-08): memory-tag normalization migration** (`020_tag_taxonomy.sql` + a Python data
 pass for slug resolution):
 
 | Old form | New form |
@@ -416,12 +418,12 @@ scheduling prefers.
 
 | # | Decision | Proposed |
 |---|---|---|
-| T1 | One namespaced taxonomy for all entities' descriptive tags | yes |
-| T2 | Namespace families incl. ratifying `actor:dungeon:`/`clock:`, new `object:`/`item:`/`faction:`/`objective:`/`trait:` | yes |
-| T3 | `validate_tag` at write time; permissive on read | yes |
-| T4 | `action_tags` stays outside the taxonomy (dies with WRP) | yes |
-| T5 | Delete `threat_tags`; stop `trigger_tags`→`action_tags`; convert to `trait:` | yes |
-| T6 | Normalization migration mapping (protagonist→pc etc.) | yes |
+| T1 | One namespaced taxonomy for all entities' descriptive tags | **OWNER-DECIDED 2026-07-08** |
+| T2 | Namespace families incl. ratifying `actor:dungeon:`/`clock:`, new `object:`/`item:`/`faction:`/`objective:`/`trait:` | **OWNER-DECIDED 2026-07-08** |
+| T3 | `validate_tag` at write time; permissive on read | **OWNER-DECIDED 2026-07-08** |
+| T4 | `action_tags` stays outside the taxonomy (dies with WRP) | **OWNER-DECIDED 2026-07-08** |
+| T5 | Delete `threat_tags`; stop `trigger_tags`→`action_tags`; convert to `trait:` | **OWNER-DECIDED 2026-07-08** |
+| T6 | Normalization migration mapping (protagonist→pc etc.) | **OWNER-DECIDED 2026-07-08** |
 | T7 | Deterministic `# Related Lore` pre-fetch is the default retrieval path | **OWNER-DECIDED 2026-07-04** |
 | L1 | Single `lookup_world` tool, name+tags+types params, out-of-scene mandate only | yes |
 | L2 | One repo method `search_entities` (ILIKE + exact tags) behind `LookupService` | yes |

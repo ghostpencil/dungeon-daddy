@@ -66,9 +66,9 @@ fixed inline (post-commit mislabel, weak assertions pinned to the exact line, 2 
 finished, dup refresh-tail folded away, `objective_location` param shadow renamed). Full suite green
 (**3536 passed**), ruff + mypy(strict) clean.
 
-**▶ Next gate before Phase A slices:** ratify the taxonomy decision points **T1–T6** (still marked
-"proposed, owner to confirm" in the spec §13) — only T7/L3/L7 are owner-decided. Slice A1
-(`validate_tag` + namespace vocabulary) waits on that.
+**✅ Taxonomy gate cleared — T1–T6 ratified as proposed (2026-07-08).** All of Part 1 is now
+owner-decided (T7 was already decided 2026-07-04); spec §13 + header updated. **▶ Now building
+Slice A1** (`validate_tag` + namespace vocabulary, `memory/tags.py`) — pure unit slice, TDD.
 
 **Exit-criterion-1 — ✅ owner accepted 1491 lines (2026-07-06).** `views/play_view.py` landed at
 **1491 lines** (from 1878), above the spec's "≤ ~900" but now containing *only* drawing / input
