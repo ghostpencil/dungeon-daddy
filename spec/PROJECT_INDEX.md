@@ -21,8 +21,8 @@ Phase **51.6 — World Reaction Policy: COMPLETE & merged to `main`** (PR #88, m
 clock +2" fan-out. Spec `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` (design
 `spec/WORLD_REACTION_POLICY.md`).
 
-Phase **51.7 — PlayView Decomposition: COMPLETE, PR #89 open** (`feat/phase-51.7-playview-decomp`
-→ `main`, opened 2026-07-06; owner GUI-verified). Incremental seam extraction of
+Phase **51.7 — PlayView Decomposition: COMPLETE & merged to `main`** (PR #89, merge commit
+`5eadaaa`, merged 2026-07-06; owner GUI-verified). Incremental seam extraction of
 `views/play_view.py` (2,765 → 1,491 lines) into a new `dungeon_daddy/play/` package
 (`PlaySessionContext` + Action/Navigation/Dialogue/Memory/Narration coordinators;
 `PlaySessionController` composition root, Slice 7). Folded in the two PR #88 deferred review items:
@@ -36,19 +36,23 @@ Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_
 
 ---
 
-## START HERE — Phase 51.7 PlayView Decomposition (all slices built; ⏸ awaiting owner GUI verify)
+## START HERE — next phase: Tag Hygiene → Narrator Lookup
 
-**PR #88 merged to `main` 2026-07-05 (`c0e1cba`) — Phase 51.6 fully closed.** Current work:
-**Phase 51.7 — PlayView Decomposition** on `feat/phase-51.7-playview-decomp` — spec + slice plan
-in `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Slices 0–7 all built 2026-07-06.
+**✅ Phase 51.7 — PlayView Decomposition: MERGED & CLOSED.** PR #89 merged to `main` 2026-07-06
+(merge commit `5eadaaa`, branch deleted); `main` is up to date. `views/play_view.py` 2,765 → 1,491
+lines; logic lives in the new `dungeon_daddy/play/` package (`PlaySessionContext` +
+Action/Navigation/Dialogue/Memory/Narration coordinators + `PlaySessionController`). Owner
+GUI-verified on the live Crucible. A 6-agent parallel PR review ran before merge — 1 regression
+fixed (`fd101df`, repo-read failures now surface `REACTION_FAILURE_LINE`), 2 findings deferred
+to this next phase (see the review block below). Full 51.7 slice history + deferred follow-ups
+retained further down for reference.
 
-**✅ Phase 51.7 COMPLETE — PR #89 open (`c5fd44e`, GUI-verified, 2026-07-06).** All slices 0–7 landed
-on `feat/phase-51.7-playview-decomp`; Slice 7 (`PlaySessionController`) is 5-angle `/code-review high`
-clean (no correctness bugs) and **owner GUI-verified on the live Crucible**: exit move, dungeon-voice
-exchange, and memory (auto-approve) pass; the action-roll flow behaves as before (a partial FIGHT vs.
-a creature ticks the world-reaction clock + DM fiction but no Body stress — that is **Phase 53 Threat
-Behavior**, not a 51.7 regression). **Next: merge PR #89, then start the next phase — Tag Hygiene →
-Narrator Lookup** (the sequenced choice; item 2 below), `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
+**▶ NEXT — Phase: Tag Hygiene → Narrator Lookup.** Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`
+(the sequenced choice; item 2 below). Start by reading that spec for the slice plan. **Carry in the
+two deferred PR #89 review findings** as early cleanup candidates: (2) the broad silent
+`except Exception` catches in `actions.py` (`run_chat_action`, `on_resolve_action`) that hide
+failed resolves/LLM calls from the GM; (3) extract an `ActiveCampaign(repo, campaign_id)` value /
+`context.active_campaign()` accessor to collapse the 15+ hand-copied co-presence guards.
 
 **Exit-criterion-1 — ✅ owner accepted 1491 lines (2026-07-06).** `views/play_view.py` landed at
 **1491 lines** (from 1878), above the spec's "≤ ~900" but now containing *only* drawing / input
