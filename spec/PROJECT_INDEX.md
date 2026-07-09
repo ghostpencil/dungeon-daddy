@@ -117,6 +117,25 @@ the `populate_crucible_*` scripts (idempotent, preserves play progress). The shi
 carry legacy `threat_tags` keys (harmlessly folded by the A3 validator) — A4 may strip them during its
 normalization pass.
 
+**A3 `/code-review high` (2026-07-08) — no real bug; 5 latent/cleanup findings deferred to A4**
+(owner elected to fold them into A4 since it normalizes the same seed data). The disposition-reset
+candidate was **refuted** (no runtime disposition writer exists). Deferred:
+1. **(F1, the key one) `validate_seed_room_ids` will reject the shipped Crucible seed once wired** —
+   `the-crucible/rpg_seed.json` uses inconsistent room-id spellings (`R1`/`r01`/`r1`/`r7`/`r04`).
+   The §4.3 helper is correct and opt-in (no caller passes `valid_room_ids` yet, so no live failure);
+   **A4 must normalize seed room-ids (audit §1.7) before validation can be enabled.**
+2. **(F2) `trigger_tags`→`trait:` fold doesn't dedup** while `_fold_threat_tags` does
+   (`seed_pack.py:223` vs `:62`) — duplicate `trigger_tags` → duplicate clock tags. Fold both through
+   one shared helper.
+3. **(F3) inline `f"trait:{raw}"` (`seed_pack.py:62,223`) writes tags unvalidated/un-normalized** —
+   empty raw → malformed `"trait:"`; `heat-spike` vs `heat_spike` diverge. `memory/tags.py::validate_tag`
+   exists for exactly this and is still unused in all production — A5 is slated to wire it into writes.
+4. **(F4) `update_clock_scope` duplicates its whole UPDATE across the tags-None/not-None branches**
+   (`repository.py:646`) — collapse to one dynamic SET fragment.
+5. **(F5, lowest) room_threats loop unconditionally blanks a co-referenced clock's `action_tags`→`[]`
+   and overwrites scope** (`seed_pack.py:224`) — harmless today (no shipped threat has non-empty
+   `related_clock_slugs`; WRP ignores `action_tags`), a trap for future seeds.
+
 **Exit-criterion-1 — ✅ owner accepted 1491 lines (2026-07-06).** `views/play_view.py` landed at
 **1491 lines** (from 1878), above the spec's "≤ ~900" but now containing *only* drawing / input
 routing / layout / overlay-widget management / delegation — **criterion 1 met in spirit** (owner
