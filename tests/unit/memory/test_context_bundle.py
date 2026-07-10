@@ -238,11 +238,15 @@ class TestContextBundleBuilder:
     def test_build_provenance_records_counts_and_criteria(
         self, repo: MemoryRepository
     ) -> None:
+        # Slice A5: retrieval is scene-scoped, so the focus actor must exist and
+        # the memories must be tagged to it to be in scene.
+        repo.save_actor("actor_001", "camp_001", "pc", "mara", "Mara")
         for i in range(5):
             repo.save_memory_entry(
                 f"mem_{i:03d}", "camp_001", "event", "x" * 40,
                 summary="y" * 40, importance=5, status="approved",
             )
+            repo.add_memory_tag(f"mem_{i:03d}", "actor:pc:mara")
 
         builder = ContextBundleBuilder(
             campaign_id="camp_001",

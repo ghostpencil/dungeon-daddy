@@ -125,7 +125,7 @@ def seed_campaign(repo: MemoryRepository) -> Phase32IDs:
         summary="Sable swore an oath to the Vault-Keeper in exchange for passage.",
         status="approved", importance=9,
     )
-    repo.add_memory_tag(MEM_SABLE_PACT_ID, f"actor:{SABLE_ID}")
+    repo.add_memory_tag(MEM_SABLE_PACT_ID, "actor:pc:sable")
 
     repo.save_memory_entry(
         MEM_GOLEM_LORE_ID, CAMPAIGN_ID, "lore", "Shard Golem Origin",
@@ -139,7 +139,7 @@ def seed_campaign(repo: MemoryRepository) -> Phase32IDs:
         summary="Nervous courier who knows the vault layout but won't say how.",
         status="approved", importance=6,
     )
-    repo.add_memory_tag(MEM_INFORMANT_ID, f"actor:{INFORMANT_ID}")
+    repo.add_memory_tag(MEM_INFORMANT_ID, "actor:npc:informant")
 
     repo.save_memory_entry(
         MEM_OLD_SECRET_ID, CAMPAIGN_ID, "lore", "Hidden Cache",

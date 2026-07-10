@@ -771,6 +771,63 @@ class TestCampaignSeedFilesValidate:
                 )
 
     @pytest.mark.parametrize("campaign_dir", list(_SEED_DATA_DIR.iterdir()) if _SEED_DATA_DIR.exists() else [])
+    def test_campaign_seed_memory_location_tags_are_room_ids(
+        self, campaign_dir: Path
+    ) -> None:
+        # BUG 1 / owner ruling 2026-07-10: a memory's location:<slug> tag uses
+        # the room's grid id (like scope_room_id / threat location_slug), so
+        # current-room retrieval (location_slug=current_room_id) matches. The
+        # dungeon (campaign) slug is allowed for dungeon-wide lore.
+        seed_file = campaign_dir / "rpg_seed.json"
+        if not seed_file.exists():
+            pytest.skip(f"No rpg_seed.json in {campaign_dir.name}")
+        model = _DUNGEON_MODELS.get(campaign_dir.name)
+        if model is None or not model.exists():
+            pytest.skip(f"No canonical dungeon model for {campaign_dir.name}")
+        valid = _room_ids_from_model(model) | {campaign_dir.name}
+        raw = json.loads(seed_file.read_text(encoding="utf-8"))
+        for memory in raw.get("memories", []):
+            for tag in memory.get("tags", []):
+                if tag.startswith("location:"):
+                    slug = tag.split(":", 1)[1]
+                    assert slug in valid, (
+                        f"{campaign_dir.name}: memory location tag {tag!r} is not "
+                        f"a room id in the dungeon model (nor the dungeon slug)"
+                    )
+
+    @pytest.mark.parametrize("campaign_dir", list(_SEED_DATA_DIR.iterdir()) if _SEED_DATA_DIR.exists() else [])
+    def test_campaign_seed_actor_memory_tags_match_actor_type(
+        self, campaign_dir: Path
+    ) -> None:
+        # Slice A5 (owner ruling 2026-07-10): a memory's actor:<subtype>:<slug>
+        # tag must use the subtype canonical to that actor's record (monster/npc
+        # -> npc; the dungeon persona -> dungeon), so present-actor retrieval
+        # filters actually match. actor:dungeon: is reserved for the persona.
+        from dungeon_daddy.memory.tags import actor_tag
+
+        seed_file = campaign_dir / "rpg_seed.json"
+        if not seed_file.exists():
+            pytest.skip(f"No rpg_seed.json in {campaign_dir.name}")
+        raw = json.loads(seed_file.read_text(encoding="utf-8"))
+        type_by_slug = {
+            a["slug"]: a["actor_type"]
+            for side in ("player_side", "dungeon_side")
+            for a in raw.get(side, {}).get("actors", [])
+        }
+        for memory in raw.get("memories", []):
+            for tag in memory.get("tags", []):
+                namespace, _, rest = tag.partition(":")
+                if namespace != "actor":
+                    continue
+                _subtype, _, slug = rest.partition(":")
+                if slug in type_by_slug:
+                    expected = actor_tag(type_by_slug[slug], slug)
+                    assert tag == expected, (
+                        f"{campaign_dir.name}: memory tag {tag!r} should be "
+                        f"{expected!r} for actor_type {type_by_slug[slug]!r}"
+                    )
+
+    @pytest.mark.parametrize("campaign_dir", list(_SEED_DATA_DIR.iterdir()) if _SEED_DATA_DIR.exists() else [])
     def test_campaign_seed_room_ids_match_dungeon_model(self, campaign_dir: Path) -> None:
         # §4.3 guard: every scope_room_id / room-threat location_slug in a shipped
         # seed must exactly match a Room.id in that campaign's canonical dungeon

@@ -81,11 +81,12 @@ class TestMustRemember:
 # ---------------------------------------------------------------------------
 
 class TestProvenanceAccounting:
-    def test_retrieved_plus_omitted_equals_total_active(self, repo):
-        # Golden fixture has 5 active memory entries; ample budget omits none.
+    def test_retrieved_plus_omitted_equals_scene_scoped_active(self, repo):
+        # Slice A5: retrieval is scene-scoped. _build focuses Sable with no room,
+        # so only the Sable-tagged pact is in scene; ample budget omits none.
         bundle = _build(repo)
         assert bundle.provenance["omitted"] == 0
-        assert bundle.provenance["retrieved"] + bundle.provenance["omitted"] == 5
+        assert bundle.provenance["retrieved"] + bundle.provenance["omitted"] == 1
 
 
 # ---------------------------------------------------------------------------

@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Literal
 
+from dungeon_daddy.memory.tags import actor_tag
 from dungeon_daddy.rpg.models import ActorState, FalloutRecord, StressTrack
 from dungeon_daddy.rpg.stress import mark_stress
 
@@ -30,7 +31,7 @@ def evaluate_fallout(
         hooks = {
             "dungeon_influence": True,
             "write_memory": True,
-            "dungeon_knowledge_tag": f"actor:{actor.actor_type}:{actor.slug}",
+            "dungeon_knowledge_tag": actor_tag(actor.actor_type, actor.slug),
         }
 
     record = FalloutRecord(

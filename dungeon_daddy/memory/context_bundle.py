@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from dungeon_daddy.memory.models import ContextBundle
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.memory.retrieval import MemoryRetriever
+from dungeon_daddy.memory.retrieval import MemoryRetriever, present_actor_ids
 from dungeon_daddy.rpg.models import RoomObject
 from dungeon_daddy.rpg.obstacles import obstacle_approach_verbs
 from dungeon_daddy.rpg.service import compute_effective_ratings
@@ -51,9 +51,22 @@ class ContextBundleBuilder:
         self, repo: MemoryRepository
     ) -> tuple[list[dict[str, Any]], list[str], dict[str, Any]]:
         retriever = MemoryRetriever(repo, self._campaign_id)
-        all_entries = retriever.query()
-        pinned = [e for e in all_entries if e.importance >= 9]
-        regular = [e for e in all_entries if e.importance < 9]
+        # Slice A5 (§5.2): the importance>=9 pins are ALWAYS included (an
+        # unscoped query — a critical memory is never gated by scene scope),
+        # while the regular bulk is scoped to the current room + present actors.
+        # With no room and no focus actors the scoped query is also unscoped,
+        # preserving pre-A5 recap/no-scene behavior.
+        pinned = [e for e in retriever.query() if e.importance >= 9]
+        pin_ids = {e.memory_id for e in pinned}
+        scoped = retriever.query(
+            actor_ids=present_actor_ids(
+                repo, self._campaign_id, self._current_room_id, self._focus_actor_ids
+            ),
+            location_slug=self._current_room_id,
+        )
+        regular = [
+            e for e in scoped if e.importance < 9 and e.memory_id not in pin_ids
+        ]
         kept_regular, omitted = retriever.trim_to_budget(regular, self._token_budget)
         kept = pinned + kept_regular
         cards = [
@@ -67,7 +80,7 @@ class ContextBundleBuilder:
         ]
         must_remember = [e.memory_id for e in pinned]
         provenance = {
-            "retrieved": len(all_entries),
+            "retrieved": len(pinned) + len(regular),
             "omitted": omitted,
             "focus_actor_ids": self._focus_actor_ids,
         }

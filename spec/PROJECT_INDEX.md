@@ -155,12 +155,41 @@ named `LEVEL_TAG` constants in level2/dungeon_channel (was documented only in le
 a shared canonical tag *builder* in `memory/tags.py` (the spec defers wiring `validate_tag`/construction
 into production writes to A5).
 
-**▶ Next — Slice A5 (spec §12 Phase A.5):** make retrieval actually use tags. Fix
-`MemoryRetriever.query` actor-tag construction (`actor_type` → `pc|npc|dungeon`, `memory/retrieval.py`),
-and pass current-room `location:` + present-actor `actor:` filters from **both** production callers —
-`context_bundle._fetch_memories` **and** `DialogueCoordinator.recent_memories()` (`play/dialogue.py:250`).
-Behavior change → own slice + integration test on bundle contents; realign retrieval tests to the
-canonical taxonomy. (A5 is also where `validate_tag` gets wired into production write paths.)
+**✅ Slice A5 — retrieval actually uses tags: COMPLETE (2026-07-10, uncommitted).** Full suite green
+(**3630 passed**), ruff + mypy(strict) clean. TDD. New `actor_tag(actor_type, slug)` builder
+(`memory/tags.py`) + shared `present_actor_ids(repo, campaign_id, room_id, party_ids)` helper
+(`memory/retrieval.py`). `MemoryRetriever.query` resolves `actor_ids` → canonical `actor:<subtype>:<slug>`
+via the actor record (was broken two-segment `actor:{id}`); a scoped call whose filters resolve to
+nothing now returns `[]` (not the whole campaign). Both production callers pass current-room `location:`
++ present-actor `actor:` filters — `context_bundle._fetch_memories` **and**
+`DialogueCoordinator.recent_memories()`. `rpg/fallout.py` routed through the builder.
+
+**Two owner rulings this session resolved spec-vs-data gaps** (memory
+[[project_phase51_8_a5_tag_conventions]]): (1) **actor-tag is TYPE-BASED** — `pc→pc`,
+`npc/monster→npc`, `dungeon/dungeon_presence/faction→dungeon`; `actor:dungeon:` reserved for the persona
+only; seeds retagged (`actor:dungeon:<creature>` → `actor:npc:`). (2) **memory `location:` tags use the
+GRID room id** (not descriptive slugs) — a `/code-review high` (2 agents) caught that
+`location:<current_room_id>` matched **zero** seeded memories (grid ids `R1`/`r01` vs descriptive
+`entry-chamber`; the A5 tests had contrived matching ids → false confidence). Seeds retagged to grid ids
+(dungeon-wide `location:the-crucible` kept). Two new seed guards pin both conventions; a drift guard
+pins that every `ActorState.actor_type` Literal is mapped.
+
+**Review also fixed:** importance≥9 **pins are now unscoped** (a critical memory is never gated by scene
+scope — spec §5.2 "keeping the existing importance-pinning"; only the regular bulk is scene-scoped);
+`query`'s actor resolution guards `campaign_id` (get_actor isn't campaign-scoped → no cross-campaign
+slug leak); the two callers' duplicated present-actor construction collapsed to the shared helper (fixed
+a real `if room is not None` vs `if room:` divergence between the copies).
+
+**⚠ Still OPEN in A5's charter — deferred to a follow-up sub-slice:** wiring `validate_tag` into
+production repo write paths (T3). Orthogonal to retrieval (write-side vs read-side) and higher-risk
+(touches every `save_*`/`add_memory_tag` path); kept out of this slice per the small-steps mandate.
+Also latent: no production code writes `location:` tags to memories yet (only seeds carry them), so
+location-scoped retrieval stays thin until an engine memory-write path tags new memories with the room.
+
+**▶ Next — Slice A6 (spec §12 Phase A.6): T7 `# Related Lore` pre-fetch.** The deterministic tag-driven
+bundle section (anchor-entity tag union → `MemoryRetriever.query(tags=…)` → sub-budget ~400 + provenance)
+in `ContextBundleBuilder` (`memory/context_bundle.py`). Integration-tested on bundle output. (Consider
+folding the `validate_tag` write-path wiring in near here, or as its own A5b.)
 
 **Exit-criterion-1 — ✅ owner accepted 1491 lines (2026-07-06).** `views/play_view.py` landed at
 **1491 lines** (from 1878), above the spec's "≤ ~900" but now containing *only* drawing / input

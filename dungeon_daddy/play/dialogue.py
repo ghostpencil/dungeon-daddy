@@ -238,14 +238,28 @@ class DialogueCoordinator:
         self.dungeon_knowledge = list(knowledge)
 
     def recent_memories(self) -> list[Any]:
-        """Last few approved memories, for the dungeon-voice context (§4.4)."""
+        """Last few approved memories, for the dungeon-voice context (§4.4).
+
+        Slice A5 (§5.2): scoped to the scene — the current room plus present
+        actors (the party and any NPCs/monsters in the room). With no room and
+        no roster the query stays unscoped (pre-A5 behavior).
+        """
         active = self._session.active_campaign()
         if active is None:
             return []
-        from dungeon_daddy.memory.retrieval import MemoryRetriever
+        from dungeon_daddy.memory.retrieval import MemoryRetriever, present_actor_ids
+
+        state = self._session.state
+        room_id = state.current_room_id if state else None
+        party_ids = [a.actor_id for a in self._session.actors]
 
         retriever = MemoryRetriever(active.repo, active.campaign_id)
-        return retriever.query()[: self._RECENT_MEMORY_LIMIT]
+        return retriever.query(
+            actor_ids=present_actor_ids(
+                active.repo, active.campaign_id, room_id, party_ids
+            ),
+            location_slug=room_id,
+        )[: self._RECENT_MEMORY_LIMIT]
 
     def agent_inputs(self, text: str) -> dict[str, Any]:
         """Assemble the §4.4 ``DungeonVoiceAgent.respond`` kwargs for ``text``.

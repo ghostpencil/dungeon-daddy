@@ -3,7 +3,11 @@ from __future__ import annotations
 from datetime import UTC
 
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.memory.retrieval import MemoryRetrieval, MemoryRetriever
+from dungeon_daddy.memory.retrieval import (
+    MemoryRetrieval,
+    MemoryRetriever,
+    present_actor_ids,
+)
 
 
 class TestMemoryRetriever:
@@ -100,6 +104,77 @@ class TestMemoryRetriever:
         assert len(results) == 1
         assert results[0].memory_id == "mem_001"
         assert results[0].title == "Mara fights"
+
+    def test_query_actor_ids_resolve_to_canonical_actor_tags(
+        self, repo: MemoryRepository
+    ) -> None:
+        """§5.1: an actor_id resolves through the record to its canonical
+        `actor:<subtype>:<slug>` tag — an npc/monster maps to `actor:npc:`,
+        never the old two-segment `actor:<id>`."""
+        repo.save_actor("act_ws", "camp_001", "npc", "wraith-steward", "Wraith Steward")
+        repo.save_memory_entry(
+            "mem_canon", "camp_001", "event", "The steward bargains",
+            importance=6, status="approved",
+        )
+        repo.add_memory_tag("mem_canon", "actor:npc:wraith-steward")
+        # decoy tagged with the old broken two-segment form the fix must drop
+        repo.save_memory_entry(
+            "mem_old", "camp_001", "event", "Old form", importance=6, status="approved",
+        )
+        repo.add_memory_tag("mem_old", "actor:act_ws")
+
+        results = MemoryRetriever(repo, "camp_001").query(actor_ids=["act_ws"])
+
+        ids = {r.memory_id for r in results}
+        assert ids == {"mem_canon"}
+
+    def test_query_actor_ids_unknown_actor_is_skipped(
+        self, repo: MemoryRepository
+    ) -> None:
+        """An actor_id with no record contributes no filter (no crash)."""
+        repo.save_memory_entry(
+            "mem_x", "camp_001", "event", "X", importance=5, status="approved",
+        )
+        repo.add_memory_tag("mem_x", "theme:guilt")
+
+        results = MemoryRetriever(repo, "camp_001").query(actor_ids=["ghost"])
+
+        assert results == []
+
+    def test_query_actor_ids_ignores_cross_campaign_actor(
+        self, repo: MemoryRepository
+    ) -> None:
+        """BUG 4: an actor_id belonging to another campaign contributes no
+        filter (get_actor is not campaign-scoped) — a same-slug memory in this
+        campaign must not leak in."""
+        repo.save_actor("act_other", "camp_999", "npc", "wraith-steward", "WS")
+        repo.save_memory_entry(
+            "mem_here", "camp_001", "event", "Here", importance=5, status="approved",
+        )
+        repo.add_memory_tag("mem_here", "actor:npc:wraith-steward")
+
+        results = MemoryRetriever(repo, "camp_001").query(actor_ids=["act_other"])
+
+        assert results == []
+
+
+class TestPresentActorIds:
+    def test_party_plus_room_npcs_and_monsters(self, repo: MemoryRepository) -> None:
+        repo.save_actor("npc-1", "camp_001", "npc", "goblin", "Goblin", room_id="R1")
+        repo.save_actor("mon-1", "camp_001", "monster", "ogre", "Ogre", room_id="R1")
+        # a PC standing in the room is not double-added via the room query
+        repo.save_actor("pc-1", "camp_001", "pc", "hero", "Hero", room_id="R1")
+
+        ids = present_actor_ids(repo, "camp_001", "R1", ["pc-1"])
+
+        assert ids[0] == "pc-1"  # party first, order preserved
+        assert set(ids) == {"pc-1", "npc-1", "mon-1"}
+        assert ids.count("pc-1") == 1
+
+    def test_empty_or_none_room_is_party_only(self, repo: MemoryRepository) -> None:
+        repo.save_actor("npc-1", "camp_001", "npc", "goblin", "Goblin", room_id="R1")
+        assert present_actor_ids(repo, "camp_001", "", ["pc-1"]) == ["pc-1"]
+        assert present_actor_ids(repo, "camp_001", None, ["pc-1"]) == ["pc-1"]
 
 
 class TestRetrievalByActor:

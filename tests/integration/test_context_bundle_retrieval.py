@@ -43,7 +43,7 @@ def _seed(repo: MemoryRepository) -> None:
     ))
     repo.save_memory_entry("mem-1", "camp-1", "event", "The Pact",
                            summary="Party made a deal.", importance=9, status="approved")
-    repo.add_memory_tag("mem-1", "actor:actor-1")
+    repo.add_memory_tag("mem-1", "actor:pc:mara")
     repo.save_memory_entry("mem-2", "camp-1", "lore", "Crypt Legend",
                            summary="Ancient tales.", importance=5, status="approved")
     repo.add_memory_tag("mem-2", "location:crypt")
@@ -96,9 +96,15 @@ class TestContextBundleBuilderIntegration:
 class TestMemoryRetrieverFilters:
     def test_query_by_tag_returns_matching_entry(self, repo):
         retriever = MemoryRetriever(repo, "camp-1")
-        results = retriever.query(tags=["actor:actor-1"])
+        results = retriever.query(tags=["actor:pc:mara"])
         assert len(results) == 1
         assert results[0].memory_id == "mem-1"
+
+    def test_query_actor_ids_build_canonical_tag_from_record(self, repo):
+        # actor-1 is a pc named "mara" -> actor:pc:mara matches mem-1
+        retriever = MemoryRetriever(repo, "camp-1")
+        results = retriever.query(actor_ids=["actor-1"])
+        assert [r.memory_id for r in results] == ["mem-1"]
 
     def test_query_by_location_slug_returns_matching_entry(self, repo):
         retriever = MemoryRetriever(repo, "camp-1")
@@ -112,6 +118,47 @@ class TestMemoryRetrieverFilters:
         ids = {r.memory_id for r in results}
         assert "mem-4" not in ids  # archived excluded
         assert ids == {"mem-1", "mem-2", "mem-3"}
+
+
+# ---------------------------------------------------------------------------
+# Slice A5: bundle memories are scene-filtered by current room + present actors
+# ---------------------------------------------------------------------------
+
+class TestSceneFilteredMemories:
+    def test_bundle_memories_filtered_to_current_room_and_present_actors(self, repo):
+        # Scene = room "crypt" with present PC actor-1 (mara).
+        bundle = ContextBundleBuilder(
+            "camp-1", "scene-1", "run_scene", ["actor-1"], 1000,
+            current_room_id="crypt",
+        ).build(repo)
+        ids = {c["memory_id"] for c in bundle.memory_cards}
+        assert "mem-2" in ids       # location:crypt — the current room
+        assert "mem-1" in ids       # actor:pc:mara — a present actor
+        assert "mem-3" not in ids   # untagged — out of scene
+
+    def test_no_scene_context_returns_all_active(self, repo):
+        # No room, no focus actors -> unscoped, importance-only (back-compat).
+        bundle = ContextBundleBuilder(
+            "camp-1", "scene-1", "run_scene", [], 1000
+        ).build(repo)
+        ids = {c["memory_id"] for c in bundle.memory_cards}
+        assert ids == {"mem-1", "mem-2", "mem-3"}
+
+    def test_high_importance_pin_survives_out_of_scene(self, repo):
+        # BUG 2: importance>=9 "must-remember" pins are never gated by scene
+        # scope — a critical campaign memory tagged to neither the room nor a
+        # present actor still lands in must_remember + memory_cards.
+        repo.save_memory_entry("mem-pin", "camp-1", "lore", "The Prophecy",
+                               summary="Foretold.", importance=9, status="approved")
+        repo.add_memory_tag("mem-pin", "thread:offscreen")  # not room/actor
+
+        bundle = ContextBundleBuilder(
+            "camp-1", "scene-1", "run_scene", ["actor-1"], 1000,
+            current_room_id="crypt",
+        ).build(repo)
+
+        assert "mem-pin" in bundle.must_remember
+        assert "mem-pin" in {c["memory_id"] for c in bundle.memory_cards}
 
 
 # ---------------------------------------------------------------------------

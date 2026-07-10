@@ -1,9 +1,29 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any
 
 from dungeon_daddy.memory.models import MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
+from dungeon_daddy.memory.tags import actor_tag
+
+
+def present_actor_ids(
+    repo: MemoryRepository,
+    campaign_id: str,
+    room_id: str | None,
+    party_ids: Iterable[str],
+) -> list[str]:
+    """Actor ids present in the scene: the party plus any NPCs/monsters in the
+    given room. Deduped, order-preserving. An empty/None room contributes no
+    room actors (and callers should likewise pass no ``location_slug``)."""
+    ids = list(party_ids)
+    if room_id:
+        in_room = repo.get_actors_by_room(
+            campaign_id, room_id, actor_types=["npc", "monster"]
+        )
+        ids.extend(a["actor_id"] for a in in_room)
+    return list(dict.fromkeys(ids))
 
 
 class MemoryRetriever:
@@ -19,11 +39,24 @@ class MemoryRetriever:
         include_archived: bool = False,
     ) -> list[MemoryEntry]:
         assert self._repo._conn is not None
+        # Whether the caller asked to scope the query at all. Distinguishes a
+        # no-filter "give me everything" call from a scoped call whose filters
+        # resolved to nothing (e.g. an unknown actor_id) — the latter must
+        # return no rows, not silently widen to the whole campaign.
+        filters_requested = bool(tags or actor_ids or location_slug)
         tag_filters: list[str] = list(tags or [])
-        if actor_ids:
-            tag_filters.extend(f"actor:{aid}" for aid in actor_ids)
+        for aid in actor_ids or []:
+            # §5.1: resolve the actor record to its canonical
+            # actor:<subtype>:<slug> tag; an unknown or cross-campaign id
+            # contributes nothing (get_actor is not campaign-scoped, so guard it).
+            actor = self._repo.get_actor(aid)
+            if actor is not None and actor["campaign_id"] == self._campaign_id:
+                tag_filters.append(actor_tag(actor["actor_type"], actor["slug"]))
         if location_slug:
             tag_filters.append(f"location:{location_slug}")
+
+        if filters_requested and not tag_filters:
+            return []
 
         status_clause = (
             "AND e.status = 'approved'"

@@ -291,7 +291,7 @@
       "summary": "The patrol golem in the Entry Chamber observed the party for 40 seconds without attacking. It tilted its head, made a sound like grinding gears, and stepped aside. No one knows why.",
       "type": "unresolved_threat",
       "importance": 6,
-      "tags": ["actor:dungeon:golem-a7", "location:entry-chamber", "theme:mystery", "emotion:unease"]
+      "tags": ["actor:npc:golem-a7", "location:r01", "theme:mystery", "emotion:unease"]
     },
     {
       "title": "Kira and Talvas Have Survived Before",
@@ -305,14 +305,14 @@
       "summary": "The desert scorpions cluster near the factory machinery. Loud sounds or heat spikes cause them to swarm aggressively.",
       "type": "location_lore",
       "importance": 5,
-      "tags": ["location:receiving-hall", "location:marketplace", "actor:dungeon:scorpion-swarm", "theme:hazard"]
+      "tags": ["location:R1", "location:R2", "actor:npc:scorpion-swarm", "theme:hazard"]
     },
     {
       "title": "The Power Core Is Destabilizing",
       "summary": "Arcane energy readings in the deepest level are spiking irregularly. The core is not dormant — it is building toward something.",
       "type": "unresolved_threat",
       "importance": 8,
-      "tags": ["location:power-core-chamber", "clock:arcane-overload-building", "theme:danger", "thread:power-core", "emotion:dread"]
+      "tags": ["location:r8", "clock:arcane-overload-building", "theme:danger", "thread:power-core", "emotion:dread"]
     }
   ],
   "room_threats": [

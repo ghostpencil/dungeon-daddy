@@ -34,6 +34,31 @@ TAG_NAMESPACES: frozenset[str] = frozenset(
 # subtypes are canonical (T2 / T6 fold `protagonist` -> `pc`).
 ACTOR_SUBTYPES: frozenset[str] = frozenset({"pc", "npc", "dungeon"})
 
+# Map a persisted ``ActorState.actor_type`` to its canonical `actor:` subtype
+# (owner ruling 2026-07-10, §5.1): players -> ``pc``; non-player creatures
+# (``npc``/``monster``) -> ``npc``; the dungeon persona and its facets
+# (``dungeon``/``dungeon_presence``/``faction``) -> ``dungeon``. Any unknown
+# type falls back to ``dungeon`` so the builder is total and never raises.
+_ACTOR_TYPE_TO_SUBTYPE: dict[str, str] = {
+    "pc": "pc",
+    "npc": "npc",
+    "monster": "npc",
+    "dungeon": "dungeon",
+    "dungeon_presence": "dungeon",
+    "faction": "dungeon",
+}
+
+
+def actor_tag(actor_type: str, slug: str) -> str:
+    """Build the canonical ``actor:<subtype>:<slug>`` tag for an actor record.
+
+    The subtype is derived from ``actor_type`` per :data:`_ACTOR_TYPE_TO_SUBTYPE`
+    so retrieval filters match the canonical tags on memories. The result is
+    guaranteed to satisfy :func:`validate_tag`.
+    """
+    subtype = _ACTOR_TYPE_TO_SUBTYPE.get(actor_type, "dungeon")
+    return f"actor:{subtype}:{slug}"
+
 
 def validate_tag(tag: str) -> str:
     """Validate a single tag against the taxonomy; return it unchanged.
