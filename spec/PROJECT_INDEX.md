@@ -180,16 +180,28 @@ scope — spec §5.2 "keeping the existing importance-pinning"; only the regular
 slug leak); the two callers' duplicated present-actor construction collapsed to the shared helper (fixed
 a real `if room is not None` vs `if room:` divergence between the copies).
 
-**⚠ Still OPEN in A5's charter — deferred to a follow-up sub-slice:** wiring `validate_tag` into
-production repo write paths (T3). Orthogonal to retrieval (write-side vs read-side) and higher-risk
-(touches every `save_*`/`add_memory_tag` path); kept out of this slice per the small-steps mandate.
-Also latent: no production code writes `location:` tags to memories yet (only seeds carry them), so
-location-scoped retrieval stays thin until an engine memory-write path tags new memories with the room.
+**▶ Next — Slice A5b — write-side tag hygiene (T3 `validate_tag` wiring + write-time tagging).** Two
+write-side gaps A5 surfaced, both handled here (write-side is the natural pairing):
+1. **T3 — wire `validate_tag` into production write paths.** Today `add_memory_tag`
+   (`memory/repository.py:399`) and the `save_*` paths accept any string; only seed/populate paths
+   validate. The LLM-proposal memory path (`rpg/proposal_applier.py:55-56`) writes **whatever tags the
+   model proposed**, unvalidated. Wire `validate_tag` (raise-on-write in dev/engine paths; reads stay
+   permissive). Higher blast radius — touches every `save_*`/`add_memory_tag` caller — so its own slice.
+2. **Write-time room/actor tagging** (the "#2" latent gap). **No production write path stamps a new
+   `memory_entries` row with the current-room `location:<room_id>` or present-actor `actor:` tags**, so
+   A5's scene-scoped retrieval only reliably surfaces **seed** lore. Concretely: `/remember` +
+   `[REMEMBER]` (`play/memory_coordinator._record_room_event`) write to the **level-memory Markdown
+   overlay**, not tagged `memory_entries` (not retrievable via `query` at all); dungeon-channel exchange
+   memories (`memory/dungeon_exchange.py:55`) are saved **untagged**; only `proposal_applier` tags, and
+   with **freeform LLM tags**. Fix = deterministically stamp canonical `location:<current_room_id>` +
+   present-actor `actor:` tags on engine-authored memories at write time (exchange memory first; consider
+   the proposal path). **This is NOT covered by any already-planned slice** — A6/T7 is read-side (it
+   unions the room's *entity* tags, which A4 set, not memory `location:` tags), so live-play memories stay
+   invisible to room-scoped retrieval until A5b lands.
 
-**▶ Next — Slice A6 (spec §12 Phase A.6): T7 `# Related Lore` pre-fetch.** The deterministic tag-driven
+**Then — Slice A6 (spec §12 Phase A.6): T7 `# Related Lore` pre-fetch.** The deterministic tag-driven
 bundle section (anchor-entity tag union → `MemoryRetriever.query(tags=…)` → sub-budget ~400 + provenance)
-in `ContextBundleBuilder` (`memory/context_bundle.py`). Integration-tested on bundle output. (Consider
-folding the `validate_tag` write-path wiring in near here, or as its own A5b.)
+in `ContextBundleBuilder` (`memory/context_bundle.py`). Integration-tested on bundle output.
 
 **Exit-criterion-1 — ✅ owner accepted 1491 lines (2026-07-06).** `views/play_view.py` landed at
 **1491 lines** (from 1878), above the spec's "≤ ~900" but now containing *only* drawing / input
