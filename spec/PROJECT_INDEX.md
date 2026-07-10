@@ -188,27 +188,31 @@ write-side gaps A5 surfaced, both handled here (write-side is the natural pairin
 un-normalizable) + wired into the **LLM-proposal path** (`rpg/proposal_applier.py` — proposed memory
 tags are normalized, un-normalizable ones dropped with a warning, never stored raw). TDD, 15 new tests
 (`test_tags.py` normalize cases + `test_proposal_applier.py` mixed-tag case); ruff + mypy clean.
-**Remaining:** the `validate_tag` (raise) wiring on the engine-authored/dev write paths, and the
-write-time room/actor tagging (part 2 below).
-1. **T3 — wire tag validation into production write paths.** Today `add_memory_tag`
-   (`memory/repository.py:399`) and the `save_*` paths accept any string; only seed/populate paths
-   validate. Two modes (owner ruling 2026-07-10): **dev/seed/engine-authored-with-known-tags paths
-   `validate_tag` (raise)** — authoring errors caught loudly; **the LLM-proposal path
-   (`rpg/proposal_applier.py:55-56`) NORMALIZES** — a new `normalize_tag` coerces to canonical
+**Remaining (owner-confirmed placement 2026-07-10 — build next):**
+1. **✅ LLM-proposal path NORMALIZES — DONE** (commit `7e82eac`): `normalize_tag` coerces to canonical
    (`actor:protagonist:`→`actor:pc:`, bare→`trait:`, drop+log the un-normalizable) so a model tag typo
-   never loses the memory but tags stay canonical. Reads stay permissive. Higher blast radius (touches
-   every `save_*`/`add_memory_tag` caller) — its own slice.
-2. **Write-time room/actor tagging** (the "#2" latent gap). **No production write path stamps a new
-   `memory_entries` row with the current-room `location:<room_id>` or present-actor `actor:` tags**, so
-   A5's scene-scoped retrieval only reliably surfaces **seed** lore. Concretely: `/remember` +
-   `[REMEMBER]` (`play/memory_coordinator._record_room_event`) write to the **level-memory Markdown
-   overlay**, not tagged `memory_entries` (not retrievable via `query` at all); dungeon-channel exchange
-   memories (`memory/dungeon_exchange.py:55`) are saved **untagged**; only `proposal_applier` tags, and
-   with **freeform LLM tags**. Fix = deterministically stamp canonical `location:<current_room_id>` +
-   present-actor `actor:` tags on engine-authored memories at write time (exchange memory first; consider
-   the proposal path). **This is NOT covered by any already-planned slice** — A6/T7 is read-side (it
-   unions the room's *entity* tags, which A4 set, not memory `location:` tags), so live-play memories stay
-   invisible to room-scoped retrieval until A5b lands.
+   never loses the memory but tags stay canonical.
+2. **T3 `validate_tag` (raise) — at the HIGHER-LEVEL authored call sites, NOT the primitive**
+   (owner ruling 2026-07-10). Do **not** make `add_memory_tag` (`memory/repository.py:399`) or the
+   `save_*` primitives raise — too many tests/read-reconstruction paths pass raw/legacy forms (e.g.
+   `test_memory_coordinator` uses the invalid `actor:pc-1`), and reads must stay permissive. Instead call
+   `validate_tag` (raise) at each **engine-authored** write site with known/authored tag values —
+   `memory/dungeon_exchange.py`, `rpg/discover_exit.py`, `rpg/objectives.py` (`rpg/seed_pack.py` +
+   populate scripts already validate). Catches authoring bugs loudly; the tags those sites build are
+   canonical by construction, so it is belt-and-suspenders + a regression guard.
+3. **Write-time room/actor tagging on ALL engine memory writes** (owner ruling 2026-07-10 — "all engine
+   memory writes", not just the exchange memory). The "#2" latent gap: **no production write path stamps a
+   new `memory_entries` row with the current-room `location:<room_id>` or present-actor `actor:` tags**,
+   so A5's scene-scoped retrieval only reliably surfaces **seed** lore. (`/remember`+`[REMEMBER]` via
+   `play/memory_coordinator._record_room_event` write to the level-memory **Markdown overlay**, not
+   `memory_entries` — out of scope here; the tagged-`memory_entries` writers are `dungeon_exchange.py:55`
+   [untagged today], `discover_exit.py`, `objectives.py`.) Fix = thread the current `room_id` +
+   present-actor ids to each and stamp canonical `location:<room_id>` (grid id) + `actor:` (via
+   `actor_tag`) tags at write time. **Not covered by any already-planned slice** — A6/T7 is read-side
+   (unions the room's *entity* tags from A4, not memory `location:` tags), so live-play memories stay
+   invisible to room-scoped retrieval until this lands. Note: `dungeon_exchange`/`discover_exit`/
+   `objectives` are called from deeper in the engine (not the view), so threading `room_id`/actor ids to
+   them is the main plumbing work — check each call chain.
 
 **Then — Slice A6 (spec §12 Phase A.6): T7 `# Related Lore` pre-fetch.** The deterministic tag-driven
 bundle section (anchor-entity tag union → `MemoryRetriever.query(tags=…)` → sub-budget ~400 + provenance)
