@@ -21,7 +21,6 @@
         },
         "stress_tracks": ["body", "composure", "bonds", "weird"],
         "tags": [],
-        "threat_tags": [],
         "relationships": []
       },
       {
@@ -41,8 +40,7 @@
           "channel": 0
         },
         "stress_tracks": ["body", "composure", "bonds", "weird"],
-        "tags": ["fighter", "human", "guardian", "veteran"],
-        "threat_tags": [],
+        "tags": ["trait:fighter", "trait:human", "trait:guardian", "trait:veteran"],
         "relationships": ["trusts Talvas with her life", "uneasy around Mira's methods"]
       },
       {
@@ -62,8 +60,7 @@
           "channel": 0
         },
         "stress_tracks": ["body", "composure", "bonds", "weird"],
-        "tags": ["ranger", "elf", "scout", "tracker"],
-        "threat_tags": [],
+        "tags": ["trait:ranger", "trait:elf", "trait:scout", "trait:tracker"],
         "relationships": ["old travelling companion of Kira", "fascinated by the factory's mechanisms"]
       },
       {
@@ -83,8 +80,7 @@
           "channel": 0
         },
         "stress_tracks": ["body", "composure", "bonds", "weird"],
-        "tags": ["thief", "halfling", "tinkerer", "arcane"],
-        "threat_tags": [],
+        "tags": ["trait:thief", "trait:halfling", "trait:tinkerer", "trait:arcane"],
         "relationships": ["hired by the Dwarven guild", "owes Talvas a debt she refuses to name"]
       }
     ]
@@ -99,8 +95,7 @@
         "instinct": "Destroy all biological intruders. Protect the Power Core above all.",
         "actions": {},
         "stress_tracks": [],
-        "tags": ["boss", "guardian", "construct", "level-3"],
-        "threat_tags": ["unstoppable", "armored", "magical", "ancient", "boss"],
+        "tags": ["trait:boss", "trait:guardian", "trait:construct", "level:level-3", "trait:unstoppable", "trait:armored", "trait:magical", "trait:ancient"],
         "relationships": []
       },
       {
@@ -111,8 +106,7 @@
         "instinct": "Attack when startled or when the machinery heat spikes.",
         "actions": {},
         "stress_tracks": [],
-        "tags": ["level-1", "vermin", "natural"],
-        "threat_tags": ["swarm", "poison", "fast", "ambush"],
+        "tags": ["level:level-1", "trait:vermin", "trait:natural", "trait:swarm", "trait:poison", "trait:fast", "trait:ambush"],
         "relationships": []
       },
       {
@@ -123,8 +117,7 @@
         "instinct": "Patrol. Assess. Destroy only confirmed threats.",
         "actions": {},
         "stress_tracks": [],
-        "tags": ["level-2", "patrol", "construct"],
-        "threat_tags": ["construct", "patrol", "uncertain", "negotiable"],
+        "tags": ["level:level-2", "trait:patrol", "trait:construct", "trait:uncertain", "trait:negotiable"],
         "relationships": []
       },
       {
@@ -135,8 +128,7 @@
         "instinct": "Watch. Test. Reward those who understand what was made here.",
         "actions": {},
         "stress_tracks": [],
-        "tags": ["everywhere", "persistent", "dungeon"],
-        "threat_tags": ["omniscient", "subtle", "environmental"],
+        "tags": ["trait:everywhere", "trait:persistent", "trait:dungeon", "trait:omniscient", "trait:subtle", "trait:environmental"],
         "relationships": []
       },
       {
@@ -147,8 +139,7 @@
         "instinct": "Reclaim what was stolen from the desert. The factory's power was never meant to be tamed.",
         "actions": {},
         "stress_tracks": [],
-        "tags": ["level-2", "elemental", "faction"],
-        "threat_tags": ["elemental", "angry", "powerful"],
+        "tags": ["level:level-2", "trait:elemental", "trait:faction", "trait:angry", "trait:powerful"],
         "relationships": []
       }
     ]
@@ -272,7 +263,7 @@
       "summary": "The party entered the Crucible to recover the dwarven Power Core — a relic the modern Dwarven guilds consider sacred, capable of restoring their cultural heritage. They must resist the temptation to sell it.",
       "type": "campaign_premise",
       "importance": 8,
-      "tags": ["theme:goal", "theme:temptation", "thread:power-core", "actor:protagonist:kira-dawnseeker"]
+      "tags": ["theme:goal", "theme:temptation", "thread:power-core", "actor:pc:kira-dawnseeker"]
     },
     {
       "title": "The Golems Rebelled",
@@ -286,7 +277,7 @@
       "summary": "Mira Coldwell was contracted by the Dwarven Artificers' Guild before the party assembled. She has instructions they have not seen.",
       "type": "actor_relationship",
       "importance": 6,
-      "tags": ["actor:protagonist:mira-coldwell", "theme:secrets", "thread:guild-agenda", "emotion:suspicion"]
+      "tags": ["actor:pc:mira-coldwell", "theme:secrets", "thread:guild-agenda", "emotion:suspicion"]
     },
     {
       "title": "The Factory is Waking Up",
@@ -307,7 +298,7 @@
       "summary": "Kira and Talvas fought side-by-side in the Siege of Ambarfall. They have an unspoken protocol: Talvas moves first, Kira holds the line.",
       "type": "actor_relationship",
       "importance": 5,
-      "tags": ["actor:protagonist:kira-dawnseeker", "actor:protagonist:talvas-the-wanderer", "theme:trust", "emotion:solidarity"]
+      "tags": ["actor:pc:kira-dawnseeker", "actor:pc:talvas-the-wanderer", "theme:trust", "emotion:solidarity"]
     },
     {
       "title": "The Scorpion Nests Are Near Heat Sources",

@@ -428,6 +428,79 @@ class TestApplySeedPack:
         assert set(clock["tags"]) == {"trait:noise", "trait:touch_artifact"}
         assert clock["action_tags"] == []
 
+    def test_apply_dedups_duplicate_trigger_tags(self, repo: MemoryRepository) -> None:
+        # F2: duplicate trigger_tags collapse to a single trait: tag on the clock
+        # (the SeedActor threat_tags fold already dedups; both share one helper).
+        data = {
+            **_MINIMAL_PACK,
+            "clocks": [
+                {"slug": "trap-primed", "label": "Trap Primed", "segments": 4, "category": "danger"}
+            ],
+            "room_threats": [
+                {
+                    "location_slug": "room_boiler",
+                    "trigger_tags": ["noise", "noise", "combat"],
+                    "related_clock_slugs": ["trap-primed"],
+                }
+            ],
+        }
+        pack = SeedPack.model_validate(data)
+        apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR)
+        clock_id = derive_clock_id("test-campaign", "trap-primed")
+        clock = {c["clock_id"]: c for c in repo.get_clocks("campaign-123")}[clock_id]
+        assert clock["tags"] == ["trait:noise", "trait:combat"]  # deduped, order kept
+
+    def test_apply_empty_trigger_tags_does_not_blank_clock_tags(
+        self, repo: MemoryRepository
+    ) -> None:
+        # A threat with an empty trigger list must only re-scope the clock, never
+        # blank tags an earlier threat (or the clock definition) set.
+        data = {
+            **_MINIMAL_PACK,
+            "clocks": [
+                {"slug": "trap-primed", "label": "Trap Primed", "segments": 4, "category": "danger"}
+            ],
+            "room_threats": [
+                {"location_slug": "room_a", "trigger_tags": ["noise"],
+                 "related_clock_slugs": ["trap-primed"]},
+                {"location_slug": "room_b", "trigger_tags": [],
+                 "related_clock_slugs": ["trap-primed"]},
+            ],
+        }
+        pack = SeedPack.model_validate(data)
+        apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR)
+        clock_id = derive_clock_id("test-campaign", "trap-primed")
+        clock = {c["clock_id"]: c for c in repo.get_clocks("campaign-123")}[clock_id]
+        assert clock["scope_room_id"] == "room_b"      # last threat re-scopes
+        assert clock["tags"] == ["trait:noise"]         # first threat's tag survives
+
+    def test_apply_room_threat_preserves_clock_action_tags(
+        self, repo: MemoryRepository
+    ) -> None:
+        # F5: routing trigger_tags onto a co-referenced clock must not blank the
+        # clock's own action_tags (its verb gate) — only scope + trait tags update.
+        data = {
+            **_MINIMAL_PACK,
+            "clocks": [
+                {"slug": "trap-primed", "label": "Trap Primed", "segments": 4,
+                 "category": "danger", "action_tags": ["fight", "move"]}
+            ],
+            "room_threats": [
+                {
+                    "location_slug": "room_boiler",
+                    "trigger_tags": ["noise"],
+                    "related_clock_slugs": ["trap-primed"],
+                }
+            ],
+        }
+        pack = SeedPack.model_validate(data)
+        apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR)
+        clock_id = derive_clock_id("test-campaign", "trap-primed")
+        clock = {c["clock_id"]: c for c in repo.get_clocks("campaign-123")}[clock_id]
+        assert clock["scope_room_id"] == "room_boiler"
+        assert clock["tags"] == ["trait:noise"]
+        assert set(clock["action_tags"]) == {"fight", "move"}  # F5: preserved
+
     def test_apply_persists_clock_level_metadata(self, repo: MemoryRepository) -> None:
         data = {
             **_MINIMAL_PACK,
@@ -533,6 +606,25 @@ class TestApplySeedPack:
 _SEED_DATA_DIR = (
     Path(__file__).parent.parent.parent.parent / "seed_data" / "campaigns"
 )
+
+_ROOT = Path(__file__).parent.parent.parent.parent
+
+# Canonical dungeon model per shipped campaign — the source of truth for the
+# room ids a seed may scope to (§4.3). The Crucible model lives as a test
+# fixture; the tomb ships as a sample.
+_DUNGEON_MODELS = {
+    "the-crucible": _ROOT / "tests" / "fixtures" / "crucible.json",
+    "tomb-of-the-forgotten-king": (
+        _ROOT / "dungeon_daddy" / "data" / "samples" / "tomb_of_the_forgotten_king.json"
+    ),
+}
+
+
+def _room_ids_from_model(path: Path) -> set[str]:
+    from dungeon_daddy.data.models import Dungeon
+
+    dungeon = Dungeon.model_validate_json(path.read_text(encoding="utf-8"))
+    return {room.id for level in dungeon.levels for room in level.rooms}
 
 
 class TestApplySeedPackFactions:
@@ -644,6 +736,53 @@ class TestCampaignSeedFilesValidate:
                 assert clock.scope_room_id is not None, (
                     f"{campaign_dir.name}: room clock {clock.slug!r} missing scope_room_id"
                 )
+
+    @pytest.mark.parametrize("campaign_dir", list(_SEED_DATA_DIR.iterdir()) if _SEED_DATA_DIR.exists() else [])
+    def test_campaign_seed_tags_are_canonical(self, campaign_dir: Path) -> None:
+        # §4.2: every descriptive tag in a shipped seed is namespaced (T1-T3);
+        # the legacy threat_tags key is gone; memory tags carry no actor:protagonist
+        # (T6 folds them to actor:pc). Read paths stay permissive, but the shipped
+        # seeds must be canonical.
+        from dungeon_daddy.memory.tags import validate_tag
+
+        seed_file = campaign_dir / "rpg_seed.json"
+        if not seed_file.exists():
+            pytest.skip(f"No rpg_seed.json in {campaign_dir.name}")
+        pack = load_seed_pack(seed_file)
+        for actor in pack.player_side.actors + pack.dungeon_side.actors:
+            for tag in actor.tags:
+                validate_tag(tag)  # raises on a bare / malformed tag
+        for faction in pack.factions:
+            for tag in faction.tags:
+                validate_tag(tag)
+        for memory in pack.memories:
+            for tag in memory.tags:
+                validate_tag(tag)
+                assert not tag.startswith("actor:protagonist:"), (
+                    f"{campaign_dir.name}: memory tag {tag!r} still uses the legacy "
+                    "actor:protagonist namespace (T6 folds it to actor:pc)"
+                )
+        raw = json.loads(seed_file.read_text(encoding="utf-8"))
+        for side in ("player_side", "dungeon_side"):
+            for actor in raw.get(side, {}).get("actors", []):
+                assert "threat_tags" not in actor, (
+                    f"{campaign_dir.name}: actor {actor.get('slug')!r} still carries a "
+                    "threat_tags key (T5: fold into trait: tags and drop it)"
+                )
+
+    @pytest.mark.parametrize("campaign_dir", list(_SEED_DATA_DIR.iterdir()) if _SEED_DATA_DIR.exists() else [])
+    def test_campaign_seed_room_ids_match_dungeon_model(self, campaign_dir: Path) -> None:
+        # §4.3 guard: every scope_room_id / room-threat location_slug in a shipped
+        # seed must exactly match a Room.id in that campaign's canonical dungeon
+        # model (union across all levels). Fails loudly on future r1-vs-R1 drift.
+        seed_file = campaign_dir / "rpg_seed.json"
+        if not seed_file.exists():
+            pytest.skip(f"No rpg_seed.json in {campaign_dir.name}")
+        model_path = _DUNGEON_MODELS.get(campaign_dir.name)
+        if model_path is None or not model_path.exists():
+            pytest.skip(f"No canonical dungeon model registered for {campaign_dir.name}")
+        pack = load_seed_pack(seed_file)
+        validate_seed_room_ids(pack, _room_ids_from_model(model_path))  # raises on drift
 
 
 class TestValidateSeedRoomIds:

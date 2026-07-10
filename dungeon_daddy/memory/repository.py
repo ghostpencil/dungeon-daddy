@@ -639,26 +639,29 @@ class MemoryRepository:
         self,
         clock_id: str,
         scope_room_id: str | None,
-        action_tags: list[str],
+        action_tags: list[str] | None = None,
         tags: list[str] | None = None,
     ) -> None:
+        """Backfill a clock's scope, and optionally its action_tags / tags.
+
+        ``action_tags`` and ``tags`` default to ``None`` meaning "leave that
+        column untouched" — so a scope+tags update on a co-referenced clock does
+        not blank its own action_tags verb gate.
+        """
         assert self._conn is not None
-        if tags is None:
-            self._conn.execute(
-                """
-                UPDATE clocks SET scope_room_id = ?, action_tags = ?
-                WHERE clock_id = ?
-                """,
-                [scope_room_id, json.dumps(action_tags), clock_id],
-            )
-        else:
-            self._conn.execute(
-                """
-                UPDATE clocks SET scope_room_id = ?, action_tags = ?, tags = ?
-                WHERE clock_id = ?
-                """,
-                [scope_room_id, json.dumps(action_tags), json.dumps(tags), clock_id],
-            )
+        set_fragments = ["scope_room_id = ?"]
+        params: list[Any] = [scope_room_id]
+        if action_tags is not None:
+            set_fragments.append("action_tags = ?")
+            params.append(json.dumps(action_tags))
+        if tags is not None:
+            set_fragments.append("tags = ?")
+            params.append(json.dumps(tags))
+        params.append(clock_id)
+        self._conn.execute(
+            f"UPDATE clocks SET {', '.join(set_fragments)} WHERE clock_id = ?",
+            params,
+        )
 
     def get_clocks(self, campaign_id: str) -> list[dict[str, Any]]:
         assert self._conn is not None

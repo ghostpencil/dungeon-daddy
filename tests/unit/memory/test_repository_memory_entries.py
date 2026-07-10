@@ -232,6 +232,20 @@ class TestClockPersistence:
         assert clocks[0]["action_tags"] == []
         assert clocks[0]["tags"] == ["trait:noise"]
 
+    def test_update_clock_scope_omitting_action_tags_preserves_them(
+        self, repo: MemoryRepository
+    ) -> None:
+        # F5: a co-referenced clock keeps its own action_tags when a scope/tags
+        # update omits them (action_tags now defaults to None = "don't touch").
+        repo.save_clock("clk_keep", "camp_keep", "Trap", 4, 0, action_tags=["fight"])
+        repo.update_clock_scope(
+            "clk_keep", scope_room_id="room_y", tags=["trait:noise"]
+        )
+        clocks = repo.get_clocks("camp_keep")
+        assert clocks[0]["scope_room_id"] == "room_y"
+        assert clocks[0]["tags"] == ["trait:noise"]
+        assert clocks[0]["action_tags"] == ["fight"]  # untouched
+
 
 # ---------------------------------------------------------------------------
 # Action resolution persistence

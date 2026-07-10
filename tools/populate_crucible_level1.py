@@ -27,6 +27,9 @@ from dungeon_daddy.rpg.models import (
 
 CAMPAIGN_ID = "campaign:the-crucible"
 LEVEL_ID = "level:1"
+# Taxonomy scope tag (A4 §4.4). The `level:` tag uses the level-<n> convention
+# (matches actor/memory tags + retrieval), distinct from the DB level_id above.
+LEVEL_TAG = "level:level-1"
 
 # Existing seeded monsters we place into rooms (rather than spawn duplicates).
 SCORPION_SWARM_ID = "89999c99-4370-510a-9571-9ecc4270d4bf"
@@ -67,18 +70,21 @@ def _rb(obj_id: str, verb: str, outcome: str, **kw) -> ObjectReactionBinding:
 
 def _obj(
     room, slug, name, archetype, state, desc, transitions,
-    *, policy: str = "ambient", bindings=None,
+    *, policy: str = "ambient", bindings=None, tags=None,
 ) -> RoomObject:
     oid = _oid(room, slug)
+    # A4 §4.4: identity + scope tags on every object, plus any thematic tags
+    # linking it to the lore memories that share those theme/thread slugs.
+    obj_tags = [f"object:{slug}", LEVEL_TAG, *(tags or [])]
     return RoomObject(
         object_id=oid, campaign_id=CAMPAIGN_ID, room_id=room, level_id=LEVEL_ID,
         slug=slug, display_name=name, archetype=archetype, description=desc,
         current_state=state, transitions=transitions,
-        reaction_policy=policy, reaction_bindings=bindings or [],
+        reaction_policy=policy, reaction_bindings=bindings or [], tags=obj_tags,
     )
 
 
-def _item(room, slug, name, desc, *, placed: bool = True) -> Item:
+def _item(room, slug, name, desc, *, placed: bool = True, tags=None) -> Item:
     """Author a Level-1 item.
 
     ``placed`` (default) drops it loose in ``room``. Pass ``placed=False`` for
@@ -91,6 +97,7 @@ def _item(room, slug, name, desc, *, placed: bool = True) -> Item:
         item_type="dungeon_item", description=desc,
         room_id=room if placed else None, level_id=LEVEL_ID,
         status="active" if placed else "inert",
+        tags=[f"item:{slug}", LEVEL_TAG, *(tags or [])],
     )
 
 
@@ -142,6 +149,7 @@ def _objects() -> list[RoomObject]:
         "A fallen granite figure of a hooded Dwarven artificer, one bronze hand still "
         "raised as if mid-command. Drifted sand half-buries the worn dedication plate.",
         [_t(o, 1, "intact", "examined", "examine")],
+        tags=["theme:history", "thread:golem-rebellion"],
     ))
     o = _oid("R1", "supply-locker")
     out.append(_obj(
@@ -171,6 +179,7 @@ def _objects() -> list[RoomObject]:
         "stays at the watch-stall here in the market until the core is secured. None "
         "take the cage down without it. — Warden Brakkus'",
         [_t(o, 1, "legible", "examined", "examine")],
+        tags=["theme:history", "thread:power-core"],
     ))
 
     # --- R3 Cargo Bay --------------------------------------------------------
@@ -189,6 +198,7 @@ def _objects() -> list[RoomObject]:
         "scrolls past: the power core was being moved to the lower vault when the "
         "golems turned.",
         [_t(o, 1, "dim", "examined", "examine")],
+        tags=["theme:history", "thread:power-core"],
     ))
 
     # --- R4 Elevator Shaft ---------------------------------------------------
@@ -202,6 +212,7 @@ def _objects() -> list[RoomObject]:
         # Overload clock — no more miss fan-out across unrelated campaign clocks.
         policy="scripted",
         bindings=[_rb(o, "*", "miss", clock_slug="arcane-overload-building", clock_delta=1)],
+        tags=["thread:power-core"],
     ))
     o = _oid("R4", "gearworks")
     out.append(_obj(
@@ -218,6 +229,7 @@ def _objects() -> list[RoomObject]:
         # noisy — a miss draws the sensors, not the dungeon's regard (D5 firewall).
         policy="scripted",
         bindings=[_rb(o, "*", "miss", clock_slug="party-detected", clock_delta=1)],
+        tags=["thread:power-core"],
     ))
 
     # --- R5 Trap Room --------------------------------------------------------
@@ -232,6 +244,7 @@ def _objects() -> list[RoomObject]:
         # authored Body stress (+2 is reserved for genuinely dangerous fiction, §5).
         policy="scripted",
         bindings=[_rb(o, "*", "miss", stress_track="body", stress_amount=2)],
+        tags=["theme:hazard"],
     ))
     o = _oid("R5", "dart-vents")
     out.append(_obj(
@@ -243,6 +256,7 @@ def _objects() -> list[RoomObject]:
         # Trap (§6, scripted): lighter needle darts — a botched handling costs +1 Body.
         policy="scripted",
         bindings=[_rb(o, "*", "miss", stress_track="body", stress_amount=1)],
+        tags=["theme:hazard"],
     ))
     o = _oid("R5", "trap-lever")
     out.append(_obj(
@@ -253,6 +267,7 @@ def _objects() -> list[RoomObject]:
         # Trap-system control (§6, scripted): pure deterministic gate — it works or
         # it doesn't. No reaction binding: a fumbled throw moves no world clock.
         policy="scripted",
+        tags=["theme:hazard"],
     ))
     return out
 
@@ -264,11 +279,12 @@ def _items() -> list[Item]:
         _item("R1", "travel-journal", "Sun-Bleached Travel Journal",
               "A dead scavenger's journal. The last entry: 'Lift's locked tight. "
               "Warden's key never left the market stalls — but the scorpions own them now.'",
-              placed=False),
+              placed=False, tags=["theme:history"]),
         # R2 — THE KEY (findable per request) + modest loot.
         _item("R2", "lift-warden-key", "Lift Warden's Iron Key",
               "A heavy iron key on a brass fob stamped with a descending-cage sigil. "
-              "It fits the locked lift door between the Marketplace and the Elevator Shaft."),
+              "It fits the locked lift door between the Marketplace and the Elevator Shaft.",
+              tags=["thread:power-core"]),
         _item("R2", "healing-draught", "Dwarven Healing Draught",
               "A squat blue vial of resin-sealed tonic. Still good — one solid swallow "
               "of restorative dwarven brew."),
@@ -277,13 +293,13 @@ def _items() -> list[Item]:
         # R3 — utility + the fuse that powers the R4 lift.
         _item("R3", "lift-fuse", "Lift Power Fuse",
               "A palm-sized brass power cell humming faintly with stored charge. Sized to "
-              "seat in a lift control podium."),
+              "seat in a lift control podium.", tags=["thread:power-core"]),
         _item("R3", "dwarven-rope", "Coil of Dwarven Rope",
               "Forty feet of fine silk-and-wire rope, light and strong, wound on a horn spool."),
         # R5 — reward for braving the trap room.
         _item("R5", "trap-spanner", "Artificer's Trap-Spanner",
               "A finely machined multi-tool of dwarven make, its jaws shaped for prising "
-              "open mechanisms and stilling triggers."),
+              "open mechanisms and stilling triggers.", tags=["theme:hazard"]),
     ]
 
 
@@ -329,19 +345,19 @@ def main() -> None:
         repo.save_actor(
             _aid("R3", "pinion-caretaker"), CAMPAIGN_ID, "npc", "pinion-caretaker",
             "Pinion, the Caretaker Cog", status="active",
-            tags=["construct", "friendly", "lore"], room_id="R3",
+            tags=["trait:construct", "trait:friendly", "trait:lore"], room_id="R3",
             disposition="willing",
         )
         # Monsters — new room-specific threats.
         repo.save_actor(
             _aid("R2", "iron-scorpions"), CAMPAIGN_ID, "monster", "iron-scorpions",
             "Skittering Iron Scorpions", status="active",
-            tags=["construct", "swarm"], room_id="R2",
+            tags=["trait:construct", "trait:swarm"], room_id="R2",
         )
         repo.save_actor(
             _aid("R5", "sweeper-drone"), CAMPAIGN_ID, "monster", "sweeper-drone",
             "Malfunctioning Sweeper Drone", status="active",
-            tags=["construct", "damaged"], room_id="R5",
+            tags=["trait:construct", "trait:damaged"], room_id="R5",
         )
         # Monsters — place existing seeded constructs into fitting rooms.
         repo._conn.execute(  # type: ignore[union-attr]

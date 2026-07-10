@@ -111,30 +111,56 @@ clocks** (a different entity → owner chose to add `clocks.tags` via migration 
 them). Note: migration runner can't parse `--` comments (splits on `;`, skips `--`-leading chunks), so
 `021` is bare SQL per convention.
 
-**▶ Next — Slice A4 (spec §12 Phase A.4):** seed-data normalization + Crucible world tagging —
-memory-tag T6 canonicalization in the seed JSONs and taxonomy `tags` on every object/item/objective in
-the `populate_crucible_*` scripts (idempotent, preserves play progress). The shipped seed JSONs still
-carry legacy `threat_tags` keys (harmlessly folded by the A3 validator) — A4 may strip them during its
-normalization pass.
+**✅ Slice A4 — seed-data normalization + Crucible world tagging: COMPLETE (2026-07-08, uncommitted).**
+All of spec §4.2/§4.3/§4.4 plus the five deferred A3 findings (F1–F5), TDD. Full suite green
+(**3606 passed**), ruff + mypy(strict, 169) clean.
+- **§4.2 normalize seed JSONs** (both `seed_data/campaigns/*/rpg_seed.json`, formatting-preserving
+  surgical edits — inline-array `indent=2` style intact): actor bare tags → `trait:*`, `level-N` →
+  `level:level-N`; legacy `threat_tags` folded into `trait:` and the key dropped; memory
+  `actor:protagonist:*` → `actor:pc:*`. New guard test `test_campaign_seed_tags_are_canonical`
+  (every shipped actor/faction/memory tag passes `validate_tag`; no `threat_tags`; no `actor:protagonist`).
+- **§4.3 room-id gate WIRED + guard.** New guard `test_campaign_seed_room_ids_match_dungeon_model`
+  validates each shipped seed against its canonical dungeon model's room-id **union across all levels**
+  (Crucible → `tests/fixtures/crucible.json`; tomb → `data/samples/…json`). Live gate in
+  `seed_campaign_with_pack`: when a `campaign_dir/dungeon.json` is present it loads the model and calls
+  `validate_seed_room_ids` — **on the write path only** (dry-run stays a pure preview), before any repo
+  open (a mismatch aborts atomically, nothing written).
+- **§4.4 tag the Crucible world.** `populate_crucible_level1/level2/dungeon_channel` assign
+  `object:<slug>`/`item:<slug>`/`objective:<slug>` + `level:level-N` + thematic `theme:`/`thread:`
+  (reusing the **real memory slugs** — `thread:power-core`, `theme:history`, `thread:golem-rebellion`,
+  `theme:hazard`, `theme:mystery` — so T7 pre-fetch actually connects nouns→lore). Also canonicalized
+  the three populate-script NPC/monster actor tags (bare → `trait:`). Idempotent, preserves play state.
+- **F2–F5 folded in** (`seed_pack.py` + `repository.py`): F2/F3 shared `_append_trait_tags` helper
+  (validates via `validate_tag`, dedups) used by both the `threat_tags` fold and `trigger_tags` routing;
+  F4 `update_clock_scope` collapsed to one dynamic SET clause (`action_tags`/`tags` default `None` =
+  leave-untouched); F5 the room-threat loop no longer blanks a co-referenced clock's `action_tags`
+  (and, post-review, no longer blanks its `tags` on an empty `trigger_tags` list either).
 
-**A3 `/code-review high` (2026-07-08) — no real bug; 5 latent/cleanup findings deferred to A4**
-(owner elected to fold them into A4 since it normalizes the same seed data). The disposition-reset
-candidate was **refuted** (no runtime disposition writer exists). Deferred:
-1. **(F1, the key one) `validate_seed_room_ids` will reject the shipped Crucible seed once wired** —
-   `the-crucible/rpg_seed.json` uses inconsistent room-id spellings (`R1`/`r01`/`r1`/`r7`/`r04`).
-   The §4.3 helper is correct and opt-in (no caller passes `valid_room_ids` yet, so no live failure);
-   **A4 must normalize seed room-ids (audit §1.7) before validation can be enabled.**
-2. **(F2) `trigger_tags`→`trait:` fold doesn't dedup** while `_fold_threat_tags` does
-   (`seed_pack.py:223` vs `:62`) — duplicate `trigger_tags` → duplicate clock tags. Fold both through
-   one shared helper.
-3. **(F3) inline `f"trait:{raw}"` (`seed_pack.py:62,223`) writes tags unvalidated/un-normalized** —
-   empty raw → malformed `"trait:"`; `heat-spike` vs `heat_spike` diverge. `memory/tags.py::validate_tag`
-   exists for exactly this and is still unused in all production — A5 is slated to wire it into writes.
-4. **(F4) `update_clock_scope` duplicates its whole UPDATE across the tags-None/not-None branches**
-   (`repository.py:646`) — collapse to one dynamic SET fragment.
-5. **(F5, lowest) room_threats loop unconditionally blanks a co-referenced clock's `action_tags`→`[]`
-   and overwrites scope** (`seed_pack.py:224`) — harmless today (no shipped threat has non-empty
-   `related_clock_slugs`; WRP ignores `action_tags`), a trap for future seeds.
+**⚠ A3 finding F1 was a false premise (corrected 2026-07-08).** F1 claimed the Crucible seed used
+"inconsistent room-id spellings (`R1`/`r01`/`r1`/`r7`/`r04`)" that `validate_seed_room_ids` would reject.
+Checking the actual dungeon model, those are **distinct valid rooms on different levels** — L1 `R1`–`R5`,
+L2 `r01`–`r06`, L3 `r1`–`r8` — so every seed reference resolves. "Match the dungeon model" therefore
+meant *wire the gate with the full room-id union* (it passes as-is), **no seed room-id rewrite needed**.
+Verified empirically + by the new guard test.
+
+**A4 `/code-review high` (2026-07-08, 3 agents / 8 angles) — no correctness bug in shipped-data paths;
+2 fixes applied, 2 kept-with-rationale.** Applied: (1) the §4.3 gate ran before the `dry_run`
+early-return → moved to the write path so `--dry-run` stays a pure, non-crashing preview; (2) the
+room-threat loop's empty-`trigger_tags`-blanks-`tags` trap (extension of F5) — now passes `tags` only
+when non-empty. Kept (intended): the gate validates threat `location_slug`s even though
+`seed_campaign_with_pack` doesn't apply threats (spec §4.3 mandates both; matches `apply_seed_pack`;
+only bites a genuinely-broken seed, atomically); `validate_tag` raising on an empty legacy `threat_tags`
+entry (T3 fail-loud on the seed/write path). Cleanup applied: lifted the `level:level-N` convention to
+named `LEVEL_TAG` constants in level2/dungeon_channel (was documented only in level1). Deferred to A5:
+a shared canonical tag *builder* in `memory/tags.py` (the spec defers wiring `validate_tag`/construction
+into production writes to A5).
+
+**▶ Next — Slice A5 (spec §12 Phase A.5):** make retrieval actually use tags. Fix
+`MemoryRetriever.query` actor-tag construction (`actor_type` → `pc|npc|dungeon`, `memory/retrieval.py`),
+and pass current-room `location:` + present-actor `actor:` filters from **both** production callers —
+`context_bundle._fetch_memories` **and** `DialogueCoordinator.recent_memories()` (`play/dialogue.py:250`).
+Behavior change → own slice + integration test on bundle contents; realign retrieval tests to the
+canonical taxonomy. (A5 is also where `validate_tag` gets wired into production write paths.)
 
 **Exit-criterion-1 — ✅ owner accepted 1491 lines (2026-07-06).** `views/play_view.py` landed at
 **1491 lines** (from 1878), above the spec's "≤ ~900" but now containing *only* drawing / input

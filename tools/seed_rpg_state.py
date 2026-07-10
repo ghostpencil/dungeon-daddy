@@ -371,6 +371,20 @@ def seed_campaign_with_pack(
         )
         return result
 
+    # §4.3 gate: if this campaign carries a dungeon model, every seed room
+    # reference (clock scope_room_id / room-threat location_slug) must exactly
+    # match a Room.id in it — fail loudly rather than silently never scope.
+    # On the write path only (dry-run stays a pure, side-effect-free preview),
+    # before any repo is opened so a mismatch aborts atomically (nothing written).
+    dungeon_json = campaign_dir / "dungeon.json"
+    if dungeon_json.exists():
+        from dungeon_daddy.data.models import Dungeon
+        from dungeon_daddy.rpg.seed_pack import validate_seed_room_ids
+
+        dungeon = Dungeon.model_validate_json(dungeon_json.read_text(encoding="utf-8"))
+        valid_room_ids = {room.id for level in dungeon.levels for room in level.rooms}
+        validate_seed_room_ids(pack, valid_room_ids)
+
     from dungeon_daddy.memory.repository import MemoryRepository
 
     db_path = campaign_dir / "campaign.duckdb"

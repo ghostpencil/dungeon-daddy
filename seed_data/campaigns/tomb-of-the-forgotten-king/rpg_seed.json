@@ -20,8 +20,7 @@
           "channel": 2
         },
         "stress_tracks": ["body", "composure", "bonds", "weird"],
-        "tags": ["cleric", "half-elf", "holy", "healer"],
-        "threat_tags": [],
+        "tags": ["trait:cleric", "trait:half-elf", "trait:holy", "trait:healer"],
         "relationships": ["order bond with the Veiled Sun temple", "protective of Seraphine despite disapproving of her methods"]
       },
       {
@@ -41,8 +40,7 @@
           "channel": 1
         },
         "stress_tracks": ["body", "composure", "bonds", "weird"],
-        "tags": ["wizard", "human", "necromancer", "scholar"],
-        "threat_tags": [],
+        "tags": ["trait:wizard", "trait:human", "trait:necromancer", "trait:scholar"],
         "relationships": ["the Spectral Advisor may know her by name", "Aldric distrusts her interest in the lich's power"]
       },
       {
@@ -62,8 +60,7 @@
           "channel": 0
         },
         "stress_tracks": ["body", "composure", "bonds", "weird"],
-        "tags": ["rogue", "halfling", "thief", "scout", "survivor"],
-        "threat_tags": [],
+        "tags": ["trait:rogue", "trait:halfling", "trait:thief", "trait:scout", "trait:survivor"],
         "relationships": ["lost his previous party in this tomb", "owes the temple a debt he refuses to name"]
       }
     ]
@@ -78,8 +75,7 @@
         "instinct": "Reclaim the Sundered Crown and complete his ascension. Let nothing that breathes leave the tomb.",
         "actions": {},
         "stress_tracks": [],
-        "tags": ["boss", "level-3", "undead", "lich"],
-        "threat_tags": ["undead", "spellcaster", "boss", "lich", "sealed"],
+        "tags": ["trait:boss", "level:level-3", "trait:undead", "trait:lich", "trait:spellcaster", "trait:sealed"],
         "relationships": []
       },
       {
@@ -90,8 +86,7 @@
         "instinct": "Assess the party's worthiness. Destroy the unworthy. Bargain with those who understand the old ways.",
         "actions": {},
         "stress_tracks": [],
-        "tags": ["level-2", "undead", "npc", "negotiable"],
-        "threat_tags": ["undead", "negotiable", "powerful", "gatekeeper"],
+        "tags": ["level:level-2", "trait:undead", "trait:npc", "trait:negotiable", "trait:powerful", "trait:gatekeeper"],
         "relationships": []
       },
       {
@@ -102,8 +97,7 @@
         "instinct": "Crush all who disturb the king's remains. It does not negotiate.",
         "actions": {},
         "stress_tracks": [],
-        "tags": ["level-3", "undead", "construct", "patrol"],
-        "threat_tags": ["undead", "relentless", "construct", "overwhelming"],
+        "tags": ["level:level-3", "trait:undead", "trait:construct", "trait:patrol", "trait:relentless", "trait:overwhelming"],
         "relationships": []
       },
       {
@@ -114,8 +108,7 @@
         "instinct": "Guide worthy souls toward the lich's binding. Test them first.",
         "actions": {},
         "stress_tracks": [],
-        "tags": ["level-3", "spectral", "npc", "helpful"],
-        "threat_tags": ["spectral", "cryptic", "demanding"],
+        "tags": ["level:level-3", "trait:spectral", "trait:npc", "trait:helpful", "trait:cryptic", "trait:demanding"],
         "relationships": []
       },
       {
@@ -126,8 +119,7 @@
         "instinct": "Remain still. Obey the king's last command. Strike when the hall is dishonored.",
         "actions": {},
         "stress_tracks": [],
-        "tags": ["level-2", "undead", "dormant", "numerous"],
-        "threat_tags": ["undead", "disciplined", "numerous", "triggered"],
+        "tags": ["level:level-2", "trait:undead", "trait:dormant", "trait:numerous", "trait:disciplined", "trait:triggered"],
         "relationships": []
       }
     ]
@@ -264,7 +256,7 @@
       "summary": "Dax entered this tomb once before with a party of four. He left alone and has never explained what happened to the others. He knows passages and dangers the others do not.",
       "type": "actor_relationship",
       "importance": 7,
-      "tags": ["actor:protagonist:dax", "theme:secrets", "thread:prior-expedition", "emotion:guilt"]
+      "tags": ["actor:pc:dax", "theme:secrets", "thread:prior-expedition", "emotion:guilt"]
     },
     {
       "title": "The Wraith-Steward Can Be Bargained With",
@@ -285,7 +277,7 @@
       "summary": "Seraphine believes the lich-king's binding ritual contains secrets about undeath that could revolutionize magical theory. Her interest in the crown is academic as much as practical — and Aldric suspects she is not committed to destroying it.",
       "type": "actor_relationship",
       "importance": 7,
-      "tags": ["actor:protagonist:seraphine-vex", "actor:protagonist:brother-aldric", "theme:secrets", "thread:seraphine-agenda", "emotion:tension"]
+      "tags": ["actor:pc:seraphine-vex", "actor:pc:brother-aldric", "theme:secrets", "thread:seraphine-agenda", "emotion:tension"]
     },
     {
       "title": "The Bone Warden Patrols the Ossuary",
@@ -299,7 +291,7 @@
       "summary": "The Veiled Sun temple dispatched Aldric without backup because the other priests refused the mission — they believe the tomb cannot be safely entered. Aldric is the only one who volunteered.",
       "type": "actor_relationship",
       "importance": 5,
-      "tags": ["actor:protagonist:brother-aldric", "theme:isolation", "thread:temple-politics", "emotion:loneliness"]
+      "tags": ["actor:pc:brother-aldric", "theme:isolation", "thread:temple-politics", "emotion:loneliness"]
     },
     {
       "title": "The Spectral Advisor Knows the Binding",

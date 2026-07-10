@@ -3,13 +3,30 @@ from __future__ import annotations
 import dataclasses
 import json
 import uuid
+from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from dungeon_daddy.memory.tags import validate_tag
+
 if TYPE_CHECKING:
     from dungeon_daddy.memory.repository import MemoryRepository
+
+
+def _append_trait_tags(existing: list[str], raws: Iterable[str]) -> list[str]:
+    """Fold descriptive raw tokens into ``existing`` as validated ``trait:<slug>``
+    tags, de-duplicated (T5, A3 findings F2/F3). Shared by the ``SeedActor``
+    ``threat_tags`` fold and the room-threat ``trigger_tags`` routing so both
+    validate (rejects a malformed / empty token) and dedup identically.
+    """
+    tags = list(existing)
+    for raw in raws:
+        trait = validate_tag(f"trait:{raw}")
+        if trait not in tags:
+            tags.append(trait)
+    return tags
 
 _ACTOR_NS = uuid.UUID("7a3f1c2e-4b5d-5e6f-8a9b-0c1d2e3f4a5b")
 _CLOCK_NS = uuid.UUID("1b2c3d4e-5f6a-5b7c-8d9e-0f1a2b3c4d5e")
@@ -57,11 +74,7 @@ class SeedActor(BaseModel):
         # actor traits (boss/construct/undead). Absorb them into `tags` as
         # `trait:<slug>` and drop the field. Applies to any legacy seed pack.
         if isinstance(data, dict) and data.get("threat_tags"):
-            tags = list(data.get("tags") or [])
-            for raw in data["threat_tags"]:
-                trait = f"trait:{raw}"
-                if trait not in tags:
-                    tags.append(trait)
+            tags = _append_trait_tags(list(data.get("tags") or []), data["threat_tags"])
             data = {k: v for k, v in data.items() if k != "threat_tags"}
             data["tags"] = tags
         return data
@@ -217,17 +230,19 @@ def apply_seed_pack(
 
     for threat in pack.room_threats:
         # T5 (Phase 51.8): trigger_tags are descriptive trigger conditions, not a
-        # verb gate. Route them to the clock's `tags` as trait:<slug> and clear the
-        # action_tags they used to (uselessly) pollute — there they never matched an
-        # action verb, so the clock silently never advanced.
-        trait_tags = [f"trait:{t}" for t in threat.trigger_tags]
+        # verb gate. Route them to the clock's `tags` as validated, de-duplicated
+        # trait:<slug> tags (F2/F3). Leave the clock's own action_tags untouched
+        # (F5) — this loop only scopes + tags the co-referenced clock.
+        trait_tags = _append_trait_tags([], threat.trigger_tags)
         for clock_slug in threat.related_clock_slugs:
             clock_id = derive_clock_id(pack.campaign_slug, clock_slug)
             repo.update_clock_scope(
                 clock_id,
                 scope_room_id=threat.location_slug,
-                action_tags=[],
-                tags=trait_tags,
+                # Only set tags when this threat actually carries trigger_tags —
+                # an empty trigger list must not blank a co-referenced clock's
+                # existing tags (mirrors the action_tags leave-untouched rule).
+                tags=trait_tags or None,
             )
 
     existing_faction_ids = {f["faction_id"] for f in repo.get_factions(campaign_id)}

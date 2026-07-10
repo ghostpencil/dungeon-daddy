@@ -4,8 +4,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from dungeon_daddy.rpg.seed_pack import derive_actor_id
+import pytest
 from seed_rpg_state import SeedResult, seed_campaign, seed_campaign_with_pack
+
+from dungeon_daddy.rpg.seed_pack import derive_actor_id
 
 
 def _make_campaign_dir(tmp_path: Path, name: str = "test-campaign") -> Path:
@@ -228,6 +230,31 @@ def _write_pack(tmp_path: Path, data: dict | None = None) -> Path:
     return pack_file
 
 
+# A real, shipped dungeon model — used as the room-id source of truth for the
+# §4.3 seed-time validation gate. Its rooms are ids like "1-A".."3-E".
+_TOMB_MODEL = (
+    Path(__file__).parent.parent.parent.parent
+    / "dungeon_daddy" / "data" / "samples" / "tomb_of_the_forgotten_king.json"
+)
+
+
+def _write_dungeon(campaign_dir: Path, model_path: Path = _TOMB_MODEL) -> None:
+    (campaign_dir / "dungeon.json").write_text(
+        model_path.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+
+
+def _pack_with_room_clock(scope_room_id: str) -> dict:
+    return {
+        **_PACK_DATA,
+        "clocks": [
+            {"slug": "trap", "label": "Trap", "segments": 4, "category": "danger",
+             "clock_level": "room", "scope_room_id": scope_room_id,
+             "stakes": "s", "completion_effect": "e"}
+        ],
+    }
+
+
 class TestSeedCampaignWithPack:
     def test_dry_run_creates_no_duckdb(self, tmp_path: Path) -> None:
         campaign_dir = _make_campaign_dir(tmp_path)
@@ -355,6 +382,46 @@ class TestSeedCampaignWithPack:
         repo.close()
         assert mara["playbook_slug"] == "fighter"
         assert mara["room_id"] == "r1"
+
+    def test_seed_rejects_room_id_absent_from_dungeon_model(self, tmp_path: Path) -> None:
+        # §4.3 live gate: when the campaign has a dungeon.json, a seed room-id that
+        # matches no Room.id must fail loudly rather than silently never scope.
+        campaign_dir = _make_campaign_dir(tmp_path)
+        _write_dungeon(campaign_dir)
+        pack_path = _write_pack(tmp_path, _pack_with_room_clock("NO-SUCH-ROOM"))
+        with pytest.raises(ValueError, match="NO-SUCH-ROOM"):
+            seed_campaign_with_pack(campaign_dir, pack_path)
+
+    def test_seed_accepts_room_id_present_in_dungeon_model(self, tmp_path: Path) -> None:
+        campaign_dir = _make_campaign_dir(tmp_path)
+        _write_dungeon(campaign_dir)  # tomb rooms include "1-A"
+        pack_path = _write_pack(tmp_path, _pack_with_room_clock("1-A"))
+        seed_campaign_with_pack(campaign_dir, pack_path)  # no raise
+        repo = _open_repo(campaign_dir)
+        clocks = repo.get_clocks("campaign:test-campaign")
+        repo.close()
+        assert any(c["scope_room_id"] == "1-A" for c in clocks)
+
+    def test_dry_run_stays_a_pure_preview_despite_room_mismatch(self, tmp_path: Path) -> None:
+        # The §4.3 gate is on the write path only — a --dry-run preview must never
+        # raise (or write), even against a live dungeon.json the seed mismatches.
+        campaign_dir = _make_campaign_dir(tmp_path)
+        _write_dungeon(campaign_dir)
+        pack_path = _write_pack(tmp_path, _pack_with_room_clock("NO-SUCH-ROOM"))
+        result = seed_campaign_with_pack(campaign_dir, pack_path, dry_run=True)
+        assert isinstance(result, SeedResult)
+        assert not (campaign_dir / "campaign.duckdb").exists()
+
+    def test_seed_skips_room_validation_without_dungeon_model(self, tmp_path: Path) -> None:
+        # Back-compat: no dungeon.json in the campaign folder → the gate is skipped
+        # (the shipped seed_data folders have no colocated dungeon model).
+        campaign_dir = _make_campaign_dir(tmp_path)
+        pack_path = _write_pack(tmp_path, _pack_with_room_clock("NO-SUCH-ROOM"))
+        seed_campaign_with_pack(campaign_dir, pack_path)  # no raise
+        repo = _open_repo(campaign_dir)
+        clocks = repo.get_clocks("campaign:test-campaign")
+        repo.close()
+        assert any(c["scope_room_id"] == "NO-SUCH-ROOM" for c in clocks)
 
     def test_force_reseed_persists_clock_metadata(self, tmp_path: Path) -> None:
         pack_data = {
