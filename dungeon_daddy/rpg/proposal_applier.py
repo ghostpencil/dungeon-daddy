@@ -1,12 +1,14 @@
 """Proposal applier — Phase 36: auto-apply low-risk proposals."""
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.memory.repository import MemoryRepository
+from dungeon_daddy.memory.tags import normalize_tag
 from dungeon_daddy.rpg.proposal import (
     AdjustReputationChange,
     ApplyConsequenceChange,
@@ -18,6 +20,8 @@ from dungeon_daddy.rpg.proposal import (
     TransformItemChange,
 )
 from dungeon_daddy.rpg.proposal_validator import ValidationResult
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -52,8 +56,15 @@ def apply_low_risk_proposals(
                 # back through MemoryRetriever, which reads only `approved`.
                 status="approved",
             )
+            # A5b: normalize LLM-proposed tags to canonical form; drop (and log)
+            # anything un-normalizable so a model tag typo never loses the memory
+            # nor poisons the tag space (owner ruling 2026-07-10).
             for tag in change.tags:
-                repo.add_memory_tag(memory_id, tag)
+                canonical = normalize_tag(tag)
+                if canonical is None:
+                    _log.warning("dropping un-normalizable proposed memory tag %r", tag)
+                    continue
+                repo.add_memory_tag(memory_id, canonical)
             event = DomainEvent(
                 event_id=str(uuid.uuid4()),
                 campaign_id=campaign_id,

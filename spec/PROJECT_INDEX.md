@@ -180,13 +180,24 @@ scope — spec §5.2 "keeping the existing importance-pinning"; only the regular
 slug leak); the two callers' duplicated present-actor construction collapsed to the shared helper (fixed
 a real `if room is not None` vs `if room:` divergence between the copies).
 
-**▶ Next — Slice A5b — write-side tag hygiene (T3 `validate_tag` wiring + write-time tagging).** Two
-write-side gaps A5 surfaced, both handled here (write-side is the natural pairing):
-1. **T3 — wire `validate_tag` into production write paths.** Today `add_memory_tag`
+**◐ IN PROGRESS — Slice A5b — write-side tag hygiene (T3 `validate_tag` wiring + write-time tagging).** Two
+write-side gaps A5 surfaced, both handled here (write-side is the natural pairing).
+
+**Done so far (2026-07-10, uncommitted):** the `normalize_tag(tag) -> str | None` primitive
+(`memory/tags.py`; T6 folds `actor:protagonist:`→`actor:pc:`, bare→`trait:`, drop+log the
+un-normalizable) + wired into the **LLM-proposal path** (`rpg/proposal_applier.py` — proposed memory
+tags are normalized, un-normalizable ones dropped with a warning, never stored raw). TDD, 15 new tests
+(`test_tags.py` normalize cases + `test_proposal_applier.py` mixed-tag case); ruff + mypy clean.
+**Remaining:** the `validate_tag` (raise) wiring on the engine-authored/dev write paths, and the
+write-time room/actor tagging (part 2 below).
+1. **T3 — wire tag validation into production write paths.** Today `add_memory_tag`
    (`memory/repository.py:399`) and the `save_*` paths accept any string; only seed/populate paths
-   validate. The LLM-proposal memory path (`rpg/proposal_applier.py:55-56`) writes **whatever tags the
-   model proposed**, unvalidated. Wire `validate_tag` (raise-on-write in dev/engine paths; reads stay
-   permissive). Higher blast radius — touches every `save_*`/`add_memory_tag` caller — so its own slice.
+   validate. Two modes (owner ruling 2026-07-10): **dev/seed/engine-authored-with-known-tags paths
+   `validate_tag` (raise)** — authoring errors caught loudly; **the LLM-proposal path
+   (`rpg/proposal_applier.py:55-56`) NORMALIZES** — a new `normalize_tag` coerces to canonical
+   (`actor:protagonist:`→`actor:pc:`, bare→`trait:`, drop+log the un-normalizable) so a model tag typo
+   never loses the memory but tags stay canonical. Reads stay permissive. Higher blast radius (touches
+   every `save_*`/`add_memory_tag` caller) — its own slice.
 2. **Write-time room/actor tagging** (the "#2" latent gap). **No production write path stamps a new
    `memory_entries` row with the current-room `location:<room_id>` or present-actor `actor:` tags**, so
    A5's scene-scoped retrieval only reliably surfaces **seed** lore. Concretely: `/remember` +

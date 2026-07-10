@@ -7,7 +7,7 @@ malformed / unknown-namespace tags.
 
 import pytest
 
-from dungeon_daddy.memory.tags import actor_tag, validate_tag
+from dungeon_daddy.memory.tags import actor_tag, normalize_tag, validate_tag
 
 
 @pytest.mark.parametrize(
@@ -94,6 +94,45 @@ def test_actor_tag_maps_actor_type_to_canonical_subtype(
     assert built == expected
     # A builder must never emit an invalid tag.
     assert validate_tag(built) == built
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # already-canonical tags pass through unchanged
+        ("actor:pc:kira", "actor:pc:kira"),
+        ("theme:guilt", "theme:guilt"),
+        ("location:R1", "location:R1"),
+        # legacy protagonist subtype folds to pc (T6)
+        ("actor:protagonist:kira-dawnseeker", "actor:pc:kira-dawnseeker"),
+        # bare, un-namespaced tag -> trait: (T6)
+        ("boss", "trait:boss"),
+        # surrounding whitespace is trimmed
+        ("  theme:guilt  ", "theme:guilt"),
+    ],
+)
+def test_normalize_tag_coerces_to_canonical(raw: str, expected: str) -> None:
+    """LLM-proposal path: coerce a proposed tag to canonical form."""
+    result = normalize_tag(raw)
+    assert result == expected
+    assert validate_tag(result) == result  # never emits an invalid tag
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "bogus:thing",        # unknown namespace
+        "actor:mara",         # two-segment, no subtype
+        "actor:protagonist",  # two-segment protagonist, no slug to resolve
+        "theme:",             # empty slug
+        "actor:pc:",          # empty slug
+        "",                   # empty
+        "   ",                # whitespace only
+    ],
+)
+def test_normalize_tag_drops_unnormalizable(raw: str) -> None:
+    """A tag that cannot be coerced to canonical is dropped (returns None)."""
+    assert normalize_tag(raw) is None
 
 
 def test_every_actor_type_literal_is_mapped_explicitly() -> None:

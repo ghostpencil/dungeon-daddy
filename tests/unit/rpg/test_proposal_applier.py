@@ -81,6 +81,31 @@ class TestCreateMemoryAutoApplied:
         tags = repo.get_memory_tags(memory_id)
         assert set(tags) == {"actor:pc:mara", "location:ossuary_gate", "thread:bone_warden"}
 
+    def test_proposed_tags_are_normalized_not_stored_raw(self, tmp_path):
+        # A5b (owner ruling 2026-07-10): the LLM-proposal path normalizes tags —
+        # legacy/bare forms are coerced to canonical, un-normalizable ones are
+        # dropped, so a model tag typo never poisons the tag space.
+        repo = _repo(tmp_path)
+        change = CreateMemoryChange(
+            title="The pact",
+            summary="An oath was sworn.",
+            importance=3,
+            tags=[
+                "actor:protagonist:kira",  # legacy -> actor:pc:kira
+                "boss",                     # bare -> trait:boss
+                "actor:pc:mara",            # already canonical
+                "bogus:thing",              # unknown namespace -> dropped
+                "actor:mara",               # no subtype -> dropped
+            ],
+        )
+        result = ValidationResult(accepted=[change], rejected=[])
+
+        apply_low_risk_proposals(result, repo=repo, campaign_id="campaign_1")
+
+        entries = repo.get_memory_entries_by_campaign("campaign_1")
+        tags = repo.get_memory_tags(entries[0]["memory_id"])
+        assert set(tags) == {"actor:pc:kira", "trait:boss", "actor:pc:mara"}
+
     def test_domain_event_memory_created_is_emitted(self, tmp_path):
         repo = _repo(tmp_path)
         change = CreateMemoryChange(

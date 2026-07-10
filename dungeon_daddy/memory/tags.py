@@ -60,6 +60,32 @@ def actor_tag(actor_type: str, slug: str) -> str:
     return f"actor:{subtype}:{slug}"
 
 
+def normalize_tag(tag: str) -> str | None:
+    """Coerce an externally-proposed tag to canonical form, or ``None`` to drop it.
+
+    Used on the LLM-proposal write path (owner ruling 2026-07-10): a model tag
+    typo must never lose the memory, but stored tags stay canonical. Applies the
+    T6 folds — ``actor:protagonist:<slug>`` -> ``actor:pc:<slug>`` and a bare
+    (un-namespaced) tag -> ``trait:<slug>`` — then validates; anything still
+    invalid is dropped. Dev/seed/engine paths use :func:`validate_tag` (raise)
+    instead of this forgiving coercion.
+    """
+    tag = tag.strip()
+    if not tag:
+        return None
+    namespace, sep, rest = tag.partition(":")
+    if not sep:
+        tag = f"trait:{tag}"  # bare -> trait: (T6)
+    elif namespace == "actor":
+        subtype, subsep, slug = rest.partition(":")
+        if subtype == "protagonist" and slug:
+            tag = f"actor:pc:{slug}"  # legacy protagonist -> pc (T6)
+    try:
+        return validate_tag(tag)
+    except ValueError:
+        return None
+
+
 def validate_tag(tag: str) -> str:
     """Validate a single tag against the taxonomy; return it unchanged.
 
