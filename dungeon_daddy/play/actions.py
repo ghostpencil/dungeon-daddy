@@ -756,7 +756,13 @@ class ActionOrchestrator:
         active = self._session.active_campaign()
         if active is None:
             return
-        for _ in advance_objectives(active.repo, active.campaign_id):
+        state = self._session.state
+        for _ in advance_objectives(
+            active.repo,
+            active.campaign_id,
+            room_id=state.current_room_id if state else None,
+            party_ids=[a.actor_id for a in self._session.actors],
+        ):
             self._post_message(
                 "dungeon", "◆ The Crucible stirs — its bond with you deepens."
             )

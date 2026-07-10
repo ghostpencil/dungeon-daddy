@@ -5,7 +5,7 @@ from typing import Any
 
 from dungeon_daddy.memory.models import MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.memory.tags import actor_tag
+from dungeon_daddy.memory.tags import actor_tag, validate_tag
 
 
 def present_actor_ids(
@@ -24,6 +24,33 @@ def present_actor_ids(
         )
         ids.extend(a["actor_id"] for a in in_room)
     return list(dict.fromkeys(ids))
+
+
+def scene_memory_tags(
+    repo: MemoryRepository,
+    campaign_id: str,
+    room_id: str | None,
+    party_ids: Iterable[str],
+) -> list[str]:
+    """Write-side twin of :func:`present_actor_ids` (Slice A5b).
+
+    The canonical scene-anchor tags to stamp on an engine memory write so A5
+    scoped retrieval resurfaces it: the current-room ``location:<room_id>``
+    (grid id) plus ``actor_tag(...)`` for the party and any NPCs/monsters in the
+    room — exactly the anchors the reader filters on (``query``'s
+    ``location_slug`` + ``present_actor_ids``), so writes and reads are
+    symmetric by construction. Every tag passes :func:`validate_tag` (they are
+    canonical by construction; the call is a loud regression guard). An unknown
+    or cross-campaign actor id contributes nothing. Order-preserving, deduped.
+    """
+    tags: list[str] = []
+    if room_id:
+        tags.append(validate_tag(f"location:{room_id}"))
+    for aid in present_actor_ids(repo, campaign_id, room_id, party_ids):
+        actor = repo.get_actor(aid)
+        if actor is not None and actor["campaign_id"] == campaign_id:
+            tags.append(validate_tag(actor_tag(actor["actor_type"], actor["slug"])))
+    return list(dict.fromkeys(tags))
 
 
 class MemoryRetriever:

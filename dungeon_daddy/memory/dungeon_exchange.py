@@ -19,9 +19,11 @@ memory; the engine composes a factual record of what was said.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from dungeon_daddy.memory.repository import MemoryRepository
+from dungeon_daddy.memory.retrieval import scene_memory_tags
 
 # The exchange deepens the player's relationship with the dungeon; drafts are of
 # the ``relationship`` memory type (one of the canonical types per D4).
@@ -42,6 +44,8 @@ def record_dungeon_exchange(
     actor: str,
     player_message: str,
     dungeon_reply: str,
+    room_id: str | None = None,
+    party_ids: Sequence[str] | None = None,
 ) -> DungeonExchangeResult:
     """Record an approved memory of one dungeon-channel exchange (no intimacy tick).
 
@@ -63,4 +67,8 @@ def record_dungeon_exchange(
         ),
         status="approved",
     )
+    # A5b: stamp the scene anchors (current-room location + present-actor tags)
+    # so A5 scoped retrieval resurfaces this exchange in the same scene later.
+    for tag in scene_memory_tags(repo, campaign_id, room_id, party_ids or []):
+        repo.add_memory_tag(memory_id, tag)
     return DungeonExchangeResult(memory_id=memory_id)

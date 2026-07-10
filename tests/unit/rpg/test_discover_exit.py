@@ -71,6 +71,38 @@ def test_discover_exit_creates_approved_memory_entry(repo: MemoryRepository) -> 
 
 
 # ---------------------------------------------------------------------------
+# A5b: discover_exit stamps scene-anchor tags on its memory
+# ---------------------------------------------------------------------------
+
+def test_discover_exit_stamps_scene_anchor_tags(repo: MemoryRepository) -> None:
+    repo.save_room_exit(_make_exit(status="hidden"))
+    repo.save_actor("pc-1", CAMPAIGN_ID, "pc", "scout", "Scout", room_id=ROOM_A)
+
+    discover_exit(
+        EXIT_ID,
+        CAMPAIGN_ID,
+        "Found a concealed passage.",
+        repo,
+        room_id=ROOM_A,
+        party_ids=["pc-1"],
+    )
+
+    entry = repo.get_memory_entries_by_campaign(CAMPAIGN_ID)[0]
+    tags = set(repo.get_memory_tags(entry["memory_id"]))
+    assert tags == {"location:room:a", "actor:pc:scout"}
+
+
+def test_discover_exit_untagged_without_scene(repo: MemoryRepository) -> None:
+    # Back-compat: the pre-A5b call shape (no room/party) writes no tags.
+    repo.save_room_exit(_make_exit(status="hidden"))
+
+    discover_exit(EXIT_ID, CAMPAIGN_ID, "Found a concealed passage.", repo)
+
+    entry = repo.get_memory_entries_by_campaign(CAMPAIGN_ID)[0]
+    assert repo.get_memory_tags(entry["memory_id"]) == []
+
+
+# ---------------------------------------------------------------------------
 # Slice 7-3: discover_exit emits an exit.discovered domain event
 # ---------------------------------------------------------------------------
 

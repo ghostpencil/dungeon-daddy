@@ -7,6 +7,7 @@ from dungeon_daddy.memory.retrieval import (
     MemoryRetrieval,
     MemoryRetriever,
     present_actor_ids,
+    scene_memory_tags,
 )
 
 
@@ -175,6 +176,39 @@ class TestPresentActorIds:
         repo.save_actor("npc-1", "camp_001", "npc", "goblin", "Goblin", room_id="R1")
         assert present_actor_ids(repo, "camp_001", "", ["pc-1"]) == ["pc-1"]
         assert present_actor_ids(repo, "camp_001", None, ["pc-1"]) == ["pc-1"]
+
+
+class TestSceneMemoryTags:
+    """A5b write-side twin of present_actor_ids: the canonical scene-anchor tags
+    to stamp on an engine memory write, symmetric with the reader's filters."""
+
+    def test_location_and_present_actor_tags(self, repo: MemoryRepository) -> None:
+        repo.save_actor("pc-1", "camp_001", "pc", "mara", "Mara", room_id="R1")
+        repo.save_actor("npc-1", "camp_001", "npc", "goblin", "Goblin", room_id="R1")
+        # a co-located monster maps to the actor:npc subtype (T2 / owner ruling)
+        repo.save_actor("mon-1", "camp_001", "monster", "ogre", "Ogre", room_id="R1")
+
+        tags = scene_memory_tags(repo, "camp_001", "R1", ["pc-1"])
+
+        assert tags[0] == "location:R1"  # grid room id, location tag first
+        assert set(tags) == {
+            "location:R1",
+            "actor:pc:mara",
+            "actor:npc:goblin",
+            "actor:npc:ogre",
+        }
+
+    def test_no_room_is_actor_tags_only(self, repo: MemoryRepository) -> None:
+        repo.save_actor("pc-1", "camp_001", "pc", "mara", "Mara", room_id="R1")
+        # no room -> no location tag and no room-NPC expansion; party only
+        assert scene_memory_tags(repo, "camp_001", None, ["pc-1"]) == ["actor:pc:mara"]
+
+    def test_unknown_or_cross_campaign_actor_contributes_no_tag(
+        self, repo: MemoryRepository
+    ) -> None:
+        repo.save_actor("other", "camp_999", "pc", "mara", "Mara", room_id="R1")
+        # unknown id + a cross-campaign id both resolve to nothing; empty room
+        assert scene_memory_tags(repo, "camp_001", None, ["ghost", "other"]) == []
 
 
 class TestRetrievalByActor:

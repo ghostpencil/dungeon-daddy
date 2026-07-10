@@ -383,10 +383,13 @@ class DialogueCoordinator:
         if active is None:
             return
         actor = self._get_acting_actor()
+        state = self._session.state
         record_dungeon_exchange(
             active.repo,
             campaign_id=active.campaign_id,
             actor=actor.slug if actor else "",
             player_message=player_message,
             dungeon_reply=reply,
+            room_id=state.current_room_id if state else None,
+            party_ids=[a.actor_id for a in self._session.actors],
         )
