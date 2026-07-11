@@ -425,10 +425,10 @@ scheduling prefers.
 | T5 | Delete `threat_tags`; stop `trigger_tags`→`action_tags`; convert to `trait:` | **OWNER-DECIDED 2026-07-08** |
 | T6 | Normalization migration mapping (protagonist→pc etc.) | **OWNER-DECIDED 2026-07-08** |
 | T7 | Deterministic `# Related Lore` pre-fetch is the default retrieval path | **OWNER-DECIDED 2026-07-04** |
-| L1 | Single `lookup_world` tool, name+tags+types params, out-of-scene mandate only | yes |
-| L2 | One repo method `search_entities` (ILIKE + exact tags) behind `LookupService` | yes |
+| L1 | Single `lookup_world` tool, name+tags+types params, out-of-scene mandate only | **OWNER-DECIDED 2026-07-11** |
+| L2 | One repo method `search_entities` (ILIKE + exact tags) behind `LookupService` | **OWNER-DECIDED 2026-07-11** |
 | L3 | Agent-owned loop: provider = transport (`complete_round` + neutral types), loop in `llm/tool_loop.py` | **OWNER-DECIDED 2026-07-04** |
-| L4 | Budgets: 2 tool rounds, 8-row default, ~1.2k-token results, errors-as-strings | yes |
-| L5 | Tool loop + DuckDB reads on the worker thread behind a repo-owned lock | yes |
-| L6 | Log + debug-panel provenance for every lookup | yes |
-| L7 | Scoping enforcement: prompt contract + redundant-lookup telemetry + full-overlap redirect | yes |
+| L4 | Budgets: 2 tool rounds, 8-row default, ~1.2k-token results, errors-as-strings | **OWNER-DECIDED 2026-07-11** |
+| L5 | Tool loop + DuckDB reads on the worker thread behind a repo-owned lock (shared conn + `threading.Lock`; read-only 2nd conn not pursued) | **OWNER-DECIDED 2026-07-11** |
+| L6 | Log + debug-panel provenance for every lookup | **OWNER-DECIDED 2026-07-11** |
+| L7 | Scoping enforcement: prompt contract + redundant-lookup telemetry + full-overlap redirect (no hard pre-filter) | **OWNER-DECIDED 2026-07-11** |
