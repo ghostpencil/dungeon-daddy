@@ -47,10 +47,24 @@ fixed (`fd101df`, repo-read failures now surface `REACTION_FAILURE_LINE`), 2 fin
 to this next phase (see the review block below). Full 51.7 slice history + deferred follow-ups
 retained further down for reference.
 
-**▶ NEXT — Phase: Tag Hygiene → Narrator Lookup.** Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`
-(the sequenced choice; item 2 below). Branch `feat/phase-51.8-tag-hygiene`. **Phase A (Tag Hygiene) is
-COMPLETE through Slice A6** — Slice 0 + A1–A6 all landed (A6 uncommitted). Next: commit A6, then either PR
-the full Phase A arc (A1–A6, unpushed) or start **Phase B (Narrator Lookup Tool)** — see the A6 block below.
+**▶ NEXT — awaiting review/merge of PR #90 (Phase A — Tag Hygiene).** Spec
+`spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`. Branch `feat/phase-51.8-tag-hygiene` (pushed, tracking
+`origin`). **Phase A (Tag Hygiene) is COMPLETE and committed** — Slice 0 + A1–A6 all landed; last commits
+`99fc091` (A6) + `7f25bde` (A6 DBG-panel follow-up). **PR #90 OPEN → `main`**
+(https://github.com/ghostpencil/dungeon-daddy/pull/90), 18 commits, owner GUI-verified on the live Crucible
+(2026-07-11). Full suite green (**3667 passed**), ruff + mypy(strict) clean.
+
+**When resuming next session:**
+1. **If PR #90 merged** → mark it MERGED here (mirror the 51.7 block), delete the branch, then start
+   **Phase B (Narrator Lookup Tool)** — first ratify decisions **L1/L2/L4–L7** with the owner (spec §13),
+   then Slice B1 = `MemoryRepository.search_entities` + `LookupService` (spec §7/§12 Phase B).
+2. **If PR #90 still open** → address any review feedback on the branch.
+3. **Optional data-hygiene pass (not blocking):** old saves' gameplay memories carry pre-taxonomy **bare
+   tags** (`knowledge`, `arcane`, …) that don't participate in scene-scoped retrieval; a normalization pass
+   (`normalize_tag` over existing `memory_tags`) would fold them into the canonical vocabulary. Noticed on
+   the live Crucible during A6 GUI verify.
+
+*(A6 detail + the full A1–A6 slice history are retained in the blocks below.)*
 
 **✅ Slice 0 — cleanup warm-up: COMPLETE (2026-07-08, uncommitted→committed).** Both deferred PR #89
 review findings landed. (a) New frozen `ActiveCampaign(repo, campaign_id)` value +
@@ -257,9 +271,9 @@ empty until the 8 were injected (backup `campaign.duckdb.bak-a6-inject-lore-2026
 state untouched) — an A6-independent seed/save data gap, not a code defect (a fresh seed loads them via
 `apply_seed_pack`). Then PR the Phase A arc.
 
-**After A6 — Phase B (Narrator Lookup Tool):** requires Phase A (done). Ratify L1/L2/L4–L7 at Phase B start
-(spec §13). Slice B1 = `MemoryRepository.search_entities` + `LookupService` (`spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`
-§7/§12 Phase B). Or PR the full Phase A arc (A1–A6, still unpushed on `feat/phase-51.8-tag-hygiene`) first.
+**After A6 — Phase B (Narrator Lookup Tool):** requires Phase A (done, **PR #90 open** — merge first).
+Ratify L1/L2/L4–L7 at Phase B start (spec §13). Slice B1 = `MemoryRepository.search_entities` +
+`LookupService` (`spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` §7/§12 Phase B).
 
 **Exit-criterion-1 — ✅ owner accepted 1491 lines (2026-07-06).** `views/play_view.py` landed at
 **1491 lines** (from 1878), above the spec's "≤ ~900" but now containing *only* drawing / input
