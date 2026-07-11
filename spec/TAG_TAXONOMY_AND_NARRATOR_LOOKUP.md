@@ -238,6 +238,38 @@ across the entity tables, plus exact tag membership (JSON-list `tags` columns an
 `memory_tags` join table). A thin `LookupService` wraps it and formats tool results;
 `MemoryRetriever` stays untouched.
 
+## 7.1 Rooms as a first-class campaign entity (OWNER-DECIDED 2026-07-11)
+
+Rooms were the one scene anchor **not** in the campaign DuckDB — authored only in the dungeon
+JSON (`data.models.Room`, via `DungeonRepository`), reachable at retrieval time only indirectly
+(memories tagged `location:<room_id>`). Every other noun (object/item/actor/clock/objective/
+faction) is a first-class, taggable, searchable DuckDB row. To let `lookup_world` and the T7
+pre-fetch treat rooms symmetrically — and to give a room's authored setting lore / quest role a
+home — Slice B0 adds a **`rooms` table** to the campaign DB.
+
+**Design (owner decisions 2026-07-11):**
+- **Runtime projection, not a move.** The table is seeded from the dungeon + campaign seed like
+  every other entity. Geometry/layout (`x/y/w/h`, loop roles, graph notes) **stays in the dungeon
+  JSON** — the map renderer + layout system remain its readers; the `rooms` table does not
+  duplicate it. It holds only the campaign-facing, searchable fields.
+- **Columns** (mirroring the `actors`/`objectives` conventions): `room_id` (grid id — `R1`,
+  `r01`, …), `campaign_id`, `level_id`, `slug`, `display_name`, `room_type`, `summary`
+  (inline setting-lore text for fast retrieval), `quest_role` (the room's role in the quest),
+  `markdown_path` + `checksum` (pointer to the full authored lore body with front matter, mirroring
+  `memory_entries`), `tags` (JSON, namespaced taxonomy).
+- **Lore lives in both places:** a short `summary` column for inline/quick lookup **and** a
+  `markdown_path`/`checksum` to the full body — same split as `memory_entries`.
+- **Quest role in both places:** an authoritative `quest_role` column **and** namespaced tags
+  (`quest:*`/`thread:*`) so the role also drives tag retrieval (column = truth, tags = reach).
+- Model `RoomState` (`rpg/models.py`, beside `ActorState`/`FactionState`/`ClockState`); repo
+  `save_room`/`get_rooms`/`get_room`; migration `022_rooms.sql` (bare SQL, no `--` comments — the
+  runner splits on `;`) with the standard migration tests (applies-on-prev-head, idempotent-from-
+  scratch, back-compat reads).
+- **Connections** stay in the existing `room_exits` table (migration `010`; already first-class
+  with gating). No tags / no memory-retrieval — a room's *traversal* graph is not thematic lore.
+  Add read helpers (`get_exits_by_room` already exists) only if `lookup_world` needs to surface
+  them.
+
 ## 8. Authority boundary — why this is clean
 
 `docs/LLM_AUTHORITY_BOUNDARY.md` restricts **mutation** only: every prohibition is a write
@@ -396,7 +428,13 @@ it directly serves Phase A's retrieval slices):
    untouched by 51.7) — deterministic, integration-tested on bundle output.
 
 **Phase B — Narrator Lookup Tool** (requires A):
-1. `MemoryRepository.search_entities` + `LookupService` (unit + roundtrip tests, fake data).
+0. **Rooms as a first-class campaign entity (owner-directed 2026-07-11; see §7.1).** New `rooms`
+   table + `RoomState` model + `save_room`/`get_rooms`/`get_room` (migration `022_rooms.sql` with the
+   standard migration tests). Seed path plants a room record per dungeon room. Prereq for room
+   lookups in slice 1. Connections stay in the existing `room_exits` table (no tags).
+1. `MemoryRepository.search_entities` + `LookupService` (unit + roundtrip tests, fake data) —
+   unions the DuckDB entity tables **incl. `rooms`** (B0), so `entity_type="room"` needs no
+   cross-repo seam.
 2. Provider transport: `LLMToolDef`/`LLMToolCall`/`LLMRoundResult`, `complete_round` on the
    protocol + `OpenAIProvider` translation (unit-test with a `FakeProvider` scripting
    `tool_calls`; no live API in the default suite).
