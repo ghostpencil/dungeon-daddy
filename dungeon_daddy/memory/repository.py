@@ -17,6 +17,7 @@ from dungeon_daddy.rpg.models import (
     Objective,
     RoomExit,
     RoomObject,
+    RoomState,
 )
 
 
@@ -1615,6 +1616,79 @@ class MemoryRepository:
             "requires_clock_slug": r[13],
             "requires_clock_min_filled": r[14],
             "requires_memory_slug": r[15],
+        }
+
+    # ------------------------------------------------------------------
+    # Rooms (Phase 51.8 Slice B0 — first-class campaign room record; spec §7.1)
+    # ------------------------------------------------------------------
+
+    def save_room(self, room: RoomState) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO rooms (
+                room_id, campaign_id, level_id, slug, display_name, room_type,
+                summary, quest_role, markdown_path, checksum, tags
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (campaign_id, room_id) DO UPDATE SET
+                level_id      = excluded.level_id,
+                slug          = excluded.slug,
+                display_name  = excluded.display_name,
+                room_type     = excluded.room_type,
+                summary       = excluded.summary,
+                quest_role    = excluded.quest_role,
+                markdown_path = excluded.markdown_path,
+                checksum      = excluded.checksum,
+                tags          = excluded.tags
+            """,
+            [
+                room.room_id, room.campaign_id, room.level_id, room.slug,
+                room.display_name, room.room_type, room.summary, room.quest_role,
+                room.markdown_path, room.checksum, json.dumps(room.tags),
+            ],
+        )
+
+    def get_rooms(self, campaign_id: str) -> list[dict[str, Any]]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT room_id, campaign_id, level_id, slug, display_name, room_type,
+                   summary, quest_role, markdown_path, checksum, tags
+            FROM rooms WHERE campaign_id = ?
+            ORDER BY level_id, room_id
+            """,
+            [campaign_id],
+        ).fetchall()
+        return [self._room_row_to_dict(r) for r in rows]
+
+    def get_room(self, campaign_id: str, room_id: str) -> dict[str, Any] | None:
+        assert self._conn is not None
+        row = self._conn.execute(
+            """
+            SELECT room_id, campaign_id, level_id, slug, display_name, room_type,
+                   summary, quest_role, markdown_path, checksum, tags
+            FROM rooms WHERE campaign_id = ? AND room_id = ?
+            """,
+            [campaign_id, room_id],
+        ).fetchone()
+        if row is None:
+            return None
+        return self._room_row_to_dict(row)
+
+    def _room_row_to_dict(self, r: tuple[Any, ...]) -> dict[str, Any]:
+        return {
+            "room_id": r[0],
+            "campaign_id": r[1],
+            "level_id": r[2],
+            "slug": r[3],
+            "display_name": r[4],
+            "room_type": r[5],
+            "summary": r[6],
+            "quest_role": r[7],
+            "markdown_path": r[8],
+            "checksum": r[9],
+            "tags": json.loads(r[10]) if r[10] else [],
         }
 
     # ------------------------------------------------------------------

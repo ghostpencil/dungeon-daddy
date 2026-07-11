@@ -4,6 +4,7 @@ import pytest
 
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.memory.repository import MemoryRepository, MigrationRunner
+from dungeon_daddy.rpg.models import RoomState
 
 MIGRATIONS_DIR = (
     Path(__file__).parent.parent.parent.parent
@@ -467,3 +468,81 @@ class TestActorAbilities:
         tables = repo2.list_tables()
         repo2.close()
         assert "actor_abilities" in tables
+
+
+class TestRoomRepository:
+    def _room(self, **overrides: object) -> RoomState:
+        kwargs: dict[str, object] = {
+            "room_id": "R4",
+            "campaign_id": "camp-1",
+            "level_id": "level-1",
+            "slug": "great-lift",
+            "display_name": "The Great Lift",
+            "room_type": "mechanism",
+            "summary": "A vast counterweighted platform over the power core.",
+            "quest_role": "power-core",
+            "markdown_path": "rooms/great-lift.md",
+            "checksum": "abc123",
+            "tags": ["location:great-lift", "level:level-1", "thread:power-core"],
+        }
+        kwargs.update(overrides)
+        return RoomState(**kwargs)  # type: ignore[arg-type]
+
+    def test_save_room_round_trips_all_fields(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.save_room(self._room())
+        got = repo.get_room("camp-1", "R4")
+        repo.close()
+        assert got is not None
+        assert got["slug"] == "great-lift"
+        assert got["quest_role"] == "power-core"
+        assert got["markdown_path"] == "rooms/great-lift.md"
+        assert got["tags"] == ["location:great-lift", "level:level-1", "thread:power-core"]
+
+    def test_get_room_returns_none_for_unknown(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        assert repo.get_room("camp-1", "nope") is None
+        repo.close()
+
+    def test_get_rooms_is_campaign_scoped(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.save_room(self._room(room_id="R1", campaign_id="camp-1", slug="a"))
+        repo.save_room(self._room(room_id="R1", campaign_id="camp-2", slug="b"))
+        rooms = repo.get_rooms("camp-1")
+        repo.close()
+        assert [r["room_id"] for r in rooms] == ["R1"]
+        assert rooms[0]["slug"] == "a"
+
+    def test_save_room_upserts_on_conflict(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        repo.save_room(self._room(display_name="Old Name", tags=["theme:old"]))
+        repo.save_room(self._room(display_name="New Name", tags=["theme:new"]))
+        rooms = repo.get_rooms("camp-1")
+        repo.close()
+        assert len(rooms) == 1
+        assert rooms[0]["display_name"] == "New Name"
+        assert rooms[0]["tags"] == ["theme:new"]
+
+    def test_defaults_persist_for_minimal_room(self, tmp_path: Path) -> None:
+        repo = MemoryRepository(db_path=tmp_path / "test.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        minimal = RoomState(
+            room_id="R2",
+            campaign_id="camp-1",
+            level_id="level-1",
+            slug="cell",
+            display_name="Holding Cell",
+            room_type="chamber",
+        )
+        repo.save_room(minimal)
+        got = repo.get_room("camp-1", "R2")
+        repo.close()
+        assert got is not None
+        assert got["summary"] == ""
+        assert got["quest_role"] is None
+        assert got["markdown_path"] is None
+        assert got["tags"] == []
