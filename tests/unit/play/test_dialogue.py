@@ -548,15 +548,31 @@ class TestRecentMemoriesScoped:
         repo.save_memory_entry("m_here", "camp-1", "event", "Here",
                                importance=5, status="approved")
         repo.add_memory_tag("m_here", "location:r1")
-        # High importance but out of scene -> excluded (relevance over importance).
+        # Out of scene AND below the pin threshold -> excluded (a non-pin memory
+        # is gated by scene scope: relevance over importance).
         repo.save_memory_entry("m_away", "camp-1", "event", "Away",
-                               importance=9, status="approved")
+                               importance=6, status="approved")
         repo.add_memory_tag("m_away", "location:r9")
         repo.save_memory_entry("m_untagged", "camp-1", "event", "Untagged",
                                importance=7, status="approved")
 
         ids = [m.memory_id for m in coord.recent_memories()]
         assert ids == ["m_here"]
+
+    def test_recent_memories_always_includes_high_importance_pin(self, tmp_path):
+        # Owner ruling 2026-07-11: mirror the context bundle (§5.2) — an
+        # importance>=9 pin is never gated by scene scope, even out of the room.
+        coord, _chat, repo, _session, _narr = _make(tmp_path)  # room "r1"
+        repo.save_memory_entry("m_here", "camp-1", "event", "Here",
+                               importance=5, status="approved")
+        repo.add_memory_tag("m_here", "location:r1")
+        repo.save_memory_entry("m_pin", "camp-1", "event", "Critical",
+                               importance=9, status="approved")
+        repo.add_memory_tag("m_pin", "location:r9")  # a different room
+
+        ids = [m.memory_id for m in coord.recent_memories()]
+        assert ids[0] == "m_pin"   # pins first, importance-ordered, unscoped
+        assert "m_here" in ids     # scoped bulk still present
 
     def test_recent_memories_include_present_party_actor(self, tmp_path):
         coord, _chat, repo, _session, _narr = _make(tmp_path)  # party = pc-1/elara

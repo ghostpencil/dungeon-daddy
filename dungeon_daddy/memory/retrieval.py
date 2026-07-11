@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from typing import Any
 
 from dungeon_daddy.memory.models import MemoryEntry
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.memory.tags import actor_tag, validate_tag
+
+_log = logging.getLogger(__name__)
 
 
 def present_actor_ids(
@@ -41,7 +44,9 @@ def scene_memory_tags(
     ``location_slug`` + ``present_actor_ids``), so writes and reads are
     symmetric by construction. Every tag passes :func:`validate_tag` (they are
     canonical by construction; the call is a loud regression guard). An unknown
-    or cross-campaign actor id contributes nothing. Order-preserving, deduped.
+    or cross-campaign actor id contributes nothing (and is logged, since a
+    party/room actor that fails to resolve permanently under-tags the memory).
+    Order-preserving, deduped.
     """
     tags: list[str] = []
     if room_id:
@@ -50,6 +55,13 @@ def scene_memory_tags(
         actor = repo.get_actor(aid)
         if actor is not None and actor["campaign_id"] == campaign_id:
             tags.append(validate_tag(actor_tag(actor["actor_type"], actor["slug"])))
+        else:
+            _log.warning(
+                "scene_memory_tags: actor_id %r did not resolve (campaign=%r); "
+                "omitted from memory anchor tags",
+                aid,
+                campaign_id,
+            )
     return list(dict.fromkeys(tags))
 
 
@@ -93,10 +105,18 @@ class MemoryRetriever:
         for aid in actor_ids or []:
             # §5.1: resolve the actor record to its canonical
             # actor:<subtype>:<slug> tag; an unknown or cross-campaign id
-            # contributes nothing (get_actor is not campaign-scoped, so guard it).
+            # contributes nothing (get_actor is not campaign-scoped, so guard it)
+            # and is logged, since a dropped filter silently narrows the result.
             actor = self._repo.get_actor(aid)
             if actor is not None and actor["campaign_id"] == self._campaign_id:
                 tag_filters.append(actor_tag(actor["actor_type"], actor["slug"]))
+            else:
+                _log.warning(
+                    "query: actor_id %r did not resolve to a canonical tag "
+                    "(campaign=%r); dropped from filter",
+                    aid,
+                    self._campaign_id,
+                )
         if location_slug:
             tag_filters.append(f"location:{location_slug}")
 

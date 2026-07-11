@@ -3,8 +3,9 @@
 One namespaced, colon-delimited controlled vocabulary for the descriptive
 `tags` field of every world entity (T1-T3 of
 `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`). Bare un-namespaced tags are
-invalid. `validate_tag` is called by repo save paths (raises on write);
-reads stay permissive so old saves still load.
+invalid. Seed/engine/authored write sites call `validate_tag` (raises); the
+LLM-proposal path uses `normalize_tag` (coerce-or-drop). The repository layer
+itself does not validate, and reads stay permissive, so old saves still load.
 """
 
 from __future__ import annotations
@@ -65,10 +66,12 @@ def normalize_tag(tag: str) -> str | None:
 
     Used on the LLM-proposal write path (owner ruling 2026-07-10): a model tag
     typo must never lose the memory, but stored tags stay canonical. Applies the
-    T6 folds — ``actor:protagonist:<slug>`` -> ``actor:pc:<slug>`` and a bare
-    (un-namespaced) tag -> ``trait:<slug>`` — then validates; anything still
-    invalid is dropped. Dev/seed/engine paths use :func:`validate_tag` (raise)
-    instead of this forgiving coercion.
+    T6 folds — a bare (un-namespaced) tag -> ``trait:<slug>``, and a legacy or
+    alias ``actor:`` subtype -> its canonical subtype (``protagonist`` -> ``pc``;
+    plus any ``ActorState.actor_type`` alias in :data:`_ACTOR_TYPE_TO_SUBTYPE`,
+    e.g. ``monster`` -> ``npc``, ``dungeon_presence``/``faction`` -> ``dungeon``)
+    — then validates; anything still invalid is dropped. Dev/seed/engine paths
+    use :func:`validate_tag` (raise) instead of this forgiving coercion.
     """
     tag = tag.strip()
     if not tag:
@@ -78,8 +81,12 @@ def normalize_tag(tag: str) -> str | None:
         tag = f"trait:{tag}"  # bare -> trait: (T6)
     elif namespace == "actor":
         subtype, subsep, slug = rest.partition(":")
-        if subtype == "protagonist" and slug:
+        if slug and subtype == "protagonist":
             tag = f"actor:pc:{slug}"  # legacy protagonist -> pc (T6)
+        elif slug and subtype in _ACTOR_TYPE_TO_SUBTYPE:
+            # alias subtype (monster/dungeon_presence/faction, or an already
+            # canonical one) -> its canonical form via the shared fold table.
+            tag = actor_tag(subtype, slug)
     try:
         return validate_tag(tag)
     except ValueError:

@@ -105,6 +105,10 @@ def test_actor_tag_maps_actor_type_to_canonical_subtype(
         ("location:R1", "location:R1"),
         # legacy protagonist subtype folds to pc (T6)
         ("actor:protagonist:kira-dawnseeker", "actor:pc:kira-dawnseeker"),
+        # alias actor subtypes fold to their canonical form via the shared map
+        ("actor:monster:goblin", "actor:npc:goblin"),
+        ("actor:dungeon_presence:echo", "actor:dungeon:echo"),
+        ("actor:faction:cult", "actor:dungeon:cult"),
         # bare, un-namespaced tag -> trait: (T6)
         ("boss", "trait:boss"),
         # surrounding whitespace is trimmed
@@ -124,6 +128,7 @@ def test_normalize_tag_coerces_to_canonical(raw: str, expected: str) -> None:
         "bogus:thing",        # unknown namespace
         "actor:mara",         # two-segment, no subtype
         "actor:protagonist",  # two-segment protagonist, no slug to resolve
+        "actor:boss:xyz",     # unknown subtype, not in the fold map -> drop
         "theme:",             # empty slug
         "actor:pc:",          # empty slug
         "",                   # empty

@@ -240,9 +240,13 @@ class DialogueCoordinator:
     def recent_memories(self) -> list[Any]:
         """Last few approved memories, for the dungeon-voice context (§4.4).
 
-        Slice A5 (§5.2): scoped to the scene — the current room plus present
-        actors (the party and any NPCs/monsters in the room). With no room and
-        no roster the query stays unscoped (pre-A5 behavior).
+        Slice A5 (§5.2): the importance>=9 pins are ALWAYS included (an unscoped
+        query — a critical memory is never gated by scene scope), mirroring the
+        DM context bundle (``ContextBundleBuilder._fetch_memories``); the regular
+        bulk is scoped to the scene — the current room plus present actors (the
+        party and any NPCs/monsters in the room). Pins lead (importance-ordered);
+        the scoped bulk fills the remaining slots. With no room and no roster the
+        scoped query is also unscoped (pre-A5 behavior).
         """
         active = self._session.active_campaign()
         if active is None:
@@ -254,12 +258,17 @@ class DialogueCoordinator:
         party_ids = [a.actor_id for a in self._session.actors]
 
         retriever = MemoryRetriever(active.repo, active.campaign_id)
-        return retriever.query(
+        pinned = [e for e in retriever.query() if e.importance >= 9]
+        pin_ids = {e.memory_id for e in pinned}
+        scoped = retriever.query(
             actor_ids=present_actor_ids(
                 active.repo, active.campaign_id, room_id, party_ids
             ),
             location_slug=room_id,
-        )[: self._RECENT_MEMORY_LIMIT]
+        )
+        regular = [e for e in scoped if e.memory_id not in pin_ids]
+        remaining = max(0, self._RECENT_MEMORY_LIMIT - len(pinned))
+        return pinned + regular[:remaining]
 
     def agent_inputs(self, text: str) -> dict[str, Any]:
         """Assemble the §4.4 ``DungeonVoiceAgent.respond`` kwargs for ``text``.

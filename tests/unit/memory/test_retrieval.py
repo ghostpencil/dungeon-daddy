@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC
+
+import pytest
 
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.memory.retrieval import (
@@ -130,17 +133,20 @@ class TestMemoryRetriever:
         assert ids == {"mem_canon"}
 
     def test_query_actor_ids_unknown_actor_is_skipped(
-        self, repo: MemoryRepository
+        self, repo: MemoryRepository, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """An actor_id with no record contributes no filter (no crash)."""
+        """An actor_id with no record contributes no filter (no crash) and is
+        logged so the silently-narrowed result is diagnosable."""
         repo.save_memory_entry(
             "mem_x", "camp_001", "event", "X", importance=5, status="approved",
         )
         repo.add_memory_tag("mem_x", "theme:guilt")
 
-        results = MemoryRetriever(repo, "camp_001").query(actor_ids=["ghost"])
+        with caplog.at_level(logging.WARNING):
+            results = MemoryRetriever(repo, "camp_001").query(actor_ids=["ghost"])
 
         assert results == []
+        assert any("ghost" in r.message for r in caplog.records)
 
     def test_query_actor_ids_ignores_cross_campaign_actor(
         self, repo: MemoryRepository
@@ -204,11 +210,16 @@ class TestSceneMemoryTags:
         assert scene_memory_tags(repo, "camp_001", None, ["pc-1"]) == ["actor:pc:mara"]
 
     def test_unknown_or_cross_campaign_actor_contributes_no_tag(
-        self, repo: MemoryRepository
+        self, repo: MemoryRepository, caplog: pytest.LogCaptureFixture
     ) -> None:
         repo.save_actor("other", "camp_999", "pc", "mara", "Mara", room_id="R1")
         # unknown id + a cross-campaign id both resolve to nothing; empty room
-        assert scene_memory_tags(repo, "camp_001", None, ["ghost", "other"]) == []
+        with caplog.at_level(logging.WARNING):
+            tags = scene_memory_tags(repo, "camp_001", None, ["ghost", "other"])
+        assert tags == []
+        # both unresolved ids are logged so the under-tagged write is diagnosable
+        logged = " ".join(r.message for r in caplog.records)
+        assert "ghost" in logged and "other" in logged
 
 
 class TestRetrievalByActor:
