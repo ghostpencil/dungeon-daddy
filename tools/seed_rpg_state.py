@@ -376,6 +376,7 @@ def seed_campaign_with_pack(
     # match a Room.id in it — fail loudly rather than silently never scope.
     # On the write path only (dry-run stays a pure, side-effect-free preview),
     # before any repo is opened so a mismatch aborts atomically (nothing written).
+    dungeon = None
     dungeon_json = campaign_dir / "dungeon.json"
     if dungeon_json.exists():
         from dungeon_daddy.data.models import Dungeon
@@ -390,6 +391,30 @@ def seed_campaign_with_pack(
     db_path = campaign_dir / "campaign.duckdb"
     repo = MemoryRepository(db_path)
     repo.initialize_schema(_MIGRATIONS_DIR)
+
+    # Slice B0 (spec §7.1): project each dungeon room into a first-class `rooms`
+    # record — the base the populate scripts later enrich with authored tags.
+    # Respect the same skip/force contract as actors/clocks: a plain reseed must
+    # not clobber a room the populate scripts have already enriched, and a force
+    # reseed refreshes only the dungeon-derived fields while preserving the
+    # authored `tags`/`quest_role`.
+    if dungeon is not None:
+        from dungeon_daddy.rpg.seed_pack import build_room_states
+
+        existing_rooms = {r["room_id"]: r for r in repo.get_rooms(campaign_id)}
+        for room_state in build_room_states(dungeon.levels, campaign_id):
+            prior = existing_rooms.get(room_state.room_id)
+            if prior is None:
+                repo.save_room(room_state)
+                result.created += 1
+            elif force:
+                repo.save_room(room_state.model_copy(update={
+                    "tags": prior["tags"],
+                    "quest_role": prior["quest_role"] or room_state.quest_role,
+                }))
+                result.updated += 1
+            else:
+                result.skipped += 1
 
     _upsert_campaign(repo, campaign_id, campaign_slug, campaign_dir.name, campaign_dir, result)
     _upsert_session(repo, campaign_id, campaign_slug, result)

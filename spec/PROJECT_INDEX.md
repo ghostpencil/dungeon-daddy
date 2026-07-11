@@ -36,8 +36,11 @@ merged 2026-07-11; owner GUI-verified). Namespaced tag taxonomy (`memory/tags.py
 and the T7 `# Related Lore` pre-fetch. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
 
 Phase **51.8 Phase B — Narrator Lookup Tool: IN PROGRESS** (branch `feat/phase-51.8-narrator-lookup`).
-Decisions ratified; rooms elevated to a first-class campaign entity (`rooms` table, Slice B0 persistence
-COMPLETE). Detail in START HERE below. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
+Decisions ratified; rooms elevated to a first-class campaign entity (`rooms` table). Slice B0 **persistence +
+seed path both COMPLETE** — every dungeon room is projected into a `rooms` record across all seeders (incl. the
+app's `seed_from_manifest`), with hybrid `quest_role` (derive from `main_loop_role`, authored override wins) and
+Crucible lore-tag enrichment. Next: Slice B1 (`search_entities` + `LookupService`). Detail in START HERE below.
+Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
 
 Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` ·
 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` · current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`
@@ -83,12 +86,28 @@ update** — close PR #91, or merge it and reconcile this block on rebase.)*
   `get_room` (upsert on conflict, campaign-scoped). Updated the migration guard test — the campaign DB now
   legitimately holds a `rooms` table (`dungeons`/`connections`/`levels` remain design-only).
 
-**Resume — next steps (in order):**
-1. **Slice B0 seed path** (next) — plant a room record per dungeon room at seed time (`rpg/seed_pack.py`
-   `apply_seed_pack`/`seed_campaign_with_pack` + the Crucible populate scripts). Source `summary` from
-   `Room.note`; `quest_role`/`tags` from the seed/populate data. **Open design fork to settle with owner:**
-   where `quest_role` values come from — authored in the populate scripts vs. derived from objectives.
-   Add a seed guard (every seeded room tag passes `validate_tag`; room-id ∈ the dungeon model's union).
+**✅ Slice B0 seed path — COMPLETE (uncommitted, TDD, full suite green, ruff + mypy(strict) clean).**
+Every dungeon room is now projected into a first-class `rooms` record across **all** seed paths.
+- **Pure builder** `build_room_states(levels, campaign_id, *, quest_roles, room_tags)` (`rpg/seed_pack.py`):
+  `summary`←`Room.note`, `level_id`=`level:<Level.id>`, `slug`←name (id fallback); **hybrid `quest_role`**
+  (owner ruling 2026-07-11: derive from `Room.main_loop_role`, authored override wins) + a **guard** that
+  raises when an override names a room-id absent from the dungeon union.
+- **Wired into every seeder:** `apply_seed_pack(levels=…)`; `seed_campaign_with_pack` (when `dungeon.json`
+  present); **and the app's new-game path `campaign/seeder.py::seed_from_manifest`** (it already receives the
+  dungeon). All respect the skip/`force` contract — a reseed never clobbers populate-authored `tags`/
+  `quest_role`. **`backfill.py` self-heals rooms on load** (its dungeon-passing `seed_from_manifest` call now
+  also plants rooms; exit count made exit-specific) — so **new campaigns get rooms on first load**, same seam
+  as exits. (An *existing* save that already has exits, e.g. the live Crucible, skips backfill → needs a manual
+  reseed for rooms, matching the A6 live-data pattern.)
+- **Crucible populate scripts author lore tags** (`populate_crucible_level1/level2`, shared helper
+  `rpg/seed_pack.py::enrich_room_tags`): base-seeded rooms get `theme:`/`thread:` tags (reusing the real A4
+  slugs), idempotent, preserving base `summary`/`quest_role`, skipping unseeded rooms. Derived `main_loop_role`
+  quest roles were kept (entry/goal/obstacle/clue/bypass are already meaningful) — no authored `quest_role`
+  overrides needed. L3 (`r1`–`r8`) has no populate script → base-seed only (known; [[reference_crucible_room_ids]]).
+- **`/code-review high` (2 finders + fixes):** fixed a reseed data-loss bug (rooms now skip/force like actors;
+  +2 regression tests), extracted the duplicated `save_room_tags` into `enrich_room_tags`, and surfaced +fixed
+  the cross-file `backfill` count coupling. **Next: commit + owner GUI-verify** (does a fresh campaign show
+  first-class rooms; live Crucible reseed).
 2. **Slice B1** — `MemoryRepository.search_entities` + read-only `LookupService`. Unions the DuckDB entity
    tables **incl. `rooms`** (ILIKE substring on name/slug + exact tag membership); rank exact-slug-match >
    tag-hit count > (memory) importance/recency; ~1.2k-token compact-JSON tool results + `+N more`.

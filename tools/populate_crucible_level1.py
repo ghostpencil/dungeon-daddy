@@ -303,6 +303,28 @@ def _items() -> list[Item]:
     ]
 
 
+# Room lore tags (Slice B0 §7.1): connect each Level-1 room to the theme/thread
+# lore memories that share these slugs (the same real slugs the room's objects
+# carry), so `lookup_world` and the T7 pre-fetch surface a room's lore. The base
+# seed already plants each room's summary + derived quest_role; this only enriches
+# the tags. Reuses the canonical A4 vocabulary.
+_ROOM_TAGS: dict[str, list[str]] = {
+    "R1": ["theme:history", "thread:golem-rebellion"],
+    "R2": ["thread:power-core", "theme:history"],
+    "R3": ["thread:power-core", "theme:history"],
+    "R4": ["thread:power-core"],
+    "R5": ["theme:hazard"],
+}
+
+
+def save_room_tags(repo: MemoryRepository) -> int:
+    """Enrich Level-1 base-seeded rooms with the authored lore tags (idempotent).
+    Thin wrapper over the shared :func:`enrich_room_tags`."""
+    from dungeon_daddy.rpg.seed_pack import enrich_room_tags
+
+    return enrich_room_tags(repo, CAMPAIGN_ID, _ROOM_TAGS)
+
+
 def save_objects_preserving_state(
     repo: MemoryRepository, objects: list[RoomObject]
 ) -> None:
@@ -328,6 +350,8 @@ def main() -> None:
         raise SystemExit(f"Save DB not found: {db}")
     repo = MemoryRepository(db)
     try:
+        # Room lore tags (enrich base-seeded records; §7.1)
+        rooms_tagged = save_room_tags(repo)
         # Objects
         objects = _objects()
         save_objects_preserving_state(repo, objects)
@@ -366,6 +390,7 @@ def main() -> None:
             "UPDATE actors SET room_id = ? WHERE actor_id = ?", ["R4", GOLEM_A7_ID])
 
         print(f"Populated Level 1 of The Crucible at {db}")
+        print(f"  rooms tagged: {rooms_tagged}")
         print(f"  objects: {len(objects)}   loose items: {len(items)}")
         print("  monsters: R1 Scorpion Swarm, R2 Iron Scorpions, R4 Golem A-7, "
               "R5 Sweeper Drone")

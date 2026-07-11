@@ -261,6 +261,18 @@ home — Slice B0 adds a **`rooms` table** to the campaign DB.
   `markdown_path`/`checksum` to the full body — same split as `memory_entries`.
 - **Quest role in both places:** an authoritative `quest_role` column **and** namespaced tags
   (`quest:*`/`thread:*`) so the role also drives tag retrieval (column = truth, tags = reach).
+- **Quest role sourcing (OWNER-DECIDED 2026-07-11): hybrid.** The seed path *derives* the default
+  `quest_role` from the dungeon room's `main_loop_role` (`entry`/`goal`/`obstacle`/`clue`/`bypass`/…),
+  and an authored per-room override wins. Rationale: the literal "derive from objectives" has no data
+  source — `Loop.objective_room_ids` is empty in every shipped dungeon and RPG `Objective` entities carry
+  no room link, whereas `main_loop_role` *is* the room's authored role in the quest layout. Rooms lacking
+  it (e.g. the tomb sample) get `None`. In practice the derived roles were kept for the Crucible (already
+  meaningful); the populate scripts author only lore `tags`.
+- **Seed-path reach (Slice B0, implemented 2026-07-11):** the projection runs in `apply_seed_pack(levels=)`,
+  `seed_campaign_with_pack` (when `dungeon.json` present), **and** the app's new-game `seed_from_manifest`
+  (already passed the dungeon). New campaigns get rooms on first load via `backfill.py` (same seam as exits);
+  a reseed respects skip/`force` and never clobbers populate-authored `tags`/`quest_role`. Crucible lore tags
+  are enriched by the populate scripts through the shared `enrich_room_tags` helper.
 - Model `RoomState` (`rpg/models.py`, beside `ActorState`/`FactionState`/`ClockState`); repo
   `save_room`/`get_rooms`/`get_room`; migration `022_rooms.sql` (bare SQL, no `--` comments — the
   runner splits on `;`) with the standard migration tests (applies-on-prev-head, idempotent-from-

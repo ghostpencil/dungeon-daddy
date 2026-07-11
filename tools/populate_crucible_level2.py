@@ -77,14 +77,38 @@ def _lift_return_exit() -> RoomExit:
     )
 
 
+# Room lore tags (Slice B0 §7.1): connect each Level-2 room to the theme/thread
+# lore memories that share these slugs, so `lookup_world` and the T7 pre-fetch
+# surface a room's lore. The base seed plants each room's summary + derived
+# quest_role; this only enriches the tags. Reuses the canonical A4 vocabulary.
+_ROOM_TAGS: dict[str, list[str]] = {
+    "r01": ["thread:power-core"],
+    "r02": ["thread:power-core"],
+    "r03": ["thread:power-core"],
+    "r04": ["thread:power-core", "theme:mystery"],
+    "r05": ["theme:hazard"],
+    "r06": ["theme:history"],
+}
+
+
+def save_room_tags(repo: MemoryRepository) -> int:
+    """Enrich Level-2 base-seeded rooms with the authored lore tags (idempotent).
+    Thin wrapper over the shared :func:`enrich_room_tags`."""
+    from dungeon_daddy.rpg.seed_pack import enrich_room_tags
+
+    return enrich_room_tags(repo, CAMPAIGN_ID, _ROOM_TAGS)
+
+
 def main() -> None:
     db = _save_path()
     if not db.exists():
         raise SystemExit(f"Save DB not found: {db}")
     repo = MemoryRepository(db)
+    rooms_tagged = save_room_tags(repo)
     repo.save_room_object(_great_lift_upper())
     repo.save_room_exit(_lift_return_exit())
     print(f"Populated Level 2 of The Crucible at {db}")
+    print(f"  rooms tagged: {rooms_tagged}")
     print("  objects: Great Lift upper landing in r01 (lore_fixture scenery)")
     print("  exits:   r01->R4 Great Lift return (connector=vertical, open)")
 

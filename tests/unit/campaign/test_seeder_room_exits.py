@@ -161,7 +161,8 @@ def test_seed_exits_skips_existing_without_force(repo: MemoryRepository) -> None
     result2 = seed_from_manifest(_manifest(), repo, campaign_id=_CAMPAIGN_ID, dungeon=dungeon)
 
     assert result2.created == 0
-    assert result2.skipped == 2
+    # 2 bidirectional exits + 2 rooms (Slice B0 projects the dungeon's rooms too).
+    assert result2.skipped == 4
 
 
 def test_seed_exits_force_updates_existing(repo: MemoryRepository) -> None:

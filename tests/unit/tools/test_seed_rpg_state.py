@@ -392,6 +392,70 @@ class TestSeedCampaignWithPack:
         with pytest.raises(ValueError, match="NO-SUCH-ROOM"):
             seed_campaign_with_pack(campaign_dir, pack_path)
 
+    def test_seed_plants_room_records_from_dungeon_model(self, tmp_path: Path) -> None:
+        # Slice B0: when the campaign carries a dungeon.json, every dungeon room
+        # is projected into a first-class `rooms` record (summary from Room.note).
+        campaign_dir = _make_campaign_dir(tmp_path)
+        _write_dungeon(campaign_dir)
+        pack_path = _write_pack(tmp_path)
+        seed_campaign_with_pack(campaign_dir, pack_path)
+        repo = _open_repo(campaign_dir)
+        rooms = {r["room_id"]: r for r in repo.get_rooms("campaign:test-campaign")}
+        repo.close()
+        assert "1-A" in rooms
+        assert rooms["1-A"]["level_id"] == "level:1"
+        assert rooms["1-A"]["summary"]  # non-empty, sourced from the room note
+
+    def test_reseed_without_force_preserves_room_enrichment(self, tmp_path: Path) -> None:
+        # A plain reseed must skip existing rooms, not clobber authored tags /
+        # quest_role the populate scripts added (mirrors actors/clocks skip).
+        campaign_dir = _make_campaign_dir(tmp_path)
+        _write_dungeon(campaign_dir)
+        pack_path = _write_pack(tmp_path)
+        seed_campaign_with_pack(campaign_dir, pack_path)
+        # Simulate populate enrichment: author a lore tag on a room.
+        from dungeon_daddy.rpg.models import RoomState
+        repo = _open_repo(campaign_dir)
+        row = repo.get_room("campaign:test-campaign", "1-A")
+        repo.save_room(RoomState(**row).model_copy(update={"tags": ["theme:history"]}))
+        repo.close()
+
+        seed_campaign_with_pack(campaign_dir, pack_path)  # plain reseed
+
+        repo = _open_repo(campaign_dir)
+        room = repo.get_room("campaign:test-campaign", "1-A")
+        repo.close()
+        assert "theme:history" in room["tags"]  # enrichment survived
+
+    def test_reseed_with_force_preserves_room_enrichment(self, tmp_path: Path) -> None:
+        campaign_dir = _make_campaign_dir(tmp_path)
+        _write_dungeon(campaign_dir)
+        pack_path = _write_pack(tmp_path)
+        seed_campaign_with_pack(campaign_dir, pack_path)
+        from dungeon_daddy.rpg.models import RoomState
+        repo = _open_repo(campaign_dir)
+        row = repo.get_room("campaign:test-campaign", "1-A")
+        repo.save_room(RoomState(**row).model_copy(update={"tags": ["theme:history"]}))
+        repo.close()
+
+        seed_campaign_with_pack(campaign_dir, pack_path, force=True)  # force reseed
+
+        repo = _open_repo(campaign_dir)
+        room = repo.get_room("campaign:test-campaign", "1-A")
+        repo.close()
+        assert "theme:history" in room["tags"]  # force refreshes but preserves tags
+
+    def test_seed_plants_no_rooms_without_dungeon_model(self, tmp_path: Path) -> None:
+        # Back-compat: no dungeon.json → no room projection (the shipped seed_data
+        # folders have no colocated dungeon model).
+        campaign_dir = _make_campaign_dir(tmp_path)
+        pack_path = _write_pack(tmp_path)
+        seed_campaign_with_pack(campaign_dir, pack_path)
+        repo = _open_repo(campaign_dir)
+        rooms = repo.get_rooms("campaign:test-campaign")
+        repo.close()
+        assert rooms == []
+
     def test_seed_accepts_room_id_present_in_dungeon_model(self, tmp_path: Path) -> None:
         campaign_dir = _make_campaign_dir(tmp_path)
         _write_dungeon(campaign_dir)  # tomb rooms include "1-A"
