@@ -47,12 +47,262 @@ fixed (`fd101df`, repo-read failures now surface `REACTION_FAILURE_LINE`), 2 fin
 to this next phase (see the review block below). Full 51.7 slice history + deferred follow-ups
 retained further down for reference.
 
-**▶ NEXT — Phase: Tag Hygiene → Narrator Lookup.** Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`
-(the sequenced choice; item 2 below). Start by reading that spec for the slice plan. **Carry in the
-two deferred PR #89 review findings** as early cleanup candidates: (2) the broad silent
-`except Exception` catches in `actions.py` (`run_chat_action`, `on_resolve_action`) that hide
-failed resolves/LLM calls from the GM; (3) extract an `ActiveCampaign(repo, campaign_id)` value /
-`context.active_campaign()` accessor to collapse the 15+ hand-copied co-presence guards.
+**▶ NEXT — awaiting review/merge of PR #90 (Phase A — Tag Hygiene).** Spec
+`spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`. Branch `feat/phase-51.8-tag-hygiene` (pushed, tracking
+`origin`). **Phase A (Tag Hygiene) is COMPLETE and committed** — Slice 0 + A1–A6 all landed; last commits
+`99fc091` (A6) + `7f25bde` (A6 DBG-panel follow-up). **PR #90 OPEN → `main`**
+(https://github.com/ghostpencil/dungeon-daddy/pull/90), 18 commits, owner GUI-verified on the live Crucible
+(2026-07-11). Full suite green (**3667 passed**), ruff + mypy(strict) clean.
+
+**✅ PR #90 review pass complete (2026-07-11) — 5-agent parallel review; follow-up fixes COMMITTED to the PR
+branch (`5c65b29`, pushed 2026-07-11).** Ran `/pr-review-toolkit:review-pr all parallel`
+(code / tests / silent-failure / type-design / comments) against the PR #90 diff. **No merge blocker** —
+the code-reviewer's two "critical" seed findings (`location:r8`/`location_slug` `r7`/`r1` "broken") were the
+**F1 false premise repeated**: those are valid **level-3** rooms per `tests/fixtures/crucible.json`
+(L1 `R1–R5`, L2 `r01–r06`, **L3 `r1–r8`**); the seed guard tests validate against the full room-id union and
+pass green. See memory [[reference-crucible-room-ids]].
+- **Fixes committed to the PR branch (`5c65b29`, TDD, ruff + mypy(strict) clean; affected suites green, 101 passed):**
+  - `memory/tags.py` — module docstring corrected (validation lives at seed/engine/authored write sites +
+    `normalize_tag` on the LLM path; the **repo layer does not validate**) — flagged independently by 3 of 5
+    agents. `normalize_tag` now folds alias actor subtypes (`monster`→`npc`,
+    `dungeon_presence`/`faction`→`dungeon`) instead of dropping them (they were recoverable via the existing
+    fold table).
+  - `memory/retrieval.py` — WARNING logs when an `actor_id` fails to resolve in `query` / `scene_memory_tags`
+    (was a silent narrowing / under-tag with no diagnostic).
+  - `play/dialogue.py` — **owner ruling 2026-07-11: mirror the DM bundle.** `recent_memories` (dungeon-voice
+    context, §5.2) now ALWAYS includes importance≥9 pins (unscoped); the scene-scoped bulk fills the rest.
+    The DM-narrator `ContextBundle` already did this; the fix aligns the separate dungeon-voice channel.
+  - Tests: normalize alias-fold + unknown-subtype-drop cases; caplog on both retrieval drops; a dungeon-voice
+    pin test (+ adjusted the scoping test's decoy to importance 6 so it still checks non-pin scene-gating).
+- **Deferred (non-blocking, from the review — fold into Phase B or a cleanup slice):** room-id gate
+  self-disable logging (`seed_rpg_state.py` when `dungeon.json` absent); a shared `field_validator("tags")`
+  on Item/RoomObject/Objective/ClockState (move tag enforcement to the type boundary); the engine
+  write→read round-trip integration test (test **Gap A** — write via `record_dungeon_exchange`/
+  `advance_objectives`/`discover_exit`, read back through `ContextBundleBuilder`, assert resurfacing); LOW
+  items (co-referenced-clock `trigger_tags` last-writer-wins; DBG panel hides found-then-fully-trimmed lore;
+  `seed_pack.py:144` docstring imprecision).
+
+**When resuming next session:**
+1. **If PR #90 merged** → mark it MERGED here (mirror the 51.7 block), delete the branch, then start
+   **Phase B (Narrator Lookup Tool)** — first ratify decisions **L1/L2/L4–L7** with the owner (spec §13),
+   then Slice B1 = `MemoryRepository.search_entities` + `LookupService` (spec §7/§12 Phase B).
+2. **If PR #90 still open** → the review-fix batch is now **committed & pushed** (`5c65b29`); address any
+   remaining human review feedback on the branch.
+3. **Optional data-hygiene pass (not blocking):** old saves' gameplay memories carry pre-taxonomy **bare
+   tags** (`knowledge`, `arcane`, …) that don't participate in scene-scoped retrieval; a normalization pass
+   (`normalize_tag` over existing `memory_tags`) would fold them into the canonical vocabulary. Noticed on
+   the live Crucible during A6 GUI verify.
+
+*(A6 detail + the full A1–A6 slice history are retained in the blocks below.)*
+
+**✅ Slice 0 — cleanup warm-up: COMPLETE (2026-07-08, uncommitted→committed).** Both deferred PR #89
+review findings landed. (a) New frozen `ActiveCampaign(repo, campaign_id)` value +
+`PlaySessionContext.active_campaign()` accessor; **14** hand-copied `(mem_repo, campaign_id)`
+co-presence guards collapsed to consume it (`dialogue.py` ×6, `actions.py` ×5, `controller.py` ×2,
+`navigation.py` ×1, `reaction_applier.py` ×1) — the `campaign_id or state.dungeon_id` **fallback**
+sites (`controller.load_player_actors`, `memory_coordinator.load_memory_entries`,
+`narration.build_context_bundle`, `actions.run_proposal_pipeline`) are deliberately left (different
+semantics). (b) The two broad `except Exception` catches in `actions.py`
+(`run_chat_action`/`on_resolve_action`) now post a GM-visible `_ACTION_FAILURE_LINE` instead of only
+logging, with the narration+`_refresh_right_panel` post-commit steps split into their own guarded
+block so a post-commit failure is logged, never mislabelled "action could not be completed" (would
+contradict the success bubble). TDD; 7 new tests. **6-finding `/code-review high`** (5 angles) all
+fixed inline (post-commit mislabel, weak assertions pinned to the exact line, 2 half-migrated guards
+finished, dup refresh-tail folded away, `objective_location` param shadow renamed). Full suite green
+(**3536 passed**), ruff + mypy(strict) clean.
+
+**✅ Taxonomy gate cleared — T1–T6 ratified as proposed (2026-07-08).** All of Part 1 is now
+owner-decided (T7 was already decided 2026-07-04); spec §13 + header updated.
+
+**✅ Slice A1 — `validate_tag` + namespace vocabulary: COMPLETE (2026-07-08).** New pure module
+`dungeon_daddy/memory/tags.py`: `validate_tag(tag) -> str` enforces T1 (must be namespaced),
+T2 (namespace ∈ `TAG_NAMESPACES`, 14 families), the `actor:<pc|npc|dungeon>:<slug>` three-segment
+rule (`ACTOR_SUBTYPES`), and T3 shape (non-empty slug); returns the tag verbatim when valid.
+Deliberately does **not** force lowercase slugs — room-ids may be mixed-case (`location:R1`); §4.3
+validates room-id consistency separately. Read paths stay permissive (they simply don't call it).
+TDD, 23 tests (`tests/unit/memory/test_tags.py`), full suite green (**3559 passed**), ruff +
+mypy(strict) clean.
+
+**✅ Slice A2 — migration `020` + model/repo `tags`: COMPLETE (2026-07-08, `3ed3986`).** Added
+`tags: list[str] = []` to `Item`, `RoomObject`, `Objective` (`rpg/models.py`, mirroring
+`ActorState.tags`/`FactionState.tags`) and threaded it through the repo save/get paths
+(`memory/repository.py`, mirroring the faction pattern — `json.dumps`/`json.loads`, NULL/absent →
+`[]`). New migration `020_tag_taxonomy.sql` adds `tags TEXT DEFAULT '[]'` to `room_objects`,
+`items`, `objectives` (`actors`/`factions` already had it from migrations `011`/`007`). Pure
+persistence/model slice — **no behavior change**; `validate_tag` (A1) not yet wired into writes,
+read paths stay permissive. TDD, 13 tests (5 model, 2 migration incl. 020-on-019-head back-compat,
+6 repo round-trip/default). Full suite green (**3572 passed**), ruff + mypy(strict) clean.
+**✅ Slice A3 — seed-path fixes: COMPLETE (2026-07-08, `64a242a`).** All three §12 Phase A.3
+fixes, TDD, +18 tests (full suite green **3590**, ruff + mypy(strict, 169) clean). (a) **Actor-tags
+drop:** `apply_seed_pack` + `seed_campaign_with_pack` (create **and** force) now thread
+`tags=actor.tags` through `save_actor` — seeded NPC/PC tags no longer land as `[]`. (b) **T5
+`threat_tags`:** a `SeedActor` `mode="before"` validator folds the legacy `threat_tags`
+(boss/construct/undead — descriptive actor traits) into `tags` as `trait:<slug>` and drops the field;
+it absorbs legacy seed JSON on load (no hand-edit of the shipped seeds needed), back-compat. (c) **T5
+`trigger_tags`:** migration `021_clock_tags.sql` adds `clocks.tags`; `ClockState.tags` +
+`save_clock`/`get_clocks`/`update_clock_scope` thread it; `apply_seed_pack` routes room-threat
+`trigger_tags` onto the clock's `tags` as `trait:<slug>` and stops writing them into `action_tags`
+(they could never match a verb there → those clocks silently never advanced). (d) **§4.3 room-ID
+validation:** new pure `validate_seed_room_ids(pack, valid_room_ids)` raises loudly on
+`r1`-vs-`R1`/zero-padding mismatches; `apply_seed_pack` gains an opt-in `valid_room_ids` param
+(`None` = skip — back-compat for the tool/test callers that lack a dungeon; `apply_seed_pack` has no
+production `dungeon_daddy/` caller).
+
+**Owner decisions this session (2026-07-08), resolving a T5 spec-vs-reality gap** (T5 said "convert
+`trigger_tags` to `trait:` tags on the clock," but clocks had no `tags` column — A2's migration `020`
+scoped `tags` to objects/items/objectives only): the two dead vocabularies were split — **`threat_tags`
+folds onto actors** (descriptive traits; `actors.tags` already existed) and **`trigger_tags` route to
+clocks** (a different entity → owner chose to add `clocks.tags` via migration `021` rather than drop
+them). Note: migration runner can't parse `--` comments (splits on `;`, skips `--`-leading chunks), so
+`021` is bare SQL per convention.
+
+**✅ Slice A4 — seed-data normalization + Crucible world tagging: COMPLETE (2026-07-08, uncommitted).**
+All of spec §4.2/§4.3/§4.4 plus the five deferred A3 findings (F1–F5), TDD. Full suite green
+(**3606 passed**), ruff + mypy(strict, 169) clean.
+- **§4.2 normalize seed JSONs** (both `seed_data/campaigns/*/rpg_seed.json`, formatting-preserving
+  surgical edits — inline-array `indent=2` style intact): actor bare tags → `trait:*`, `level-N` →
+  `level:level-N`; legacy `threat_tags` folded into `trait:` and the key dropped; memory
+  `actor:protagonist:*` → `actor:pc:*`. New guard test `test_campaign_seed_tags_are_canonical`
+  (every shipped actor/faction/memory tag passes `validate_tag`; no `threat_tags`; no `actor:protagonist`).
+- **§4.3 room-id gate WIRED + guard.** New guard `test_campaign_seed_room_ids_match_dungeon_model`
+  validates each shipped seed against its canonical dungeon model's room-id **union across all levels**
+  (Crucible → `tests/fixtures/crucible.json`; tomb → `data/samples/…json`). Live gate in
+  `seed_campaign_with_pack`: when a `campaign_dir/dungeon.json` is present it loads the model and calls
+  `validate_seed_room_ids` — **on the write path only** (dry-run stays a pure preview), before any repo
+  open (a mismatch aborts atomically, nothing written).
+- **§4.4 tag the Crucible world.** `populate_crucible_level1/level2/dungeon_channel` assign
+  `object:<slug>`/`item:<slug>`/`objective:<slug>` + `level:level-N` + thematic `theme:`/`thread:`
+  (reusing the **real memory slugs** — `thread:power-core`, `theme:history`, `thread:golem-rebellion`,
+  `theme:hazard`, `theme:mystery` — so T7 pre-fetch actually connects nouns→lore). Also canonicalized
+  the three populate-script NPC/monster actor tags (bare → `trait:`). Idempotent, preserves play state.
+- **F2–F5 folded in** (`seed_pack.py` + `repository.py`): F2/F3 shared `_append_trait_tags` helper
+  (validates via `validate_tag`, dedups) used by both the `threat_tags` fold and `trigger_tags` routing;
+  F4 `update_clock_scope` collapsed to one dynamic SET clause (`action_tags`/`tags` default `None` =
+  leave-untouched); F5 the room-threat loop no longer blanks a co-referenced clock's `action_tags`
+  (and, post-review, no longer blanks its `tags` on an empty `trigger_tags` list either).
+
+**⚠ A3 finding F1 was a false premise (corrected 2026-07-08).** F1 claimed the Crucible seed used
+"inconsistent room-id spellings (`R1`/`r01`/`r1`/`r7`/`r04`)" that `validate_seed_room_ids` would reject.
+Checking the actual dungeon model, those are **distinct valid rooms on different levels** — L1 `R1`–`R5`,
+L2 `r01`–`r06`, L3 `r1`–`r8` — so every seed reference resolves. "Match the dungeon model" therefore
+meant *wire the gate with the full room-id union* (it passes as-is), **no seed room-id rewrite needed**.
+Verified empirically + by the new guard test.
+
+**A4 `/code-review high` (2026-07-08, 3 agents / 8 angles) — no correctness bug in shipped-data paths;
+2 fixes applied, 2 kept-with-rationale.** Applied: (1) the §4.3 gate ran before the `dry_run`
+early-return → moved to the write path so `--dry-run` stays a pure, non-crashing preview; (2) the
+room-threat loop's empty-`trigger_tags`-blanks-`tags` trap (extension of F5) — now passes `tags` only
+when non-empty. Kept (intended): the gate validates threat `location_slug`s even though
+`seed_campaign_with_pack` doesn't apply threats (spec §4.3 mandates both; matches `apply_seed_pack`;
+only bites a genuinely-broken seed, atomically); `validate_tag` raising on an empty legacy `threat_tags`
+entry (T3 fail-loud on the seed/write path). Cleanup applied: lifted the `level:level-N` convention to
+named `LEVEL_TAG` constants in level2/dungeon_channel (was documented only in level1). Deferred to A5:
+a shared canonical tag *builder* in `memory/tags.py` (the spec defers wiring `validate_tag`/construction
+into production writes to A5).
+
+**✅ Slice A5 — retrieval actually uses tags: COMPLETE (2026-07-10, uncommitted).** Full suite green
+(**3630 passed**), ruff + mypy(strict) clean. TDD. New `actor_tag(actor_type, slug)` builder
+(`memory/tags.py`) + shared `present_actor_ids(repo, campaign_id, room_id, party_ids)` helper
+(`memory/retrieval.py`). `MemoryRetriever.query` resolves `actor_ids` → canonical `actor:<subtype>:<slug>`
+via the actor record (was broken two-segment `actor:{id}`); a scoped call whose filters resolve to
+nothing now returns `[]` (not the whole campaign). Both production callers pass current-room `location:`
++ present-actor `actor:` filters — `context_bundle._fetch_memories` **and**
+`DialogueCoordinator.recent_memories()`. `rpg/fallout.py` routed through the builder.
+
+**Two owner rulings this session resolved spec-vs-data gaps** (memory
+[[project_phase51_8_a5_tag_conventions]]): (1) **actor-tag is TYPE-BASED** — `pc→pc`,
+`npc/monster→npc`, `dungeon/dungeon_presence/faction→dungeon`; `actor:dungeon:` reserved for the persona
+only; seeds retagged (`actor:dungeon:<creature>` → `actor:npc:`). (2) **memory `location:` tags use the
+GRID room id** (not descriptive slugs) — a `/code-review high` (2 agents) caught that
+`location:<current_room_id>` matched **zero** seeded memories (grid ids `R1`/`r01` vs descriptive
+`entry-chamber`; the A5 tests had contrived matching ids → false confidence). Seeds retagged to grid ids
+(dungeon-wide `location:the-crucible` kept). Two new seed guards pin both conventions; a drift guard
+pins that every `ActorState.actor_type` Literal is mapped.
+
+**Review also fixed:** importance≥9 **pins are now unscoped** (a critical memory is never gated by scene
+scope — spec §5.2 "keeping the existing importance-pinning"; only the regular bulk is scene-scoped);
+`query`'s actor resolution guards `campaign_id` (get_actor isn't campaign-scoped → no cross-campaign
+slug leak); the two callers' duplicated present-actor construction collapsed to the shared helper (fixed
+a real `if room is not None` vs `if room:` divergence between the copies).
+
+**✅ Slice A5b — write-side tag hygiene: COMPLETE (2026-07-10, committed `f5b3cff`).** Full suite green
+(**3653 passed**), ruff + mypy(strict, 169) clean. TDD throughout. All three parts landed.
+
+**Part 1 (commit `7e82eac`):** the `normalize_tag(tag) -> str | None` primitive (`memory/tags.py`; T6
+folds `actor:protagonist:`→`actor:pc:`, bare→`trait:`, drop+log the un-normalizable) + wired into the
+**LLM-proposal path** (`rpg/proposal_applier.py` — proposed memory tags are normalized, un-normalizable
+ones dropped with a warning, never stored raw). 15 tests.
+
+**Parts 2+3 (uncommitted — the two collapsed into one piece of work, since none of the three engine
+sites authored any tags before, so there was nothing to guard until the tags existed):** +9 tests.
+- **New `scene_memory_tags(repo, campaign_id, room_id, party_ids)` (`memory/retrieval.py`)** — the
+  write-side twin of `present_actor_ids`. Returns validated `location:<grid-room-id>` + `actor_tag(...)`
+  for the party **and** any NPCs/monsters in the room — exactly the anchors the reader filters on
+  (`query`'s `location_slug` + `present_actor_ids`), so **writes and reads are symmetric by
+  construction** (owner ruling 2026-07-10: mirror the reader — the wider net helps narration continuity;
+  tags control retrieval reach, not memory content).
+- **Item 2 (`validate_tag` raise-guard) satisfied via the helper**, not a separate call per site: every
+  tag `scene_memory_tags` emits passes `validate_tag`, and all three writers build their tags **only**
+  through it — so the authored-site raise-guard lives at the single construction point (DRY; can't be
+  forgotten at a new call site). Tags are canonical by construction → belt-and-suspenders regression guard.
+- **Item 3 (write-time room/actor tagging) — all three `memory_entries` writers now stamp scene tags:**
+  `record_dungeon_exchange` (`dialogue.py` caller threads room + party), `advance_objectives`
+  (`actions.py`/ActionOrchestrator threads session room + party), `discover_exit` (owner: tag now for
+  correctness-when-wired — test-only caller today). Each gained `room_id`/`party_ids` params defaulting
+  `None` → back-compat (the pre-A5b call shape writes no tags; existing tests untouched).
+- Live-play memories are now retrievable by A5's scene-scoped query (previously only **seed** lore was);
+  `/remember`+`[REMEMBER]` still write the level-memory **Markdown overlay** (not `memory_entries`) — out
+  of scope, as planned.
+
+**✅ Slice A6 — T7 `# Related Lore` pre-fetch: COMPLETE (2026-07-10, uncommitted).** Full suite green
+(**3665 passed**), ruff + mypy(strict) clean. TDD (red→green per behavior). **Phase A (Tag Hygiene) is
+now fully implemented** — the deterministic tag-driven bundle section is the payoff slice A1–A5b built up to.
+- **New `ContextBundle.related_lore: list[dict]`** (`memory/models.py`) — a distinct bundle section beside
+  `memory_cards`, defaulting `[]`.
+- **New `MemoryRetriever.query_by_tag_relevance(tags)`** (`memory/retrieval.py`) — approved memories sharing
+  any anchor tag, ranked **tag-hit count DESC → importance DESC → recency** (the spec §5 T7 ranking; the
+  existing `query()` ranks importance/recency only). Row→`MemoryEntry` mapping DRY'd behind a shared
+  `_entry_from_row` helper (both query methods use it).
+- **`ContextBundleBuilder._fetch_related_lore` + `_collect_anchor_tags`** (`memory/context_bundle.py`) — unions
+  the descriptive tags of the scene's anchor entities (room objects/items, present NPCs/monsters, the party
+  focus actors, active objectives), retrieves related lore, **dedups against `memory_cards`** (a memory already
+  in the scoped section is never re-listed — and since importance≥9 pins are always in `memory_cards`, related
+  lore is purely the thematic mid-importance expansion), trims to a **dedicated ~400-token sub-budget**
+  (separate from the memory-card trim, so lore never crowds out scene memories), and records
+  `related_lore_anchor_tags`/`related_lore_retrieved`/`related_lore_omitted` in `provenance`. Gated on a
+  current room (no room → no scene → empty).
+- **DM prompt renders `# Related Lore`** (`llm/agents/dm_agent.py`) — the section is emitted into the system
+  prompt after `# Memory`, so the pre-fetched lore actually reaches the LLM (omitted when empty).
+- Live play activates it: `narration.build_context_bundle` already passes `current_room_id`.
+
+**A6 `/code-review high` (2026-07-10, 3 finder agents / 8 angles) — 1 correctness bug fixed + 2 cleanups
+applied; spec-deviation notes kept.** **Fixed (real bug):** `get_actors_by_room` never SELECTed `tags`, so
+in-room NPC/monster anchor tags were silently always `[]` — the party branch worked (via `get_actor`, which
+returns tags) but present-actor anchoring was a no-op. Added `tags` to the method (mirrors `get_actor`;
+back-compat, key access only in callers); TDD guard `test_present_npc_tag_surfaces_related_lore`. **Cleanups:**
+DRY'd the duplicated row→`MemoryEntry` mapping into `_entry_from_row`; corrected the sub-budget comment (it's a
+*dedicated* ~400 budget, not carved out of the memory section's 2000). **Kept (noted, not bugs):** anchors
+union *all* active objectives (spec says "the active objective" singular, but objectives are campaign-scoped
+with no room link, and their `thread:`/`theme:` tags are exactly the thematic hooks T7 wants); exits omitted
+from anchors (they have no `tags` column — inert); the pre-existing `trim_to_budget` first-overflow-break
+(inherited A5 helper, not this diff). Committed `99fc091`.
+
+**A6 observability + GUI verify — ✅ owner-verified on the live Crucible (2026-07-11).** The DBG-tab bundle
+section never rendered `bundle_section_lines()` (it showed action/clock/reaction/proposal only), so A6 was
+invisible in-app. Wired `bundle_section_lines()` into `_draw_debug_tab` (`views/play_view.py`) and extended it
+to list a **`Related Lore: N Trimmed: M`** block + each lore title `[lore]` (`ui/panels/debug_controls.py`),
+rendered only when the section pre-fetched something. TDD (2 debug-controls tests); 412 view/debug tests green,
+ruff + mypy(strict) clean. **Live verify:** at room R4 (Great Lift, `thread:power-core`) a Look built the bundle
+and the DBG panel showed `Related Lore: 1 — The Power Core Is Destabilizing [lore]`, correctly deduped out of
+the 4 scoped Cards — matching the offline probe (R1→2, R5→2, r04→2). **Data note:** the live Crucible save was
+missing all 8 canonically-tagged seed lore memories (it had 4 gameplay memories with old bare tags), so A6 read
+empty until the 8 were injected (backup `campaign.duckdb.bak-a6-inject-lore-20260711-074321`, additive, play
+state untouched) — an A6-independent seed/save data gap, not a code defect (a fresh seed loads them via
+`apply_seed_pack`). Then PR the Phase A arc.
+
+**After A6 — Phase B (Narrator Lookup Tool):** requires Phase A (done, **PR #90 open** — merge first).
+Ratify L1/L2/L4–L7 at Phase B start (spec §13). Slice B1 = `MemoryRepository.search_entities` +
+`LookupService` (`spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` §7/§12 Phase B).
 
 **Exit-criterion-1 — ✅ owner accepted 1491 lines (2026-07-06).** `views/play_view.py` landed at
 **1491 lines** (from 1878), above the spec's "≤ ~900" but now containing *only* drawing / input

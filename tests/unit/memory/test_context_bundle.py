@@ -42,6 +42,17 @@ class TestContextBundleBuilder:
         assert bundle.open_clocks == []
         assert bundle.mechanical_state == {}
         assert bundle.must_remember == []
+        assert bundle.related_lore == []
+
+    def test_related_lore_defaults_empty(self) -> None:
+        # Slice A6 (T7): the bundle gains a distinct `# Related Lore` section,
+        # defaulting to an empty list, mirroring `memory_cards`.
+        from dungeon_daddy.memory.models import ContextBundle
+
+        bundle = ContextBundle(
+            bundle_id="b1", campaign_id="camp_001", mode="run_scene"
+        )
+        assert bundle.related_lore == []
 
     def test_build_with_unknown_actor_returns_empty_actor_state(
         self, repo: MemoryRepository
@@ -238,11 +249,15 @@ class TestContextBundleBuilder:
     def test_build_provenance_records_counts_and_criteria(
         self, repo: MemoryRepository
     ) -> None:
+        # Slice A5: retrieval is scene-scoped, so the focus actor must exist and
+        # the memories must be tagged to it to be in scene.
+        repo.save_actor("actor_001", "camp_001", "pc", "mara", "Mara")
         for i in range(5):
             repo.save_memory_entry(
                 f"mem_{i:03d}", "camp_001", "event", "x" * 40,
                 summary="y" * 40, importance=5, status="approved",
             )
+            repo.add_memory_tag(f"mem_{i:03d}", "actor:pc:mara")
 
         builder = ContextBundleBuilder(
             campaign_id="camp_001",

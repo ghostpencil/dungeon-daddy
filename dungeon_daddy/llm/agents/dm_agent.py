@@ -43,6 +43,14 @@ class DungeonMasterAgent:
                     f"{i}. {label}{card['title']} (importance: {card['importance']})"
                     f"\n   {card['summary']}"
                 )
+        lore = context_bundle.related_lore
+        if lore:
+            lines.append("\n# Related Lore")
+            for entry in lore:
+                lines.append(
+                    f"  - {entry['title']} (importance: {entry['importance']})"
+                    f"\n    {entry['summary']}"
+                )
         fallout = context_bundle.active_fallout
         clocks = context_bundle.open_clocks
         if fallout or clocks:

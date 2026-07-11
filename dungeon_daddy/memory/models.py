@@ -52,6 +52,7 @@ class ContextBundle(BaseModel):
     open_clocks: list[dict[str, Any]] = Field(default_factory=list)
     must_remember: list[str] = Field(default_factory=list)
     memory_cards: list[dict[str, Any]] = Field(default_factory=list)
+    related_lore: list[dict[str, Any]] = Field(default_factory=list)
     faction_reputations: list[dict[str, Any]] = Field(default_factory=list)
     inventory: dict[str, Any] = Field(default_factory=dict)
     current_room: dict[str, Any] = Field(default_factory=dict)

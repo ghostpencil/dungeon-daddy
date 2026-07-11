@@ -29,6 +29,7 @@ def _objective(
     status: str = "active",
     required_state: str = "restored",
     reveals_knowledge: list[str] | None = None,
+    tags: list[str] | None = None,
 ) -> Objective:
     return Objective(
         objective_id=objective_id,
@@ -45,6 +46,7 @@ def _objective(
         ),
         advances_clock_slug="dungeon_intimacy",
         reveals_knowledge=reveals_knowledge if reveals_knowledge is not None else [],
+        tags=tags if tags is not None else [],
     )
 
 
@@ -77,6 +79,17 @@ class TestRoundTrip:
         repo.save_objective(_objective(reveals_knowledge=secrets))
         o = repo.get_objectives("campaign:test")[0]
         assert o["reveals_knowledge"] == secrets
+
+    def test_tags_round_trip(self, repo: MemoryRepository) -> None:
+        tags = ["objective:restore-coolant-loop", "thread:restore-the-power-core"]
+        repo.save_objective(_objective(tags=tags))
+        o = repo.get_objectives("campaign:test")[0]
+        assert o["tags"] == tags
+
+    def test_tags_default_empty_when_unset(self, repo: MemoryRepository) -> None:
+        repo.save_objective(_objective())
+        o = repo.get_objectives("campaign:test")[0]
+        assert o["tags"] == []
 
     def test_empty_reveals_knowledge_is_empty_list(self, repo: MemoryRepository) -> None:
         repo.save_objective(_objective())

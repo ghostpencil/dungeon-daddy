@@ -536,3 +536,50 @@ def test_apply_dungeon_reply_posts_bubble_and_records_exchange(tmp_path):
     # An approved memory of the exchange is written engine-side.
     assert repo.count_by_status("camp-1") == {"approved": 1}
     assert ("dungeon", "I am the deep.") in coord.session.turns
+
+
+# ---------------------------------------------------------------------------
+# Slice A5 — recent_memories is scene-scoped (current room + present actors)
+# ---------------------------------------------------------------------------
+
+class TestRecentMemoriesScoped:
+    def test_recent_memories_scoped_to_current_room(self, tmp_path):
+        coord, _chat, repo, _session, _narr = _make(tmp_path)  # room "r1"
+        repo.save_memory_entry("m_here", "camp-1", "event", "Here",
+                               importance=5, status="approved")
+        repo.add_memory_tag("m_here", "location:r1")
+        # Out of scene AND below the pin threshold -> excluded (a non-pin memory
+        # is gated by scene scope: relevance over importance).
+        repo.save_memory_entry("m_away", "camp-1", "event", "Away",
+                               importance=6, status="approved")
+        repo.add_memory_tag("m_away", "location:r9")
+        repo.save_memory_entry("m_untagged", "camp-1", "event", "Untagged",
+                               importance=7, status="approved")
+
+        ids = [m.memory_id for m in coord.recent_memories()]
+        assert ids == ["m_here"]
+
+    def test_recent_memories_always_includes_high_importance_pin(self, tmp_path):
+        # Owner ruling 2026-07-11: mirror the context bundle (§5.2) — an
+        # importance>=9 pin is never gated by scene scope, even out of the room.
+        coord, _chat, repo, _session, _narr = _make(tmp_path)  # room "r1"
+        repo.save_memory_entry("m_here", "camp-1", "event", "Here",
+                               importance=5, status="approved")
+        repo.add_memory_tag("m_here", "location:r1")
+        repo.save_memory_entry("m_pin", "camp-1", "event", "Critical",
+                               importance=9, status="approved")
+        repo.add_memory_tag("m_pin", "location:r9")  # a different room
+
+        ids = [m.memory_id for m in coord.recent_memories()]
+        assert ids[0] == "m_pin"   # pins first, importance-ordered, unscoped
+        assert "m_here" in ids     # scoped bulk still present
+
+    def test_recent_memories_include_present_party_actor(self, tmp_path):
+        coord, _chat, repo, _session, _narr = _make(tmp_path)  # party = pc-1/elara
+        repo.save_actor("pc-1", "camp-1", "pc", "elara", "Elara")
+        repo.save_memory_entry("m_actor", "camp-1", "event", "About Elara",
+                               importance=4, status="approved")
+        repo.add_memory_tag("m_actor", "actor:pc:elara")
+
+        ids = [m.memory_id for m in coord.recent_memories()]
+        assert "m_actor" in ids

@@ -9,7 +9,7 @@ wraps it with persistence.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
@@ -65,7 +65,10 @@ def completion_satisfied(
 
 
 def advance_objectives(
-    repo: MemoryRepository, campaign_id: str
+    repo: MemoryRepository,
+    campaign_id: str,
+    room_id: str | None = None,
+    party_ids: Sequence[str] | None = None,
 ) -> list[ObjectiveResult]:
     """Complete satisfied active objectives, advancing the intimacy ladder.
 
@@ -82,6 +85,11 @@ def advance_objectives(
     objectives = repo.get_objectives(campaign_id)
     world_state = {"objects": repo.get_objects_for_campaign(campaign_id)}
     clocks = repo.get_clocks(campaign_id)
+    # A5b scene-anchor tags: identical for every completion this pass, but this
+    # service runs after *every* command (most passes complete nothing), so the
+    # tags are built lazily on the first completion — the no-op path does zero
+    # extra actor/room queries.
+    scene_tags: list[str] | None = None
 
     results: list[ObjectiveResult] = []
     for obj in objectives:
@@ -108,6 +116,16 @@ def advance_objectives(
             ),
             status="approved",
         )
+        # A5b: stamp the scene anchors so A5 scoped retrieval resurfaces this
+        # milestone in the same room / with the same actors present.
+        if scene_tags is None:
+            # Local import keeps rpg.objectives free of a module-load-time
+            # memory/retrieval import (mirrors the TYPE_CHECKING-only repo hint).
+            from dungeon_daddy.memory.retrieval import scene_memory_tags
+
+            scene_tags = scene_memory_tags(repo, campaign_id, room_id, party_ids or [])
+        for tag in scene_tags:
+            repo.add_memory_tag(memory_id, tag)
 
         results.append(
             ObjectiveResult(

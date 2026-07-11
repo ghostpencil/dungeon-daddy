@@ -381,3 +381,44 @@ def test_reseed_does_not_duplicate_bindings(repo, tmp_path: Path):
     seed_dungeon_channel(repo, tmp_path, CAMPAIGN_ID)
     assert len(_obj_by_slug(repo, "coolant-loop").reaction_bindings) == 1
     assert len(_obj_by_slug(repo, "arcane-resonance-node").reaction_bindings) == 1
+
+
+# --- Phase 51.8 A4 §4.4: taxonomy tags on subsystems, objectives, resonance ---
+
+def test_subsystem_objects_carry_canonical_taxonomy_tags():
+    from dungeon_daddy.memory.tags import validate_tag
+    from tools.populate_crucible_dungeon_channel import LADDER, _subsystem_object
+
+    for rung in LADDER:
+        if rung.room_id is None:
+            continue  # tier 0 adopts the Level-1 gearworks (tagged by that seed)
+        obj = _subsystem_object(rung)
+        assert obj.tags
+        for t in obj.tags:
+            validate_tag(t)
+        assert f"object:{obj.slug}" in obj.tags
+        assert "level:level-2" in obj.tags
+
+
+def test_objectives_carry_canonical_taxonomy_tags():
+    from dungeon_daddy.memory.tags import validate_tag
+    from tools.populate_crucible_dungeon_channel import LADDER, _objective
+
+    for rung in LADDER:
+        obj = _objective(rung, "active")
+        assert obj.tags
+        for t in obj.tags:
+            validate_tag(t)
+        assert f"objective:{obj.slug}" in obj.tags
+
+
+def test_resonance_object_carries_canonical_taxonomy_tags():
+    from dungeon_daddy.memory.tags import validate_tag
+    from tools.populate_crucible_dungeon_channel import _resonance_object
+
+    obj = _resonance_object()
+    assert obj.tags
+    for t in obj.tags:
+        validate_tag(t)
+    assert "object:arcane-resonance-node" in obj.tags
+    assert "level:level-2" in obj.tags

@@ -60,6 +60,29 @@ def _transition(
     )
 
 
+class TestTags:
+    def test_tags_round_trip(self, repo: MemoryRepository) -> None:
+        tags = ["object:iron-chest", "theme:the-machine-remembers"]
+        repo.save_room_object(_room_object().model_copy(update={"tags": tags}))
+        result = repo.get_room_object("obj:test:chest")
+        assert result is not None
+        assert result["tags"] == tags
+
+    def test_tags_default_empty_when_unset(self, repo: MemoryRepository) -> None:
+        repo.save_room_object(_room_object())
+        result = repo.get_room_object("obj:test:chest")
+        assert result is not None
+        assert result["tags"] == []
+
+    def test_tags_surface_via_get_objects_by_room(
+        self, repo: MemoryRepository
+    ) -> None:
+        tags = ["object:iron-chest"]
+        repo.save_room_object(_room_object().model_copy(update={"tags": tags}))
+        objs = repo.get_objects_by_room("campaign:test", "room:test:vault")
+        assert objs[0]["tags"] == tags
+
+
 class TestTransitions:
     def test_transitions_nested_in_get_room_object(self, repo: MemoryRepository) -> None:
         obj = _room_object().model_copy(update={"transitions": [_transition()]})

@@ -123,6 +123,7 @@ class ClockState(BaseModel):
     completion_effect: str | None = None
     visible_to_player: bool = True
     monotonic: bool = True
+    tags: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def filled_within_segments(self) -> ClockState:
@@ -283,6 +284,7 @@ class Item(BaseModel):
     combines_with_slug: str | None = None
     combination_result_slug: str | None = None
     features: list[ItemFeature] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
     @field_validator("description")
     @classmethod
@@ -384,6 +386,7 @@ class RoomObject(BaseModel):
     # authored `reaction_bindings` (§5); `inert` = no mechanics.
     reaction_policy: Literal["scripted", "ambient", "inert"] = "ambient"
     reaction_bindings: list[ObjectReactionBinding] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
     @field_validator("description")
     @classmethod
@@ -430,6 +433,7 @@ class Objective(BaseModel):
     completion: ObjectiveCompletion
     advances_clock_slug: str | None = None
     reveals_knowledge: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
     @field_validator("tier_index")
     @classmethod

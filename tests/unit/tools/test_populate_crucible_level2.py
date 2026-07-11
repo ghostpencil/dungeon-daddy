@@ -26,3 +26,14 @@ def test_upper_landing_drops_out_of_systems_status():
         "current_state": upper.current_state,
     }
     assert dungeon_systems_status([obj]) == []
+
+
+def test_upper_landing_carries_canonical_taxonomy_tags():
+    from dungeon_daddy.memory.tags import validate_tag
+
+    upper = _great_lift_upper()
+    assert upper.tags
+    for t in upper.tags:
+        validate_tag(t)
+    assert "object:great-lift-upper" in upper.tags
+    assert "level:level-2" in upper.tags

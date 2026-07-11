@@ -55,6 +55,37 @@ class TestRecordDungeonExchange:
         counts = repo.count_by_status("camp_001")
         assert counts == {"approved": 1}
 
+    def test_stamps_scene_anchor_tags(self, repo: MemoryRepository) -> None:
+        # A5b: an engine memory write is tagged with the current-room
+        # location:<grid-id> + present-actor tags (party + room NPCs/monsters)
+        # so A5 scoped retrieval resurfaces it later in the same scene.
+        repo.save_actor("pc-1", "camp_001", "pc", "mara", "Mara", room_id="R1")
+        repo.save_actor("mon-1", "camp_001", "monster", "ogre", "Ogre", room_id="R1")
+
+        result = record_dungeon_exchange(
+            repo,
+            campaign_id="camp_001",
+            actor="mara",
+            player_message="Who built you?",
+            dungeon_reply="I remember hands.",
+            room_id="R1",
+            party_ids=["pc-1"],
+        )
+
+        tags = set(repo.get_memory_tags(result.memory_id))
+        assert tags == {"location:R1", "actor:pc:mara", "actor:npc:ogre"}
+
+    def test_untagged_when_no_room_or_party(self, repo: MemoryRepository) -> None:
+        # Back-compat: the pre-A5b call shape (no room/party) writes no tags.
+        result = record_dungeon_exchange(
+            repo,
+            campaign_id="camp_001",
+            actor="mara",
+            player_message="Hi",
+            dungeon_reply="...",
+        )
+        assert repo.get_memory_tags(result.memory_id) == []
+
     def test_does_not_advance_the_intimacy_clock(
         self, repo: MemoryRepository
     ) -> None:

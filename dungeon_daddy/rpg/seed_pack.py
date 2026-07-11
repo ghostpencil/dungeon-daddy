@@ -3,13 +3,30 @@ from __future__ import annotations
 import dataclasses
 import json
 import uuid
+from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from dungeon_daddy.memory.tags import validate_tag
 
 if TYPE_CHECKING:
     from dungeon_daddy.memory.repository import MemoryRepository
+
+
+def _append_trait_tags(existing: list[str], raws: Iterable[str]) -> list[str]:
+    """Fold descriptive raw tokens into ``existing`` as validated ``trait:<slug>``
+    tags, de-duplicated (T5, A3 findings F2/F3). Shared by the ``SeedActor``
+    ``threat_tags`` fold and the room-threat ``trigger_tags`` routing so both
+    validate (rejects a malformed / empty token) and dedup identically.
+    """
+    tags = list(existing)
+    for raw in raws:
+        trait = validate_tag(f"trait:{raw}")
+        if trait not in tags:
+            tags.append(trait)
+    return tags
 
 _ACTOR_NS = uuid.UUID("7a3f1c2e-4b5d-5e6f-8a9b-0c1d2e3f4a5b")
 _CLOCK_NS = uuid.UUID("1b2c3d4e-5f6a-5b7c-8d9e-0f1a2b3c4d5e")
@@ -48,8 +65,19 @@ class SeedActor(BaseModel):
     actions: dict[str, int] = Field(default_factory=dict)
     stress_tracks: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
-    threat_tags: list[str] = Field(default_factory=list)
     relationships: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _fold_threat_tags(cls, data: object) -> object:
+        # T5 (Phase 51.8): the legacy `threat_tags` vocabulary held descriptive
+        # actor traits (boss/construct/undead). Absorb them into `tags` as
+        # `trait:<slug>` and drop the field. Applies to any legacy seed pack.
+        if isinstance(data, dict) and data.get("threat_tags"):
+            tags = _append_trait_tags(list(data.get("tags") or []), data["threat_tags"])
+            data = {k: v for k, v in data.items() if k != "threat_tags"}
+            data["tags"] = tags
+        return data
 
 
 class SeedClock(BaseModel):
@@ -109,6 +137,27 @@ def load_seed_pack(path: Path) -> SeedPack:
     return SeedPack.model_validate(data)
 
 
+def validate_seed_room_ids(pack: SeedPack, valid_room_ids: set[str]) -> None:
+    """Fail loudly (§4.3) if any room reference in the pack does not exactly match
+    a room id in the dungeon model. Catches `r1`-vs-`R1` / zero-padding mismatches
+    that would otherwise silently never scope. Checks `SeedClock.scope_room_id` and
+    `SeedRoomThreat.location_slug`; `None` scopes are skipped.
+    """
+    bad: list[str] = []
+    for clock in pack.clocks:
+        if clock.scope_room_id is not None and clock.scope_room_id not in valid_room_ids:
+            bad.append(f"clock {clock.slug!r} scope_room_id={clock.scope_room_id!r}")
+    for threat in pack.room_threats:
+        if threat.location_slug not in valid_room_ids:
+            bad.append(f"room_threat location_slug={threat.location_slug!r}")
+    if bad:
+        raise ValueError(
+            "Seed references room ids absent from the dungeon model: "
+            + "; ".join(bad)
+            + f" (known room ids: {sorted(valid_room_ids)})"
+        )
+
+
 _MEMORY_NS = uuid.UUID("3c4d5e6f-7a8b-5c9d-0e1f-2a3b4c5d6e7f")
 
 
@@ -129,15 +178,22 @@ def apply_seed_pack(
     campaign_id: str,
     repo: MemoryRepository,
     migrations_dir: Path,
+    valid_room_ids: set[str] | None = None,
 ) -> ApplyResult:
     from dungeon_daddy.memory.repository import MemoryRepository as _Repo  # noqa: F401
+
+    if valid_room_ids is not None:
+        validate_seed_room_ids(pack, valid_room_ids)
 
     repo.initialize_schema(migrations_dir)
 
     all_actors = pack.player_side.actors + pack.dungeon_side.actors
     for actor in all_actors:
         actor_id = derive_actor_id(pack.campaign_slug, actor.slug)
-        repo.save_actor(actor_id, campaign_id, actor.actor_type, actor.slug, actor.display_name)
+        repo.save_actor(
+            actor_id, campaign_id, actor.actor_type, actor.slug, actor.display_name,
+            tags=actor.tags,
+        )
         for action_key, rating in actor.actions.items():
             repo.save_actor_action_rating(actor_id, action_key, rating)
         for track_key in actor.stress_tracks:
@@ -173,12 +229,20 @@ def apply_seed_pack(
             repo.add_memory_tag(memory_id, tag)
 
     for threat in pack.room_threats:
+        # T5 (Phase 51.8): trigger_tags are descriptive trigger conditions, not a
+        # verb gate. Route them to the clock's `tags` as validated, de-duplicated
+        # trait:<slug> tags (F2/F3). Leave the clock's own action_tags untouched
+        # (F5) — this loop only scopes + tags the co-referenced clock.
+        trait_tags = _append_trait_tags([], threat.trigger_tags)
         for clock_slug in threat.related_clock_slugs:
             clock_id = derive_clock_id(pack.campaign_slug, clock_slug)
             repo.update_clock_scope(
                 clock_id,
                 scope_room_id=threat.location_slug,
-                action_tags=threat.trigger_tags,
+                # Only set tags when this threat actually carries trigger_tags —
+                # an empty trigger list must not blank a co-referenced clock's
+                # existing tags (mirrors the action_tags leave-untouched rule).
+                tags=trait_tags or None,
             )
 
     existing_faction_ids = {f["faction_id"] for f in repo.get_factions(campaign_id)}

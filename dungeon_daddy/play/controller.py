@@ -444,18 +444,17 @@ class PlaySessionController:
         actors = self.context.actors
         if max((a.actions.get("sense", 0) for a in actors), default=0) >= 1:
             flags.add("can_sense")
-        mem_repo = self.context.mem_repo
-        cid = self.context.campaign_id
-        if mem_repo is None or cid is None:
+        active = self.context.active_campaign()
+        if active is None:
             return flags
-        exits = mem_repo.get_exits_by_room(cid, room_id)
+        exits = active.repo.get_exits_by_room(active.campaign_id, room_id)
         if any(e.get("status") == "one_way" for e in exits):
             flags.add("one_way")
         if any(e.get("connector_type") == "ritual_gate" for e in exits):
             flags.add("ritual_connector")
         if any(
             o["archetype"] == "trap" and o["current_state"] == "armed"
-            for o in mem_repo.get_objects_by_room(cid, room_id)
+            for o in active.repo.get_objects_by_room(active.campaign_id, room_id)
         ):
             flags.add("armed_trap")
         return flags
@@ -465,16 +464,16 @@ class PlaySessionController:
         from dungeon_daddy.memory.context_bundle import build_room_noun_context
 
         host = self._host
-        mem_repo = self.context.mem_repo
-        cid = self.context.campaign_id
+        active = self.context.active_campaign()
         state = self.context.state
-        if mem_repo is None or cid is None or state is None or not state.current_room_id:
+        if active is None or state is None or not state.current_room_id:
             return
+        mem_repo = active.repo
         actor = self.acting_actor()
         if actor is None:
             return
         room_id = state.current_room_id
-        room_context = build_room_noun_context(mem_repo, cid, room_id)
+        room_context = build_room_noun_context(mem_repo, active.campaign_id, room_id)
         room_context = self.navigation.prepare_vna_exits(room_context, room_id)
         # Party PCs move as a group — their location is in session state, not
         # per-actor room_id, so we inject them here from the loaded actor roster.

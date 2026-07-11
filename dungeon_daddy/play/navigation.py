@@ -107,12 +107,13 @@ class NavigationCoordinator:
         from dungeon_daddy.rpg.move_party import apply_move_party
 
         session = self._session
-        if session.mem_repo is None or session.campaign_id is None or session.state is None:
+        active = session.active_campaign()
+        if active is None or session.state is None:
             return
 
         new_session, result = apply_move_party(
             MoveParty(exit_id=exit_id, how=how),
-            session.mem_repo, session.campaign_id, session.state,
+            active.repo, active.campaign_id, session.state,
             extra_inventory_slugs=[item_slug] if item_slug else None,
         )
         if not result.accepted:

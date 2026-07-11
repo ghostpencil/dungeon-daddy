@@ -20,8 +20,7 @@
           "channel": 2
         },
         "stress_tracks": ["body", "composure", "bonds", "weird"],
-        "tags": ["cleric", "half-elf", "holy", "healer"],
-        "threat_tags": [],
+        "tags": ["trait:cleric", "trait:half-elf", "trait:holy", "trait:healer"],
         "relationships": ["order bond with the Veiled Sun temple", "protective of Seraphine despite disapproving of her methods"]
       },
       {
@@ -41,8 +40,7 @@
           "channel": 1
         },
         "stress_tracks": ["body", "composure", "bonds", "weird"],
-        "tags": ["wizard", "human", "necromancer", "scholar"],
-        "threat_tags": [],
+        "tags": ["trait:wizard", "trait:human", "trait:necromancer", "trait:scholar"],
         "relationships": ["the Spectral Advisor may know her by name", "Aldric distrusts her interest in the lich's power"]
       },
       {
@@ -62,8 +60,7 @@
           "channel": 0
         },
         "stress_tracks": ["body", "composure", "bonds", "weird"],
-        "tags": ["rogue", "halfling", "thief", "scout", "survivor"],
-        "threat_tags": [],
+        "tags": ["trait:rogue", "trait:halfling", "trait:thief", "trait:scout", "trait:survivor"],
         "relationships": ["lost his previous party in this tomb", "owes the temple a debt he refuses to name"]
       }
     ]
@@ -78,8 +75,7 @@
         "instinct": "Reclaim the Sundered Crown and complete his ascension. Let nothing that breathes leave the tomb.",
         "actions": {},
         "stress_tracks": [],
-        "tags": ["boss", "level-3", "undead", "lich"],
-        "threat_tags": ["undead", "spellcaster", "boss", "lich", "sealed"],
+        "tags": ["trait:boss", "level:level-3", "trait:undead", "trait:lich", "trait:spellcaster", "trait:sealed"],
         "relationships": []
       },
       {
@@ -90,8 +86,7 @@
         "instinct": "Assess the party's worthiness. Destroy the unworthy. Bargain with those who understand the old ways.",
         "actions": {},
         "stress_tracks": [],
-        "tags": ["level-2", "undead", "npc", "negotiable"],
-        "threat_tags": ["undead", "negotiable", "powerful", "gatekeeper"],
+        "tags": ["level:level-2", "trait:undead", "trait:npc", "trait:negotiable", "trait:powerful", "trait:gatekeeper"],
         "relationships": []
       },
       {
@@ -102,8 +97,7 @@
         "instinct": "Crush all who disturb the king's remains. It does not negotiate.",
         "actions": {},
         "stress_tracks": [],
-        "tags": ["level-3", "undead", "construct", "patrol"],
-        "threat_tags": ["undead", "relentless", "construct", "overwhelming"],
+        "tags": ["level:level-3", "trait:undead", "trait:construct", "trait:patrol", "trait:relentless", "trait:overwhelming"],
         "relationships": []
       },
       {
@@ -114,8 +108,7 @@
         "instinct": "Guide worthy souls toward the lich's binding. Test them first.",
         "actions": {},
         "stress_tracks": [],
-        "tags": ["level-3", "spectral", "npc", "helpful"],
-        "threat_tags": ["spectral", "cryptic", "demanding"],
+        "tags": ["level:level-3", "trait:spectral", "trait:npc", "trait:helpful", "trait:cryptic", "trait:demanding"],
         "relationships": []
       },
       {
@@ -126,8 +119,7 @@
         "instinct": "Remain still. Obey the king's last command. Strike when the hall is dishonored.",
         "actions": {},
         "stress_tracks": [],
-        "tags": ["level-2", "undead", "dormant", "numerous"],
-        "threat_tags": ["undead", "disciplined", "numerous", "triggered"],
+        "tags": ["level:level-2", "trait:undead", "trait:dormant", "trait:numerous", "trait:disciplined", "trait:triggered"],
         "relationships": []
       }
     ]
@@ -257,56 +249,56 @@
       "summary": "Four centuries ago, the Forgotten King performed the Rite of Undying to cheat death. His own court sealed him below the ziggurat rather than face him in open war. The seals hold — for now.",
       "type": "location_lore",
       "importance": 8,
-      "tags": ["location:tomb-of-the-forgotten-king", "theme:history", "thread:lich-king", "actor:dungeon:the-lich-king", "emotion:dread"]
+      "tags": ["location:tomb-of-the-forgotten-king", "theme:history", "thread:lich-king", "actor:npc:the-lich-king", "emotion:dread"]
     },
     {
       "title": "Dax Came Back Alone",
       "summary": "Dax entered this tomb once before with a party of four. He left alone and has never explained what happened to the others. He knows passages and dangers the others do not.",
       "type": "actor_relationship",
       "importance": 7,
-      "tags": ["actor:protagonist:dax", "theme:secrets", "thread:prior-expedition", "emotion:guilt"]
+      "tags": ["actor:pc:dax", "theme:secrets", "thread:prior-expedition", "emotion:guilt"]
     },
     {
       "title": "The Wraith-Steward Can Be Bargained With",
       "summary": "Temple records suggest the Wraith-Steward values ritual propriety above violence. Those who approach him with the correct forms of address may negotiate passage rather than fight.",
       "type": "location_lore",
       "importance": 6,
-      "tags": ["actor:dungeon:wraith-steward", "location:wrath-study", "theme:negotiation", "thread:passage-to-level-3"]
+      "tags": ["actor:npc:wraith-steward", "location:2-E", "theme:negotiation", "thread:passage-to-level-3"]
     },
     {
       "title": "The Drowned Shrine Is Still Active",
       "summary": "The Shrine of Mythrax on Level 1 still conducts necromantic energy. The silver dust on the floor responds to living footsteps — disturbing it may alert something below.",
       "type": "dungeon_emotional_tell",
       "importance": 6,
-      "tags": ["location:drowned-shrine", "theme:danger", "clock:the-lich-senses-intruders", "emotion:unease"]
+      "tags": ["location:1-B", "theme:danger", "clock:the-lich-senses-intruders", "emotion:unease"]
     },
     {
       "title": "Seraphine Wants to Study the Lich",
       "summary": "Seraphine believes the lich-king's binding ritual contains secrets about undeath that could revolutionize magical theory. Her interest in the crown is academic as much as practical — and Aldric suspects she is not committed to destroying it.",
       "type": "actor_relationship",
       "importance": 7,
-      "tags": ["actor:protagonist:seraphine-vex", "actor:protagonist:brother-aldric", "theme:secrets", "thread:seraphine-agenda", "emotion:tension"]
+      "tags": ["actor:pc:seraphine-vex", "actor:pc:brother-aldric", "theme:secrets", "thread:seraphine-agenda", "emotion:tension"]
     },
     {
       "title": "The Bone Warden Patrols the Ossuary",
       "summary": "The massive bone construct is the primary active threat on Level 3. Noise on the approach advances its alertness. It cannot be destroyed by conventional means — only dispersed temporarily.",
       "type": "unresolved_threat",
       "importance": 7,
-      "tags": ["actor:dungeon:bone-warden", "location:ossuary-approach", "clock:the-bone-warden-stirs", "theme:danger", "emotion:dread"]
+      "tags": ["actor:npc:bone-warden", "location:3-A", "clock:the-bone-warden-stirs", "theme:danger", "emotion:dread"]
     },
     {
       "title": "Aldric's Order Sent Him Alone",
       "summary": "The Veiled Sun temple dispatched Aldric without backup because the other priests refused the mission — they believe the tomb cannot be safely entered. Aldric is the only one who volunteered.",
       "type": "actor_relationship",
       "importance": 5,
-      "tags": ["actor:protagonist:brother-aldric", "theme:isolation", "thread:temple-politics", "emotion:loneliness"]
+      "tags": ["actor:pc:brother-aldric", "theme:isolation", "thread:temple-politics", "emotion:loneliness"]
     },
     {
       "title": "The Spectral Advisor Knows the Binding",
       "summary": "The court wizard's spirit in the Advisor's Nook claims to know a method to permanently bind the lich rather than dispel him temporarily. The cost of this knowledge is not yet known.",
       "type": "unresolved_threat",
       "importance": 6,
-      "tags": ["actor:dungeon:spectral-advisor", "location:advisors-nook", "thread:lich-binding", "theme:bargain", "emotion:hope"]
+      "tags": ["actor:npc:spectral-advisor", "location:3-B", "thread:lich-binding", "theme:bargain", "emotion:hope"]
     },
     {
       "title": "The Tomb Breathes",

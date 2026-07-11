@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC
 
+import pytest
+
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.memory.retrieval import MemoryRetrieval, MemoryRetriever
+from dungeon_daddy.memory.retrieval import (
+    MemoryRetrieval,
+    MemoryRetriever,
+    present_actor_ids,
+    scene_memory_tags,
+)
 
 
 class TestMemoryRetriever:
@@ -100,6 +108,118 @@ class TestMemoryRetriever:
         assert len(results) == 1
         assert results[0].memory_id == "mem_001"
         assert results[0].title == "Mara fights"
+
+    def test_query_actor_ids_resolve_to_canonical_actor_tags(
+        self, repo: MemoryRepository
+    ) -> None:
+        """§5.1: an actor_id resolves through the record to its canonical
+        `actor:<subtype>:<slug>` tag — an npc/monster maps to `actor:npc:`,
+        never the old two-segment `actor:<id>`."""
+        repo.save_actor("act_ws", "camp_001", "npc", "wraith-steward", "Wraith Steward")
+        repo.save_memory_entry(
+            "mem_canon", "camp_001", "event", "The steward bargains",
+            importance=6, status="approved",
+        )
+        repo.add_memory_tag("mem_canon", "actor:npc:wraith-steward")
+        # decoy tagged with the old broken two-segment form the fix must drop
+        repo.save_memory_entry(
+            "mem_old", "camp_001", "event", "Old form", importance=6, status="approved",
+        )
+        repo.add_memory_tag("mem_old", "actor:act_ws")
+
+        results = MemoryRetriever(repo, "camp_001").query(actor_ids=["act_ws"])
+
+        ids = {r.memory_id for r in results}
+        assert ids == {"mem_canon"}
+
+    def test_query_actor_ids_unknown_actor_is_skipped(
+        self, repo: MemoryRepository, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """An actor_id with no record contributes no filter (no crash) and is
+        logged so the silently-narrowed result is diagnosable."""
+        repo.save_memory_entry(
+            "mem_x", "camp_001", "event", "X", importance=5, status="approved",
+        )
+        repo.add_memory_tag("mem_x", "theme:guilt")
+
+        with caplog.at_level(logging.WARNING):
+            results = MemoryRetriever(repo, "camp_001").query(actor_ids=["ghost"])
+
+        assert results == []
+        assert any("ghost" in r.message for r in caplog.records)
+
+    def test_query_actor_ids_ignores_cross_campaign_actor(
+        self, repo: MemoryRepository
+    ) -> None:
+        """BUG 4: an actor_id belonging to another campaign contributes no
+        filter (get_actor is not campaign-scoped) — a same-slug memory in this
+        campaign must not leak in."""
+        repo.save_actor("act_other", "camp_999", "npc", "wraith-steward", "WS")
+        repo.save_memory_entry(
+            "mem_here", "camp_001", "event", "Here", importance=5, status="approved",
+        )
+        repo.add_memory_tag("mem_here", "actor:npc:wraith-steward")
+
+        results = MemoryRetriever(repo, "camp_001").query(actor_ids=["act_other"])
+
+        assert results == []
+
+
+class TestPresentActorIds:
+    def test_party_plus_room_npcs_and_monsters(self, repo: MemoryRepository) -> None:
+        repo.save_actor("npc-1", "camp_001", "npc", "goblin", "Goblin", room_id="R1")
+        repo.save_actor("mon-1", "camp_001", "monster", "ogre", "Ogre", room_id="R1")
+        # a PC standing in the room is not double-added via the room query
+        repo.save_actor("pc-1", "camp_001", "pc", "hero", "Hero", room_id="R1")
+
+        ids = present_actor_ids(repo, "camp_001", "R1", ["pc-1"])
+
+        assert ids[0] == "pc-1"  # party first, order preserved
+        assert set(ids) == {"pc-1", "npc-1", "mon-1"}
+        assert ids.count("pc-1") == 1
+
+    def test_empty_or_none_room_is_party_only(self, repo: MemoryRepository) -> None:
+        repo.save_actor("npc-1", "camp_001", "npc", "goblin", "Goblin", room_id="R1")
+        assert present_actor_ids(repo, "camp_001", "", ["pc-1"]) == ["pc-1"]
+        assert present_actor_ids(repo, "camp_001", None, ["pc-1"]) == ["pc-1"]
+
+
+class TestSceneMemoryTags:
+    """A5b write-side twin of present_actor_ids: the canonical scene-anchor tags
+    to stamp on an engine memory write, symmetric with the reader's filters."""
+
+    def test_location_and_present_actor_tags(self, repo: MemoryRepository) -> None:
+        repo.save_actor("pc-1", "camp_001", "pc", "mara", "Mara", room_id="R1")
+        repo.save_actor("npc-1", "camp_001", "npc", "goblin", "Goblin", room_id="R1")
+        # a co-located monster maps to the actor:npc subtype (T2 / owner ruling)
+        repo.save_actor("mon-1", "camp_001", "monster", "ogre", "Ogre", room_id="R1")
+
+        tags = scene_memory_tags(repo, "camp_001", "R1", ["pc-1"])
+
+        assert tags[0] == "location:R1"  # grid room id, location tag first
+        assert set(tags) == {
+            "location:R1",
+            "actor:pc:mara",
+            "actor:npc:goblin",
+            "actor:npc:ogre",
+        }
+
+    def test_no_room_is_actor_tags_only(self, repo: MemoryRepository) -> None:
+        repo.save_actor("pc-1", "camp_001", "pc", "mara", "Mara", room_id="R1")
+        # no room -> no location tag and no room-NPC expansion; party only
+        assert scene_memory_tags(repo, "camp_001", None, ["pc-1"]) == ["actor:pc:mara"]
+
+    def test_unknown_or_cross_campaign_actor_contributes_no_tag(
+        self, repo: MemoryRepository, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        repo.save_actor("other", "camp_999", "pc", "mara", "Mara", room_id="R1")
+        # unknown id + a cross-campaign id both resolve to nothing; empty room
+        with caplog.at_level(logging.WARNING):
+            tags = scene_memory_tags(repo, "camp_001", None, ["ghost", "other"])
+        assert tags == []
+        # both unresolved ids are logged so the under-tagged write is diagnosable
+        logged = " ".join(r.message for r in caplog.records)
+        assert "ghost" in logged and "other" in logged
 
 
 class TestRetrievalByActor:

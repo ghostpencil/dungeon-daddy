@@ -192,6 +192,31 @@ class TestAdvanceObjectives:
         assert entry["type"] == "dungeon_state"
         assert entry["status"] == "approved"
 
+    def test_stamps_scene_anchor_tags_on_completion_memory(
+        self, repo: MemoryRepository
+    ) -> None:
+        # A5b: the objective-completion memory is tagged with the party's
+        # current-room location + present-actor tags for A5 scoped retrieval.
+        repo.save_objective(_objective())
+        repo.save_room_object(_subsystem(current_state="restored"))
+        repo.save_actor("pc-1", CAMPAIGN, "pc", "mara", "Mara", room_id="r01")
+
+        results = advance_objectives(repo, CAMPAIGN, room_id="r01", party_ids=["pc-1"])
+
+        tags = set(repo.get_memory_tags(results[0].memory_id))
+        assert tags == {"location:r01", "actor:pc:mara"}
+
+    def test_completion_memory_untagged_without_scene(
+        self, repo: MemoryRepository
+    ) -> None:
+        # Back-compat: the pre-A5b call shape (no room/party) writes no tags.
+        repo.save_objective(_objective())
+        repo.save_room_object(_subsystem(current_state="restored"))
+
+        results = advance_objectives(repo, CAMPAIGN)
+
+        assert repo.get_memory_tags(results[0].memory_id) == []
+
     def test_unsatisfied_objective_is_left_untouched(
         self, repo: MemoryRepository
     ) -> None:

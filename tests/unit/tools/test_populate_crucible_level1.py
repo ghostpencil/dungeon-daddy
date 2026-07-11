@@ -164,3 +164,27 @@ def test_no_binding_targets_a_firewalled_clock():
     for o in _objects():
         for b in o.reaction_bindings:
             assert b.clock_slug not in _FIREWALLED_CLOCK_SLUGS, (o.slug, b.clock_slug)
+
+
+# --- Phase 51.8 A4 §4.4: taxonomy tags on every world entity -----------------
+
+def test_every_object_carries_canonical_taxonomy_tags():
+    from dungeon_daddy.memory.tags import validate_tag
+
+    for o in _objects():
+        assert o.tags, f"object {o.slug!r} has no tags"
+        for t in o.tags:
+            validate_tag(t)  # raises on a bare / malformed tag
+        assert f"object:{o.slug}" in o.tags  # self-identity hook for pre-fetch
+        assert "level:level-1" in o.tags     # scene scope
+
+
+def test_every_item_carries_canonical_taxonomy_tags():
+    from dungeon_daddy.memory.tags import validate_tag
+
+    for i in _items():
+        assert i.tags, f"item {i.slug!r} has no tags"
+        for t in i.tags:
+            validate_tag(t)
+        assert f"item:{i.slug}" in i.tags
+        assert "level:level-1" in i.tags

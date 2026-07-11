@@ -17,6 +17,9 @@ from dungeon_daddy.rpg.models import ObjectTransition, RoomExit, RoomObject
 
 CAMPAIGN_ID = "campaign:the-crucible"
 LEVEL_ID = "level:2"  # 1-based level ID for data scoping
+# Taxonomy scope tag (A4 §4.4) — the `level:` tag uses the level-<n> convention
+# (matches actor/memory tags + retrieval), deliberately NOT the DB level_id above.
+LEVEL_TAG = "level:level-2"
 
 
 def _save_path() -> Path:
@@ -54,6 +57,8 @@ def _great_lift_upper() -> RoomObject:
                 contested=False,
             ),
         ],
+        # A4 §4.4: identity + scope + the power-core thread it gates.
+        tags=["object:great-lift-upper", LEVEL_TAG, "thread:power-core"],
     )
 
 

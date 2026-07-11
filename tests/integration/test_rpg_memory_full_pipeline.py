@@ -27,6 +27,7 @@ from dungeon_daddy.rpg.models import (
 from dungeon_daddy.rpg.service import RpgService
 from tests.fixtures.phase32_campaign import (
     CAMPAIGN_ID,
+    MEM_SABLE_PACT_ID,
     SABLE_ID,
     SCENE_COMBAT_ID,
     seed_campaign,
@@ -108,7 +109,7 @@ def _run_pipeline(tmp_path: Path) -> _PipelineResult:
         status="approved",
         importance=7,
     )
-    db.add_memory_tag(new_memory_id, f"actor:{SABLE_ID}")
+    db.add_memory_tag(new_memory_id, "actor:pc:sable")
 
     # Bullet 5 — build context bundle
     bundle = ContextBundleBuilder(
@@ -194,9 +195,14 @@ class TestMemoryInBundle:
         ids = {c["memory_id"] for c in pipeline.bundle.memory_cards}
         assert pipeline.new_memory_id in ids
 
-    def test_bundle_has_six_memory_cards(self, pipeline):
-        # golden fixture 5 + 1 new = 6 entries retrieved
-        assert len(pipeline.bundle.memory_cards) == 6
+    def test_bundle_holds_the_scene_scoped_memories(self, pipeline):
+        # Slice A5: retrieval is scene-scoped to the focus PC (Sable, no room),
+        # so only Sable-tagged memories land — the golden pact + the new fallout
+        # memory (both actor:pc:sable), not the golem/informant/location lore.
+        ids = {c["memory_id"] for c in pipeline.bundle.memory_cards}
+        assert pipeline.new_memory_id in ids
+        assert MEM_SABLE_PACT_ID in ids
+        assert len(ids) == 2
 
 
 # ---------------------------------------------------------------------------

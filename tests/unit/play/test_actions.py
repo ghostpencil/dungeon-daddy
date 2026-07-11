@@ -14,7 +14,11 @@ from typing import Any
 
 from dungeon_daddy.data.models import SessionState
 from dungeon_daddy.memory.repository import MemoryRepository
-from dungeon_daddy.play.actions import ActionOrchestrator, describe_spawned_loot
+from dungeon_daddy.play.actions import (
+    _ACTION_FAILURE_LINE,
+    ActionOrchestrator,
+    describe_spawned_loot,
+)
 from dungeon_daddy.play.session_context import PlaySessionContext
 from dungeon_daddy.rpg.models import ActorState
 from tests.unit.play._factories import MIGRATIONS_DIR
@@ -632,6 +636,65 @@ def test_on_resolve_action_narrates_with_dice_and_refreshes(tmp_path):
     assert msg.startswith("Elara [MOVE] climb the wall —")
     assert "dice=" in msg
     assert ports.right_panel_refreshes == ["pc-1"]
+
+
+class _RaisingService:
+    """An rpg_service whose resolve fails — stands in for a mid-turn LLM/DB error."""
+
+    def resolve_action(self, request: Any) -> Any:
+        raise RuntimeError("boom")
+
+
+def test_run_chat_action_failure_posts_gm_visible_line(tmp_path):
+    """A resolve/LLM failure is surfaced to the GM, not silently swallowed
+    (deferred PR #89 review finding — the catch used to only log)."""
+    orchestrator, ports, _repo, _ = _make(
+        tmp_path, dungeon=_dungeon(), rpg_service=_RaisingService(),
+    )
+
+    orchestrator.run_chat_action("camp-1", "pc-1", "fight", "smash the door")
+
+    assert ("system", _ACTION_FAILURE_LINE) in ports.messages
+
+
+def test_on_resolve_action_failure_posts_gm_visible_line(tmp_path):
+    orchestrator, ports, _repo, _ = _make(
+        tmp_path, dungeon=_dungeon(), rpg_service=_RaisingService(),
+    )
+
+    orchestrator.on_resolve_action(
+        "camp-1", "pc-1", "climb the wall", "move",
+        push_yourself=False, momentum_spend=0, dice_pool=2,
+    )
+
+    assert ("system", _ACTION_FAILURE_LINE) in ports.messages
+
+
+class _RaisingNarration:
+    """Narration whose request fails — stands in for a post-commit narration error."""
+
+    def request_narration(self, msg: str) -> None:
+        raise RuntimeError("narration boom")
+
+
+def test_run_chat_action_post_commit_failure_is_not_mislabelled(tmp_path):
+    """A narration/UI failure AFTER the action resolves + persists must NOT post
+    the action-failure line — it would contradict the success bubble already
+    shown (code-review finding #1)."""
+    from dungeon_daddy.rpg.service import RpgService
+
+    orchestrator, ports, _repo, _ = _make(
+        tmp_path, dungeon=_dungeon(), rpg_service=RpgService(),
+    )
+    orchestrator._get_narration = lambda: _RaisingNarration()  # type: ignore[method-assign]
+
+    orchestrator.run_chat_action("camp-1", "pc-1", "fight", "smash the door")
+
+    # The action ran (result stored, mechanical bubble posted) and the failure
+    # line is absent despite the narration raising.
+    assert len(ports.stored_results) == 1
+    assert ("system", _ACTION_FAILURE_LINE) not in ports.messages
+    assert any("Elara rolls FIGHT" in text for _role, text in ports.messages)
 
 
 # ---------------------------------------------------------------------------

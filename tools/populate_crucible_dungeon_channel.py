@@ -41,6 +41,10 @@ CAMPAIGN_ID = "campaign:the-crucible"
 # Resonance site: the Arcane Power Room, one Great-Lift descent from Level 1.
 RESONANCE_ROOM_ID = "r04"
 RESONANCE_LEVEL_ID = "level:2"
+# Taxonomy scope tags (A4 §4.4) — the `level:` tag uses the level-<n> convention
+# (matches actor/memory tags + retrieval), deliberately NOT the DB level_id above.
+LEVEL_1_TAG = "level:level-1"
+LEVEL_2_TAG = "level:level-2"
 RESONANCE_OBJECT_ID = "object:the-crucible:r04:arcane-resonance-node"
 
 INTIMACY_CLOCK_ID = "clock:the-crucible:dungeon-intimacy"
@@ -292,10 +296,15 @@ def _subsystem_object(rung: _Rung) -> RoomObject:
         ],
         reaction_policy="scripted" if bindings else "ambient",
         reaction_bindings=bindings,
+        # A4 §4.4: identity + scope + the power-core thread every subsystem serves.
+        tags=[f"object:{rung.subsystem_slug}", LEVEL_2_TAG, "thread:power-core"],
     )
 
 
 def _objective(rung: _Rung, status: str) -> Objective:
+    # A4 §4.4: identity + thread + scope (tier 0 adopts the Level-1 gearworks; the
+    # fresh subsystems for tiers 1-3 sit on Level 2 near the resonance node).
+    level_tag = LEVEL_1_TAG if rung.tier == 0 else LEVEL_2_TAG
     return Objective(
         objective_id=_objective_id(rung),
         campaign_id=CAMPAIGN_ID,
@@ -311,6 +320,7 @@ def _objective(rung: _Rung, status: str) -> Objective:
         ),
         advances_clock_slug=INTIMACY_CATEGORY,
         reveals_knowledge=list(rung.reveals_knowledge),
+        tags=[f"objective:{rung.objective_slug}", "thread:power-core", level_tag],
     )
 
 
@@ -343,6 +353,8 @@ def _resonance_object() -> RoomObject:
                 stress_amount=1,
             )
         ],
+        # A4 §4.4: the channel site — identity + scope + the dungeon-mind mystery.
+        tags=["object:arcane-resonance-node", LEVEL_2_TAG, "theme:mystery"],
     )
 
 

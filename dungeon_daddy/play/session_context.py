@@ -14,6 +14,7 @@ dependency direction).
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from dungeon_daddy.data.models import Dungeon, Level, Room, SessionState
@@ -21,6 +22,20 @@ from dungeon_daddy.rpg.models import ActorState
 
 if TYPE_CHECKING:
     from dungeon_daddy.memory.repository import MemoryRepository
+
+
+@dataclass(frozen=True)
+class ActiveCampaign:
+    """A play session with both a live repo and a campaign id present.
+
+    The play coordinators repeat a ``(mem_repo, campaign_id)`` co-presence guard
+    ~15× before any memory read/write. :meth:`PlaySessionContext.active_campaign`
+    returns this value only when both are set, so a caller narrows once and then
+    uses ``active.repo`` / ``active.campaign_id`` without re-checking.
+    """
+
+    repo: MemoryRepository
+    campaign_id: str
 
 
 class PlaySessionContext:
@@ -40,6 +55,18 @@ class PlaySessionContext:
         self.mem_repo = mem_repo
         self.campaign_id = campaign_id
         self._actors: list[ActorState] = list(actors) if actors is not None else []
+
+    # -- repo / campaign co-presence ----------------------------------------
+
+    def active_campaign(self) -> ActiveCampaign | None:
+        """The live ``(repo, campaign_id)`` pair, or ``None`` if either is unset.
+
+        Collapses the co-presence guard the coordinators would otherwise
+        hand-write before every memory read/write.
+        """
+        if self.mem_repo is None or self.campaign_id is None:
+            return None
+        return ActiveCampaign(repo=self.mem_repo, campaign_id=self.campaign_id)
 
     # -- level / room accessors ---------------------------------------------
 

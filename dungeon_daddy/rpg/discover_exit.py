@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from dungeon_daddy.memory.models import DomainEvent
 from dungeon_daddy.memory.repository import MemoryRepository
+from dungeon_daddy.memory.retrieval import scene_memory_tags
 
 
 @dataclass
@@ -19,6 +21,8 @@ def discover_exit(
     campaign_id: str,
     memory_title: str,
     repo: MemoryRepository,
+    room_id: str | None = None,
+    party_ids: Sequence[str] | None = None,
 ) -> DiscoverResult:
     row = repo.get_exit_by_id(exit_id)
     if row is None:
@@ -32,13 +36,18 @@ def discover_exit(
 
     repo.update_exit_status(exit_id, "discovered")
 
+    memory_id = str(uuid.uuid4())
     repo.save_memory_entry(
-        memory_id=str(uuid.uuid4()),
+        memory_id=memory_id,
         campaign_id=campaign_id,
         entry_type="discovery",
         title=memory_title,
         status="approved",
     )
+    # A5b: stamp the scene anchors so A5 scoped retrieval resurfaces this
+    # discovery in the same room / with the same actors present.
+    for tag in scene_memory_tags(repo, campaign_id, room_id, party_ids or []):
+        repo.add_memory_tag(memory_id, tag)
 
     event = DomainEvent(
         event_id=str(uuid.uuid4()),

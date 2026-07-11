@@ -239,6 +239,17 @@ class TestClockState:
         )
         assert c.category == "threat"
 
+    def test_tags_default_to_empty_and_round_trip(self) -> None:
+        c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4)
+        assert c.tags == []
+        tagged = ClockState(
+            clock_id="c", campaign_id="x", label="L", segments=4,
+            tags=["trait:noise", "trait:combat"],
+        )
+        assert ClockState.model_validate(tagged.model_dump()).tags == [
+            "trait:noise", "trait:combat"
+        ]
+
     def test_optional_level_metadata_defaults(self) -> None:
         c = ClockState(clock_id="c", campaign_id="x", label="L", segments=4)
         assert c.category is None
@@ -480,6 +491,30 @@ class TestItem:
         assert item.status == "active"
         assert item.is_equipped is False
         assert item.features == []
+
+    def test_tags_default_empty(self) -> None:
+        item = Item(
+            item_id="item:c:torch",
+            campaign_id="c",
+            slug="torch",
+            display_name="Torch",
+            item_type="dungeon_item",
+            description="A simple torch.",
+        )
+        assert item.tags == []
+
+    def test_tags_round_trip(self) -> None:
+        item = Item(
+            item_id="item:c:torch",
+            campaign_id="c",
+            slug="torch",
+            display_name="Torch",
+            item_type="dungeon_item",
+            description="A simple torch.",
+            tags=["item:torch", "theme:the-machine-remembers"],
+        )
+        restored = Item.model_validate(item.model_dump())
+        assert restored.tags == ["item:torch", "theme:the-machine-remembers"]
 
     def test_empty_description_rejected(self) -> None:
         with pytest.raises(ValidationError):
@@ -756,6 +791,14 @@ class TestRoomObjectReactionPolicy:
         obj = self._obj()
         assert obj.reaction_bindings == []
 
+    def test_tags_default_empty(self) -> None:
+        assert self._obj().tags == []
+
+    def test_tags_round_trip(self) -> None:
+        obj = self._obj(tags=["object:statue", "theme:the-machine-remembers"])
+        restored = RoomObject.model_validate(obj.model_dump())
+        assert restored.tags == ["object:statue", "theme:the-machine-remembers"]
+
     def test_all_reaction_policies_accepted(self) -> None:
         for policy in ("scripted", "ambient", "inert"):
             obj = self._obj(reaction_policy=policy)
@@ -994,7 +1037,25 @@ class TestObjective:
         assert obj.status == "locked"
         assert obj.advances_clock_slug is None
         assert obj.reveals_knowledge == []
+        assert obj.tags == []
         assert obj.completion.target_slug == "coolant-loop"
+
+    def test_tags_round_trip(self) -> None:
+        obj = Objective(
+            objective_id="obj:camp-1:restore-coolant",
+            campaign_id="camp-1",
+            slug="restore-coolant",
+            title="Restore the Coolant Loop",
+            description="The Crucible wants its coolant loop online again.",
+            tier_index=0,
+            completion=self._completion(),
+            tags=["objective:restore-coolant", "thread:restore-the-power-core"],
+        )
+        restored = Objective.model_validate(obj.model_dump())
+        assert restored.tags == [
+            "objective:restore-coolant",
+            "thread:restore-the-power-core",
+        ]
 
     def test_full_fields_stored(self) -> None:
         obj = Objective(

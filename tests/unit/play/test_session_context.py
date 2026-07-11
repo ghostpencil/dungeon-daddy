@@ -7,6 +7,8 @@ session state, repo/campaign handles, and the actor roster. It replaces the
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from dungeon_daddy.data.models import (
     Connection,
     Dungeon,
@@ -15,8 +17,10 @@ from dungeon_daddy.data.models import (
     Room,
     SessionState,
 )
-from dungeon_daddy.play.session_context import PlaySessionContext
+from dungeon_daddy.memory.repository import MemoryRepository
+from dungeon_daddy.play.session_context import ActiveCampaign, PlaySessionContext
 from dungeon_daddy.rpg.models import ActorState
+from tests.unit.play._factories import MIGRATIONS_DIR
 
 
 def _rooms() -> list[Room]:
@@ -152,3 +156,42 @@ def test_acting_actor_falls_back_to_first_pc() -> None:
 
 def test_acting_actor_is_none_when_roster_empty() -> None:
     assert PlaySessionContext().acting_actor("a1") is None
+
+
+# --- active_campaign() -------------------------------------------------------
+
+def _repo(tmp_path: Path) -> MemoryRepository:
+    repo = MemoryRepository(tmp_path / "test.duckdb")
+    repo.initialize_schema(MIGRATIONS_DIR)
+    repo.save_campaign("camp-1", "test-campaign", "Test Campaign")
+    return repo
+
+
+def test_active_campaign_returns_value_when_repo_and_id_present(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    ctx = PlaySessionContext(mem_repo=repo, campaign_id="camp-1")
+    active = ctx.active_campaign()
+    assert active is not None
+    assert active.repo is repo
+    assert active.campaign_id == "camp-1"
+
+
+def test_active_campaign_is_none_without_repo(tmp_path: Path) -> None:
+    ctx = PlaySessionContext(campaign_id="camp-1")
+    assert ctx.active_campaign() is None
+
+
+def test_active_campaign_is_none_without_campaign_id(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    ctx = PlaySessionContext(mem_repo=repo)
+    assert ctx.active_campaign() is None
+
+
+def test_active_campaign_is_frozen_value() -> None:
+    active = ActiveCampaign(repo=None, campaign_id="camp-1")  # type: ignore[arg-type]
+    try:
+        active.campaign_id = "other"  # type: ignore[misc]
+    except Exception as exc:  # frozen dataclass raises FrozenInstanceError
+        assert "FrozenInstanceError" in type(exc).__name__
+    else:  # pragma: no cover - guard against a mutable value slipping in
+        raise AssertionError("ActiveCampaign should be immutable")

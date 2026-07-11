@@ -1,10 +1,36 @@
 # Tag Taxonomy & Narrator Lookup Tool — Implementation Spec (proposed)
 
 **Status:** Draft 2026-07-04. Decision points **T1–T7** (taxonomy & pre-fetch) and **L1–L7**
-(lookup tool) — most *proposed*, owner to confirm before build. **Two are OWNER-DECIDED
-(2026-07-04):** the tool loop is **agent-owned** (provider stays pure transport, L3) and
-retrieval is **two-tier** — deterministic pre-fetch by default, the tool reserved for topics
-not scoped by the nouns/lore in the room (T7 + L7). **Not yet scheduled.**
+(lookup tool). **All of Part 1 is now OWNER-DECIDED: T1–T6 ratified 2026-07-08** (as proposed,
+no changes); T7 was already owner-decided 2026-07-04. The tool loop is **agent-owned** (provider
+stays pure transport, L3) and retrieval is **two-tier** — deterministic pre-fetch by default, the
+tool reserved for topics not scoped by the nouns/lore in the room (T7 + L7). Part 2's L1/L2/L4–L7
+remain *proposed* (ratify at Phase B start). **Phase A in progress** (branch
+`feat/phase-51.8-tag-hygiene`).
+
+> **⚠ Post-51.7 reference remap (added 2026-07-08).** This spec was drafted **2026-07-04**,
+> two days before the **Phase 51.7 PlayView decomposition** (merged 2026-07-06, PR #89) moved the
+> play-mode logic out of `views/play_view.py` (2,765 → 1,491 lines) into the `dungeon_daddy/play/`
+> package (five coordinators + `PlaySessionController`). **Every `views/play_view.py:NNNN` reference
+> below is pre-refactor and stale.** The verified current locations (2026-07-08):
+>
+> | Spec reference (2026-07-04) | Current location |
+> |---|---|
+> | `play_view.py:1517` — 2nd `MemoryRetriever.query()` caller (§1.3, §5.2) | **`play/dialogue.py:250`** — `DialogueCoordinator.recent_memories()` |
+> | `play_view.py:2206` — `_spawn_dm_thread` (§9, §10 L5) | **`play/narration.py:246`** — `NarrationCoordinator.spawn_dm_thread` |
+> | `play_view.py:1442-1457` — voice worker (§10 L5) | **`play/narration.py`** `spawn()` + `play/dialogue.py` |
+> | `play_view.py:2171-2204` — bundle build on main thread (§10 L5) | **`play/narration.py:205`** `build_context_bundle`, called *before* the thread launches → the "bundle built on the main thread" premise **still holds** |
+> | `play_view.py:1909` — `_run_proposal_pipeline` (§11) | **`play/actions.py:582`** — `ActionOrchestrator.run_proposal_pipeline` |
+>
+> **The rest of the spec is unaffected:** `memory/context_bundle.py`, `memory/retrieval.py`,
+> `memory/repository.py`, `rpg/models.py`, `rpg/seed_pack.py`, `tools/seed_rpg_state.py`, the
+> `populate_crucible_*` scripts, `llm/provider.py`, and `llm/agents/*` were **not** touched by 51.7
+> — their line numbers below are still approximately correct. In particular T7's pre-fetch (§5, the
+> highest-value Phase A slice) lives entirely in `ContextBundleBuilder`
+> (`memory/context_bundle.py`), which the refactor never touched. Net effect: **Phase A is
+> essentially unaffected; Phase B's agent/threading wiring (§10 L5) now targets the
+> `NarrationCoordinator`/`DialogueCoordinator` ports — a cleaner, DI-friendly seam than the old
+> inline `play_view` thread sites.**
 
 Two features, **strictly sequenced**: Part 1 (tag hygiene) is a hard prerequisite for Part 2
 (the narrator lookup tool). A lookup tool built on today's tag data would query a mostly-empty,
@@ -33,7 +59,8 @@ covering **four unrelated concepts**, and most of the pipeline broken at write- 
    (`tools/seed_rpg_state.py:125-131`).
 3. **Tag-based retrieval is never exercised in production.** Both production callers invoke
    `MemoryRetriever.query()` with **no arguments** (`memory/context_bundle.py:54`,
-   `views/play_view.py:1517`) — retrieval is importance-only in practice. When `query()` *is*
+   `play/dialogue.py:250` — `recent_memories()`, ex-`play_view.py:1517`) — retrieval is
+   importance-only in practice. When `query()` *is*
    given filters it builds two-part `actor:{id}` / `location:{slug}` (`memory/retrieval.py:22-24`),
    which cannot match the seeds' three-part tags. The retrieval tests assert the spec form
    (`actor:pc:mara`) that no seed uses — tests validate a taxonomy nobody seeds.
@@ -58,11 +85,11 @@ covering **four unrelated concepts**, and most of the pipeline broken at write- 
 
 ## 2. One taxonomy, all entities
 
-**T1 (proposed): a single namespaced, colon-delimited controlled vocabulary applies to the
+**T1 (ratified 2026-07-08): a single namespaced, colon-delimited controlled vocabulary applies to the
 descriptive `tags` field of every entity** — memories, actors, factions, objects, items,
 objectives, and clocks. Bare un-namespaced tags (`"fighter"`, `"boss"`) are invalid.
 
-**T2 (proposed): canonical namespace families** (extends `RPG_MEMORY_DATA_MODEL.md`):
+**T2 (ratified 2026-07-08): canonical namespace families** (extends `RPG_MEMORY_DATA_MODEL.md`):
 
 | Family | Form | Notes |
 |---|---|---|
@@ -79,7 +106,7 @@ objectives, and clocks. Bare un-namespaced tags (`"fighter"`, `"boss"`) are inva
 | `trait:` | `trait:<slug>` | new — replaces bare descriptive tags (`trait:boss`, `trait:construct`, `trait:veteran`) |
 | `fallout:` / `track:` / `emotion:` | per existing spec | unchanged |
 
-**T3 (proposed): validation at write time.** A `validate_tag(tag: str) -> str` helper
+**T3 (ratified 2026-07-08): validation at write time.** A `validate_tag(tag: str) -> str` helper
 (`memory/tags.py`, new) checks namespace membership and shape; repo save paths call it.
 Unknown namespaces raise on save in dev/seed paths; on *read*, unknown tags are passed
 through (old saves must still load).
@@ -88,11 +115,11 @@ through (old saves must still load).
 verb gate consumed by the world-reaction engine, slated for retirement outside the ambient
 tier by `spec/WORLD_REACTION_POLICY.md`. This spec does not touch it beyond the seed fix (§4).
 
-**T5 (proposed): kill the dead vocabularies.** Delete `SeedActor.threat_tags` (never read);
+**T5 (ratified 2026-07-08): kill the dead vocabularies.** Delete `SeedActor.threat_tags` (never read);
 stop writing `trigger_tags` into clock `action_tags` (`seed_pack.py:181`) — instead convert
 them to descriptive `trait:` tags on the threat's clock. Aligns with WORLD_REACTION_POLICY §10.5.
 
-**T6 (proposed): memory-tag normalization migration** (`020_tag_taxonomy.sql` + a Python data
+**T6 (ratified 2026-07-08): memory-tag normalization migration** (`020_tag_taxonomy.sql` + a Python data
 pass for slug resolution):
 
 | Old form | New form |
@@ -133,7 +160,8 @@ pass for slug resolution):
    (`actor_type` → `pc|npc|dungeon` middle segment) instead of two-part `actor:{id}`
    (`memory/retrieval.py:22-24`).
 2. **Pass filters in production:** `context_bundle._fetch_memories` and
-   `play_view.py:1517` pass current-room `location:` and present-actor `actor:` tags, keeping
+   `play/dialogue.py:250` (`recent_memories()`, ex-`play_view.py:1517`) pass current-room
+   `location:` and present-actor `actor:` tags, keeping
    the existing importance-pinning and budget trim. **Behavior change** — bundle contents
    shift from importance-only to relevance-filtered; needs its own slice + integration test.
 3. **Align the tests** with the canonical taxonomy (they currently assert `actor:pc:mara`
@@ -313,9 +341,11 @@ call `run_tool_loop`; no agent reimplements the loop.
   No hard pre-filter on the query itself — the model may legitimately search a tag that
   *partially* overlaps the scene; only full-overlap results are redirected.
 - **L5 (proposed): threading.** The whole request→tool→request cycle runs inside the existing
-  per-view daemon worker thread (`play_view._spawn_dm_thread`, `play_view.py:2206`; voice
-  worker `:1442-1457`). Tool queries execute DuckDB **reads from that worker thread** —
-  today's convention builds bundles on the main thread (`play_view.py:2171-2204`), so this is
+  per-view daemon worker thread (`NarrationCoordinator.spawn_dm_thread`, `play/narration.py:246`;
+  the generic voice worker via `NarrationCoordinator.spawn()` + `play/dialogue.py`). Tool queries
+  execute DuckDB **reads from that worker thread** — today's convention builds the bundle on the
+  main thread (`build_context_bundle` runs synchronously in `spawn_dm_thread` *before* the thread
+  launches, `play/narration.py:205,264`), so this is
   new. Approach: the shared connection is guarded by a `threading.Lock` owned by
   `MemoryRepository`, and tool queries go through `conn.cursor()` under that lock. (A second
   `read_only=True` connection is NOT assumed safe while the app holds the write connection —
@@ -328,7 +358,7 @@ call `run_tool_loop`; no agent reimplements the loop.
 ## 11. Non-goals
 
 - **No write tools, ever** — proposals stay on the existing propose→validate→apply pipeline
-  (`play_view._run_proposal_pipeline`, `play_view.py:1909`).
+  (`ActionOrchestrator.run_proposal_pipeline`, `play/actions.py:582`, ex-`play_view.py:1909`).
 - No vector/semantic search, no embeddings — exact tags + ILIKE substring only.
 - No LLM-visible SQL; no cross-campaign search.
 - No DuckDB FTS extension in v1 (revisit if ILIKE+tags proves insufficient).
@@ -336,15 +366,34 @@ call `run_tool_loop`; no agent reimplements the loop.
 
 ## 12. Phasing & slices (TDD per `spec/TESTING.md`; use the TDD skill)
 
+> **Post-51.7 correction (2026-07-08):** slice targets below reflect the current `play/` package
+> (see the remap banner at the top). Two former `play_view.py` sites are now coordinator methods:
+> A5's second retrieval caller is `DialogueCoordinator.recent_memories()` (`play/dialogue.py:250`),
+> and B4's agent/threading wiring targets `NarrationCoordinator`/`DialogueCoordinator` ports.
+
+**Slice 0 — cleanup warm-up** (carry-in from the deferred PR #89 review; sequenced first because
+it directly serves Phase A's retrieval slices):
+- Extract `ActiveCampaign(repo, campaign_id)` value / `PlaySessionContext.active_campaign()`
+  accessor to collapse the 15+ hand-copied `(mem_repo, campaign_id)` co-presence guards
+  (`play/dialogue.py:243-246 recent_memories`, `play/actions.py:597-599 run_proposal_pipeline`,
+  `play/narration.py:213 build_context_bundle`, `reaction_applier`, `navigation`, `controller`).
+  A5/A6 add more retrieval sites; landing the accessor first means they consume it clean.
+- Narrow the two broad `except Exception` catches in `play/actions.py` (`run_chat_action`,
+  `on_resolve_action`) to post a GM-visible system line instead of only logging.
+
 **Phase A — Tag Hygiene** (no LLM changes, independently valuable):
 1. `validate_tag` + namespace vocabulary (`memory/tags.py`) — pure unit slice.
 2. Migration `020` + model/repo `tags` for objects/items/objectives.
 3. Seed-path fixes (actor-tags drop, `threat_tags`/`trigger_tags` removal, room-ID validation).
 4. Seed-data normalization + Crucible world tagging (idempotent populate-script updates).
-5. Retrieval: canonical tag construction + production callers pass filters (behavior change —
-   own slice + integration test on bundle contents).
+5. Retrieval: canonical tag construction (`memory/retrieval.py`) + **both** production callers pass
+   filters — `context_bundle._fetch_memories` (`context_bundle.py:54`) **and**
+   `DialogueCoordinator.recent_memories()` (`play/dialogue.py:250`, ex-`play_view.py:1517`).
+   Behavior change — own slice + integration test on bundle contents; realign the retrieval tests
+   to the canonical taxonomy.
 6. **T7 pre-fetch:** the `# Related Lore` bundle section (anchor-entity tag union → memory
-   retrieval → sub-budget + provenance) — deterministic, integration-tested on bundle output.
+   retrieval → sub-budget + provenance) in `ContextBundleBuilder` (`memory/context_bundle.py`,
+   untouched by 51.7) — deterministic, integration-tested on bundle output.
 
 **Phase B — Narrator Lookup Tool** (requires A):
 1. `MemoryRepository.search_entities` + `LookupService` (unit + roundtrip tests, fake data).
@@ -354,7 +403,10 @@ call `run_tool_loop`; no agent reimplements the loop.
 3. `run_tool_loop` helper (`llm/tool_loop.py`) — loop, round budget, error-as-string,
    final forced-plain round (pure unit slice with `FakeProvider`).
 4. Agent integration (scoped prompts, L7 redirect/telemetry) + worker-thread lock story +
-   observability panel line.
+   observability panel line — the `lookup` executor injects through the
+   `NarrationCoordinator`/`DialogueCoordinator` ports (`play/narration.py spawn_dm_thread`/`spawn`,
+   `play/dialogue.py`), **not** raw `play_view` methods; the worker thread these coordinators
+   already own is the single seam the DuckDB-read lock guards.
 5. Optional `pytest -m eval`: one live eval that an *out-of-scene* lore question triggers a
    lookup and lands the fact in the narration — and that an in-room question does **not**.
 
@@ -366,12 +418,12 @@ scheduling prefers.
 
 | # | Decision | Proposed |
 |---|---|---|
-| T1 | One namespaced taxonomy for all entities' descriptive tags | yes |
-| T2 | Namespace families incl. ratifying `actor:dungeon:`/`clock:`, new `object:`/`item:`/`faction:`/`objective:`/`trait:` | yes |
-| T3 | `validate_tag` at write time; permissive on read | yes |
-| T4 | `action_tags` stays outside the taxonomy (dies with WRP) | yes |
-| T5 | Delete `threat_tags`; stop `trigger_tags`→`action_tags`; convert to `trait:` | yes |
-| T6 | Normalization migration mapping (protagonist→pc etc.) | yes |
+| T1 | One namespaced taxonomy for all entities' descriptive tags | **OWNER-DECIDED 2026-07-08** |
+| T2 | Namespace families incl. ratifying `actor:dungeon:`/`clock:`, new `object:`/`item:`/`faction:`/`objective:`/`trait:` | **OWNER-DECIDED 2026-07-08** |
+| T3 | `validate_tag` at write time; permissive on read | **OWNER-DECIDED 2026-07-08** |
+| T4 | `action_tags` stays outside the taxonomy (dies with WRP) | **OWNER-DECIDED 2026-07-08** |
+| T5 | Delete `threat_tags`; stop `trigger_tags`→`action_tags`; convert to `trait:` | **OWNER-DECIDED 2026-07-08** |
+| T6 | Normalization migration mapping (protagonist→pc etc.) | **OWNER-DECIDED 2026-07-08** |
 | T7 | Deterministic `# Related Lore` pre-fetch is the default retrieval path | **OWNER-DECIDED 2026-07-04** |
 | L1 | Single `lookup_world` tool, name+tags+types params, out-of-scene mandate only | yes |
 | L2 | One repo method `search_entities` (ILIKE + exact tags) behind `LookupService` | yes |
