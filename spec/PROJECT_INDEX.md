@@ -54,11 +54,40 @@ retained further down for reference.
 (https://github.com/ghostpencil/dungeon-daddy/pull/90), 18 commits, owner GUI-verified on the live Crucible
 (2026-07-11). Full suite green (**3667 passed**), ruff + mypy(strict) clean.
 
+**✅ PR #90 review pass complete (2026-07-11) — 5-agent parallel review; follow-up fixes COMMITTED to the PR
+branch (`5c65b29`, pushed 2026-07-11).** Ran `/pr-review-toolkit:review-pr all parallel`
+(code / tests / silent-failure / type-design / comments) against the PR #90 diff. **No merge blocker** —
+the code-reviewer's two "critical" seed findings (`location:r8`/`location_slug` `r7`/`r1` "broken") were the
+**F1 false premise repeated**: those are valid **level-3** rooms per `tests/fixtures/crucible.json`
+(L1 `R1–R5`, L2 `r01–r06`, **L3 `r1–r8`**); the seed guard tests validate against the full room-id union and
+pass green. See memory [[reference-crucible-room-ids]].
+- **Fixes committed to the PR branch (`5c65b29`, TDD, ruff + mypy(strict) clean; affected suites green, 101 passed):**
+  - `memory/tags.py` — module docstring corrected (validation lives at seed/engine/authored write sites +
+    `normalize_tag` on the LLM path; the **repo layer does not validate**) — flagged independently by 3 of 5
+    agents. `normalize_tag` now folds alias actor subtypes (`monster`→`npc`,
+    `dungeon_presence`/`faction`→`dungeon`) instead of dropping them (they were recoverable via the existing
+    fold table).
+  - `memory/retrieval.py` — WARNING logs when an `actor_id` fails to resolve in `query` / `scene_memory_tags`
+    (was a silent narrowing / under-tag with no diagnostic).
+  - `play/dialogue.py` — **owner ruling 2026-07-11: mirror the DM bundle.** `recent_memories` (dungeon-voice
+    context, §5.2) now ALWAYS includes importance≥9 pins (unscoped); the scene-scoped bulk fills the rest.
+    The DM-narrator `ContextBundle` already did this; the fix aligns the separate dungeon-voice channel.
+  - Tests: normalize alias-fold + unknown-subtype-drop cases; caplog on both retrieval drops; a dungeon-voice
+    pin test (+ adjusted the scoping test's decoy to importance 6 so it still checks non-pin scene-gating).
+- **Deferred (non-blocking, from the review — fold into Phase B or a cleanup slice):** room-id gate
+  self-disable logging (`seed_rpg_state.py` when `dungeon.json` absent); a shared `field_validator("tags")`
+  on Item/RoomObject/Objective/ClockState (move tag enforcement to the type boundary); the engine
+  write→read round-trip integration test (test **Gap A** — write via `record_dungeon_exchange`/
+  `advance_objectives`/`discover_exit`, read back through `ContextBundleBuilder`, assert resurfacing); LOW
+  items (co-referenced-clock `trigger_tags` last-writer-wins; DBG panel hides found-then-fully-trimmed lore;
+  `seed_pack.py:144` docstring imprecision).
+
 **When resuming next session:**
 1. **If PR #90 merged** → mark it MERGED here (mirror the 51.7 block), delete the branch, then start
    **Phase B (Narrator Lookup Tool)** — first ratify decisions **L1/L2/L4–L7** with the owner (spec §13),
    then Slice B1 = `MemoryRepository.search_entities` + `LookupService` (spec §7/§12 Phase B).
-2. **If PR #90 still open** → address any review feedback on the branch.
+2. **If PR #90 still open** → the review-fix batch is now **committed & pushed** (`5c65b29`); address any
+   remaining human review feedback on the branch.
 3. **Optional data-hygiene pass (not blocking):** old saves' gameplay memories carry pre-taxonomy **bare
    tags** (`knowledge`, `arcane`, …) that don't participate in scene-scoped retrieval; a normalization pass
    (`normalize_tag` over existing `memory_tags`) would fold them into the canonical vocabulary. Noticed on
