@@ -30,13 +30,33 @@ Slice 1 fixed the non-atomic world-reaction write; the WRP "all three call sites
 was corrected (owner ruling 2026-07-05, `spec/WORLD_REACTION_POLICY.md` §7). Spec + slice plan:
 `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`.
 
+Phase **51.8 Phase A — Tag Hygiene: COMPLETE & merged to `main`** (PR #90, merge commit `6c899cc`,
+merged 2026-07-11; owner GUI-verified). A namespaced, colon-delimited tag taxonomy for every world
+entity (`memory/tags.py` `validate_tag`/`normalize_tag`; migrations `020`/`021`), seed + Crucible-world
+tagging, tag-based scene-scoped memory retrieval, write-side scene tagging, and the deterministic T7
+`# Related Lore` pre-fetch. Next: Phase B (Narrator Lookup Tool). Spec
+`spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
+
 Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` ·
 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` · current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`
 (index `spec/IMPLEMENTATION_PHASES.md`).
 
 ---
 
-## START HERE — next phase: Tag Hygiene → Narrator Lookup
+## START HERE — next phase: Phase B — Narrator Lookup Tool
+
+**✅ Phase 51.8 Phase A — Tag Hygiene: MERGED & CLOSED.** PR #90 merged to `main` 2026-07-11
+(merge commit `6c899cc`, branch `feat/phase-51.8-tag-hygiene` deleted); `main` is up to date.
+Slice 0 + A1–A6 all landed (the namespaced tag taxonomy: `validate_tag`/`normalize_tag`,
+migrations `020`/`021`, seed + Crucible-world tagging, tag-based scene-scoped retrieval,
+write-side scene tagging, and the T7 `# Related Lore` pre-fetch). Owner GUI-verified on the live
+Crucible. A 5-agent parallel PR review ran before merge — the review-fix batch (`5c65b29`) landed 3
+non-blocking fixes; deferred follow-ups retained below. Full 51.8-A slice history further down.
+
+**▶ NEXT — Phase B (Narrator Lookup Tool).** Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`
+(§7/§12 Phase B; decisions §13). Requires Phase A (done). **First: ratify decisions L1/L2/L4–L7 with
+the owner** (spec §13) before writing code. Then Slice B1 = `MemoryRepository.search_entities` +
+`LookupService`. Carry in the Phase-A deferred items (below) as candidates for a B cleanup slice.
 
 **✅ Phase 51.7 — PlayView Decomposition: MERGED & CLOSED.** PR #89 merged to `main` 2026-07-06
 (merge commit `5eadaaa`, branch deleted); `main` is up to date. `views/play_view.py` 2,765 → 1,491
@@ -47,15 +67,8 @@ fixed (`fd101df`, repo-read failures now surface `REACTION_FAILURE_LINE`), 2 fin
 to this next phase (see the review block below). Full 51.7 slice history + deferred follow-ups
 retained further down for reference.
 
-**▶ NEXT — awaiting review/merge of PR #90 (Phase A — Tag Hygiene).** Spec
-`spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`. Branch `feat/phase-51.8-tag-hygiene` (pushed, tracking
-`origin`). **Phase A (Tag Hygiene) is COMPLETE and committed** — Slice 0 + A1–A6 all landed; last commits
-`99fc091` (A6) + `7f25bde` (A6 DBG-panel follow-up). **PR #90 OPEN → `main`**
-(https://github.com/ghostpencil/dungeon-daddy/pull/90), 18 commits, owner GUI-verified on the live Crucible
-(2026-07-11). Full suite green (**3667 passed**), ruff + mypy(strict) clean.
-
-**✅ PR #90 review pass complete (2026-07-11) — 5-agent parallel review; follow-up fixes COMMITTED to the PR
-branch (`5c65b29`, pushed 2026-07-11).** Ran `/pr-review-toolkit:review-pr all parallel`
+**✅ PR #90 review pass (2026-07-11) — 5-agent parallel review; follow-up fixes COMMITTED (`5c65b29`) and
+MERGED with the PR.** Ran `/pr-review-toolkit:review-pr all parallel`
 (code / tests / silent-failure / type-design / comments) against the PR #90 diff. **No merge blocker** —
 the code-reviewer's two "critical" seed findings (`location:r8`/`location_slug` `r7`/`r1` "broken") were the
 **F1 false premise repeated**: those are valid **level-3** rooms per `tests/fixtures/crucible.json`
@@ -82,13 +95,10 @@ pass green. See memory [[reference-crucible-room-ids]].
   items (co-referenced-clock `trigger_tags` last-writer-wins; DBG panel hides found-then-fully-trimmed lore;
   `seed_pack.py:144` docstring imprecision).
 
-**When resuming next session:**
-1. **If PR #90 merged** → mark it MERGED here (mirror the 51.7 block), delete the branch, then start
-   **Phase B (Narrator Lookup Tool)** — first ratify decisions **L1/L2/L4–L7** with the owner (spec §13),
-   then Slice B1 = `MemoryRepository.search_entities` + `LookupService` (spec §7/§12 Phase B).
-2. **If PR #90 still open** → the review-fix batch is now **committed & pushed** (`5c65b29`); address any
-   remaining human review feedback on the branch.
-3. **Optional data-hygiene pass (not blocking):** old saves' gameplay memories carry pre-taxonomy **bare
+**When resuming next session (Phase A merged — start Phase B):**
+1. **Start Phase B (Narrator Lookup Tool)** → first ratify decisions **L1/L2/L4–L7** with the owner
+   (spec §13), then Slice B1 = `MemoryRepository.search_entities` + `LookupService` (spec §7/§12 Phase B).
+2. **Optional data-hygiene pass (not blocking):** old saves' gameplay memories carry pre-taxonomy **bare
    tags** (`knowledge`, `arcane`, …) that don't participate in scene-scoped retrieval; a normalization pass
    (`normalize_tag` over existing `memory_tags`) would fold them into the canonical vocabulary. Noticed on
    the live Crucible during A6 GUI verify.
