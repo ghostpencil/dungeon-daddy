@@ -97,6 +97,15 @@ class DebugControls:
         for card in b.memory_cards:
             reason = "importance" if card["memory_id"] in b.must_remember else "retrieved"
             lines.append(f"  - {card['title']} [{reason}]")
+        # Slice A6 (T7): surface the deterministic tag-driven pre-fetch so it can
+        # be observed/verified — only when the section actually pre-fetched lore.
+        if b.related_lore:
+            lore_omitted = b.provenance.get("related_lore_omitted", 0)
+            lines.append(
+                f"  Related Lore: {len(b.related_lore)}  Trimmed: {lore_omitted}"
+            )
+            for card in b.related_lore:
+                lines.append(f"  - {card['title']} [lore]")
         return lines
 
     def clock_section_lines(self) -> list[str]:

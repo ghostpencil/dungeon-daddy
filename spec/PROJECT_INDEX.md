@@ -242,7 +242,20 @@ DRY'd the duplicated row→`MemoryEntry` mapping into `_entry_from_row`; correct
 union *all* active objectives (spec says "the active objective" singular, but objectives are campaign-scoped
 with no room link, and their `thread:`/`theme:` tags are exactly the thematic hooks T7 wants); exits omitted
 from anchors (they have no `tags` column — inert); the pre-existing `trim_to_budget` first-overflow-break
-(inherited A5 helper, not this diff). **Open:** commit + owner GUI verify.
+(inherited A5 helper, not this diff). Committed `99fc091`.
+
+**A6 observability + GUI verify — ✅ owner-verified on the live Crucible (2026-07-11).** The DBG-tab bundle
+section never rendered `bundle_section_lines()` (it showed action/clock/reaction/proposal only), so A6 was
+invisible in-app. Wired `bundle_section_lines()` into `_draw_debug_tab` (`views/play_view.py`) and extended it
+to list a **`Related Lore: N Trimmed: M`** block + each lore title `[lore]` (`ui/panels/debug_controls.py`),
+rendered only when the section pre-fetched something. TDD (2 debug-controls tests); 412 view/debug tests green,
+ruff + mypy(strict) clean. **Live verify:** at room R4 (Great Lift, `thread:power-core`) a Look built the bundle
+and the DBG panel showed `Related Lore: 1 — The Power Core Is Destabilizing [lore]`, correctly deduped out of
+the 4 scoped Cards — matching the offline probe (R1→2, R5→2, r04→2). **Data note:** the live Crucible save was
+missing all 8 canonically-tagged seed lore memories (it had 4 gameplay memories with old bare tags), so A6 read
+empty until the 8 were injected (backup `campaign.duckdb.bak-a6-inject-lore-20260711-074321`, additive, play
+state untouched) — an A6-independent seed/save data gap, not a code defect (a fresh seed loads them via
+`apply_seed_pack`). Then PR the Phase A arc.
 
 **After A6 — Phase B (Narrator Lookup Tool):** requires Phase A (done). Ratify L1/L2/L4–L7 at Phase B start
 (spec §13). Slice B1 = `MemoryRepository.search_entities` + `LookupService` (`spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`

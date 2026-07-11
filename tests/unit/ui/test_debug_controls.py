@@ -209,6 +209,35 @@ def test_bundle_section_lines_shows_card_title_and_reason():
 
 
 # ---------------------------------------------------------------------------
+# Slice A6 (T7) — bundle_section_lines surfaces the pre-fetched Related Lore so
+# it can be GUI-verified in the debug panel.
+# ---------------------------------------------------------------------------
+
+def test_bundle_section_lines_shows_related_lore():
+    ctrl = _controls()
+    b = _bundle(
+        related_lore=[
+            {"memory_id": "L1", "title": "The Old Pact", "summary": "", "importance": 5},
+        ],
+        provenance={"retrieved": 0, "omitted": 0, "focus_actor_ids": [],
+                    "related_lore_retrieved": 1, "related_lore_omitted": 0,
+                    "related_lore_anchor_tags": ["thread:pact"]},
+    )
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.bundle_section_lines())
+    assert "Related Lore" in text
+    assert "The Old Pact" in text
+
+
+def test_bundle_section_lines_omits_related_lore_when_empty():
+    ctrl = _controls()
+    b = _bundle()  # no related lore
+    ctrl.set_bundle(b)
+    text = "\n".join(ctrl.bundle_section_lines())
+    assert "Related Lore" not in text
+
+
+# ---------------------------------------------------------------------------
 # Bullet 4 — no bundle → "No bundle built yet"
 # ---------------------------------------------------------------------------
 
