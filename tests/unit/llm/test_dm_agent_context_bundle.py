@@ -204,6 +204,31 @@ def test_build_prompt_no_bundle_returns_system_prompt():
 # rendered so the DM can narrate what the party studies/interacts with.
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Slice A6 (T7): the deterministic pre-fetch renders as a distinct
+# `# Related Lore` section so the DM actually sees it.
+# ---------------------------------------------------------------------------
+
+def test_build_prompt_renders_related_lore_section():
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    agent = DungeonMasterAgent(provider=_MockProvider())
+    bundle = _make_bundle(related_lore=[
+        {"memory_id": "L-1", "title": "The Old Pact", "summary": "A bargain struck in blood.", "importance": 5},
+    ])
+    result = agent.build_prompt(context_bundle=bundle)
+    assert "# Related Lore" in result
+    assert "The Old Pact" in result
+    assert "A bargain struck in blood." in result
+
+
+def test_build_prompt_omits_related_lore_section_when_empty():
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    agent = DungeonMasterAgent(provider=_MockProvider())
+    bundle = _make_bundle(related_lore=[])
+    result = agent.build_prompt(context_bundle=bundle)
+    assert "# Related Lore" not in result
+
+
 def test_build_prompt_includes_room_object_description():
     from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
     agent = DungeonMasterAgent(provider=_MockProvider())

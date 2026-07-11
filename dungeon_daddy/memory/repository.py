@@ -266,7 +266,7 @@ class MemoryRepository:
         assert self._conn is not None
         sql = (
             "SELECT actor_id, campaign_id, actor_type, slug, display_name, status, "
-            "playbook_slug, room_id, disposition "
+            "playbook_slug, room_id, disposition, tags "
             "FROM actors WHERE campaign_id = ? AND room_id = ?"
         )
         params: list[str] = [campaign_id, room_id]
@@ -286,6 +286,7 @@ class MemoryRepository:
                 "playbook_slug": row[6],
                 "room_id": row[7],
                 "disposition": row[8],
+                "tags": json.loads(row[9]) if row[9] else [],
             }
             for row in rows
         ]

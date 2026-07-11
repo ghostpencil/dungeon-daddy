@@ -8,7 +8,7 @@ import pytest
 from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.memory.retrieval import MemoryRetriever
-from dungeon_daddy.rpg.models import FalloutRecord
+from dungeon_daddy.rpg.models import FalloutRecord, RoomObject
 
 MIGRATIONS_DIR = (
     Path(__file__).parent.parent.parent
@@ -159,6 +159,165 @@ class TestSceneFilteredMemories:
 
         assert "mem-pin" in bundle.must_remember
         assert "mem-pin" in {c["memory_id"] for c in bundle.memory_cards}
+
+
+# ---------------------------------------------------------------------------
+# Slice A6 (T7): query_by_tag_relevance ranks by tag-hit count, then importance,
+# then recency — the related-lore retrieval primitive.
+# ---------------------------------------------------------------------------
+
+class TestQueryByTagRelevance:
+    def test_more_tag_hits_outrank_higher_importance(self, repo):
+        # mem-two shares BOTH anchor tags (2 hits, importance 4); mem-one shares
+        # only one (1 hit, importance 8). Hit count dominates importance.
+        repo.save_memory_entry("mem-two", "camp-1", "lore", "Two Hits",
+                               summary="s", importance=4, status="approved")
+        repo.add_memory_tag("mem-two", "thread:pact")
+        repo.add_memory_tag("mem-two", "theme:betrayal")
+        repo.save_memory_entry("mem-one", "camp-1", "lore", "One Hit",
+                               summary="s", importance=8, status="approved")
+        repo.add_memory_tag("mem-one", "thread:pact")
+
+        retriever = MemoryRetriever(repo, "camp-1")
+        results = retriever.query_by_tag_relevance(["thread:pact", "theme:betrayal"])
+        assert [r.memory_id for r in results] == ["mem-two", "mem-one"]
+
+    def test_equal_hits_break_by_importance(self, repo):
+        repo.save_memory_entry("mem-lo", "camp-1", "lore", "Lo",
+                               summary="s", importance=3, status="approved")
+        repo.add_memory_tag("mem-lo", "thread:pact")
+        repo.save_memory_entry("mem-hi", "camp-1", "lore", "Hi",
+                               summary="s", importance=7, status="approved")
+        repo.add_memory_tag("mem-hi", "thread:pact")
+
+        retriever = MemoryRetriever(repo, "camp-1")
+        results = retriever.query_by_tag_relevance(["thread:pact"])
+        assert [r.memory_id for r in results] == ["mem-hi", "mem-lo"]
+
+    def test_empty_tags_returns_nothing(self, repo):
+        retriever = MemoryRetriever(repo, "camp-1")
+        assert retriever.query_by_tag_relevance([]) == []
+
+    def test_excludes_non_approved(self, repo):
+        repo.save_memory_entry("mem-arch", "camp-1", "lore", "Archived",
+                               summary="s", importance=5, status="archived")
+        repo.add_memory_tag("mem-arch", "thread:pact")
+        retriever = MemoryRetriever(repo, "camp-1")
+        assert retriever.query_by_tag_relevance(["thread:pact"]) == []
+
+
+# ---------------------------------------------------------------------------
+# Slice A6 (T7): the `# Related Lore` pre-fetch section on the bundle.
+# ---------------------------------------------------------------------------
+
+def _crucible_object(room_id: str, *tags: str) -> RoomObject:
+    return RoomObject(
+        object_id=f"obj:{room_id}:altar",
+        campaign_id="camp-1",
+        room_id=room_id,
+        level_id="level-1",
+        slug="altar",
+        display_name="Blood Altar",
+        archetype="lore_fixture",
+        description="A slab crusted with old sacrifice.",
+        current_state="idle",
+        tags=list(tags),
+        transitions=[],
+    )
+
+
+class TestRelatedLorePrefetch:
+    def test_object_tag_surfaces_related_lore_scoped_query_misses(self, repo):
+        # A room object carries a thematic tag; a memory shares that tag but is
+        # tagged to NEITHER the room nor a present actor — so A5's scoped
+        # memory_cards misses it, and T7 pre-fetch is exactly what surfaces it.
+        repo.save_room_object(_crucible_object("crypt", "object:altar", "thread:pact"))
+        repo.save_memory_entry("mem-lore", "camp-1", "lore", "The Old Pact",
+                               summary="A bargain struck in blood.",
+                               importance=5, status="approved")
+        repo.add_memory_tag("mem-lore", "thread:pact")
+
+        bundle = ContextBundleBuilder(
+            "camp-1", "scene-1", "run_scene", ["actor-1"], 1000,
+            current_room_id="crypt",
+        ).build(repo)
+
+        lore_ids = {c["memory_id"] for c in bundle.related_lore}
+        card_ids = {c["memory_id"] for c in bundle.memory_cards}
+        assert "mem-lore" in lore_ids       # T7 surfaced it via the object tag
+        assert "mem-lore" not in card_ids   # A5 scoped query never had it
+        assert "thread:pact" in bundle.provenance["related_lore_anchor_tags"]
+        assert bundle.provenance["related_lore_retrieved"] == 1
+
+    def test_present_npc_tag_surfaces_related_lore(self, repo):
+        # A monster in the room carries a trait tag; a memory shares that trait
+        # (but not the room/actor-identity anchors A5 scopes on). The in-room
+        # actor is an anchor entity, so T7 must surface the memory.
+        repo.save_actor("mon-1", "camp-1", "monster", "cultist", "Cultist",
+                        "active", room_id="crypt")
+        repo._conn.execute(
+            "UPDATE actors SET tags = ? WHERE actor_id = ?",
+            ['["trait:cultist"]', "mon-1"],
+        )
+        repo.save_memory_entry("mem-cult", "camp-1", "lore", "The Cult",
+                               summary="They serve the deep.",
+                               importance=5, status="approved")
+        repo.add_memory_tag("mem-cult", "trait:cultist")
+
+        bundle = ContextBundleBuilder(
+            "camp-1", "scene-1", "run_scene", ["actor-1"], 1000,
+            current_room_id="crypt",
+        ).build(repo)
+
+        assert "mem-cult" in {c["memory_id"] for c in bundle.related_lore}
+
+    def test_memory_already_in_cards_not_duplicated_in_lore(self, repo):
+        # mem-2 (location:crypt) is already in memory_cards. Even though the room
+        # object also shares a tag with it, it must NOT be re-listed under lore.
+        repo.save_room_object(_crucible_object("crypt", "object:altar", "theme:shared"))
+        repo.add_memory_tag("mem-2", "theme:shared")  # mem-2 already in scope
+
+        bundle = ContextBundleBuilder(
+            "camp-1", "scene-1", "run_scene", ["actor-1"], 1000,
+            current_room_id="crypt",
+        ).build(repo)
+
+        assert "mem-2" in {c["memory_id"] for c in bundle.memory_cards}
+        assert "mem-2" not in {c["memory_id"] for c in bundle.related_lore}
+
+    def test_no_current_room_yields_empty_related_lore(self, repo):
+        repo.save_room_object(_crucible_object("crypt", "thread:pact"))
+        repo.save_memory_entry("mem-lore", "camp-1", "lore", "The Old Pact",
+                               summary="s", importance=5, status="approved")
+        repo.add_memory_tag("mem-lore", "thread:pact")
+
+        bundle = ContextBundleBuilder(
+            "camp-1", "scene-1", "run_scene", ["actor-1"], 1000,
+        ).build(repo)  # no current_room_id
+
+        assert bundle.related_lore == []
+        assert bundle.provenance["related_lore_retrieved"] == 0
+
+    def test_related_lore_trimmed_to_sub_budget(self, repo):
+        # Two large lore memories share the anchor tag; the ~400-token section
+        # sub-budget holds only the first (higher importance), omitting the next.
+        repo.save_room_object(_crucible_object("crypt", "thread:pact"))
+        repo.save_memory_entry("mem-big-hi", "camp-1", "lore", "H" * 40,
+                               summary="s" * 1200, importance=6, status="approved")
+        repo.add_memory_tag("mem-big-hi", "thread:pact")
+        repo.save_memory_entry("mem-big-lo", "camp-1", "lore", "L" * 40,
+                               summary="s" * 1200, importance=4, status="approved")
+        repo.add_memory_tag("mem-big-lo", "thread:pact")
+
+        bundle = ContextBundleBuilder(
+            "camp-1", "scene-1", "run_scene", ["actor-1"], 1000,
+            current_room_id="crypt",
+        ).build(repo)
+
+        lore_ids = [c["memory_id"] for c in bundle.related_lore]
+        assert lore_ids == ["mem-big-hi"]                       # only the first fits
+        assert bundle.provenance["related_lore_retrieved"] == 2
+        assert bundle.provenance["related_lore_omitted"] == 1
 
 
 # ---------------------------------------------------------------------------

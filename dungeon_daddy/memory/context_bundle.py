@@ -10,6 +10,12 @@ from dungeon_daddy.rpg.models import RoomObject
 from dungeon_daddy.rpg.obstacles import obstacle_approach_verbs
 from dungeon_daddy.rpg.service import compute_effective_ratings
 
+# Slice A6 (T7): the `# Related Lore` section has its own dedicated sub-budget
+# (~400 tokens, per spec §5 T7 step 3), retrieved and trimmed independently of
+# the scoped memory-card section so pre-fetched lore never crowds out the
+# scene's own memories.
+_RELATED_LORE_TOKEN_BUDGET = 400
+
 
 class ContextBundleBuilder:
     def __init__(
@@ -30,6 +36,8 @@ class ContextBundleBuilder:
 
     def build(self, repo: MemoryRepository) -> ContextBundle:
         memory_cards, must_remember, provenance = self._fetch_memories(repo)
+        already_bundled = {c["memory_id"] for c in memory_cards}
+        related_lore, lore_provenance = self._fetch_related_lore(repo, already_bundled)
         return ContextBundle(
             bundle_id=str(uuid.uuid4()),
             campaign_id=self._campaign_id,
@@ -40,11 +48,12 @@ class ContextBundleBuilder:
             active_fallout=self._fetch_active_fallout(repo),
             open_clocks=self._fetch_open_clocks(repo),
             memory_cards=memory_cards,
+            related_lore=related_lore,
             must_remember=must_remember,
             faction_reputations=self._fetch_faction_reputations(repo),
             inventory=self._fetch_inventory(repo),
             current_room=self._fetch_current_room(repo),
-            provenance=provenance,
+            provenance={**provenance, **lore_provenance},
         )
 
     def _fetch_memories(
@@ -85,6 +94,52 @@ class ContextBundleBuilder:
             "focus_actor_ids": self._focus_actor_ids,
         }
         return cards, must_remember, provenance
+
+    def _fetch_related_lore(
+        self, repo: MemoryRepository, exclude_ids: set[str]
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Slice A6 (T7): the deterministic tag-driven `# Related Lore` section.
+
+        Unions the descriptive tags of the scene's anchor entities (room
+        objects/items, present NPCs/monsters, the party, the active objective),
+        retrieves memories sharing those tags ranked by tag-hit count, drops
+        anything already in ``memory_cards`` (``exclude_ids``), and trims to the
+        section sub-budget. Records anchor tags + retrieved/omitted counts in
+        provenance. With no current room there is no scene to expand → empty.
+        """
+        if self._current_room_id is None:
+            return [], {
+                "related_lore_anchor_tags": [],
+                "related_lore_retrieved": 0,
+                "related_lore_omitted": 0,
+            }
+        anchor_tags = _collect_anchor_tags(
+            repo, self._campaign_id, self._current_room_id, self._focus_actor_ids
+        )
+        retriever = MemoryRetriever(repo, self._campaign_id)
+        candidates = [
+            e
+            for e in retriever.query_by_tag_relevance(anchor_tags)
+            if e.memory_id not in exclude_ids
+        ]
+        kept, omitted = retriever.trim_to_budget(
+            candidates, _RELATED_LORE_TOKEN_BUDGET
+        )
+        cards = [
+            {
+                "memory_id": e.memory_id,
+                "title": e.title,
+                "summary": e.summary,
+                "importance": e.importance,
+            }
+            for e in kept
+        ]
+        provenance = {
+            "related_lore_anchor_tags": anchor_tags,
+            "related_lore_retrieved": len(candidates),
+            "related_lore_omitted": omitted,
+        }
+        return cards, provenance
 
     def _fetch_open_clocks(self, repo: MemoryRepository) -> list[dict[str, Any]]:
         clocks = [c for c in repo.get_clocks(self._campaign_id) if c["status"] == "active"]
@@ -191,6 +246,38 @@ class ContextBundleBuilder:
         if row is None:
             return {}
         return {"scene_id": row[0], "location_slug": row[1], "status": row[2]}
+
+
+def _collect_anchor_tags(
+    repo: MemoryRepository,
+    campaign_id: str,
+    room_id: str,
+    focus_actor_ids: list[str],
+) -> list[str]:
+    """The union of the scene's anchor-entity tags (Slice A6 / T7 step 1).
+
+    The same nouns the room noun-context assembles — room objects, loose room
+    items, present NPCs/monsters — plus the focus party and the active
+    objective. Order-preserving, deduped. A cross-campaign or unknown focus
+    actor id contributes nothing.
+    """
+    tags: list[str] = []
+    for obj in repo.get_objects_by_room(campaign_id, room_id):
+        tags.extend(obj.get("tags", []))
+    for item in repo.get_items_by_room(campaign_id, room_id):
+        tags.extend(item.get("tags", []))
+    for actor in repo.get_actors_by_room(
+        campaign_id, room_id, actor_types=["npc", "monster"]
+    ):
+        tags.extend(actor.get("tags", []))
+    for actor_id in focus_actor_ids:
+        party_actor = repo.get_actor(actor_id)
+        if party_actor is not None and party_actor["campaign_id"] == campaign_id:
+            tags.extend(party_actor.get("tags", []))
+    for objective in repo.get_objectives(campaign_id):
+        if objective.get("status") == "active":
+            tags.extend(objective.get("tags", []))
+    return list(dict.fromkeys(tags))
 
 
 def _actor_noun(actor: dict[str, Any]) -> dict[str, Any]:

@@ -53,6 +53,24 @@ def scene_memory_tags(
     return list(dict.fromkeys(tags))
 
 
+def _entry_from_row(r: tuple[Any, ...]) -> MemoryEntry:
+    """Map a memory_entries SELECT row (columns memory_id..created_at, in
+    schema order) to a :class:`MemoryEntry`. Any trailing columns (e.g. a
+    COUNT used only for ranking) are ignored."""
+    return MemoryEntry(
+        memory_id=r[0],
+        campaign_id=r[1],
+        type=r[2],
+        title=r[3],
+        summary=r[4],
+        status=r[5],
+        importance=r[6],
+        markdown_path=r[7],
+        checksum=r[8],
+        created_at=r[9],
+    )
+
+
 class MemoryRetriever:
     def __init__(self, repo: MemoryRepository, campaign_id: str) -> None:
         self._repo = repo
@@ -118,21 +136,39 @@ class MemoryRetriever:
             params = [self._campaign_id]
 
         rows = self._repo._conn.execute(sql, params).fetchall()
-        return [
-            MemoryEntry(
-                memory_id=r[0],
-                campaign_id=r[1],
-                type=r[2],
-                title=r[3],
-                summary=r[4],
-                status=r[5],
-                importance=r[6],
-                markdown_path=r[7],
-                checksum=r[8],
-                created_at=r[9],
-            )
-            for r in rows
-        ]
+        return [_entry_from_row(r) for r in rows]
+
+    def query_by_tag_relevance(self, tags: list[str]) -> list[MemoryEntry]:
+        """Slice A6 (T7): related-lore retrieval ranked by *relevance*.
+
+        Returns approved memories sharing any of ``tags``, ordered by tag-hit
+        count DESC (how many of the anchor tags a memory carries), then
+        importance DESC, then recency (``created_at`` DESC) — the ranking the
+        ``# Related Lore`` pre-fetch wants (spec §5 T7). An empty tag list
+        returns nothing (no anchors → no related lore).
+        """
+        assert self._repo._conn is not None
+        if not tags:
+            return []
+        placeholders = ", ".join("?" for _ in tags)
+        sql = f"""
+            SELECT e.memory_id, e.campaign_id, e.type, e.title, e.summary,
+                   e.status, e.importance, e.markdown_path, e.checksum,
+                   e.created_at, COUNT(t.tag) AS hits
+            FROM memory_entries e
+            JOIN memory_tags t ON e.memory_id = t.memory_id
+            WHERE e.campaign_id = ?
+              AND t.tag IN ({placeholders})
+              AND e.status = 'approved'
+            GROUP BY e.memory_id, e.campaign_id, e.type, e.title, e.summary,
+                     e.status, e.importance, e.markdown_path, e.checksum,
+                     e.created_at
+            ORDER BY hits DESC, e.importance DESC, e.created_at DESC
+        """
+        params = [self._campaign_id] + tags
+        rows = self._repo._conn.execute(sql, params).fetchall()
+        # The extra COUNT(...) column (r[10]) is used only for ORDER BY.
+        return [_entry_from_row(r) for r in rows]
 
     def trim_to_budget(
         self, entries: list[MemoryEntry], max_tokens: int

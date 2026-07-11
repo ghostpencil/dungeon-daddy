@@ -48,7 +48,9 @@ to this next phase (see the review block below). Full 51.7 slice history + defer
 retained further down for reference.
 
 **▶ NEXT — Phase: Tag Hygiene → Narrator Lookup.** Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`
-(the sequenced choice; item 2 below). Branch `feat/phase-51.8-tag-hygiene`.
+(the sequenced choice; item 2 below). Branch `feat/phase-51.8-tag-hygiene`. **Phase A (Tag Hygiene) is
+COMPLETE through Slice A6** — Slice 0 + A1–A6 all landed (A6 uncommitted). Next: commit A6, then either PR
+the full Phase A arc (A1–A6, unpushed) or start **Phase B (Narrator Lookup Tool)** — see the A6 block below.
 
 **✅ Slice 0 — cleanup warm-up: COMPLETE (2026-07-08, uncommitted→committed).** Both deferred PR #89
 review findings landed. (a) New frozen `ActiveCampaign(repo, campaign_id)` value +
@@ -180,7 +182,7 @@ scope — spec §5.2 "keeping the existing importance-pinning"; only the regular
 slug leak); the two callers' duplicated present-actor construction collapsed to the shared helper (fixed
 a real `if room is not None` vs `if room:` divergence between the copies).
 
-**✅ Slice A5b — write-side tag hygiene: COMPLETE (2026-07-10, uncommitted).** Full suite green
+**✅ Slice A5b — write-side tag hygiene: COMPLETE (2026-07-10, committed `f5b3cff`).** Full suite green
 (**3653 passed**), ruff + mypy(strict, 169) clean. TDD throughout. All three parts landed.
 
 **Part 1 (commit `7e82eac`):** the `normalize_tag(tag) -> str | None` primitive (`memory/tags.py`; T6
@@ -209,9 +211,42 @@ sites authored any tags before, so there was nothing to guard until the tags exi
   `/remember`+`[REMEMBER]` still write the level-memory **Markdown overlay** (not `memory_entries`) — out
   of scope, as planned.
 
-**Then — Slice A6 (spec §12 Phase A.6): T7 `# Related Lore` pre-fetch.** The deterministic tag-driven
-bundle section (anchor-entity tag union → `MemoryRetriever.query(tags=…)` → sub-budget ~400 + provenance)
-in `ContextBundleBuilder` (`memory/context_bundle.py`). Integration-tested on bundle output.
+**✅ Slice A6 — T7 `# Related Lore` pre-fetch: COMPLETE (2026-07-10, uncommitted).** Full suite green
+(**3665 passed**), ruff + mypy(strict) clean. TDD (red→green per behavior). **Phase A (Tag Hygiene) is
+now fully implemented** — the deterministic tag-driven bundle section is the payoff slice A1–A5b built up to.
+- **New `ContextBundle.related_lore: list[dict]`** (`memory/models.py`) — a distinct bundle section beside
+  `memory_cards`, defaulting `[]`.
+- **New `MemoryRetriever.query_by_tag_relevance(tags)`** (`memory/retrieval.py`) — approved memories sharing
+  any anchor tag, ranked **tag-hit count DESC → importance DESC → recency** (the spec §5 T7 ranking; the
+  existing `query()` ranks importance/recency only). Row→`MemoryEntry` mapping DRY'd behind a shared
+  `_entry_from_row` helper (both query methods use it).
+- **`ContextBundleBuilder._fetch_related_lore` + `_collect_anchor_tags`** (`memory/context_bundle.py`) — unions
+  the descriptive tags of the scene's anchor entities (room objects/items, present NPCs/monsters, the party
+  focus actors, active objectives), retrieves related lore, **dedups against `memory_cards`** (a memory already
+  in the scoped section is never re-listed — and since importance≥9 pins are always in `memory_cards`, related
+  lore is purely the thematic mid-importance expansion), trims to a **dedicated ~400-token sub-budget**
+  (separate from the memory-card trim, so lore never crowds out scene memories), and records
+  `related_lore_anchor_tags`/`related_lore_retrieved`/`related_lore_omitted` in `provenance`. Gated on a
+  current room (no room → no scene → empty).
+- **DM prompt renders `# Related Lore`** (`llm/agents/dm_agent.py`) — the section is emitted into the system
+  prompt after `# Memory`, so the pre-fetched lore actually reaches the LLM (omitted when empty).
+- Live play activates it: `narration.build_context_bundle` already passes `current_room_id`.
+
+**A6 `/code-review high` (2026-07-10, 3 finder agents / 8 angles) — 1 correctness bug fixed + 2 cleanups
+applied; spec-deviation notes kept.** **Fixed (real bug):** `get_actors_by_room` never SELECTed `tags`, so
+in-room NPC/monster anchor tags were silently always `[]` — the party branch worked (via `get_actor`, which
+returns tags) but present-actor anchoring was a no-op. Added `tags` to the method (mirrors `get_actor`;
+back-compat, key access only in callers); TDD guard `test_present_npc_tag_surfaces_related_lore`. **Cleanups:**
+DRY'd the duplicated row→`MemoryEntry` mapping into `_entry_from_row`; corrected the sub-budget comment (it's a
+*dedicated* ~400 budget, not carved out of the memory section's 2000). **Kept (noted, not bugs):** anchors
+union *all* active objectives (spec says "the active objective" singular, but objectives are campaign-scoped
+with no room link, and their `thread:`/`theme:` tags are exactly the thematic hooks T7 wants); exits omitted
+from anchors (they have no `tags` column — inert); the pre-existing `trim_to_budget` first-overflow-break
+(inherited A5 helper, not this diff). **Open:** commit + owner GUI verify.
+
+**After A6 — Phase B (Narrator Lookup Tool):** requires Phase A (done). Ratify L1/L2/L4–L7 at Phase B start
+(spec §13). Slice B1 = `MemoryRepository.search_entities` + `LookupService` (`spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`
+§7/§12 Phase B). Or PR the full Phase A arc (A1–A6, still unpushed on `feat/phase-51.8-tag-hygiene`) first.
 
 **Exit-criterion-1 — ✅ owner accepted 1491 lines (2026-07-06).** `views/play_view.py` landed at
 **1491 lines** (from 1878), above the spec's "≤ ~900" but now containing *only* drawing / input
