@@ -40,8 +40,9 @@ Decisions ratified; rooms elevated to a first-class campaign entity (`rooms` tab
 seed path both COMPLETE, committed (`24375b0` + `b15602e`), and owner GUI-verified on the live Crucible
 (2026-07-11)** — every dungeon room is projected into a `rooms` record across all seeders (incl. the app's
 `seed_from_manifest`), with hybrid `quest_role` (derive from `main_loop_role`, authored override wins) and
-Crucible lore-tag enrichment. **Next: Slice B1 (`search_entities` + `LookupService`)** — pure backend TDD, no
-GUI until B4. Detail in START HERE below. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
+Crucible lore-tag enrichment. **Slice B1 (`search_entities` + `LookupService`) COMPLETE (uncommitted,
+2026-07-12; TDD, full suite green 3753, ruff + mypy(strict) clean)** — the read-only narrator-lookup backend.
+**Next: Slice B2 (provider transport).** Detail in START HERE below. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
 
 Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` ·
 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` · current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`
@@ -134,12 +135,32 @@ additive, timestamped `campaign.duckdb.bak-*` backups; the app was closed for th
      `rooms` table** (A6 predates B0). So the room's own `tags`/`quest_role` do **not** yet drive retrieval; B0 is
      backend groundwork with **no GUI-visible surface** until `lookup_world` (B1+). If we want room-table tags in
      the pre-fetch too, add a `repo.get_room(...).tags` line to `_collect_anchor_tags` (small, optional follow-up).
-2. **Slice B1** — `MemoryRepository.search_entities` + read-only `LookupService`. Unions the DuckDB entity
-   tables **incl. `rooms`** (ILIKE substring on name/slug + exact tag membership); rank exact-slug-match >
-   tag-hit count > (memory) importance/recency; ~1.2k-token compact-JSON tool results + `+N more`.
-   Tracer-bullet sequence: actor-by-query → case-insensitivity → tags filter → entity_types filter →
-   limit → remaining tables one at a time → ranking → campaign scoping → LookupService formatting.
-3. **Slices B2–B4** — provider transport (`complete_round` + `LLMToolDef`/`LLMToolCall`/`LLMRoundResult`),
+**✅ Slice B1 — `search_entities` + `LookupService`: COMPLETE (uncommitted, 2026-07-12; TDD, full suite green
+3753, ruff + mypy(strict) clean).** The read-only narrator-lookup backend.
+- **`MemoryRepository.search_entities(campaign_id, query, tags, entity_types, limit)`** (`memory/repository.py`):
+  unions all 8 taggable tables via a module-level `_EntitySource`/`_ENTITY_SOURCES` projection (actor/object/item/
+  clock/objective/faction/room) + a dedicated memory branch (`memory_entries` ⋈ `memory_tags`, **approved-only**).
+  Case-insensitive substring on slug/display_name (title for memories) **OR** exact tag membership (query OR tags
+  union); ≥1 of query/tags required (else `ValueError`); `entity_types` filter (empty list = no filter); `limit`
+  default 8, hard-capped 20. Ranking: exact-slug > tag-hit count; **importance/recency is a memories-only intra-
+  group tiebreak** (owner ruling 2026-07-12 — a memory never jumps a tied non-memory entity; stable sort +
+  pre-sorted memory block). Normalized row `{entity_type, id, slug, display_name, room_id, status, tags, snippet}`
+  — **`status` added per owner ruling 2026-07-12** (surface all entities incl. defunct, but let the narrator tell
+  live from dead; rooms have no status, objects report `current_state`). Campaign-scoped throughout.
+- **`LookupService`** (`memory/lookup.py`) — read-only façade (only public method `lookup`, per §8 authority
+  boundary): snippet truncated ~200 chars, ~1,200-token result budget with overflow dropped as `omitted` count
+  (always keeps ≥1 row), bad requests surfaced as `{"error": …}` data not raised (L4 "errors-as-strings").
+- **TDD, 43 tests** (`tests/unit/memory/test_search_entities.py` + `test_lookup_service.py`). Tracer-bullet
+  sequence followed (actor-by-query → case-insensitivity → tags → entity_types → limit → tables one-at-a-time →
+  ranking → scoping → LookupService).
+- **`/code-review high` (5 finder angles + owner rulings):** Angle C verified all table/columns vs the migration
+  DDL (clean). Fixed the `entity_types=[]`-returns-nothing bug (+test) and a stale comment. **Two owner rulings
+  resolved spec-shape gaps:** (1) add `status` to the row; (2) constrain importance to intra-memory ranking.
+  Deferred/noted (non-blocking): the Python-side substring filter instead of SQL `ILIKE` (equivalent at this
+  scale; the spec proposed ILIKE); `LookupService` budget trim overlaps `MemoryRetriever.trim_to_budget` but
+  differs in keep-first policy (not a drop-in). **`docs/LLM_AUTHORITY_BOUNDARY.md` "Read tools" note still TODO
+  when the phase lands (spec §8).**
+- **Slices B2–B4** — provider transport (`complete_round` + `LLMToolDef`/`LLMToolCall`/`LLMRoundResult`),
    `run_tool_loop` helper, agent integration (scoped prompts, L7 redirect/telemetry, worker-thread lock,
    observability panel). Optional B5 eval.
 
