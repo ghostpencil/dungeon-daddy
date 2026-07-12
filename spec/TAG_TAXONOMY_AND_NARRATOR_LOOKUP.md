@@ -226,17 +226,34 @@ now with better recall.
 ```
 
 At least one of `query`/`tags` is required. Results are compact JSON rows:
-`{entity_type, id, slug, display_name, room_id, tags, snippet}` — `snippet` is the
+`{entity_type, id, slug, display_name, room_id, status, tags, snippet}` — `snippet` is the
 description/summary truncated to ~200 chars. Deterministic ranking: exact slug match >
 tag-hit count > (memories only) importance DESC, created_at DESC. Total tool-result budget
 ~1,200 tokens; overflow rows dropped with a `"+N more"` marker.
 
+**Two owner rulings during Slice B1 (2026-07-12; refine the row/ranking above):**
+- **Row gains `status` (8 keys, not 7).** `lookup_world` is for entities/places/*past events*, so
+  it must surface defunct entities (dead actors, consumed items, resolved clocks, completed
+  objectives), not filter them out — but each row carries its lifecycle `status` so the narrator
+  can tell live from defunct (objects report `current_state`; rooms have no status → `null`;
+  memories are always `approved`). Prompt-side handling (past-tense narration of defunct entities)
+  is B4's job; the field is the prerequisite.
+- **Importance/recency is a *memories-only intra-group* tiebreak, not a global 4th key.** The
+  cross-type ranking stops at tag-hit count; importance/`created_at` only order memories among
+  themselves, so a memory never jumps a tied non-memory entity (which would push concrete world
+  entities past the `limit` in favour of lore). Implemented as a stable sort on `(exact_slug,
+  tag_hits)` with the memory block pre-sorted by importance DESC / recency DESC — entities precede
+  memories at a genuine relevance tie.
+
 **L2 (proposed): backend = one new repo method**, `MemoryRepository.search_entities(
-campaign_id, query=None, tags=None, entity_types=None, limit=8)` — `ILIKE '%q%'` over
-`slug`/`display_name` (first `LIKE` in the codebase; DuckDB supports `ILIKE` natively) union'd
-across the entity tables, plus exact tag membership (JSON-list `tags` columns and the
-`memory_tags` join table). A thin `LookupService` wraps it and formats tool results;
-`MemoryRetriever` stays untouched.
+campaign_id, query=None, tags=None, entity_types=None, limit=8)` — union'd across the entity
+tables, matching a case-insensitive substring on `slug`/`display_name` plus exact tag membership
+(JSON-list `tags` columns and the `memory_tags` join table). *(Slice B1 note: the substring match
+is done in Python over campaign-scoped rows rather than SQL `ILIKE` — equivalent behaviour at this
+scale, simpler, and lets the query-OR-tags union compose cleanly; revisit if campaign size ever
+makes it a scaling ceiling.)* An empty `entity_types` list means "no filter" (all types), not
+"match nothing". A thin read-only `LookupService` wraps it and formats tool results (snippet trim,
+token budget, `+N more`); `MemoryRetriever` stays untouched.
 
 ## 7.1 Rooms as a first-class campaign entity (OWNER-DECIDED 2026-07-11)
 
