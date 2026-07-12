@@ -42,9 +42,9 @@ seed path both COMPLETE, committed (`24375b0` + `b15602e`), and owner GUI-verifi
 `seed_from_manifest`), with hybrid `quest_role` (derive from `main_loop_role`, authored override wins) and
 Crucible lore-tag enrichment. **Slice B1 (`search_entities` + `LookupService`) COMPLETE, committed
 (`1af065e` + owner-ruling docs `419c8bb`, 2026-07-12)** — the read-only narrator-lookup backend. **Slice B2
-(provider transport) COMPLETE (uncommitted, 2026-07-12; TDD, full suite green 3771, ruff + mypy(strict) clean)** —
-`complete_round` tool-use round on the provider seam. **Next: Slice B3 (`run_tool_loop` helper).** Detail in
-START HERE below. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
+(provider transport) COMPLETE, committed (`2a01c58`, 2026-07-12; TDD, full suite green 3772, ruff + mypy(strict)
+clean)** — `complete_round` tool-use round on the provider seam. **Next: Slice B3 (`run_tool_loop` helper).** Detail
+in START HERE below. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
 
 Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` ·
 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` · current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`
@@ -163,9 +163,9 @@ backend.
   scale; the spec proposed ILIKE); `LookupService` budget trim overlaps `MemoryRetriever.trim_to_budget` but
   differs in keep-first policy (not a drop-in). **`docs/LLM_AUTHORITY_BOUNDARY.md` "Read tools" note still TODO
   when the phase lands (spec §8).**
-**✅ Slice B2 — provider transport (`complete_round`): COMPLETE (uncommitted, 2026-07-12; TDD, full suite green
-3772, ruff + mypy(strict, 170) clean).** The tool-use round on the provider seam (spec §9, L3 = agent-owned loop /
-provider = pure transport). +19 tests.
+**✅ Slice B2 — provider transport (`complete_round`): COMPLETE, committed (`2a01c58`, 2026-07-12; TDD, full suite
+green 3772, ruff + mypy(strict, 170) clean).** The tool-use round on the provider seam (spec §9, L3 = agent-owned
+loop / provider = pure transport). +19 tests.
 - **Provider-neutral types** (`llm/provider.py`): `LLMToolDef(name, description, parameters)`,
   `LLMToolCall(call_id, name, arguments)`, `LLMRoundResult(text, tool_calls)`; `LLMMessage` gains role `"tool"`
   + optional `tool_call_id` / `tool_calls` (all default `None` → back-compat). `dict[str, Any]` for the JSON
