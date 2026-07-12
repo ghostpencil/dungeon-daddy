@@ -133,6 +133,66 @@ def test_observing_provider_model_id_delegates(mocker, tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Slice B2: ObservingProvider forwards tool-use transport (complete_round)
+# ---------------------------------------------------------------------------
+
+def test_observing_provider_supports_tools_reflects_inner(mocker, tmp_path):
+    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
+
+    inner = _make_mock_provider(mocker)
+    inner.supports_tools = True
+    op = ObservingProvider(inner, agent="dm", writer=TelemetryWriter(tmp_path / "f.jsonl"))
+    assert op.supports_tools is True
+
+
+def test_observing_provider_supports_tools_false_when_inner_lacks_it(tmp_path):
+    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
+
+    class _NoTools:
+        model_id = "x"
+        last_usage = None
+
+    op = ObservingProvider(_NoTools(), agent="dm", writer=TelemetryWriter(tmp_path / "f.jsonl"))
+    assert op.supports_tools is False
+
+
+def test_observing_provider_complete_round_delegates_and_returns_result(mocker, tmp_path):
+    from dungeon_daddy.llm.provider import LLMMessage, LLMRoundResult, LLMToolDef
+    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
+
+    inner = _make_mock_provider(mocker)
+    expected = LLMRoundResult(text="ok")
+    inner.complete_round.return_value = expected
+    op = ObservingProvider(inner, agent="dm", writer=TelemetryWriter(tmp_path / "f.jsonl"))
+
+    msgs = [LLMMessage(role="user", content="hi")]
+    tools = [LLMToolDef(name="lookup_world", description="d", parameters={})]
+    result = op.complete_round(msgs, system="sys", tools=tools, max_tokens=256)
+
+    assert result is expected
+    inner.complete_round.assert_called_once_with(msgs, system="sys", tools=tools, max_tokens=256)
+
+
+def test_observing_provider_complete_round_writes_one_record(mocker, tmp_path):
+    from dungeon_daddy.llm.provider import LLMMessage, LLMRoundResult
+    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
+
+    inner = _make_mock_provider(mocker, last_usage=(100, 40))
+    inner.complete_round.return_value = LLMRoundResult(text="ok")
+    log_file = tmp_path / "llm_calls.jsonl"
+    op = ObservingProvider(inner, agent="dm", writer=TelemetryWriter(log_file))
+
+    op.complete_round([LLMMessage(role="user", content="hi")])
+
+    lines = log_file.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    rec = json.loads(lines[0])
+    assert rec["agent"] == "dm"
+    assert rec["prompt_tokens"] == 100
+    assert rec["completion_tokens"] == 40
+
+
+# ---------------------------------------------------------------------------
 # Cycle 5: OpenAIProvider.last_usage
 # ---------------------------------------------------------------------------
 

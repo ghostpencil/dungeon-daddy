@@ -40,9 +40,11 @@ Decisions ratified; rooms elevated to a first-class campaign entity (`rooms` tab
 seed path both COMPLETE, committed (`24375b0` + `b15602e`), and owner GUI-verified on the live Crucible
 (2026-07-11)** — every dungeon room is projected into a `rooms` record across all seeders (incl. the app's
 `seed_from_manifest`), with hybrid `quest_role` (derive from `main_loop_role`, authored override wins) and
-Crucible lore-tag enrichment. **Slice B1 (`search_entities` + `LookupService`) COMPLETE (uncommitted,
-2026-07-12; TDD, full suite green 3753, ruff + mypy(strict) clean)** — the read-only narrator-lookup backend.
-**Next: Slice B2 (provider transport).** Detail in START HERE below. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
+Crucible lore-tag enrichment. **Slice B1 (`search_entities` + `LookupService`) COMPLETE, committed
+(`1af065e` + owner-ruling docs `419c8bb`, 2026-07-12)** — the read-only narrator-lookup backend. **Slice B2
+(provider transport) COMPLETE (uncommitted, 2026-07-12; TDD, full suite green 3771, ruff + mypy(strict) clean)** —
+`complete_round` tool-use round on the provider seam. **Next: Slice B3 (`run_tool_loop` helper).** Detail in
+START HERE below. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
 
 Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` ·
 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` · current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`
@@ -135,8 +137,9 @@ additive, timestamped `campaign.duckdb.bak-*` backups; the app was closed for th
      `rooms` table** (A6 predates B0). So the room's own `tags`/`quest_role` do **not** yet drive retrieval; B0 is
      backend groundwork with **no GUI-visible surface** until `lookup_world` (B1+). If we want room-table tags in
      the pre-fetch too, add a `repo.get_room(...).tags` line to `_collect_anchor_tags` (small, optional follow-up).
-**✅ Slice B1 — `search_entities` + `LookupService`: COMPLETE (uncommitted, 2026-07-12; TDD, full suite green
-3753, ruff + mypy(strict) clean).** The read-only narrator-lookup backend.
+**✅ Slice B1 — `search_entities` + `LookupService`: COMPLETE, committed (`1af065e`; owner-ruling docs
+`419c8bb`; 2026-07-12; TDD, full suite green 3753, ruff + mypy(strict) clean).** The read-only narrator-lookup
+backend.
 - **`MemoryRepository.search_entities(campaign_id, query, tags, entity_types, limit)`** (`memory/repository.py`):
   unions all 8 taggable tables via a module-level `_EntitySource`/`_ENTITY_SOURCES` projection (actor/object/item/
   clock/objective/faction/room) + a dedicated memory branch (`memory_entries` ⋈ `memory_tags`, **approved-only**).
@@ -160,9 +163,34 @@ additive, timestamped `campaign.duckdb.bak-*` backups; the app was closed for th
   scale; the spec proposed ILIKE); `LookupService` budget trim overlaps `MemoryRetriever.trim_to_budget` but
   differs in keep-first policy (not a drop-in). **`docs/LLM_AUTHORITY_BOUNDARY.md` "Read tools" note still TODO
   when the phase lands (spec §8).**
-- **Slices B2–B4** — provider transport (`complete_round` + `LLMToolDef`/`LLMToolCall`/`LLMRoundResult`),
-   `run_tool_loop` helper, agent integration (scoped prompts, L7 redirect/telemetry, worker-thread lock,
-   observability panel). Optional B5 eval.
+**✅ Slice B2 — provider transport (`complete_round`): COMPLETE (uncommitted, 2026-07-12; TDD, full suite green
+3772, ruff + mypy(strict, 170) clean).** The tool-use round on the provider seam (spec §9, L3 = agent-owned loop /
+provider = pure transport). +19 tests.
+- **Provider-neutral types** (`llm/provider.py`): `LLMToolDef(name, description, parameters)`,
+  `LLMToolCall(call_id, name, arguments)`, `LLMRoundResult(text, tool_calls)`; `LLMMessage` gains role `"tool"`
+  + optional `tool_call_id` / `tool_calls` (all default `None` → back-compat). `dict[str, Any]` for the JSON
+  payload fields (mypy strict).
+- **`LLMProvider` Protocol** gains `complete_round(messages, system, tools=None, max_tokens=1024) -> LLMRoundResult`
+  + a `supports_tools` property (`complete`/`stream` untouched; capability-detected via
+  `getattr(provider, "supports_tools", False)`, so Anthropic — never checked as `LLMProvider` — stays untouched,
+  same as it already lacks `last_usage`).
+- **`OpenAIProvider.complete_round`** translates `LLMToolDef`→OpenAI function-tool format, sends `tools=` only when
+  present (final forced-plain round passes `tools=None`), parses `message.tool_calls`→`list[LLMToolCall]` (args
+  JSON-decoded), updates `last_usage`, wraps `APIError`→`LLMError`. New `_build_round_messages` preserves assistant
+  `tool_calls` + `role="tool"` results (the existing `_build_messages`/`complete`/`stream` untouched). `supports_tools=True`.
+- **`ObservingProvider` (telemetry) forwards both** — production agents receive an `ObservingProvider` wrapping
+  `OpenAIProvider` (`window.py`), so `complete_round` records a telemetry line like `complete` and `supports_tools`
+  reflects the inner provider; otherwise the wrapper would mask the capability from B4's `getattr` detection.
+- **AnthropicProvider deferred** (spec §9: "Anthropic later") — no `complete_round` yet; falls back to `complete()`.
+- **`/code-review high` (8 angles):** 1 correctness fix — a `JSONDecodeError` from truncated/malformed tool-call
+  `arguments` (model hits `max_tokens` mid-call) escaped `complete_round`'s `except openai.APIError` uncaught,
+  breaking the "callers only ever see `LLMError`" contract; extracted `_parse_tool_arguments` that wraps it as
+  `LLMError` (+guard test). Noted/deferred (low): `json.loads` may return a non-dict for `arguments` (validate in
+  the B3 executor); `_build_round_messages` mildly duplicates `_build_messages` (different dict shapes → reuse awkward).
+- **`docs/LLM_AUTHORITY_BOUNDARY.md` "Read tools" note still TODO** when the phase lands (spec §8; carried from B1).
+- **Slices B3–B4** — `run_tool_loop` helper (`llm/tool_loop.py`: loop, 2-round budget, error-as-string, final
+   forced-plain round; pure unit slice with a `FakeProvider` scripting `tool_calls`), then agent integration
+   (scoped prompts, L7 redirect/telemetry, worker-thread lock, observability panel). Optional B5 eval.
 
 **Phase A deferred items (non-blocking — fold into Phase B or a cleanup slice):** room-id gate
 self-disable logging (`seed_rpg_state.py` when `dungeon.json` absent); a shared `field_validator("tags")`
