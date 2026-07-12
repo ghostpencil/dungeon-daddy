@@ -37,10 +37,11 @@ and the T7 `# Related Lore` pre-fetch. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOK
 
 Phase **51.8 Phase B — Narrator Lookup Tool: IN PROGRESS** (branch `feat/phase-51.8-narrator-lookup`).
 Decisions ratified; rooms elevated to a first-class campaign entity (`rooms` table). Slice B0 **persistence +
-seed path both COMPLETE** — every dungeon room is projected into a `rooms` record across all seeders (incl. the
-app's `seed_from_manifest`), with hybrid `quest_role` (derive from `main_loop_role`, authored override wins) and
-Crucible lore-tag enrichment. Next: Slice B1 (`search_entities` + `LookupService`). Detail in START HERE below.
-Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
+seed path both COMPLETE, committed (`24375b0` + `b15602e`), and owner GUI-verified on the live Crucible
+(2026-07-11)** — every dungeon room is projected into a `rooms` record across all seeders (incl. the app's
+`seed_from_manifest`), with hybrid `quest_role` (derive from `main_loop_role`, authored override wins) and
+Crucible lore-tag enrichment. **Next: Slice B1 (`search_entities` + `LookupService`)** — pure backend TDD, no
+GUI until B4. Detail in START HERE below. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
 
 Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` ·
 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` · current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`
@@ -86,7 +87,7 @@ update** — close PR #91, or merge it and reconcile this block on rebase.)*
   `get_room` (upsert on conflict, campaign-scoped). Updated the migration guard test — the campaign DB now
   legitimately holds a `rooms` table (`dungeons`/`connections`/`levels` remain design-only).
 
-**✅ Slice B0 seed path — COMPLETE (uncommitted, TDD, full suite green, ruff + mypy(strict) clean).**
+**✅ Slice B0 seed path — COMPLETE & committed (`b15602e`; TDD, full suite green, ruff + mypy(strict) clean).**
 Every dungeon room is now projected into a first-class `rooms` record across **all** seed paths.
 - **Pure builder** `build_room_states(levels, campaign_id, *, quest_roles, room_tags)` (`rpg/seed_pack.py`):
   `summary`←`Room.note`, `level_id`=`level:<Level.id>`, `slug`←name (id fallback); **hybrid `quest_role`**
@@ -106,8 +107,33 @@ Every dungeon room is now projected into a first-class `rooms` record across **a
   overrides needed. L3 (`r1`–`r8`) has no populate script → base-seed only (known; [[reference_crucible_room_ids]]).
 - **`/code-review high` (2 finders + fixes):** fixed a reseed data-loss bug (rooms now skip/force like actors;
   +2 regression tests), extracted the duplicated `save_room_tags` into `enrich_room_tags`, and surfaced +fixed
-  the cross-file `backfill` count coupling. **Next: commit + owner GUI-verify** (does a fresh campaign show
-  first-class rooms; live Crucible reseed).
+  the cross-file `backfill` count coupling.
+
+**✅ Slice B0 owner GUI-verified on the live Crucible (2026-07-11).** Live save reseeded + reset (all steps
+additive, timestamped `campaign.duckdb.bak-*` backups; the app was closed for the DuckDB write lock):
+1. **Rooms planted into the live save.** An existing save that already has exits **skips `backfill`** → rooms
+   never got projected (the A6 live-data pattern). A one-off replicated the app seam (open repo → `initialize_schema`
+   applies migration `022_rooms.sql` → `seed_from_manifest(dungeon=…)` additive → L1/L2 `save_room_tags` lore
+   enrichers). Result: **19 first-class rooms** (L1 `R1`–`R5`, L2 `r01`–`r06`, L3 `r1`–`r8`), 11 with lore tags,
+   38 exits untouched.
+2. **Full new-game reset** via `tools/reset_crucible_new_game.py` (party → Level 1 `R1`; clocks 0; objectives
+   ladder tier 0 active / 1–3 locked; objects/items/stress → authored seed state; play memory wiped). Fixed the
+   item-state drift the owner reported. *(NB: `START_ROOM_ID = "R1"` — the Level-1 entrance, **not** lowercase
+   `r1` which is L3's Control Nexus; case selects the level.)*
+3. **Re-injected the 8 canonical seed lore memories** (`seed_data/campaigns/the-crucible/rpg_seed.json`) — the
+   reset wipes `memory_entries`, and this save's base manifest never carried the 8 (pre-existing A6 live-data gap),
+   so `# Related Lore` read empty until re-injected. Replicated only `apply_seed_pack`'s memory loop
+   (`save_memory_entry` + `add_memory_tag`, deterministic uuid5 ids → idempotent).
+   - **GUI verify passed** (owner, live play R1→R2→R1): scene-scoped Cards correctly party/room-anchored (NOT
+     top-importance — the two importance-8/7 lore facts routed to Related Lore, `The Factory is Waking Up`
+     correctly appeared nowhere at R1/R2); Related Lore deduped against Cards; exits/unlock persisted;
+     **container loot re-spawns on open** (Half-Buried Supply Locker in R1 → Sun-Bleached Travel Journal) — the
+     item-state concern is resolved.
+   - **⚠ Architecture finding for Slice B1+:** `_collect_anchor_tags` (`memory/context_bundle.py:251`) anchors
+     Related Lore on **objects / items / present NPCs / focus party / active objectives — it does NOT read the new
+     `rooms` table** (A6 predates B0). So the room's own `tags`/`quest_role` do **not** yet drive retrieval; B0 is
+     backend groundwork with **no GUI-visible surface** until `lookup_world` (B1+). If we want room-table tags in
+     the pre-fetch too, add a `repo.get_room(...).tags` line to `_collect_anchor_tags` (small, optional follow-up).
 2. **Slice B1** — `MemoryRepository.search_entities` + read-only `LookupService`. Unions the DuckDB entity
    tables **incl. `rooms`** (ILIKE substring on name/slug + exact tag membership); rank exact-slug-match >
    tag-hit count > (memory) importance/recency; ~1.2k-token compact-JSON tool results + `+N more`.
