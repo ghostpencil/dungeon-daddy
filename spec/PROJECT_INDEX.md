@@ -43,8 +43,9 @@ seed path both COMPLETE, committed (`24375b0` + `b15602e`), and owner GUI-verifi
 Crucible lore-tag enrichment. **Slice B1 (`search_entities` + `LookupService`) COMPLETE, committed
 (`1af065e` + owner-ruling docs `419c8bb`, 2026-07-12)** — the read-only narrator-lookup backend. **Slice B2
 (provider transport) COMPLETE, committed (`2a01c58`, 2026-07-12; TDD, full suite green 3772, ruff + mypy(strict)
-clean)** — `complete_round` tool-use round on the provider seam. **Next: Slice B3 (`run_tool_loop` helper).** Detail
-in START HERE below. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
+clean)** — `complete_round` tool-use round on the provider seam. **Slice B3 (`run_tool_loop` helper) COMPLETE, committed
+(`91ffafa`, 2026-07-12; TDD, full suite green 3779, ruff + mypy(strict, 171) clean)** — the agent-owned tool loop.
+**Next: Slice B4 (agent integration).** Detail in START HERE below. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
 
 Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` ·
 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` · current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`
@@ -188,9 +189,27 @@ loop / provider = pure transport). +19 tests.
   `LLMError` (+guard test). Noted/deferred (low): `json.loads` may return a non-dict for `arguments` (validate in
   the B3 executor); `_build_round_messages` mildly duplicates `_build_messages` (different dict shapes → reuse awkward).
 - **`docs/LLM_AUTHORITY_BOUNDARY.md` "Read tools" note still TODO** when the phase lands (spec §8; carried from B1).
-- **Slices B3–B4** — `run_tool_loop` helper (`llm/tool_loop.py`: loop, 2-round budget, error-as-string, final
-   forced-plain round; pure unit slice with a `FakeProvider` scripting `tool_calls`), then agent integration
-   (scoped prompts, L7 redirect/telemetry, worker-thread lock, observability panel). Optional B5 eval.
+
+**✅ Slice B3 — `run_tool_loop` helper: COMPLETE, committed (`91ffafa`, 2026-07-12; TDD, full suite green 3779, ruff +
+mypy(strict, 171) clean).** The agent-owned request→tool→request loop (spec §9, L3 = agent owns the loop / provider is
+pure transport). +9 tests, pure unit slice with a `FakeProvider` scripting `complete_round`.
+- **`run_tool_loop(provider, messages, system="", tools=None, *, executor, max_rounds=2, max_tokens=1024) -> str`**
+  (`llm/tool_loop.py`): each round calls `complete_round`; a round returning `tool_calls` runs the injected `executor`
+  per call, appends an assistant `tool_calls` message + one `role="tool"` result per call (carrying `tool_call_id`),
+  and resubmits. The **last round forces `tools=None`** → plain answer (L4: answer with what it has once the budget is
+  spent). Plain-text round returns immediately; `None` text → `""`. **`executor` exceptions become `Error: …` strings**
+  (L4: tool errors never raise through the turn) via `_run_executor`. `executor` is required keyword-only (a loop without
+  one is meaningless). The `role="tool"`/assistant-`tool_calls` history it builds is exactly what B2's
+  `OpenAIProvider._build_round_messages` consumes, so the loop feeds straight back into the real provider.
+- **`/code-review high` (8 angles) — 2 low-severity robustness fixes applied (TDD, RED first):** (1) the last round now
+  returns text **unconditionally** — a non-conformant provider that still emits `tool_calls` under `tools=None` no longer
+  blanks the answer or re-runs the executor; (2) `max_rounds` clamped to ≥1 so there is always one provider call (a
+  `max_rounds=0` no-op empty answer is impossible). No callers yet (B4 wires it), so no cross-file breakage.
+- **Slice B4 (next)** — agent integration: `DungeonMasterAgent`/`DungeonVoiceAgent` gain the optional `lookup` seam
+  (call `run_tool_loop` when `supports_tools` + executor injected, else today's `complete` path), scoped "when to look
+  things up" prompt (§6/§10), the `LookupService` executor wired through the `NarrationCoordinator`/`DialogueCoordinator`
+  worker-thread ports behind the repo-owned DuckDB read lock (L5), L7 redirect/telemetry, and the L6 observability panel
+  line. Optional B5 eval. **Carried TODO: the `docs/LLM_AUTHORITY_BOUNDARY.md` "Read tools" note (spec §8).**
 
 **Phase A deferred items (non-blocking — fold into Phase B or a cleanup slice):** room-id gate
 self-disable logging (`seed_rpg_state.py` when `dungeon.json` absent); a shared `field_validator("tags")`
