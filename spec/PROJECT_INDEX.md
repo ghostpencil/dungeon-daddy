@@ -45,7 +45,11 @@ Crucible lore-tag enrichment. **Slice B1 (`search_entities` + `LookupService`) C
 (provider transport) COMPLETE, committed (`2a01c58`, 2026-07-12; TDD, full suite green 3772, ruff + mypy(strict)
 clean)** — `complete_round` tool-use round on the provider seam. **Slice B3 (`run_tool_loop` helper) COMPLETE, committed
 (`91ffafa`, 2026-07-12; TDD, full suite green 3779, ruff + mypy(strict, 171) clean)** — the agent-owned tool loop.
-**Next: Slice B4 (agent integration).** Detail in START HERE below. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
+**Slice B4a–d (agent integration) COMPLETE, committed (`9afce53`, 2026-07-13; TDD, +23 tests, llm+play+memory sweep green
+696, ruff + mypy(strict) clean)** — the `lookup_world` tool wired end-to-end (tool def + executor with L7/L6, both agent
+seams, both coordinator worker-thread wirings behind the L5 read lock). **Next: Slice B4e (L6 debug-panel line — touches
+`PlayView` UI, needs UI-harness tests) + B4f (the carried `LLM_AUTHORITY_BOUNDARY.md` read-tools note); optional B5 eval.**
+Detail in START HERE below. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
 
 Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` ·
 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` · current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`
@@ -205,11 +209,47 @@ pure transport). +9 tests, pure unit slice with a `FakeProvider` scripting `comp
   returns text **unconditionally** — a non-conformant provider that still emits `tool_calls` under `tools=None` no longer
   blanks the answer or re-runs the executor; (2) `max_rounds` clamped to ≥1 so there is always one provider call (a
   `max_rounds=0` no-op empty answer is impossible). No callers yet (B4 wires it), so no cross-file breakage.
-- **Slice B4 (next)** — agent integration: `DungeonMasterAgent`/`DungeonVoiceAgent` gain the optional `lookup` seam
-  (call `run_tool_loop` when `supports_tools` + executor injected, else today's `complete` path), scoped "when to look
-  things up" prompt (§6/§10), the `LookupService` executor wired through the `NarrationCoordinator`/`DialogueCoordinator`
-  worker-thread ports behind the repo-owned DuckDB read lock (L5), L7 redirect/telemetry, and the L6 observability panel
-  line. Optional B5 eval. **Carried TODO: the `docs/LLM_AUTHORITY_BOUNDARY.md` "Read tools" note (spec §8).**
+**✅ Slice B4a–d — agent integration: COMPLETE, committed (`9afce53`, 2026-07-13; TDD, +23 tests, llm+play+memory sweep
+green 696, ruff + mypy(strict) clean).** The `lookup_world` tool wired end-to-end — define → detect → escalate →
+search-under-lock. Owner ruling this session: **fold the carried `LLM_AUTHORITY_BOUNDARY.md` note into B4** (see B4f
+below). Nothing has exercised it against a **live** tool-calling provider yet (B2's `complete_round` only fake-driven);
+no GUI-visible surface until B4e renders the panel line.
+- **B4a — `llm/lookup_tool.py` (new):** `LOOKUP_WORLD_TOOL` (`LLMToolDef`, §7/L1) + `build_lookup_executor(service,
+  bundle_entity_ids, *, on_lookup)` bridging `LLMToolCall`→`LookupService.lookup`→JSON string. **L7:** full-overlap
+  **redirect** (`REDIRECT_MESSAGE`, cheap hard-stop) + partial-overlap **`redundant_lookup` telemetry** via a
+  `LookupRecord` (query/tags/hit_count/overlap_count/redirected); **L6** logging. Plus `bundle_entity_ids(bundle)` — the
+  scene's entity-id set (memory-card + related-lore memory ids, current room + its objects/loose-items/present-actors,
+  open clocks, active factions) matching `search_entities`' `id` per type.
+- **B4b/B4c — agent seams:** `DungeonMasterAgent.respond` / `DungeonVoiceAgent.respond` gain optional `lookup`
+  (`Callable[[LLMToolCall], str] | None`). When `getattr(provider, "supports_tools", False)` **and** `lookup` injected →
+  `run_tool_loop(..., tools=[LOOKUP_WORLD_TOOL], executor=lookup)` with a scoped `# Looking Things Up` prompt section
+  restating the §6 contract; else exactly today's single-shot `complete()`. Capability-detected, so existing agents +
+  the `AnthropicProvider` (no `complete_round`) are unaffected.
+- **B4d — L5 read lock + coordinator wiring:** `MemoryRepository.search_entities` now runs its reads on a dedicated
+  `self._conn.cursor()` under a repo-owned `self._read_lock = threading.Lock()` — worker-thread lookups never interleave
+  with main-thread use of the shared connection (deterministic concurrency guard test, RED confirmed on the old code).
+  `NarrationCoordinator._build_lookup_executor(bundle)` (called in `spawn_dm_thread`) and
+  `DialogueCoordinator._build_lookup_executor(recent_memories)` (called in `send_dungeon_line`) build a `LookupService`
+  scoped to the campaign — overlap set seeded from the bundle (DM) / recent memories (voice) — and inject it; `None` when
+  no repo/campaign (agent falls back to `complete`). New tests: `tests/unit/{llm/test_lookup_tool,llm/test_dm_agent_lookup,
+  llm/test_dungeon_voice_agent_lookup,memory/test_search_entities_concurrency,play/test_narration_lookup,play/test_dialogue_lookup}.py`.
+
+**▶ NEXT — Slice B4e/B4f (+ optional B5); owner paused after B4a–d for review before the UI-touching part.**
+- **B4e — L6 observability (debug-panel line).** Surface each lookup (query, tags, hit count, redundant/redirected) in the
+  Play-mode DBG tab the way proposal/bundle provenance already is (`ui/panels/debug_controls.py` — mirror
+  `set_reaction`/`reaction_section_lines` + `set_bundle`/`bundle_section_lines`). **Threading:** the executor's `on_lookup`
+  fires on the **worker thread**; the collected `LookupRecord`s must ride back to the main thread (attach to `DMResult`,
+  forward on `NarrationCoordinator.poll` via a new port → `DebugControls`), then render in `PlayView._draw_debug_tab` —
+  so this touches `PlayView` (arcade) and needs UI-harness tests (see `spec/UI_TESTING.md`). Same seam as the A6
+  `bundle_section_lines()` wiring did.
+- **B4f — carried TODO (folded into B4 per owner 2026-07-13):** add a short "Read tools" note to
+  `docs/LLM_AUTHORITY_BOUNDARY.md` codifying that a lookup returns **data, not proposals**, and the executor is read-only
+  by construction (spec §8). Cheap doc-only slice.
+- **B5 (optional) — `pytest -m eval`:** one live eval that an *out-of-scene* lore question triggers a lookup and lands the
+  fact in the narration, and an in-room question does **not** (spec §12 Phase B.5). This is the first thing that exercises
+  the tool against a real tool-calling provider (B2's `OpenAIProvider.complete_round`).
+- After B4e/B4f: PR the Phase B arc (merge/close the superseded docs PR #91 per the note above), then owner GUI-verify on
+  the live Crucible (an existing save needs a manual reseed for `rooms` — the A6 live-data pattern).
 
 **Phase A deferred items (non-blocking — fold into Phase B or a cleanup slice):** room-id gate
 self-disable logging (`seed_rpg_state.py` when `dungeon.json` absent); a shared `field_validator("tags")`
