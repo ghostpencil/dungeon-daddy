@@ -72,9 +72,11 @@ class LookupRecord:
     query: str | None
     tags: list[str] = field(default_factory=list)
     entity_types: list[str] = field(default_factory=list)
-    hit_count: int = 0
+    hit_count: int = 0  # rows returned, i.e. *after* the service's budget trim
     overlap_count: int = 0  # hits already present in the bundle (redundant_lookup)
     redirected: bool = False  # full overlap → redirect returned instead of rows
+    omitted: int = 0  # rows the ~1,200-token budget dropped
+    error: str | None = None  # bad request surfaced as data (L4), not raised
 
 
 def bundle_entity_ids(bundle: ContextBundle) -> set[str]:
@@ -159,14 +161,19 @@ def build_lookup_executor(
             hit_count=len(rows),
             overlap_count=overlap_count,
             redirected=redirected,
+            omitted=result.get("omitted", 0),
+            error=result.get("error"),
         )
         _log.info(
-            "lookup_world query=%r tags=%r hits=%d overlap=%d redirected=%s",
+            "lookup_world query=%r tags=%r hits=%d overlap=%d redirected=%s "
+            "omitted=%d error=%r",
             query,
             tags,
             record.hit_count,
             overlap_count,
             redirected,
+            record.omitted,
+            record.error,
         )
         if on_lookup is not None:
             on_lookup(record)

@@ -520,8 +520,12 @@ class PlaySessionController:
             self._host._rpg_debug.set_bundle(bundle)
 
     def _set_debug_lookups(self, records: list[LookupRecord]) -> None:
-        if self._host._rpg_debug is not None:
-            self._host._rpg_debug.set_lookups(records)
+        # `getattr`: this fires on every polled turn (incl. lookup-free ones, to
+        # clear the panel), so it must tolerate a `__new__`-built host that
+        # never ran `PlayView.__init__` — the seam the view tests use.
+        debug = getattr(self._host, "_rpg_debug", None)
+        if debug is not None:
+            debug.set_lookups(records)
 
     def refresh_memory_state(self) -> None:
         self._host._has_memory = self.memory.has_level_memory()

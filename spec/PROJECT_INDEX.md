@@ -265,7 +265,32 @@ provenance loop — the first GUI-visible surface of the whole Phase B arc.
   **matches the A6 precedent exactly** (`bundle_section_lines()` shipped the same way, debug-controls tests only), but
   the B4e plan above had called for UI-harness tests (`spec/UI_TESTING.md`).
 
-**▶ NEXT — `/code-review high` on B4e/B4f, then optional B5.**
+**✅ B4e `/code-review high` (8 angles, 2026-07-15) — 7 findings; the 3 substantive ones fixed on owner ruling
+(TDD, RED first; +5 tests, full suite green 3817, ruff + mypy(strict, 172) clean).** Committed `<pending>`.
+- **Fixed (real observability bug) — the panel never cleared.** `poll()` forwarded lookups only when the list was
+  non-empty, so after any lookup, every later lookup-free turn (the *common* case — most turns call no tool) kept
+  rendering the stale record, reading as provenance for the current narration. Now forwarded **unconditionally**; an
+  empty section means *this* turn looked nothing up. **Owner ruling 2026-07-15: yes, clear it** — so the B4e test
+  `test_poll_does_not_forward_when_no_lookups`, which had pinned the wrong behavior, was **inverted** to
+  `test_poll_forwards_empty_lookups_to_clear_the_panel`.
+- **Fixed (regression the above exposed):** the port now fires every polled turn, so it reached `_set_debug_lookups` on
+  a `__new__`-built view that never ran `PlayView.__init__` → `AttributeError` (`test_on_update_routes_dungeon_result_to_apply`).
+  Switched to `getattr(self._host, "_rpg_debug", None)`, the seam's established pattern (`controller.py:225/388/431/437`).
+  *(Note: the sibling `_set_debug_bundle` at `controller.py:519` has the same latent fragility — not reachable today
+  because `on_bundle_built` only fires on a bundle build. Left alone as out-of-scope; candidate cleanup.)*
+- **Fixed (L6 data loss) — `LookupRecord` dropped what `LookupService` already computed.** Added `omitted: int = 0` and
+  `error: str | None = None`, populated in `build_lookup_executor` from the service result (also now logged). Panel
+  renders `→ ERROR: <msg>` (a bad request — e.g. neither query nor tags, the L4 errors-as-strings path — previously
+  rendered as an indistinguishable `→ 0 hit(s)`) and `(N trimmed)` (budget-dropped rows; `hit_count` is the *post-trim*
+  count, so an 8-match/3-returned lookup silently read as "3 hit(s)" — the sibling `bundle_section_lines` renders
+  `Trimmed: M` for exactly this reason, A6 precedent).
+- **Not fixed (noted, low):** `set_lookups` aliases the worker's mutable list (safe today — all appends precede the
+  `queue.put`; a `list(records)` copy would harden it); `_build_lookup_executor`'s two siblings diverge (narration's
+  `records` required-positional vs dialogue's optional `None`, which exists only for one test's one-arg call);
+  `rec.query or "(tags only)"` mislabels an empty-string query; `entity_types` recorded but never rendered; and the
+  `play_view.py` render line remains unpinned (the coverage gap above).
+
+**▶ NEXT — optional B5, then PR the Phase B arc.**
 - **B5 (optional) — `pytest -m eval`:** one live eval that an *out-of-scene* lore question triggers a lookup and lands the
   fact in the narration, and an in-room question does **not** (spec §12 Phase B.5). This is the first thing that exercises
   the tool against a real tool-calling provider (B2's `OpenAIProvider.complete_round`) — nothing has yet.

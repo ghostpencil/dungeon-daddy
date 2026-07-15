@@ -53,6 +53,47 @@ class TestExecutorResults:
         assert payload["results"] == []
         assert payload["error"]
 
+    def test_error_is_recorded_on_the_record(self, tmp_path: Path) -> None:
+        # L6: a failed lookup must be distinguishable from a legitimate
+        # no-match in the debug panel, so the error rides on the record.
+        service, _ = _service(tmp_path)
+        from dungeon_daddy.llm.lookup_tool import LookupRecord, build_lookup_executor
+
+        records: list[LookupRecord] = []
+        executor = build_lookup_executor(
+            service, bundle_entity_ids=set(), on_lookup=records.append
+        )
+        executor(_call())
+
+        assert records[0].error
+        assert records[0].hit_count == 0
+
+    def test_omitted_is_recorded_on_the_record(self, tmp_path: Path) -> None:
+        # L6: rows the ~1,200-token budget dropped are provenance too —
+        # `hit_count` alone hides that the narrator's evidence was truncated.
+        service, repo = _service(tmp_path)
+        from dungeon_daddy.llm.lookup_tool import LookupRecord, build_lookup_executor
+        from dungeon_daddy.rpg.models import RoomObject
+
+        for i in range(20):
+            repo.save_room_object(
+                RoomObject(
+                    object_id=f"o{i}", campaign_id="camp-A", room_id="R1",
+                    level_id="level:0", slug=f"relic-{i}", display_name=f"Relic {i}",
+                    archetype="lore_fixture", description="x" * 200,
+                    current_state="present", tags=["theme:big"],
+                )
+            )
+
+        records: list[LookupRecord] = []
+        executor = build_lookup_executor(
+            service, bundle_entity_ids=set(), on_lookup=records.append
+        )
+        executor(_call(tags=["theme:big"], limit=20))
+
+        assert records[0].omitted >= 1
+        assert records[0].hit_count + records[0].omitted == 20
+
 
 class TestL7Scoping:
     def test_full_overlap_returns_redirect(self, tmp_path: Path) -> None:

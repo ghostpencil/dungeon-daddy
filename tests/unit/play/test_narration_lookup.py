@@ -157,13 +157,17 @@ def test_poll_forwards_lookups_to_port() -> None:
     assert got == [[rec]]
 
 
-def test_poll_does_not_forward_when_no_lookups() -> None:
+def test_poll_forwards_empty_lookups_to_clear_the_panel() -> None:
+    # A lookup-free turn must clear the panel: otherwise a record from an
+    # earlier turn keeps rendering and reads as provenance for *this*
+    # narration. Most turns call no tool, so stale is the common case.
+    from dungeon_daddy.llm.lookup_tool import LookupRecord
     from dungeon_daddy.play.narration import DMResult
 
-    got: list = []
+    got: list[list[LookupRecord]] = []
     coord = _coord(None, _StubAgent(), on_lookups=got.append)
     coord.queue.put(DMResult(content="hi"))
 
     coord.poll()
 
-    assert got == []
+    assert got == [[]]

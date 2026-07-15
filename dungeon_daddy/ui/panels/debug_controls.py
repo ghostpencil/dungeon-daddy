@@ -115,20 +115,28 @@ class DebugControls:
 
     def lookup_section_lines(self) -> list[str]:
         # Slice B4e (L6): surface each narrator `lookup_world` call (query/tags,
-        # hit count, redundant/redirected) so an off-scene lookup is observable.
+        # hit count, trimmed/errored, redundant/redirected) so an off-scene
+        # lookup is observable. Cleared each turn, so an empty section means
+        # *this* narration looked nothing up (not that it never has).
         if not self._last_lookups:
             return ["No lookups yet"]
         lines = [f"World lookups: {len(self._last_lookups)}"]
         for rec in self._last_lookups:
             subject = rec.query or "(tags only)"
             tag_part = f" [{','.join(rec.tags)}]" if rec.tags else ""
+            if rec.error:
+                lines.append(f"  - {subject}{tag_part} → ERROR: {rec.error}")
+                continue
             if rec.redirected:
                 flag = "  [REDIRECT]"
             elif rec.overlap_count:
                 flag = f"  [redundant {rec.overlap_count}/{rec.hit_count}]"
             else:
                 flag = ""
-            lines.append(f"  - {subject}{tag_part} → {rec.hit_count} hit(s){flag}")
+            trim_part = f"  ({rec.omitted} trimmed)" if rec.omitted else ""
+            lines.append(
+                f"  - {subject}{tag_part} → {rec.hit_count} hit(s){trim_part}{flag}"
+            )
         return lines
 
     def clock_section_lines(self) -> list[str]:

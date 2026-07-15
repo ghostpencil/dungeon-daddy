@@ -173,7 +173,9 @@ class NarrationCoordinator:
             return
         self._llm_busy = False
         self._on_busy(False)
-        if result.lookups and self._on_lookups is not None:
+        if self._on_lookups is not None:
+            # Forwarded even when empty: a lookup-free turn must clear the
+            # panel, else an earlier turn's record reads as this one's.
             self._on_lookups(result.lookups)
         if result.error:
             self._post_system(f"⚠ The dungeon is silent. ({result.error})")

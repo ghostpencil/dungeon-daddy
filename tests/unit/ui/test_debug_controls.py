@@ -305,6 +305,30 @@ def test_lookup_section_lines_no_lookups():
     assert any("No lookups yet" in line for line in ctrl.lookup_section_lines())
 
 
+def test_lookup_section_lines_shows_error():
+    # A failed lookup must not read as a legitimate "0 hit(s)" no-match.
+    ctrl = _controls()
+    ctrl.set_lookups([_lookup_record(query=None, error="query or tags required")])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "ERROR" in text
+    assert "query or tags required" in text
+
+
+def test_lookup_section_lines_shows_trimmed_count():
+    ctrl = _controls()
+    ctrl.set_lookups([_lookup_record(query="relic", hit_count=14, omitted=6)])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "14 hit(s)" in text
+    assert "6 trimmed" in text
+
+
+def test_lookup_section_lines_omits_trim_note_when_nothing_trimmed():
+    ctrl = _controls()
+    ctrl.set_lookups([_lookup_record(query="relic", hit_count=2)])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "trimmed" not in text
+
+
 # ---------------------------------------------------------------------------
 # Bullet — set_reaction / reaction_section_lines
 # ---------------------------------------------------------------------------
