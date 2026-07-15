@@ -35,7 +35,8 @@ merged 2026-07-11; owner GUI-verified). Namespaced tag taxonomy (`memory/tags.py
 `020`/`021`), seed + Crucible-world tagging, tag-based scene-scoped retrieval, write-side scene tagging,
 and the T7 `# Related Lore` pre-fetch. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
 
-Phase **51.8 Phase B — Narrator Lookup Tool: IN PROGRESS** (branch `feat/phase-51.8-narrator-lookup`).
+Phase **51.8 Phase B — Narrator Lookup Tool: COMPLETE, owner GUI-verified, PR #92 OPEN awaiting review**
+(https://github.com/ghostpencil/dungeon-daddy/pull/92 · branch `feat/phase-51.8-narrator-lookup` → `main`).
 Decisions ratified; rooms elevated to a first-class campaign entity (`rooms` table). Slice B0 **persistence +
 seed path both COMPLETE, committed (`24375b0` + `b15602e`), and owner GUI-verified on the live Crucible
 (2026-07-11)** — every dungeon room is projected into a `rooms` record across all seeders (incl. the app's
@@ -297,12 +298,39 @@ provenance loop — the first GUI-visible surface of the whole Phase B arc.
 
 ---
 
-### ▶ PICK UP HERE NEXT SESSION — Phase B is done + owner GUI-verified; **only the PR remains**
+### ▶ PICK UP HERE NEXT SESSION — **review PR #92**, then pick the next phase
 
-**State:** branch `feat/phase-51.8-narrator-lookup`, **working tree clean**, 7 commits ahead — `c7bdc5c` (B4e/B4f) →
-`d3497ff` (B4e review fixes) → `4677989` + `09d9f2d` (index) → `1839a58` (**B5 live eval**) → `b17a4a0` (**B4e review
-sweep**) → index. Full suite **3820 passed** (8 eval deselected), ruff + mypy(strict, 172) clean. **B0–B5 are all
-COMPLETE, proven end-to-end, and owner GUI-verified.** The only step left is the PR (+ reconciling docs PR #91).
+**➡ PR #92 — Phase 51.8 Phase B — Narrator Lookup Tool (`lookup_world`): OPEN, awaiting review.**
+**https://github.com/ghostpencil/dungeon-daddy/pull/92** — branch `feat/phase-51.8-narrator-lookup` → `main`,
+**pushed** (`8320f64`), 23 commits / 49 files / ~4.28k insertions. **Next session starts here: run the PR review.**
+- **Nothing is in progress and nothing is blocked.** Working tree clean, `main` untouched, no rebase needed as of
+  2026-07-15. B0–B5 all COMPLETE, proven end-to-end, and **owner GUI-verified**. Full suite **3820 passed** (8 eval
+  deselected), ruff + mypy(strict, 172) clean.
+- **Suggested review command:** `/code-review high` on the branch diff, or the `pr-review-toolkit:review-pr` skill
+  against #92. Each *slice* already had its own `/code-review high` (findings fixed or recorded below), but **the arc
+  has never been reviewed as a whole** — cross-slice seams (B1↔B2↔B3↔B4) are the interesting surface.
+- **Where a reviewer should look first:** (1) the L5 threading story — `search_entities` reads on a dedicated cursor
+  under the repo's `_read_lock` while the worker thread runs; (2) the §8 read-only-by-construction claim; (3) B2's
+  `OpenAIProvider` tool-call translation, now proven by B5 but only on the happy path.
+- **Known-and-deliberate, already recorded in the PR body — not review findings:** `_collect_anchor_tags` doesn't read
+  the `rooms` table; `views/play_view.py`'s `lookup_section_lines()` render line is unpinned (A6 precedent, owner ruling
+  2026-07-15).
+- **✅ Docs PR #91 — no action needed: it was already closed.** (The index had carried "merge/close #91" as an open
+  decision for days; checking GitHub showed it was long since closed. Same stale-hand-off pattern as the reseed warning
+  below — *verify against the source of truth, not the index.*)
+
+### After #92 merges — **next phase is an OWNER CALL** (do not assume)
+
+`spec/IMPLEMENTATION_PHASES.md:22` leaves it explicitly open. The candidates:
+- **Phase 52 — Milestone Advancement**: beats, ranks-to-5, `FulfillMilestone`, LLM milestone detection, `actor_beats`,
+  campaign-specific beats. Split out of the old "Playbooks" phase (49 = *starting* playbooks, 52 = *advancement*). The
+  action picker already reads the actor's **live** `actor_abilities` set, so advancement grows the verb/adverb lists
+  **with no rewiring** (`IMPLEMENTATION_PHASES_33_ONWARDS.md:1368` sequencing). Spec: same file, and the Phase 49 block.
+- **Phase 53 — Threat Behavior & Monster Reactions**: design already written 2026-06-17
+  (`spec/MONSTER_REACTION_DESIGN.md`; phase block at `IMPLEMENTATION_PHASES_33_ONWARDS.md:1422`) — how monsters react in
+  fights, the engine/LLM authority split, boss phases.
+- **Or a cleanup slice** — the deferred pile has grown enough to justify one on its own: the Phase A deferred items, the
+  `rooms`-table anchor-tags follow-up, the unpinned DBG render line, and the tag-hygiene data pass (all detailed below).
 
 **✅ Owner GUI-verified on the live Crucible (2026-07-15).** Phase B's narrator lookup confirmed working in-app from the
 DBG tab. **No reseed or data surgery was needed** — see the corrected live-save note below.
@@ -365,11 +393,6 @@ findings were real and are fixed; **the fourth was not a defect.**
    is consistent with how A6's `bundle_section_lines()` shipped; coverage sits at the `DebugControls` + wiring seams.
    *(Still a known gap if the DBG tab ever gets harness coverage — the natural time to pin both render lines at once.)*
 2. **Sweep the 4 low findings — yes**, done above.
-
-**All that remains:**
-1. **PR the Phase B arc** (B0–B5 + the B4e sweep). Also **merge/close the superseded docs PR #91** (see the Phase-A
-   block above — this branch's index update is the fuller one; reconcile on rebase). ⚠ **Owner decision on #91 still
-   open.**
 
 **Deferred/optional, not blocking:** the Phase A deferred items + the tag-hygiene data pass (both below). Two carried
 Phase-B notes worth folding into a future cleanup: (a) `_collect_anchor_tags` (`memory/context_bundle.py`) still does
