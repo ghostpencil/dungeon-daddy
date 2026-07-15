@@ -111,7 +111,9 @@ class DebugControls:
         return lines
 
     def set_lookups(self, records: list[LookupRecord]) -> None:
-        self._last_lookups = records
+        # Copy: `records` is the LLM worker thread's own accumulator, so holding
+        # the reference would let a later append mutate what the panel renders.
+        self._last_lookups = list(records)
 
     def lookup_section_lines(self) -> list[str]:
         # Slice B4e (L6): surface each narrator `lookup_world` call (query/tags,
@@ -122,10 +124,14 @@ class DebugControls:
             return ["No lookups yet"]
         lines = [f"World lookups: {len(self._last_lookups)}"]
         for rec in self._last_lookups:
+            # A falsy query is one `search_entities` itself ignores, so it truly
+            # ran as a tags-only search — label it for what it did.
             subject = rec.query or "(tags only)"
             tag_part = f" [{','.join(rec.tags)}]" if rec.tags else ""
+            type_part = f" <{','.join(rec.entity_types)}>" if rec.entity_types else ""
+            subject = f"{subject}{tag_part}{type_part}"
             if rec.error:
-                lines.append(f"  - {subject}{tag_part} → ERROR: {rec.error}")
+                lines.append(f"  - {subject} → ERROR: {rec.error}")
                 continue
             if rec.redirected:
                 flag = "  [REDIRECT]"
@@ -135,7 +141,7 @@ class DebugControls:
                 flag = ""
             trim_part = f"  ({rec.omitted} trimmed)" if rec.omitted else ""
             lines.append(
-                f"  - {subject}{tag_part} → {rec.hit_count} hit(s){trim_part}{flag}"
+                f"  - {subject} → {rec.hit_count} hit(s){trim_part}{flag}"
             )
         return lines
 

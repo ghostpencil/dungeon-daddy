@@ -260,7 +260,19 @@ def test_set_lookups_stores_records():
     ctrl = _controls()
     recs = [_lookup_record(query="mira")]
     ctrl.set_lookups(recs)
-    assert ctrl._last_lookups is recs
+    assert ctrl._last_lookups == recs
+
+
+def test_set_lookups_copies_so_later_worker_appends_do_not_leak_in():
+    # The list handed over is the worker thread's own accumulator. Storing it by
+    # reference would let a later append mutate what the panel is rendering.
+    ctrl = _controls()
+    recs = [_lookup_record(query="mira")]
+    ctrl.set_lookups(recs)
+    recs.append(_lookup_record(query="vault"))
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "World lookups: 1" in text
+    assert "vault" not in text
 
 
 def test_lookup_section_lines_shows_count_query_and_hits():
@@ -280,6 +292,25 @@ def test_lookup_section_lines_shows_tags_when_no_query():
     ctrl.set_lookups([_lookup_record(query=None, tags=["theme:guilt"], hit_count=2)])
     text = "\n".join(ctrl.lookup_section_lines())
     assert "theme:guilt" in text
+
+
+def test_lookup_section_lines_labels_empty_query_as_tags_only():
+    # `search_entities` treats a falsy query as absent (`q = query.lower() if
+    # query else None`), so an empty-string query really did run as a tags-only
+    # search — the panel reports what the search did, not what was passed.
+    ctrl = _controls()
+    ctrl.set_lookups([_lookup_record(query="", tags=["theme:guilt"], hit_count=2)])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "(tags only)" in text
+
+
+def test_lookup_section_lines_shows_entity_types_filter():
+    ctrl = _controls()
+    ctrl.set_lookups([
+        _lookup_record(query="mira", entity_types=["actor", "memory"], hit_count=2),
+    ])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "actor,memory" in text
 
 
 def test_lookup_section_lines_shows_redirect_flag():

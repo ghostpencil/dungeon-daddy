@@ -47,7 +47,7 @@ def test_lookup_is_none_without_active_campaign(tmp_path: Path) -> None:
     coord, _chat, _repo, session, _narr = _make(tmp_path, voice_agent=agent)
     session.campaign_id = None  # no active campaign → no lookup seam
 
-    assert coord._build_lookup_executor([]) is None
+    assert coord._build_lookup_executor([], []) is None
 
 
 # -- Slice B4e — voice-path lookups ride back on the DMResult ----------------

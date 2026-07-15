@@ -204,7 +204,7 @@ class DialogueCoordinator:
     def _build_lookup_executor(
         self,
         recent_memories: list[MemoryEntry],
-        records: list[LookupRecord] | None = None,
+        records: list[LookupRecord],
     ) -> Callable[[LLMToolCall], str] | None:
         """The read-only `lookup_world` executor for the dungeon-voice tool loop.
 
@@ -213,16 +213,15 @@ class DialogueCoordinator:
         ``None`` when no campaign is attached (the agent falls back to
         ``complete``). Runs on the worker thread; reads go through the repo's L5
         read lock. Each call's :class:`LookupRecord` is appended to ``records``
-        (when given) so the worker can carry them back to the main thread on the
-        :class:`DMResult` for the debug panel (B4e/L6).
+        (worker-thread-local) so the worker can carry them back to the main
+        thread on the :class:`DMResult` for the debug panel (B4e/L6).
         """
         active = self._session.active_campaign()
         if active is None:
             return None
         service = LookupService(active.repo, active.campaign_id)
         ids = {m.memory_id for m in recent_memories if getattr(m, "memory_id", None)}
-        on_lookup = records.append if records is not None else None
-        return build_lookup_executor(service, ids, on_lookup=on_lookup)
+        return build_lookup_executor(service, ids, on_lookup=records.append)
 
     def dungeon_intimacy_clock(self) -> ClockState | None:
         """Return the seed-authored non-monotonic intimacy clock, or ``None``.
