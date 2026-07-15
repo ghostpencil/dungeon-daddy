@@ -50,8 +50,10 @@ clean)** — `complete_round` tool-use round on the provider seam. **Slice B3 (`
 seams, both coordinator worker-thread wirings behind the L5 read lock). **Slice B4e (L6 debug-panel line) + B4f (the
 carried `LLM_AUTHORITY_BOUNDARY.md` read-tools note) COMPLETE, committed (`c7bdc5c` + review fixes `d3497ff`, 2026-07-15;
 TDD, +18 tests, full suite green 3817, ruff + mypy(strict, 172) clean)** — every narrator lookup now renders in the
-Play-mode DBG tab, the **first GUI-visible surface of the whole Phase B arc**. **All code slices are done: what remains is
-the optional B5 live eval, then PR + owner GUI-verify.** Detail in START HERE below.
+Play-mode DBG tab, the **first GUI-visible surface of the whole Phase B arc**. **Slice B5 (live eval) COMPLETE, committed
+(`1839a58`, 2026-07-15)** — `lookup_world` is now **proven end-to-end against a real tool-calling provider**, the last
+unknown in the arc. **The B4e review sweep is COMPLETE (`b17a4a0`)**; full suite green 3820, ruff + mypy(strict, 172)
+clean. **B0–B5 are all done: what remains is PR + owner GUI-verify.** Detail in START HERE below.
 Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
 
 Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` ·
@@ -295,28 +297,55 @@ provenance loop — the first GUI-visible surface of the whole Phase B arc.
 
 ---
 
-### ▶ PICK UP HERE NEXT SESSION — Phase B: all code slices done, landing the arc
+### ▶ PICK UP HERE NEXT SESSION — Phase B is feature-complete + proven; landing the arc
 
-**State:** branch `feat/phase-51.8-narrator-lookup`, **working tree clean**, 3 commits ahead — `c7bdc5c` (B4e/B4f) →
-`d3497ff` (B4e review fixes) → `4677989` (index). Full suite **3817 passed**, ruff + mypy(strict, 172) clean.
-**B0–B4f are all COMPLETE.** Nothing is half-finished; the arc is feature-complete and only needs proving + landing.
+**State:** branch `feat/phase-51.8-narrator-lookup`, **working tree clean**, 6 commits ahead — `c7bdc5c` (B4e/B4f) →
+`d3497ff` (B4e review fixes) → `4677989` + `09d9f2d` (index) → `1839a58` (**B5 live eval**) → `b17a4a0` (**B4e review
+sweep**). Full suite **3820 passed** (8 eval deselected), ruff + mypy(strict, 172) clean. **B0–B5 are all COMPLETE and
+the arc is proven end-to-end.** Only PR + owner GUI-verify remain.
 
-**Two owner decisions are still open** (asked 2026-07-15, not yet ruled — do not assume either way):
-1. **UI-harness test for the `PlayView` render line?** `views/play_view.py:270` (`lookup_section_lines()` in the DBG
-   tab) is **unpinned — deleting that line leaves the full suite green.** All B4e coverage sits at the `DebugControls`
-   + coordinator-wiring seams. This **exactly matches the A6 `bundle_section_lines()` precedent**, but the B4e plan had
-   called for UI-harness tests (`spec/UI_TESTING.md`). Options: accept the precedent, or add the harness test.
-2. **Sweep the 4 low review findings, or leave them?** Listed under "Not fixed (noted, low)" just above.
+**✅ Slice B5 — live eval: COMPLETE (`1839a58`, 2026-07-15).** `tests/evals/test_narrator_lookup_evals.py`, 2 tests,
+`-m eval`, green on **4 consecutive live runs**; correctly deselected from the default suite.
+- **This closed the last real unknown in Phase B.** Every prior test fake-drives `complete_round`, so B2's
+  `OpenAIProvider` tool-call translation (`LLMToolDef`→OpenAI function format, `message.tool_calls`→`LLMToolCall`) had
+  **never once run against a real tool-calling provider**. It works.
+- **Out-of-scene test:** a lore memory about "The Sunken Bell of Karn Vale" (approved, tagged `theme:history`/
+  `thread:obsidian-crown`) lives in the campaign but in no prompt; asking about it triggers a real `lookup_world` call
+  and the fact lands in the narration. The assertion probes for **the bellwright's name (`vessa`)**, which appears in no
+  prompt the model receives — so it **cannot pass by hallucination**, only via the tool result. (Deliberately not
+  "obsidian" — that word is already in the fixture dungeon's quest.)
+- **In-room test:** a question about the dust (already covered by `VAULT_ROOM.note`) looks nothing up — `records == []`.
+- Fixture = a real `MemoryRepository` on a tmp DuckDB + `LookupService` + `build_lookup_executor`, with `on_lookup`
+  capturing `LookupRecord`s as the assertion surface. Empty overlap set → no L7 redirect in this eval.
+
+**✅ B4e review sweep — COMPLETE (`b17a4a0`, 2026-07-15; owner-directed, TDD, +3 net tests).** Three of the four low
+findings were real and are fixed; **the fourth was not a defect.**
+- **Fixed — `set_lookups` aliased the worker's list.** It stored the LLM worker thread's own accumulator by reference, so
+  a later append could mutate what the panel renders. Copies now (`list(records)`). The existing
+  `test_set_lookups_stores_records` **pinned the aliasing** (`assert ctrl._last_lookups is recs`) → inverted to `==`,
+  plus a new mutation guard (append-after-set must not leak in).
+- **Fixed — sibling signature divergence.** `DialogueCoordinator._build_lookup_executor`'s `records` was
+  `list[LookupRecord] | None = None` purely to serve one test's one-arg call; now **required**, matching
+  `NarrationCoordinator`'s. The `on_lookup = records.append if records is not None else None` branch is gone.
+- **Fixed — `entity_types` recorded but never rendered.** Now renders as `<actor,memory>` after the `[tags]` part.
+- **NOT a defect, left as-is (with a test + comment pinning why):** `rec.query or "(tags only)"` was flagged for
+  "mislabeling" an empty-string query. But `search_entities` **itself** treats a falsy query as absent
+  (`q = query.lower() if query else None`, `repository.py:1761`), so an empty-string query genuinely **did** run as a
+  tags-only search. The panel reports **what the search did**, not what was passed — "fixing" it would make the label
+  *less* truthful. New `test_lookup_section_lines_labels_empty_query_as_tags_only` documents this so it isn't
+  re-"fixed" later.
+
+**Owner rulings 2026-07-15 (both previously-open decisions now closed):**
+1. **UI-harness test for the `PlayView` render line — NOT added; A6 precedent accepted.** `views/play_view.py:270`
+   (`lookup_section_lines()` in the DBG tab) stays **unpinned** — deleting that line still leaves the suite green. This
+   is consistent with how A6's `bundle_section_lines()` shipped; coverage sits at the `DebugControls` + wiring seams.
+   *(Still a known gap if the DBG tab ever gets harness coverage — the natural time to pin both render lines at once.)*
+2. **Sweep the 4 low findings — yes**, done above.
 
 **Then, in order:**
-1. **B5 (optional, but the highest-value thing left) — `pytest -m eval`.** One live eval: an *out-of-scene* lore question
-   triggers a lookup and lands the fact in the narration; an in-room question does **not** (spec §12 Phase B.5).
-   **Why it matters:** *nothing has yet exercised `lookup_world` against a real tool-calling provider.* Every test to
-   date fake-drives `complete_round`, so B2's `OpenAIProvider` tool-call translation (`LLMToolDef`→OpenAI function
-   format, `message.tool_calls`→`LLMToolCall`) is **unproven end-to-end**. This is the last real unknown in Phase B.
-2. **PR the Phase B arc.** Also **merge/close the superseded docs PR #91** (see the Phase-A block above — this branch's
+1. **PR the Phase B arc.** Also **merge/close the superseded docs PR #91** (see the Phase-A block above — this branch's
    index update is the fuller one; reconcile on rebase).
-3. **Owner GUI-verify on the live Crucible.** ⚠ The live save **already has exits → `backfill` skips → no `rooms`
+2. **Owner GUI-verify on the live Crucible.** ⚠ The live save **already has exits → `backfill` skips → no `rooms`
    records** (the A6 live-data pattern), so it needs a **manual reseed** before `lookup_world` can find rooms; see the
    Slice B0 GUI-verify recipe above for the exact one-off (`initialize_schema` → `seed_from_manifest(dungeon=…)` → L1/L2
    `save_room_tags`). Take a timestamped `campaign.duckdb.bak-*` backup and close the app first (DuckDB write lock).
@@ -328,11 +357,6 @@ provenance loop — the first GUI-visible surface of the whole Phase B arc.
 ---
 
 *(Historical detail for the completed slices follows.)*
-- **B5 (optional) — `pytest -m eval`:** one live eval that an *out-of-scene* lore question triggers a lookup and lands the
-  fact in the narration, and an in-room question does **not** (spec §12 Phase B.5). This is the first thing that exercises
-  the tool against a real tool-calling provider (B2's `OpenAIProvider.complete_round`) — nothing has yet.
-- Then: PR the Phase B arc (merge/close the superseded docs PR #91 per the note above), then owner GUI-verify on
-  the live Crucible (an existing save needs a manual reseed for `rooms` — the A6 live-data pattern).
 
 **Phase A deferred items (non-blocking — fold into Phase B or a cleanup slice):** room-id gate
 self-disable logging (`seed_rpg_state.py` when `dungeon.json` absent); a shared `field_validator("tags")`
