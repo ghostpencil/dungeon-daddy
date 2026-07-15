@@ -1,16 +1,31 @@
 """DungeonMasterAgent — Play Mode narration and chat."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from dungeon_daddy.data.models import Dungeon, Level, Loop, Room
 from dungeon_daddy.llm.context_builder import ContextBuilder
+from dungeon_daddy.llm.lookup_tool import LOOKUP_WORLD_TOOL
 from dungeon_daddy.llm.prompts import load_prompt
-from dungeon_daddy.llm.provider import LLMMessage, LLMProvider
+from dungeon_daddy.llm.provider import LLMMessage, LLMProvider, LLMToolCall
+from dungeon_daddy.llm.tool_loop import run_tool_loop
 
 if TYPE_CHECKING:
     from dungeon_daddy.memory.models import ContextBundle
     from dungeon_daddy.rpg.models import ActionResolution
+
+# The §6 scoping contract, restated for the model when the lookup tool is live:
+# only escalate to `lookup_world` for what the in-room context cannot cover.
+_LOOKUP_GUIDANCE = (
+    "\n\n# Looking Things Up\n"
+    "You have a `lookup_world` tool. Use it ONLY for people, places, or past "
+    "events that are NOT already in your context — an off-scene character the "
+    "player names, distant lore across the dungeon, or a past event that no "
+    "room detail or Related Lore entry covers. Never look up something already "
+    "described in your context (the current room, present actors, or the "
+    "Related Lore section). If you already have what you need, just answer."
+)
 
 
 class DungeonMasterAgent:
@@ -82,6 +97,7 @@ class DungeonMasterAgent:
         level_id: int | None = None,
         active_loop: Loop | None = None,
         context_bundle: ContextBundle | None = None,
+        lookup: Callable[[LLMToolCall], str] | None = None,
     ) -> str:
         context = self._build_context(room, level, dungeon, room_memory)
         base = self.build_prompt(context_bundle)
@@ -92,6 +108,18 @@ class DungeonMasterAgent:
             doc_context = self._context_builder.build_system_prompt(dungeon, level_id=level_id)
             if doc_context:
                 system = doc_context + "\n\n" + system
+        if lookup is not None and getattr(self._provider, "supports_tools", False):
+            # Escalation path (§9/§10): the agent owns the request→tool→request
+            # loop; the provider is pure transport. Guidance restates the §6
+            # "when to look things up" contract only when the tool is live.
+            return run_tool_loop(
+                self._provider,
+                history,
+                system + _LOOKUP_GUIDANCE,
+                tools=[LOOKUP_WORLD_TOOL],
+                executor=lookup,
+                max_tokens=1024,
+            )
         return self._provider.complete(
             messages=history,
             system=system,

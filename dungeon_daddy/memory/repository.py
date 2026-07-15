@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -116,6 +117,11 @@ class MemoryRepository:
         self._db_path = db_path
         self._conn: duckdb.DuckDBPyConnection | None = duckdb.connect(str(db_path))
         self._in_transaction = False
+        # L5 (spec §10): `search_entities` runs from the narrator worker thread
+        # while the main thread may use the shared connection. Guard those reads
+        # with this lock and run them on a dedicated cursor so concurrent
+        # `execute`/`fetch` calls never interleave on the connection object.
+        self._read_lock = threading.Lock()
 
     def health_check(self) -> bool:
         if self._conn is None:
@@ -1799,45 +1805,50 @@ class MemoryRepository:
                 )
             )
 
-        for src in _ENTITY_SOURCES:
-            if types is not None and src.entity_type not in types:
-                continue
-            sql = (
-                f"SELECT {src.id_col}, {src.slug_col or 'NULL'}, {src.name_col}, "
-                f"{src.room_col or 'NULL'}, {src.status_col or 'NULL'}, "
-                f"{src.snippet_col or 'NULL'}, tags "
-                f"FROM {src.table} WHERE campaign_id = ?"
-            )
-            for r in self._conn.execute(sql, [campaign_id]).fetchall():
-                _consider(
-                    src.entity_type, r[0], r[1], r[2], r[3], r[4], r[5] or "",
-                    json.loads(r[6]) if r[6] else [],
+        # L5 (spec §10): serialize the worker-thread reads and run them on a
+        # dedicated cursor so they never interleave with main-thread use of the
+        # shared connection.
+        with self._read_lock:
+            cursor = self._conn.cursor()
+            for src in _ENTITY_SOURCES:
+                if types is not None and src.entity_type not in types:
+                    continue
+                sql = (
+                    f"SELECT {src.id_col}, {src.slug_col or 'NULL'}, {src.name_col}, "
+                    f"{src.room_col or 'NULL'}, {src.status_col or 'NULL'}, "
+                    f"{src.snippet_col or 'NULL'}, tags "
+                    f"FROM {src.table} WHERE campaign_id = ?"
                 )
+                for r in cursor.execute(sql, [campaign_id]).fetchall():
+                    _consider(
+                        src.entity_type, r[0], r[1], r[2], r[3], r[4], r[5] or "",
+                        json.loads(r[6]) if r[6] else [],
+                    )
 
-        if types is None or "memory" in types:
-            # Memories carry tags in the memory_tags join table (not a JSON
-            # column) and match the query on their title; only approved lore
-            # is surfaced. LEFT JOIN + LIST folds each memory's tags into a row.
-            # Pre-sort by importance DESC / recency DESC so the (stable) final
-            # sort keeps the intra-memory importance order.
-            mem_rows = self._conn.execute(
-                """
-                SELECT e.memory_id, e.title, e.summary, e.importance, e.created_at,
-                       e.status,
-                       COALESCE(LIST(t.tag) FILTER (WHERE t.tag IS NOT NULL), []) AS tags
-                FROM memory_entries e
-                LEFT JOIN memory_tags t ON e.memory_id = t.memory_id
-                WHERE e.campaign_id = ? AND e.status = 'approved'
-                GROUP BY e.memory_id, e.title, e.summary, e.importance, e.created_at,
-                         e.status
-                """,
-                [campaign_id],
-            ).fetchall()
-            mem_rows.sort(key=lambda r: (r[3] or 0, str(r[4] or "")), reverse=True)
-            for r in mem_rows:
-                _consider(
-                    "memory", r[0], None, r[1], None, r[5], r[2] or "", list(r[6])
-                )
+            if types is None or "memory" in types:
+                # Memories carry tags in the memory_tags join table (not a JSON
+                # column) and match the query on their title; only approved lore
+                # is surfaced. LEFT JOIN + LIST folds each memory's tags into a
+                # row. Pre-sort by importance DESC / recency DESC so the (stable)
+                # final sort keeps the intra-memory importance order.
+                mem_rows = cursor.execute(
+                    """
+                    SELECT e.memory_id, e.title, e.summary, e.importance, e.created_at,
+                           e.status,
+                           COALESCE(LIST(t.tag) FILTER (WHERE t.tag IS NOT NULL), []) AS tags
+                    FROM memory_entries e
+                    LEFT JOIN memory_tags t ON e.memory_id = t.memory_id
+                    WHERE e.campaign_id = ? AND e.status = 'approved'
+                    GROUP BY e.memory_id, e.title, e.summary, e.importance, e.created_at,
+                             e.status
+                    """,
+                    [campaign_id],
+                ).fetchall()
+                mem_rows.sort(key=lambda r: (r[3] or 0, str(r[4] or "")), reverse=True)
+                for r in mem_rows:
+                    _consider(
+                        "memory", r[0], None, r[1], None, r[5], r[2] or "", list(r[6])
+                    )
 
         scored.sort(key=lambda item: item[0], reverse=True)
         return [row for _, row in scored[:capped_limit]]

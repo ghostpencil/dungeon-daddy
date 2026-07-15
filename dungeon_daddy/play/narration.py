@@ -26,12 +26,16 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from dungeon_daddy.llm.provider import LLMMessage
+from dungeon_daddy.llm.lookup_tool import build_lookup_executor, bundle_entity_ids
+from dungeon_daddy.llm.provider import LLMMessage, LLMToolCall
 from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
+from dungeon_daddy.memory.lookup import LookupService
 from dungeon_daddy.rpg.actor_control import filter_player_actors
 from dungeon_daddy.rpg.models import ActorState
 
 if TYPE_CHECKING:
+    from collections.abc import Callable as _Callable
+
     from dungeon_daddy.data.models import Level, Room
     from dungeon_daddy.data.repository import DungeonRepository
     from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
@@ -243,6 +247,26 @@ class NarrationCoordinator:
             _log.exception("ContextBundle build failed — proceeding without bundle")
             return None
 
+    def _build_lookup_executor(
+        self, bundle: ContextBundle | None
+    ) -> _Callable[[LLMToolCall], str] | None:
+        """The read-only `lookup_world` executor for the DM tool loop (§10).
+
+        Scopes a :class:`LookupService` to the same campaign as the bundle and
+        seeds the L7 overlap set from the bundle's entity ids. ``None`` when
+        there is no repo (the agent falls back to the plain ``complete`` path).
+        The executor runs on the worker thread; its reads go through the repo's
+        L5 read lock.
+        """
+        mem_repo = self._session.mem_repo
+        state = self._session.state
+        if mem_repo is None or state is None:
+            return None
+        campaign_id = self._session.campaign_id or state.dungeon_id
+        service = LookupService(mem_repo, campaign_id)
+        ids = bundle_entity_ids(bundle) if bundle is not None else set()
+        return build_lookup_executor(service, ids)
+
     def spawn_dm_thread(self, room: Room, level: Level) -> None:
         """Snapshot the room memory + context bundle and run the DM agent off
         the main thread, queuing its reply. No-op if a call is already in
@@ -262,6 +286,7 @@ class NarrationCoordinator:
         repo = self._get_repo()
         memory = repo.load_room_memory(session.state.dungeon_id, level.id)
         bundle = self.build_context_bundle()
+        lookup = self._build_lookup_executor(bundle)
         self._llm_busy = True
         _history = list(self._history)
         _dungeon = session.dungeon
@@ -275,6 +300,7 @@ class NarrationCoordinator:
                     dungeon=_dungeon,
                     room_memory=memory,
                     context_bundle=bundle,
+                    lookup=lookup,
                 )
                 self._queue.put(DMResult(content=response))
             except Exception as exc:

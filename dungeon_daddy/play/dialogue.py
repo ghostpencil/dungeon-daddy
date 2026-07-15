@@ -22,11 +22,15 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
+from dungeon_daddy.llm.lookup_tool import build_lookup_executor
+from dungeon_daddy.memory.lookup import LookupService
 from dungeon_daddy.play.narration import DMResult
 from dungeon_daddy.rpg.models import ClockState
 
 if TYPE_CHECKING:
     from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
+    from dungeon_daddy.llm.provider import LLMToolCall
+    from dungeon_daddy.memory.models import MemoryEntry
     from dungeon_daddy.play.narration import NarrationCoordinator
     from dungeon_daddy.play.session_context import PlaySessionContext
     from dungeon_daddy.rpg.models import ActorState
@@ -179,16 +183,35 @@ class DialogueCoordinator:
         if self._get_narration().is_busy:
             return
         inputs = self.agent_inputs(text)
+        lookup = self._build_lookup_executor(inputs["recent_memories"])
         self._set_busy(True)
 
         def _worker() -> DMResult:
             try:
-                reply = agent.respond(**inputs)
+                reply = agent.respond(**inputs, lookup=lookup)
                 return DMResult(content=reply, dungeon=True, player_message=text)
             except Exception as exc:
                 return DMResult(content="", error=str(exc), dungeon=True, player_message=text)
 
         self._get_narration().spawn(_worker)
+
+    def _build_lookup_executor(
+        self, recent_memories: list[MemoryEntry]
+    ) -> Callable[[LLMToolCall], str] | None:
+        """The read-only `lookup_world` executor for the dungeon-voice tool loop.
+
+        Scopes a :class:`LookupService` to the active campaign; seeds the L7
+        overlap set from the recent memories already in the voice context.
+        ``None`` when no campaign is attached (the agent falls back to
+        ``complete``). Runs on the worker thread; reads go through the repo's L5
+        read lock.
+        """
+        active = self._session.active_campaign()
+        if active is None:
+            return None
+        service = LookupService(active.repo, active.campaign_id)
+        ids = {m.memory_id for m in recent_memories if getattr(m, "memory_id", None)}
+        return build_lookup_executor(service, ids)
 
     def dungeon_intimacy_clock(self) -> ClockState | None:
         """Return the seed-authored non-monotonic intimacy clock, or ``None``.

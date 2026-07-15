@@ -8,14 +8,26 @@ boundary). Knowledge filtering (``reveal_knowledge``) and memory retrieval
 """
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING
 
+from dungeon_daddy.llm.lookup_tool import LOOKUP_WORLD_TOOL
 from dungeon_daddy.llm.prompts import load_prompt
-from dungeon_daddy.llm.provider import LLMMessage, LLMProvider
+from dungeon_daddy.llm.provider import LLMMessage, LLMProvider, LLMToolCall
+from dungeon_daddy.llm.tool_loop import run_tool_loop
 
 if TYPE_CHECKING:
     from dungeon_daddy.memory.models import MemoryEntry
+
+# The §6 scoping contract, restated for the model when the lookup tool is live.
+_LOOKUP_GUIDANCE = (
+    "\n\n# Looking Things Up\n"
+    "You have a `lookup_world` tool. Use it ONLY for people, places, or past "
+    "events NOT already in your context — someone the speaker names who is not "
+    "present, distant lore, or a past event your knowledge and recent memories "
+    "do not already cover. Never look up something already in your context. If "
+    "you already have what you need, just answer."
+)
 
 
 class DungeonVoiceAgent:
@@ -41,6 +53,7 @@ class DungeonVoiceAgent:
         next_objective: str | None = None,
         next_objective_location: str | None = None,
         session_turns: list[tuple[str, str]] | None = None,
+        lookup: Callable[[LLMToolCall], str] | None = None,
     ) -> str:
         system = self._build_system(
             dungeon_voice=dungeon_voice,
@@ -57,8 +70,20 @@ class DungeonVoiceAgent:
             session_turns=session_turns or [],
         )
         user = f"{actor} says: {player_message}"
+        history = [LLMMessage(role="user", content=user)]
+        if lookup is not None and getattr(self._provider, "supports_tools", False):
+            # Escalation path (§9/§10): agent-owned tool loop; provider is pure
+            # transport. Guidance restates the §6 contract only when live.
+            return run_tool_loop(
+                self._provider,
+                history,
+                system + _LOOKUP_GUIDANCE,
+                tools=[LOOKUP_WORLD_TOOL],
+                executor=lookup,
+                max_tokens=1024,
+            )
         return self._provider.complete(
-            messages=[LLMMessage(role="user", content=user)],
+            messages=history,
             system=system,
             max_tokens=1024,
         )
