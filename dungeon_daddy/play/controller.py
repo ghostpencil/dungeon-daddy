@@ -41,6 +41,7 @@ from dungeon_daddy.ui.actor_mini_card import build_actor_mini_card
 if TYPE_CHECKING:
     from dungeon_daddy.data.repository import DungeonRepository
     from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    from dungeon_daddy.llm.lookup_tool import LookupRecord
     from dungeon_daddy.memory.models import ContextBundle
     from dungeon_daddy.rpg.service import RpgService
 
@@ -129,6 +130,7 @@ class PlaySessionController:
             extract_remember=lambda text: host._extract_remember(text),
             auto_remember=lambda event: host._auto_remember(event),
             on_bundle_built=lambda bundle: self._set_debug_bundle(bundle),
+            on_lookups=lambda records: self._set_debug_lookups(records),
         )
 
         # -- Dialogue --------------------------------------------------------
@@ -516,6 +518,10 @@ class PlaySessionController:
     def _set_debug_bundle(self, bundle: ContextBundle) -> None:
         if self._host._rpg_debug is not None:
             self._host._rpg_debug.set_bundle(bundle)
+
+    def _set_debug_lookups(self, records: list[LookupRecord]) -> None:
+        if self._host._rpg_debug is not None:
+            self._host._rpg_debug.set_lookups(records)
 
     def refresh_memory_state(self) -> None:
         self._host._has_memory = self.memory.has_level_memory()

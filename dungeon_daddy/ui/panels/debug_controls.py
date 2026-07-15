@@ -16,6 +16,7 @@ from dungeon_daddy.rpg.models import (
 from dungeon_daddy.rpg.service import RpgService
 
 if TYPE_CHECKING:
+    from dungeon_daddy.llm.lookup_tool import LookupRecord
     from dungeon_daddy.memory.sync import SyncIssue, SyncReporter
     from dungeon_daddy.rpg.proposal_applier import ApplyResult
     from dungeon_daddy.rpg.proposal_validator import ValidationResult
@@ -37,6 +38,7 @@ class DebugControls:
         self._last_sync_issues: list[SyncIssue] | None = None
         self._last_memory_note: MemoryEntry | None = None
         self._last_bundle: ContextBundle | None = None
+        self._last_lookups: list[LookupRecord] = []
         self._last_reaction: WorldReaction | None = None
         self._last_validation: ValidationResult | None = None
         self._last_apply_result: ApplyResult | None = None
@@ -106,6 +108,27 @@ class DebugControls:
             )
             for card in b.related_lore:
                 lines.append(f"  - {card['title']} [lore]")
+        return lines
+
+    def set_lookups(self, records: list[LookupRecord]) -> None:
+        self._last_lookups = records
+
+    def lookup_section_lines(self) -> list[str]:
+        # Slice B4e (L6): surface each narrator `lookup_world` call (query/tags,
+        # hit count, redundant/redirected) so an off-scene lookup is observable.
+        if not self._last_lookups:
+            return ["No lookups yet"]
+        lines = [f"World lookups: {len(self._last_lookups)}"]
+        for rec in self._last_lookups:
+            subject = rec.query or "(tags only)"
+            tag_part = f" [{','.join(rec.tags)}]" if rec.tags else ""
+            if rec.redirected:
+                flag = "  [REDIRECT]"
+            elif rec.overlap_count:
+                flag = f"  [redundant {rec.overlap_count}/{rec.hit_count}]"
+            else:
+                flag = ""
+            lines.append(f"  - {subject}{tag_part} → {rec.hit_count} hit(s){flag}")
         return lines
 
     def clock_section_lines(self) -> list[str]:

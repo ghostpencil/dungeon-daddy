@@ -267,6 +267,7 @@ class _RpgSidePanel:
         for section in (
             self._debug.last_action_section_lines(),
             self._debug.bundle_section_lines(),
+            self._debug.lookup_section_lines(),
             self._debug.clock_section_lines(),
             self._debug.reaction_section_lines(),
             self._debug.proposal_section_lines(),

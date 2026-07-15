@@ -172,6 +172,40 @@ def test_controller_exposes_five_coordinators_sharing_the_context(tmp_path: Path
     assert controller.memory._session is session
 
 
+def test_set_debug_lookups_routes_to_debug_panel(tmp_path: Path) -> None:
+    from dungeon_daddy.llm.lookup_tool import LookupRecord
+
+    controller, host, _session, _repo = _make(tmp_path, dungeon=_dungeon())
+    host._rpg_debug = _RecPanel()
+    recs = [LookupRecord(query="mira", hit_count=1)]
+
+    controller._set_debug_lookups(recs)
+
+    assert ("set_lookups", (recs,)) in host._rpg_debug.calls
+
+
+def test_set_debug_lookups_noop_without_debug_panel(tmp_path: Path) -> None:
+    from dungeon_daddy.llm.lookup_tool import LookupRecord
+
+    controller, host, _session, _repo = _make(tmp_path, dungeon=_dungeon())
+    assert host._rpg_debug is None
+    # No panel → no crash.
+    controller._set_debug_lookups([LookupRecord(query="mira")])
+
+
+def test_narration_on_lookups_port_wired_to_controller(tmp_path: Path) -> None:
+    from dungeon_daddy.llm.lookup_tool import LookupRecord
+
+    controller, host, _session, _repo = _make(tmp_path, dungeon=_dungeon())
+    host._rpg_debug = _RecPanel()
+    recs = [LookupRecord(query="mira", hit_count=1)]
+
+    # The port the coordinator was constructed with routes to the debug panel.
+    controller.narration._on_lookups(recs)
+
+    assert ("set_lookups", (recs,)) in host._rpg_debug.calls
+
+
 def test_load_dungeon_transient_sets_context_and_posts_dm_line(tmp_path: Path) -> None:
     controller, host, session, _repo = _make(tmp_path)
 

@@ -48,12 +48,27 @@ class _StubAgent:
         return "ok"
 
 
+class _LookupCallingAgent:
+    """A DM agent whose respond() invokes the injected lookup executor once
+    (simulating a `lookup_world` tool call) so a LookupRecord is produced."""
+
+    def respond(self, **kwargs) -> str:  # type: ignore[no-untyped-def]
+        lookup = kwargs.get("lookup")
+        if lookup is not None:
+            lookup(LLMToolCall("c1", "lookup_world", {"query": "mira"}))
+        return "ok"
+
+
 class _StubRepo:
     def load_room_memory(self, dungeon_id: str, level_id: int) -> str:
         return "prior events"
 
 
-def _coord(mem_repo: MemoryRepository | None, agent: _StubAgent) -> NarrationCoordinator:
+def _coord(
+    mem_repo: MemoryRepository | None,
+    agent,  # type: ignore[no-untyped-def]
+    on_lookups=None,  # type: ignore[no-untyped-def]
+) -> NarrationCoordinator:
     session = PlaySessionContext(
         dungeon=_dungeon(),
         state=SessionState(dungeon_id="d", current_level_idx=0, current_room_id="1-A"),
@@ -71,6 +86,7 @@ def _coord(mem_repo: MemoryRepository | None, agent: _StubAgent) -> NarrationCoo
         on_dungeon_reply=lambda pm, c: None,
         extract_remember=lambda t: (None, t),
         auto_remember=lambda s: None,
+        on_lookups=on_lookups,
     )
 
 
@@ -104,3 +120,50 @@ def test_lookup_is_none_without_repo() -> None:
     coord.active_thread.join(timeout=5.0)
 
     assert agent.calls[0]["lookup"] is None
+
+
+# -- Slice B4e — lookup provenance rides back to the main thread -------------
+
+
+def test_spawn_attaches_lookup_records_to_result() -> None:
+    repo = MemoryRepository(db_path=Path(":memory:"))
+    repo.initialize_schema(MIGRATIONS_DIR)
+    repo.save_actor("npc-mira", "camp-1", "npc", "mira", "Mira", tags=["actor:npc:mira"])
+    coord = _coord(repo, _LookupCallingAgent())
+
+    room = _dungeon().levels[0].rooms[0]
+    level = _dungeon().levels[0]
+    coord.spawn_dm_thread(room, level)
+    assert coord.active_thread is not None
+    coord.active_thread.join(timeout=5.0)
+
+    result = coord.queue.get_nowait()
+    assert len(result.lookups) == 1
+    assert result.lookups[0].query == "mira"
+    assert result.lookups[0].hit_count == 1
+
+
+def test_poll_forwards_lookups_to_port() -> None:
+    from dungeon_daddy.llm.lookup_tool import LookupRecord
+    from dungeon_daddy.play.narration import DMResult
+
+    got: list[list[LookupRecord]] = []
+    coord = _coord(None, _StubAgent(), on_lookups=got.append)
+    rec = LookupRecord(query="mira", hit_count=1)
+    coord.queue.put(DMResult(content="hi", lookups=[rec]))
+
+    coord.poll()
+
+    assert got == [[rec]]
+
+
+def test_poll_does_not_forward_when_no_lookups() -> None:
+    from dungeon_daddy.play.narration import DMResult
+
+    got: list = []
+    coord = _coord(None, _StubAgent(), on_lookups=got.append)
+    coord.queue.put(DMResult(content="hi"))
+
+    coord.poll()
+
+    assert got == []

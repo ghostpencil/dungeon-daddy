@@ -99,6 +99,30 @@ These tools or structured outputs must produce proposals only. They must not com
 
 The application must validate proposals before applying them.
 
+## Read tools
+
+The proposal-only tool policy above governs *mutating* tools. A **read tool** is different: it
+returns **data, not proposals**, and sits below that policy — reads are already how the LLM is
+fed, so a lookup adds no authority.
+
+The `lookup_world` tool (Phase 51.8 Phase B) is the one such tool today. It lets the model
+initiate a mid-turn search of campaign entities and memories by name, id, or tag. It is safe by
+construction:
+
+- **The executor is read-only.** It holds a `LookupService`
+  (`memory/lookup.py`) whose only public method is `lookup(...)`; the service exposes no write
+  method and wraps `MemoryRepository.search_entities` (a read). There is no path from the tool to
+  a mutation.
+- **The LLM never sees SQL.** It sends a query / tags / entity-type filter; the executor performs
+  the search and returns formatted rows.
+- **A lookup is data, never a proposal.** Its result is not gated by `validate_proposal` — there is
+  nothing to validate or apply, because nothing is being changed. Anything the model then wants to
+  *do* with what it read still flows through the normal proposal → validate → apply path above.
+
+The rule for adding future tools: a read tool must remain read-only by construction (a façade with
+no write method), and its results must never be treated as authoritative state without going
+through the proposal seam.
+
 ## Validation examples
 
 A proposal must be rejected if:

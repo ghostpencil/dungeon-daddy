@@ -234,21 +234,42 @@ no GUI-visible surface until B4e renders the panel line.
   no repo/campaign (agent falls back to `complete`). New tests: `tests/unit/{llm/test_lookup_tool,llm/test_dm_agent_lookup,
   llm/test_dungeon_voice_agent_lookup,memory/test_search_entities_concurrency,play/test_narration_lookup,play/test_dialogue_lookup}.py`.
 
-**▶ NEXT — Slice B4e/B4f (+ optional B5); owner paused after B4a–d for review before the UI-touching part.**
-- **B4e — L6 observability (debug-panel line).** Surface each lookup (query, tags, hit count, redundant/redirected) in the
-  Play-mode DBG tab the way proposal/bundle provenance already is (`ui/panels/debug_controls.py` — mirror
-  `set_reaction`/`reaction_section_lines` + `set_bundle`/`bundle_section_lines`). **Threading:** the executor's `on_lookup`
-  fires on the **worker thread**; the collected `LookupRecord`s must ride back to the main thread (attach to `DMResult`,
-  forward on `NarrationCoordinator.poll` via a new port → `DebugControls`), then render in `PlayView._draw_debug_tab` —
-  so this touches `PlayView` (arcade) and needs UI-harness tests (see `spec/UI_TESTING.md`). Same seam as the A6
-  `bundle_section_lines()` wiring did.
-- **B4f — carried TODO (folded into B4 per owner 2026-07-13):** add a short "Read tools" note to
-  `docs/LLM_AUTHORITY_BOUNDARY.md` codifying that a lookup returns **data, not proposals**, and the executor is read-only
-  by construction (spec §8). Cheap doc-only slice.
+**✅ Slice B4f — carried "Read tools" doc note: COMPLETE (2026-07-14, doc-only, uncommitted).** Added a **"Read tools"**
+subsection to `docs/LLM_AUTHORITY_BOUNDARY.md` (right after "Tool policy", which governs *mutating* tools), codifying
+spec §8: the proposal-only policy governs mutating tools; a read tool returns **data, not proposals** and sits below it;
+`lookup_world`'s executor is **read-only by construction** (holds a `LookupService` with only a public `lookup(...)`, no
+write method, wrapping `search_entities`); the LLM **never sees SQL**; a lookup is **not gated by `validate_proposal`**
+(nothing to apply — anything the model then wants to *do* still flows through proposal→validate→apply); plus a
+forward-looking rule for future read tools. Clears the TODO carried from B1/B2. (Folded into B4 per owner 2026-07-13.)
+
+**✅ Slice B4e — L6 observability (debug-panel line): COMPLETE (2026-07-15; TDD, +13 tests, full suite green 3812,
+ruff + mypy(strict, 172) clean).** Each narrator lookup is now visible in the Play-mode DBG tab, closing the L6
+provenance loop — the first GUI-visible surface of the whole Phase B arc.
+- **Worker→main-thread carry:** the executor's `on_lookup` fires on the **worker thread**, so both spawn paths now
+  collect `LookupRecord`s into a worker-local list and attach it to `DMResult.lookups` (`lookups: list[LookupRecord] =
+  field(default_factory=list)`) — on the success *and* the error path, so a failed turn still shows what it looked up.
+  `NarrationCoordinator.poll` forwards them on the main thread through a new optional `on_lookups` port (only when
+  non-empty). `DialogueCoordinator.send_dungeon_line` does the same for the dungeon-voice path (its
+  `_build_lookup_executor` takes `records=None` → back-compat with the B4d call shape).
+- **`PlaySessionController`** wires the port → `_set_debug_lookups` → `DebugControls.set_lookups` (no-op when no panel).
+- **`DebugControls.set_lookups` / `lookup_section_lines()`** (`ui/panels/debug_controls.py`, mirroring
+  `set_bundle`/`bundle_section_lines`): renders `World lookups: N` + a line per record — query (or `(tags only)`),
+  `[tags]`, hit count, and the L7 flags `[REDIRECT]` (full overlap) / `[redundant k/n]` (partial). `PlayView`
+  (`_RpgSidePanel`) draws the section after the bundle block.
+- **Tests (+13):** `tests/unit/ui/test_debug_controls.py` (6 — count/query/hits, tags-only, redirect, redundant, empty),
+  `tests/unit/play/test_narration_lookup.py` (3 — records attach to the result via a real repo + lookup-calling agent;
+  poll forwards; no-lookups doesn't fire), `tests/unit/play/test_dialogue_lookup.py` (1 — voice path attaches),
+  `tests/unit/play/test_controller.py` (3 — port routes to panel, no-panel no-op, coordinator wired).
+- **⚠ Known test-coverage gap (owner call pending):** no view-level test asserts `_draw_debug_tab` renders the section —
+  the one-line `play_view.py` change is untested; coverage sits at the `DebugControls` + wiring seams instead. This
+  **matches the A6 precedent exactly** (`bundle_section_lines()` shipped the same way, debug-controls tests only), but
+  the B4e plan above had called for UI-harness tests (`spec/UI_TESTING.md`).
+
+**▶ NEXT — `/code-review high` on B4e/B4f, then optional B5.**
 - **B5 (optional) — `pytest -m eval`:** one live eval that an *out-of-scene* lore question triggers a lookup and lands the
   fact in the narration, and an in-room question does **not** (spec §12 Phase B.5). This is the first thing that exercises
-  the tool against a real tool-calling provider (B2's `OpenAIProvider.complete_round`).
-- After B4e/B4f: PR the Phase B arc (merge/close the superseded docs PR #91 per the note above), then owner GUI-verify on
+  the tool against a real tool-calling provider (B2's `OpenAIProvider.complete_round`) — nothing has yet.
+- Then: PR the Phase B arc (merge/close the superseded docs PR #91 per the note above), then owner GUI-verify on
   the live Crucible (an existing save needs a manual reseed for `rooms` — the A6 live-data pattern).
 
 **Phase A deferred items (non-blocking — fold into Phase B or a cleanup slice):** room-id gate

@@ -248,6 +248,64 @@ def test_bundle_section_lines_no_bundle():
 
 
 # ---------------------------------------------------------------------------
+# Slice B4e — set_lookups / lookup_section_lines (narrator lookup provenance)
+# ---------------------------------------------------------------------------
+
+def _lookup_record(**kwargs):
+    from dungeon_daddy.llm.lookup_tool import LookupRecord
+    return LookupRecord(**kwargs)
+
+
+def test_set_lookups_stores_records():
+    ctrl = _controls()
+    recs = [_lookup_record(query="mira")]
+    ctrl.set_lookups(recs)
+    assert ctrl._last_lookups is recs
+
+
+def test_lookup_section_lines_shows_count_query_and_hits():
+    ctrl = _controls()
+    ctrl.set_lookups([
+        _lookup_record(query="mira", hit_count=3),
+        _lookup_record(query="vault", hit_count=1),
+    ])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "World lookups: 2" in text
+    assert "mira" in text
+    assert "3 hit(s)" in text
+
+
+def test_lookup_section_lines_shows_tags_when_no_query():
+    ctrl = _controls()
+    ctrl.set_lookups([_lookup_record(query=None, tags=["theme:guilt"], hit_count=2)])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "theme:guilt" in text
+
+
+def test_lookup_section_lines_shows_redirect_flag():
+    ctrl = _controls()
+    ctrl.set_lookups([
+        _lookup_record(query="mira", hit_count=2, overlap_count=2, redirected=True),
+    ])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "REDIRECT" in text
+
+
+def test_lookup_section_lines_shows_redundant_overlap():
+    ctrl = _controls()
+    ctrl.set_lookups([
+        _lookup_record(query="mira", hit_count=3, overlap_count=1),
+    ])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "redundant 1/3" in text
+
+
+def test_lookup_section_lines_no_lookups():
+    ctrl = _controls()
+    assert any("No lookups yet" in line for line in ctrl.lookup_section_lines())
+
+
+# ---------------------------------------------------------------------------
 # Bullet — set_reaction / reaction_section_lines
 # ---------------------------------------------------------------------------
 
