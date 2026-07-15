@@ -95,6 +95,125 @@ class TestExecutorResults:
         assert records[0].hit_count + records[0].omitted == 20
 
 
+class TestArgumentCoercion:
+    """The model's JSON is untrusted input (Slice B4 review fix).
+
+    Round 0 is the only tool round (`max_rounds=2` forces plain text on the
+    last), so a rejected argument costs the narrator the fact entirely. Coerce
+    what has an obvious reading; error only on the genuinely ambiguous.
+    """
+
+    def test_null_limit_falls_back_to_the_default(self, tmp_path: Path) -> None:
+        # `{"limit": null}` is a routine serialization of an unset optional int.
+        service, repo = _service(tmp_path)
+        repo.save_actor("a1", "camp-A", "npc", "mira", "Mira", tags=["actor:npc:mira"])
+        from dungeon_daddy.llm.lookup_tool import build_lookup_executor
+
+        executor = build_lookup_executor(service, bundle_entity_ids=set())
+        payload = json.loads(executor(_call(query="mira", limit=None)))
+        assert payload["results"][0]["id"] == "a1"
+        assert "error" not in payload
+
+    def test_string_limit_is_coerced(self, tmp_path: Path) -> None:
+        service, repo = _service(tmp_path)
+        repo.save_actor("a1", "camp-A", "npc", "mira", "Mira", tags=["actor:npc:mira"])
+        from dungeon_daddy.llm.lookup_tool import build_lookup_executor
+
+        executor = build_lookup_executor(service, bundle_entity_ids=set())
+        payload = json.loads(executor(_call(query="mira", limit="5")))
+        assert payload["results"][0]["id"] == "a1"
+
+    def test_unusable_limit_falls_back_rather_than_failing(self, tmp_path: Path) -> None:
+        # `limit` is an optimization knob — a bad one must not cost the lookup.
+        service, repo = _service(tmp_path)
+        repo.save_actor("a1", "camp-A", "npc", "mira", "Mira", tags=["actor:npc:mira"])
+        from dungeon_daddy.llm.lookup_tool import build_lookup_executor
+
+        executor = build_lookup_executor(service, bundle_entity_ids=set())
+        payload = json.loads(executor(_call(query="mira", limit="lots")))
+        assert payload["results"][0]["id"] == "a1"
+
+    def test_bare_string_tags_is_read_as_a_single_tag(self, tmp_path: Path) -> None:
+        # Without this, `set("theme:guilt")` becomes a set of CHARACTERS, which
+        # matches no tag — a silent zero-hit answer the narrator reads as
+        # "this lore does not exist".
+        service, repo = _service(tmp_path)
+        repo.save_actor("a1", "camp-A", "npc", "mira", "Mira", tags=["theme:guilt"])
+        from dungeon_daddy.llm.lookup_tool import build_lookup_executor
+
+        executor = build_lookup_executor(service, bundle_entity_ids=set())
+        payload = json.loads(executor(_call(tags="theme:guilt")))
+        assert [r["id"] for r in payload["results"]] == ["a1"]
+
+    def test_bare_string_entity_types_is_read_as_a_single_type(self, tmp_path: Path) -> None:
+        service, repo = _service(tmp_path)
+        repo.save_actor("a1", "camp-A", "npc", "mira", "Mira", tags=["theme:guilt"])
+        from dungeon_daddy.llm.lookup_tool import build_lookup_executor
+
+        executor = build_lookup_executor(service, bundle_entity_ids=set())
+        payload = json.loads(executor(_call(query="mira", entity_types="actor")))
+        assert [r["id"] for r in payload["results"]] == ["a1"]
+
+    def test_uninterpretable_tags_error_rather_than_search_wrongly(
+        self, tmp_path: Path
+    ) -> None:
+        service, _ = _service(tmp_path)
+        from dungeon_daddy.llm.lookup_tool import LookupRecord, build_lookup_executor
+
+        records: list[LookupRecord] = []
+        executor = build_lookup_executor(
+            service, bundle_entity_ids=set(), on_lookup=records.append
+        )
+        payload = json.loads(executor(_call(tags={"theme": "guilt"})))
+        assert "tags" in payload["error"]
+        assert records[0].error  # L6: visible in the debug panel, not silent
+
+    def test_unknown_entity_type_errors_instead_of_matching_nothing(
+        self, tmp_path: Path
+    ) -> None:
+        # `search_entities` doesn't validate `entity_types` — it just filters,
+        # so a plural/misspelled type quietly matches no source and the
+        # narrator reads the empty result as "this doesn't exist". Name the
+        # valid types so the model can correct itself.
+        service, repo = _service(tmp_path)
+        repo.save_actor("a1", "camp-A", "npc", "mira", "Mira", tags=["actor:npc:mira"])
+        from dungeon_daddy.llm.lookup_tool import build_lookup_executor
+
+        executor = build_lookup_executor(service, bundle_entity_ids=set())
+        payload = json.loads(executor(_call(query="mira", entity_types=["actors"])))
+        assert payload["results"] == []
+        assert "actors" in payload["error"]
+        assert "actor" in payload["error"]  # the valid types are listed
+
+    def test_valid_entity_types_match_the_repository_sources(self) -> None:
+        # Drift guard: the tool's advertised vocabulary is hand-maintained
+        # against `_ENTITY_SOURCES` + the dedicated memory branch. If a source
+        # is added and this set isn't updated, the new type is rejected at the
+        # boundary and the table is unreachable through the tool.
+        from dungeon_daddy.llm.lookup_tool import VALID_ENTITY_TYPES
+        from dungeon_daddy.memory.repository import _ENTITY_SOURCES
+
+        assert VALID_ENTITY_TYPES == {s.entity_type for s in _ENTITY_SOURCES} | {"memory"}
+
+    def test_tool_description_advertises_the_valid_entity_types(self) -> None:
+        from dungeon_daddy.llm.lookup_tool import LOOKUP_WORLD_TOOL, VALID_ENTITY_TYPES
+
+        described = LOOKUP_WORLD_TOOL.parameters["properties"]["entity_types"]["description"]
+        for entity_type in VALID_ENTITY_TYPES:
+            assert entity_type in described
+
+    def test_non_dict_arguments_do_not_raise(self, tmp_path: Path) -> None:
+        # A provider can hand back a JSON array: `json.loads("[1,2]")` parses
+        # fine, and `.get` on it would be an AttributeError through the turn.
+        service, _ = _service(tmp_path)
+        from dungeon_daddy.llm.lookup_tool import build_lookup_executor
+
+        executor = build_lookup_executor(service, bundle_entity_ids=set())
+        call = LLMToolCall(call_id="c1", name="lookup_world", arguments=[1, 2])  # type: ignore[arg-type]
+        payload = json.loads(executor(call))
+        assert payload["error"]
+
+
 class TestL7Scoping:
     def test_full_overlap_returns_redirect(self, tmp_path: Path) -> None:
         service, repo = _service(tmp_path)

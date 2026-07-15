@@ -77,14 +77,47 @@ class DungeonMasterAgent:
             if clocks:
                 lines.append("Open Clocks:")
                 for c in clocks:
-                    lines.append(f"  - {c.get('label', c.get('name', ''))} ({c.get('filled', 0)}/{c.get('segments', 0)})")
-        objects = (context_bundle.current_room or {}).get("objects", [])
+                    label = c.get("label", c.get("name", ""))
+                    line = f"  - {label} ({c.get('filled', 0)}/{c.get('segments', 0)})"
+                    stakes = c.get("stakes", "")
+                    lines.append(f"{line} — {stakes}" if stakes else line)
+        room = context_bundle.current_room or {}
+        objects = room.get("objects", [])
         if objects:
             lines.append("\n# Room Contents")
             for o in objects:
                 desc = o.get("description", "")
                 lines.append(f"  - {o.get('display_name', '')}: {desc}" if desc
                              else f"  - {o.get('display_name', '')}")
+        # Everything below is collected by `lookup_tool.bundle_entity_ids` and so
+        # drives the L7 full-overlap redirect. Anything in that set the narrator
+        # cannot read here would be refused by the redirect *and* absent from the
+        # prompt — see test_every_bundle_entity_id_is_described_in_the_system_prompt.
+        actors = list(room.get("npcs", [])) + list(room.get("monsters", []))
+        if actors:
+            lines.append("\n# Present Actors")
+            for a in actors:
+                lines.append(
+                    f"  - {a.get('display_name', '')} [{a.get('status', '')}, "
+                    f"{a.get('disposition', 'neutral')}]"
+                )
+        loose_items = room.get("loose_items", [])
+        if loose_items:
+            lines.append("\n# Loose Items")
+            for i in loose_items:
+                desc = i.get("description", "")
+                lines.append(f"  - {i.get('display_name', '')}: {desc}" if desc
+                             else f"  - {i.get('display_name', '')}")
+        factions = context_bundle.faction_reputations
+        if factions:
+            lines.append("\n# Factions")
+            for f in factions:
+                goal = f.get("goal", "")
+                line = (
+                    f"  - {f.get('display_name', '')} "
+                    f"(reputation: {f.get('reputation', 0)}, tier: {f.get('tier', 0)})"
+                )
+                lines.append(f"{line} — {goal}" if goal else line)
         return "\n".join(lines)
 
     def respond(

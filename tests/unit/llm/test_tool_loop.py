@@ -7,7 +7,10 @@ without a live API.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
+
+import pytest
 
 from dungeon_daddy.llm.provider import (
     LLMMessage,
@@ -190,6 +193,33 @@ def test_executor_exception_becomes_error_string_and_loop_continues() -> None:
     assert result == "recovered"
     tool_msg = [m for m in provider.calls[1].messages if m.role == "tool"][0]
     assert "db locked" in tool_msg.content
+
+
+def test_executor_exception_is_logged(caplog: pytest.LogCaptureFixture) -> None:
+    """L4 makes the error the model's problem; it must still be the
+    developer's. Slice B4 review fix: the string went to the model and nowhere
+    else, so a tool crashing every turn left no trace anywhere."""
+    provider = _FakeProvider(
+        scripted=[
+            LLMRoundResult(tool_calls=[_lookup_tool_call()]),
+            LLMRoundResult(text="recovered"),
+        ]
+    )
+
+    def boom(call: LLMToolCall) -> str:
+        raise RuntimeError("db locked")
+
+    with caplog.at_level(logging.ERROR):
+        run_tool_loop(
+            provider,
+            messages=[LLMMessage(role="user", content="q")],
+            system="sys",
+            tools=[_TOOL],
+            executor=boom,
+        )
+
+    assert "db locked" in caplog.text
+    assert "lookup_world" in caplog.text  # which tool failed
 
 
 def test_none_text_on_final_round_returns_empty_string() -> None:

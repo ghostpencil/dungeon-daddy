@@ -229,7 +229,8 @@ At least one of `query`/`tags` is required. Results are compact JSON rows:
 `{entity_type, id, slug, display_name, room_id, status, tags, snippet}` — `snippet` is the
 description/summary truncated to ~200 chars. Deterministic ranking: exact slug match >
 tag-hit count > (memories only) importance DESC, created_at DESC. Total tool-result budget
-~1,200 tokens; overflow rows dropped with a `"+N more"` marker.
+~1,200 tokens; overflow rows dropped. *(As built: reported as a structured `omitted: N` field
+rather than a `"+N more"` marker string — the debug panel renders it as `(N trimmed)`.)*
 
 **Two owner rulings during Slice B1 (2026-07-12; refine the row/ranking above):**
 - **Row gains `status` (8 keys, not 7).** `lookup_world` is for entities/places/*past events*, so
@@ -253,7 +254,7 @@ is done in Python over campaign-scoped rows rather than SQL `ILIKE` — equivale
 scale, simpler, and lets the query-OR-tags union compose cleanly; revisit if campaign size ever
 makes it a scaling ceiling.)* An empty `entity_types` list means "no filter" (all types), not
 "match nothing". A thin read-only `LookupService` wraps it and formats tool results (snippet trim,
-token budget, `+N more`); `MemoryRetriever` stays untouched.
+token budget, `omitted` count); `MemoryRetriever` stays untouched.
 
 ## 7.1 Rooms as a first-class campaign entity (OWNER-DECIDED 2026-07-11)
 
@@ -407,10 +408,15 @@ call `run_tool_loop`; no agent reimplements the loop.
   execute DuckDB **reads from that worker thread** — today's convention builds the bundle on the
   main thread (`build_context_bundle` runs synchronously in `spawn_dm_thread` *before* the thread
   launches, `play/narration.py:205,264`), so this is
-  new. Approach: the shared connection is guarded by a `threading.Lock` owned by
-  `MemoryRepository`, and tool queries go through `conn.cursor()` under that lock. (A second
-  `read_only=True` connection is NOT assumed safe while the app holds the write connection —
-  verify in a spike before choosing it.)
+  new. Approach: tool queries go through `conn.cursor()` under a `threading.Lock` owned by
+  `MemoryRepository`. **As built (corrected after the PR #92 review):** the *cursor* is what
+  isolates a worker read from main-thread use of the connection — the lock is held only by
+  `search_entities`, so it serializes worker lookups against each other and never against the
+  main thread. The original wording ("the shared connection is guarded by a `threading.Lock`")
+  overstated it: guarding one method does not guard the connection. Both properties are pinned
+  by `tests/unit/memory/test_search_entities_concurrency.py`. (A second `read_only=True`
+  connection is NOT assumed safe while the app holds the write connection — verify in a spike
+  before choosing it.)
 - **L6 (proposed): observability.** Every tool call is logged (query, tags, hit count) and
   surfaced in the transcript debug panel the way proposal provenance already is — so a bad
   narration can be traced to what the model looked up (mirrors `MEMORY_SYSTEM_SPEC.md`
@@ -420,9 +426,10 @@ call `run_tool_loop`; no agent reimplements the loop.
 
 - **No write tools, ever** — proposals stay on the existing propose→validate→apply pipeline
   (`ActionOrchestrator.run_proposal_pipeline`, `play/actions.py:582`, ex-`play_view.py:1909`).
-- No vector/semantic search, no embeddings — exact tags + ILIKE substring only.
+- No vector/semantic search, no embeddings — exact tags + substring only (see the §7 L2 note: the
+  substring match is done in Python, not SQL `ILIKE`).
 - No LLM-visible SQL; no cross-campaign search.
-- No DuckDB FTS extension in v1 (revisit if ILIKE+tags proves insufficient).
+- No DuckDB FTS extension in v1 (revisit if substring+tags proves insufficient).
 - No tool use in the generator/design-side agents (out of scope).
 
 ## 12. Phasing & slices (TDD per `spec/TESTING.md`; use the TDD skill)
@@ -493,7 +500,7 @@ scheduling prefers.
 | T6 | Normalization migration mapping (protagonist→pc etc.) | **OWNER-DECIDED 2026-07-08** |
 | T7 | Deterministic `# Related Lore` pre-fetch is the default retrieval path | **OWNER-DECIDED 2026-07-04** |
 | L1 | Single `lookup_world` tool, name+tags+types params, out-of-scene mandate only | **OWNER-DECIDED 2026-07-11** |
-| L2 | One repo method `search_entities` (ILIKE + exact tags) behind `LookupService` | **OWNER-DECIDED 2026-07-11** |
+| L2 | One repo method `search_entities` (substring + exact tags; Python not `ILIKE`, see §7 L2 note) behind `LookupService` | **OWNER-DECIDED 2026-07-11** |
 | L3 | Agent-owned loop: provider = transport (`complete_round` + neutral types), loop in `llm/tool_loop.py` | **OWNER-DECIDED 2026-07-04** |
 | L4 | Budgets: 2 tool rounds, 8-row default, ~1.2k-token results, errors-as-strings | **OWNER-DECIDED 2026-07-11** |
 | L5 | Tool loop + DuckDB reads on the worker thread behind a repo-owned lock (shared conn + `threading.Lock`; read-only 2nd conn not pursued) | **OWNER-DECIDED 2026-07-11** |

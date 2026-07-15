@@ -53,7 +53,10 @@ LOOKUP_WORLD_TOOL = LLMToolDef(
             "entity_types": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "optional filter: actor|object|item|clock|objective|faction|memory|room",
+                "description": (
+                    "optional filter, exact values only: actor|object|item|clock|"
+                    "objective|faction|memory|room"
+                ),
             },
             "limit": {
                 "type": "integer",
@@ -116,6 +119,60 @@ def bundle_entity_ids(bundle: ContextBundle) -> set[str]:
     return ids
 
 
+# The tool schema's documented default (mirrors `LookupService.lookup`).
+_DEFAULT_LIMIT = 8
+
+# The entity vocabulary the tool advertises. `search_entities` does NOT validate
+# `entity_types` — it only filters — so an unknown type there matches no source
+# and returns an empty result the narrator reads as "this doesn't exist".
+# Validate at this boundary instead, and name the alternatives in the error.
+# Hand-maintained against `repository._ENTITY_SOURCES` + the memory branch;
+# pinned by test_valid_entity_types_match_the_repository_sources.
+VALID_ENTITY_TYPES: frozenset[str] = frozenset(
+    {"actor", "object", "item", "clock", "objective", "faction", "memory", "room"}
+)
+
+
+class _BadToolArgs(ValueError):
+    """The model's arguments have no safe reading (surfaced as L4 error data)."""
+
+
+def _coerce_query(value: object) -> str | None:
+    if value is None or isinstance(value, str):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return str(value)
+    raise _BadToolArgs("'query' must be a string")
+
+
+def _coerce_str_list(value: object, field_name: str) -> list[str] | None:
+    """Accept the schema's array, or a bare string meaning one element.
+
+    A bare string is the common model slip and its intent is unambiguous. Left
+    uncoerced it is *silently destructive*: `set("theme:guilt")` is a set of
+    characters that matches no tag, and `entity_types` is membership-tested
+    against the string, so "actors" would match "actor" by substring.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list) and all(isinstance(v, str) for v in value):
+        return list(value)
+    raise _BadToolArgs(f"'{field_name}' must be a string or an array of strings")
+
+
+def _coerce_limit(value: object) -> int:
+    """Never fail the lookup over `limit` — it only caps an already-capped row
+    count, so an unusable value falls back to the documented default."""
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        return _DEFAULT_LIMIT
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return _DEFAULT_LIMIT
+
+
 class _Lookup(Protocol):
     def lookup(
         self,
@@ -140,12 +197,36 @@ def build_lookup_executor(
     call is logged and reported via ``on_lookup``.
     """
 
+    def _fail(message: str) -> str:
+        """L4: a bad request comes back as data — but it is still recorded, so
+        the debug panel shows `→ ERROR` rather than an innocent `0 hit(s)`."""
+        _log.warning("lookup_world rejected: %s", message)
+        if on_lookup is not None:
+            on_lookup(LookupRecord(query=None, error=message))
+        return json.dumps(
+            {"results": [], "omitted": 0, "error": message}, ensure_ascii=False
+        )
+
     def _execute(call: LLMToolCall) -> str:
-        args = call.arguments or {}
-        query = args.get("query")
-        tags = args.get("tags")
-        entity_types = args.get("entity_types")
-        limit = args.get("limit", 8)
+        if not isinstance(call.arguments, dict):
+            # A provider can hand back a JSON array; `.get` on it would raise
+            # through the turn.
+            return _fail("tool arguments must be a JSON object")
+        args = call.arguments
+        try:
+            query = _coerce_query(args.get("query"))
+            tags = _coerce_str_list(args.get("tags"), "tags")
+            entity_types = _coerce_str_list(args.get("entity_types"), "entity_types")
+        except _BadToolArgs as exc:
+            return _fail(str(exc))
+        if entity_types is not None:
+            unknown = [t for t in entity_types if t not in VALID_ENTITY_TYPES]
+            if unknown:
+                return _fail(
+                    f"unknown entity_types {unknown} — valid types are "
+                    f"{', '.join(sorted(VALID_ENTITY_TYPES))}"
+                )
+        limit = _coerce_limit(args.get("limit"))
 
         result = service.lookup(
             query=query, tags=tags, entity_types=entity_types, limit=limit

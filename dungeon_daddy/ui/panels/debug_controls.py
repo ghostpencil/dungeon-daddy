@@ -121,7 +121,7 @@ class DebugControls:
         # lookup is observable. Cleared each turn, so an empty section means
         # *this* narration looked nothing up (not that it never has).
         if not self._last_lookups:
-            return ["No lookups yet"]
+            return ["No lookups this turn"]
         lines = [f"World lookups: {len(self._last_lookups)}"]
         for rec in self._last_lookups:
             # A falsy query is one `search_entities` itself ignores, so it truly

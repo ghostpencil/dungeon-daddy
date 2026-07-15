@@ -267,7 +267,8 @@ class NarrationCoordinator:
 
         Scopes a :class:`LookupService` to the same campaign as the bundle and
         seeds the L7 overlap set from the bundle's entity ids. ``None`` when
-        there is no repo (the agent falls back to the plain ``complete`` path).
+        there is no repo *or* no session state (the agent falls back to the
+        plain ``complete`` path).
         The executor runs on the worker thread; its reads go through the repo's
         L5 read lock. Each call's :class:`LookupRecord` is appended to
         ``records`` (worker-thread-local) so the worker can carry them back to

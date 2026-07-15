@@ -93,3 +93,44 @@ def test_respond_without_lookup_uses_complete() -> None:
     assert out == "plain voice"
     assert provider.round_calls == []
     assert provider.complete_calls == 1
+
+
+@dataclass
+class _PlainProvider:
+    """A provider from before the tool era — no ``complete_round``, no
+    ``supports_tools`` (the `AnthropicProvider` shape; spec §9 defers it)."""
+
+    complete_response: str = "plain voice"
+    complete_calls: int = 0
+
+    def complete(self, messages, system="", max_tokens=1024, response_format=None):  # type: ignore[no-untyped-def]
+        self.complete_calls += 1
+        return self.complete_response
+
+    @property
+    def model_id(self) -> str:
+        return "plain"
+
+
+def test_respond_falls_back_to_complete_when_provider_lacks_tool_support() -> None:
+    """The `supports_tools` guard is load-bearing (Slice B4 review fix):
+    `DialogueCoordinator` injects `lookup` without consulting the provider, so
+    only this guard prevents an `AttributeError` on every voice turn."""
+    provider = _PlainProvider()
+    agent = DungeonVoiceAgent(provider)  # type: ignore[arg-type]
+
+    out = _respond(agent, lookup=lambda call: "rows: mira")
+
+    assert out == "plain voice"
+    assert provider.complete_calls == 1
+
+
+def test_respond_falls_back_to_complete_when_tools_unsupported() -> None:
+    provider = _ToolProvider(complete_response="plain voice", supports_tools=False)
+    agent = DungeonVoiceAgent(provider)
+
+    out = _respond(agent, lookup=lambda call: "rows: mira")
+
+    assert out == "plain voice"
+    assert provider.round_calls == []
+    assert provider.complete_calls == 1

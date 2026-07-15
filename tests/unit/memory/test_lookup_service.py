@@ -1,12 +1,16 @@
 """Slice B1 — LookupService (read-only façade over search_entities; spec §7/§8).
 
 Formats `lookup_world` tool results: compact rows, snippet truncated to ~200
-chars, a ~1,200-token result budget with overflow dropped behind a `+N more`
-marker, and errors surfaced as data (never raised).
+chars, a ~1,200-token result budget with overflow reported as an `omitted`
+count, and errors surfaced as data (never raised).
 """
 from __future__ import annotations
 
+import logging
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from dungeon_daddy.memory.lookup import LookupService
 from dungeon_daddy.memory.repository import MemoryRepository
@@ -104,3 +108,55 @@ class TestLookupServiceErrors:
         assert result["results"] == []
         assert isinstance(result["error"], str)
         assert result["error"]
+
+    def test_bad_request_error_keeps_its_correctable_text(self, tmp_path: Path) -> None:
+        # A ValueError is the model's own fault and its text tells it how to
+        # fix the call — that detail must survive (L4).
+        service, _ = _service(tmp_path)
+        result = service.lookup()
+        assert "query" in result["error"]
+
+
+class _ExplodingRepo:
+    """A repo whose search raises the way DuckDB does — with the SQL in the
+    message. Real repos can't be made to fail this way on demand."""
+
+    MESSAGE = (
+        "Catalog Error: Table with name rooms does not exist!\n"
+        "LINE 1: ...SELECT room_id, slug, display_name FROM rooms WHERE campaign_id = ?"
+    )
+
+    def search_entities(self, *args: object, **kwargs: object) -> list[dict[str, Any]]:
+        raise RuntimeError(self.MESSAGE)
+
+
+class TestLookupServiceInfrastructureErrors:
+    """Slice B4 review fix: only `ValueError` was caught, so a schema-drifted DB
+    (e.g. migration 022 unapplied) raised out through the executor — where it
+    became an unlogged `Error: ...` string with no LookupRecord behind it."""
+
+    def test_infrastructure_error_is_returned_as_data(self) -> None:
+        service = LookupService(_ExplodingRepo(), "camp-A")  # type: ignore[arg-type]
+        result = service.lookup(query="mira")
+        assert result["results"] == []
+        assert result["error"]
+
+    def test_infrastructure_error_does_not_leak_sql_to_the_model(self) -> None:
+        # docs/LLM_AUTHORITY_BOUNDARY.md promises "the LLM never sees SQL".
+        # The error string is fed straight back as a tool result, so a raw
+        # DuckDB message would break that promise.
+        service = LookupService(_ExplodingRepo(), "camp-A")  # type: ignore[arg-type]
+        error = service.lookup(query="mira")["error"]
+        assert "SELECT" not in error
+        assert "FROM rooms" not in error
+        assert "campaign_id = ?" not in error
+
+    def test_infrastructure_error_is_logged_with_its_detail(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # The model gets a generic string; the developer must still get the
+        # real cause, or the failure is invisible everywhere.
+        service = LookupService(_ExplodingRepo(), "camp-A")  # type: ignore[arg-type]
+        with caplog.at_level(logging.ERROR):
+            service.lookup(query="mira")
+        assert "rooms does not exist" in caplog.text

@@ -405,8 +405,11 @@ class RoomState(BaseModel):
     (:class:`dungeon_daddy.data.models.Room`) — this record does not duplicate it.
     ``summary`` is the inline setting-lore for fast retrieval; ``markdown_path``
     points to the full authored body (mirroring :class:`MemoryEntry`). ``quest_role``
-    is the room's authoritative role in the quest (also mirrored into ``tags`` as
-    ``quest:``/``thread:`` for tag-driven retrieval).
+    is the room's authoritative role in the quest; it is a **column only** and is
+    NOT mirrored into ``tags`` — there is no ``quest:`` namespace (see
+    ``memory/tags.py::TAG_NAMESPACES``), so such a tag would fail ``validate_tag``.
+    ``tags`` are authored independently by the populate scripts (``theme:``/
+    ``thread:``); nothing keeps the two in step.
     """
 
     room_id: str

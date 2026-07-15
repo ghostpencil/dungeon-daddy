@@ -332,8 +332,11 @@ def test_lookup_section_lines_shows_redundant_overlap():
 
 
 def test_lookup_section_lines_no_lookups():
+    # "this turn", not "yet": the section is cleared every polled turn, so an
+    # empty section means *this* narration looked nothing up — it says nothing
+    # about earlier turns. The old wording contradicted the code's own comment.
     ctrl = _controls()
-    assert any("No lookups yet" in line for line in ctrl.lookup_section_lines())
+    assert any("No lookups this turn" in line for line in ctrl.lookup_section_lines())
 
 
 def test_lookup_section_lines_shows_error():

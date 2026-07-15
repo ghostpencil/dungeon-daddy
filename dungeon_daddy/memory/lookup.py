@@ -8,16 +8,26 @@ that holds it is read-only by construction (spec §8).
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from dungeon_daddy.memory.repository import MemoryRepository
+
+_log = logging.getLogger(__name__)
+
+# What the model is told when the search itself broke. Deliberately carries no
+# detail: the string becomes a tool result, and a raw DuckDB message quotes the
+# SQL (spec §8). It still reads as retryable-or-not to the narrator.
+_LOOKUP_FAILED_MESSAGE = "lookup failed — the world database could not be searched"
 
 # Snippet cap (~200 chars, spec §7). Overflow is truncated with an ellipsis.
 _SNIPPET_MAX = 200
 
 # Total tool-result token budget (~1,200, spec §7). Rows past it are dropped
-# and reported via `omitted`. Token cost is estimated as JSON-length // 4,
-# matching the retrieval layer's `trim_to_budget` heuristic.
+# and reported via `omitted`. Token cost is estimated as JSON-length // 4 — the
+# same `chars // 4` heuristic as the retrieval layer's `trim_to_budget`, though
+# not the same measurement: that one costs plain title+summary text, and it
+# drops an oversized first entry where `lookup` deliberately keeps it.
 _RESULT_TOKEN_BUDGET = 1200
 
 
@@ -55,7 +65,20 @@ class LookupService:
                 self._campaign_id, query, tags, entity_types, limit
             )
         except ValueError as exc:
+            # The model's own bad request: its text says how to fix the call,
+            # so hand it back verbatim.
             return {"results": [], "omitted": 0, "error": str(exc)}
+        except Exception:
+            # Anything else is ours, not the model's (schema drift, a locked
+            # DB). It gets a generic string: the error is fed straight back as
+            # a tool result, and DuckDB echoes the failing SQL in its message —
+            # which would break the §8 "the LLM never sees SQL" boundary. The
+            # real cause goes to the log instead.
+            _log.exception(
+                "search_entities failed: campaign=%r query=%r tags=%r",
+                self._campaign_id, query, tags,
+            )
+            return {"results": [], "omitted": 0, "error": _LOOKUP_FAILED_MESSAGE}
 
         results: list[dict[str, Any]] = []
         used = 0

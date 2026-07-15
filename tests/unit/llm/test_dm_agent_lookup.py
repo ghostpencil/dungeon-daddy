@@ -126,3 +126,57 @@ def test_respond_without_lookup_uses_complete_even_if_tools_supported() -> None:
     assert out == "plain narration"
     assert provider.round_calls == []
     assert provider.complete_calls == 1
+
+
+@dataclass
+class _PlainProvider:
+    """A provider from before the tool era — no ``complete_round``, no
+    ``supports_tools``. `AnthropicProvider` is exactly this shape (spec §9
+    defers its tool support)."""
+
+    complete_response: str = "plain narration"
+    complete_calls: int = 0
+
+    def complete(self, messages, system="", max_tokens=1024, response_format=None):  # type: ignore[no-untyped-def]
+        self.complete_calls += 1
+        return self.complete_response
+
+    @property
+    def model_id(self) -> str:
+        return "plain"
+
+
+def test_respond_falls_back_to_complete_when_provider_lacks_tool_support() -> None:
+    """The `supports_tools` guard is load-bearing (Slice B4 review fix).
+
+    Both coordinators inject `lookup` whenever a repo exists — they do not check
+    the provider. So this guard is the only thing standing between a non-tool
+    provider and an `AttributeError` on *every* narration turn.
+    """
+    provider = _PlainProvider()
+    agent = DungeonMasterAgent(provider)  # type: ignore[arg-type]
+
+    out = agent.respond(
+        history=[LLMMessage(role="user", content="who is mira?")],
+        room=_room(), level=_level(), dungeon=_dungeon(),
+        lookup=lambda call: "rows: mira-coldwell",
+    )
+
+    assert out == "plain narration"
+    assert provider.complete_calls == 1
+
+
+def test_respond_falls_back_to_complete_when_tools_unsupported() -> None:
+    # The capability is declared but false — the tool loop must stay off.
+    provider = _ToolProvider(complete_response="plain narration", supports_tools=False)
+    agent = DungeonMasterAgent(provider)
+
+    out = agent.respond(
+        history=[LLMMessage(role="user", content="who is mira?")],
+        room=_room(), level=_level(), dungeon=_dungeon(),
+        lookup=lambda call: "rows: mira-coldwell",
+    )
+
+    assert out == "plain narration"
+    assert provider.round_calls == []
+    assert provider.complete_calls == 1

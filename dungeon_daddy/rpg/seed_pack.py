@@ -284,6 +284,14 @@ def apply_seed_pack(
 
     repo.initialize_schema(migrations_dir)
 
+    # Rooms are written unconditionally, exactly like the actors/clocks below:
+    # this is the full-apply primitive and has no `force`/skip contract (that
+    # lives in `campaign/seeder.py::seed_from_manifest` and
+    # `tools/seed_rpg_state.py`, the two paths a *reseed* actually goes
+    # through). It has no production caller — tools and tests only — and only
+    # touches rooms when a caller passes `levels`, so it cannot clobber the
+    # populate scripts' authored `tags`/`quest_role`. Reviewers read the
+    # missing guard here as the B0 data-loss bug; it isn't the same path.
     rooms_applied = 0
     if levels is not None:
         for room_state in build_room_states(levels, campaign_id):

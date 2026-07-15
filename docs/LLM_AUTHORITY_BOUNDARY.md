@@ -109,19 +109,30 @@ The `lookup_world` tool (Phase 51.8 Phase B) is the one such tool today. It lets
 initiate a mid-turn search of campaign entities and memories by name, id, or tag. It is safe by
 construction:
 
-- **The executor is read-only.** It holds a `LookupService`
-  (`memory/lookup.py`) whose only public method is `lookup(...)`; the service exposes no write
-  method and wraps `MemoryRepository.search_entities` (a read). There is no path from the tool to
-  a mutation.
-- **The LLM never sees SQL.** It sends a query / tags / entity-type filter; the executor performs
-  the search and returns formatted rows.
+- **The executor is read-only by construction.** `build_lookup_executor` types its dependency as
+  the `_Lookup` Protocol (`llm/lookup_tool.py`), whose only member is `lookup(...)` — the executor
+  *structurally cannot see* a write method. The `LookupService` it is handed
+  (`memory/lookup.py`) likewise exposes only `lookup(...)`, wrapping
+  `MemoryRepository.search_entities` (a read).
+  *Precisely:* the service still holds a full read/write `MemoryRepository` at `self._repo`, so
+  "no write path" is enforced at the executor boundary and by convention within the service —
+  adding a write method to `LookupService` would compile. Narrowing its constructor to a
+  search-only Protocol would close that; see PROJECT_INDEX deferred items.
+- **The LLM never composes or names SQL.** It sends a query / tags / entity-type filter; the
+  executor performs the search and returns formatted rows. LLM-supplied input never reaches SQL
+  text — the statements are fixed, the table list is a closed allowlist (`_ENTITY_SOURCES`), and
+  values are bound parameters, so there is no injection surface. Failures are caught and returned
+  as a **generic** message (`memory/lookup.py::_LOOKUP_FAILED_MESSAGE`) because a raw DuckDB error
+  quotes the failing statement, and tool errors are fed straight back to the model.
 - **A lookup is data, never a proposal.** Its result is not gated by `validate_proposal` — there is
   nothing to validate or apply, because nothing is being changed. Anything the model then wants to
   *do* with what it read still flows through the normal proposal → validate → apply path above.
 
-The rule for adding future tools: a read tool must remain read-only by construction (a façade with
-no write method), and its results must never be treated as authoritative state without going
-through the proposal seam.
+The rule for adding future tools: a read tool must remain read-only by construction — type the
+executor's dependency as a Protocol exposing only the read it needs, rather than handing it a
+repository and trusting the next editor. Its results must never be treated as authoritative state
+without going through the proposal seam, and errors returned to the model must not carry engine
+internals.
 
 ## Validation examples
 

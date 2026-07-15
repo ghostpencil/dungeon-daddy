@@ -43,8 +43,8 @@ class _EntitySource(NamedTuple):
     snippet_col: str | None
 
 
-# Order = default result order before ranking. Tables are added one at a time
-# as their behavior is covered (tracer-bullet TDD).
+# Order = default result order before ranking (the stable sort in
+# `search_entities` depends on it).
 _ENTITY_SOURCES: list[_EntitySource] = [
     _EntitySource("actor", "actors", "actor_id", "slug", "display_name", "room_id", "status", None),
     _EntitySource("object", "room_objects", "object_id", "slug", "display_name", "room_id", "current_state", "description"),
@@ -118,9 +118,14 @@ class MemoryRepository:
         self._conn: duckdb.DuckDBPyConnection | None = duckdb.connect(str(db_path))
         self._in_transaction = False
         # L5 (spec §10): `search_entities` runs from the narrator worker thread
-        # while the main thread may use the shared connection. Guard those reads
-        # with this lock and run them on a dedicated cursor so concurrent
-        # `execute`/`fetch` calls never interleave on the connection object.
+        # while the main thread may use the shared connection. Two mechanisms,
+        # two jobs — do not conflate them:
+        #   - the dedicated `self._conn.cursor()` in `search_entities` is what
+        #     keeps a worker read from interleaving with MAIN-THREAD use of the
+        #     connection. This lock cannot do that: no other method acquires it.
+        #   - this lock serializes concurrent worker lookups against EACH OTHER.
+        # Deleting either one leaves a real race; both are pinned by
+        # tests/unit/memory/test_search_entities_concurrency.py.
         self._read_lock = threading.Lock()
 
     def health_check(self) -> bool:
@@ -1751,7 +1756,9 @@ class MemoryRepository:
         Unions the taggable DuckDB entity tables, matching a case-insensitive
         substring `query` on slug/display_name and/or exact membership in `tags`
         (OR semantics). Returns normalized rows
-        `{entity_type, id, slug, display_name, room_id, tags, snippet}`.
+        `{entity_type, id, slug, display_name, room_id, status, tags, snippet}`
+        — `status` included per the owner ruling of 2026-07-12 so the narrator
+        can tell a live entity from a defunct one.
         """
         assert self._conn is not None
         if not query and not tags:
@@ -1805,9 +1812,9 @@ class MemoryRepository:
                 )
             )
 
-        # L5 (spec §10): serialize the worker-thread reads and run them on a
-        # dedicated cursor so they never interleave with main-thread use of the
-        # shared connection.
+        # L5 (spec §10): the cursor isolates this read from main-thread use of
+        # the shared connection; the lock serializes it against other worker
+        # lookups. See `__init__` — the two are not interchangeable.
         with self._read_lock:
             cursor = self._conn.cursor()
             for src in _ENTITY_SOURCES:

@@ -6,9 +6,12 @@ here, written once, so no agent reimplements it.
 """
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 
 from .provider import LLMMessage, LLMProvider, LLMToolCall, LLMToolDef
+
+_log = logging.getLogger(__name__)
 
 
 def run_tool_loop(
@@ -62,8 +65,10 @@ def _run_executor(
 ) -> str:
     """Run one tool call, returning its output. A raised exception is returned
     to the model as an error string rather than propagated (L4: tool errors
-    never raise through the turn)."""
+    never raise through the turn) — and logged, because L4 keeps the error from
+    killing the turn, not from being seen."""
     try:
         return executor(call)
-    except Exception as exc:  # noqa: BLE001 — surfaced to the model, not swallowed
+    except Exception as exc:  # noqa: BLE001 — returned to the model AND logged
+        _log.exception("tool %r failed: args=%r", call.name, call.arguments)
         return f"Error: {exc}"
