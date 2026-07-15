@@ -297,12 +297,36 @@ provenance loop — the first GUI-visible surface of the whole Phase B arc.
 
 ---
 
-### ▶ PICK UP HERE NEXT SESSION — Phase B is feature-complete + proven; landing the arc
+### ▶ PICK UP HERE NEXT SESSION — Phase B is done + owner GUI-verified; **only the PR remains**
 
-**State:** branch `feat/phase-51.8-narrator-lookup`, **working tree clean**, 6 commits ahead — `c7bdc5c` (B4e/B4f) →
+**State:** branch `feat/phase-51.8-narrator-lookup`, **working tree clean**, 7 commits ahead — `c7bdc5c` (B4e/B4f) →
 `d3497ff` (B4e review fixes) → `4677989` + `09d9f2d` (index) → `1839a58` (**B5 live eval**) → `b17a4a0` (**B4e review
-sweep**). Full suite **3820 passed** (8 eval deselected), ruff + mypy(strict, 172) clean. **B0–B5 are all COMPLETE and
-the arc is proven end-to-end.** Only PR + owner GUI-verify remain.
+sweep**) → index. Full suite **3820 passed** (8 eval deselected), ruff + mypy(strict, 172) clean. **B0–B5 are all
+COMPLETE, proven end-to-end, and owner GUI-verified.** The only step left is the PR (+ reconciling docs PR #91).
+
+**✅ Owner GUI-verified on the live Crucible (2026-07-15).** Phase B's narrator lookup confirmed working in-app from the
+DBG tab. **No reseed or data surgery was needed** — see the corrected live-save note below.
+
+**⚠️ Corrected a stale hand-off warning (2026-07-15).** Previous index revisions warned that the live Crucible save
+"already has exits → `backfill` skips → **no `rooms` records**" and needed a manual reseed before `lookup_world` could
+find rooms. **That was false at the time it was written** — the 2026-07-11 B0 GUI-verify session had *already* planted
+them. Verified directly against the live DB before the verify: **19 rooms present, 11 lore-tagged, 8 approved memories**
+— i.e. exactly the B0 block's own result. The warning had been carried forward without reconciling against the B0 block
+two screens above it, which contradicted it. **Lesson for future hand-offs: when two blocks disagree about live data,
+read the database, not the index.**
+
+**Live-save facts confirmed by direct inspection (2026-07-15), useful for any future verify:**
+- Save at `C:\Users\ljfan\AppData\Local\DungeonDaddy\saves\The Crucible` ([[reference_local_saves_dir]]); campaign id
+  `campaign:the-crucible`; party at **R1 (Receiving Hall)** per `session.json`; Scorpion Swarm present.
+- **The app runs `gpt-4o`** (`window.py::_DEFAULT_OPENAI_MODEL`, override `DUNGEON_DADDY_MODEL`) — **the same model the
+  B5 eval runs on** (`openai_provider.DEFAULT_OPENAI_MODEL`), so the eval's end-to-end proof covers the real app path.
+  The app wires `ObservingProvider(OpenAIProvider(...))`, and B2's wrapper forwards `supports_tools`/`complete_round`,
+  so the tool is genuinely live in-app.
+- **Offline bundle probe at R1** (real `ContextBundleBuilder` against a *copy* of the live DB — read-only, never the
+  original): in-context = 4 memory cards + 2 related lore, 21 entity ids. Out-of-scene lookup demos that work:
+  **"Pinion, the Caretaker Cog"** (NPC in **R3, Cargo Bay** → 1 hit, 0 overlap) and **"The Prime Golem"** (2 hits, 0
+  overlap — one of them a **`room` row**, so it exercises B0's rooms-as-first-class). Reliable **`[REDIRECT]`** queries
+  (every hit already in context): `scorpion swarm`, `receiving hall`, `power core mission`, `golems rebelled`.
 
 **✅ Slice B5 — live eval: COMPLETE (`1839a58`, 2026-07-15).** `tests/evals/test_narrator_lookup_evals.py`, 2 tests,
 `-m eval`, green on **4 consecutive live runs**; correctly deselected from the default suite.
@@ -342,17 +366,16 @@ findings were real and are fixed; **the fourth was not a defect.**
    *(Still a known gap if the DBG tab ever gets harness coverage — the natural time to pin both render lines at once.)*
 2. **Sweep the 4 low findings — yes**, done above.
 
-**Then, in order:**
-1. **PR the Phase B arc.** Also **merge/close the superseded docs PR #91** (see the Phase-A block above — this branch's
-   index update is the fuller one; reconcile on rebase).
-2. **Owner GUI-verify on the live Crucible.** ⚠ The live save **already has exits → `backfill` skips → no `rooms`
-   records** (the A6 live-data pattern), so it needs a **manual reseed** before `lookup_world` can find rooms; see the
-   Slice B0 GUI-verify recipe above for the exact one-off (`initialize_schema` → `seed_from_manifest(dungeon=…)` → L1/L2
-   `save_room_tags`). Take a timestamped `campaign.duckdb.bak-*` backup and close the app first (DuckDB write lock).
-   **What to look for in the DBG tab:** a lookup line only on turns that actually looked something up (the panel now
-   clears each turn); `[REDIRECT]` when the narrator re-asks for something already in its context.
+**All that remains:**
+1. **PR the Phase B arc** (B0–B5 + the B4e sweep). Also **merge/close the superseded docs PR #91** (see the Phase-A
+   block above — this branch's index update is the fuller one; reconcile on rebase). ⚠ **Owner decision on #91 still
+   open.**
 
-**Deferred/optional, not blocking:** the Phase A deferred items + the tag-hygiene data pass (both below).
+**Deferred/optional, not blocking:** the Phase A deferred items + the tag-hygiene data pass (both below). Two carried
+Phase-B notes worth folding into a future cleanup: (a) `_collect_anchor_tags` (`memory/context_bundle.py`) still does
+**not** read the `rooms` table, so a room's own `tags`/`quest_role` don't drive the T7 pre-fetch (B0 note, unchanged);
+(b) `views/play_view.py`'s `lookup_section_lines()` render line stays **unpinned** per the A6 precedent (owner ruling
+2026-07-15) — the natural time to pin it is whenever the DBG tab gets harness coverage.
 
 ---
 
