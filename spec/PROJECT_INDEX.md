@@ -266,7 +266,7 @@ provenance loop — the first GUI-visible surface of the whole Phase B arc.
   the B4e plan above had called for UI-harness tests (`spec/UI_TESTING.md`).
 
 **✅ B4e `/code-review high` (8 angles, 2026-07-15) — 7 findings; the 3 substantive ones fixed on owner ruling
-(TDD, RED first; +5 tests, full suite green 3817, ruff + mypy(strict, 172) clean).** Committed `<pending>`.
+(TDD, RED first; +5 tests, full suite green 3817, ruff + mypy(strict, 172) clean).** Committed `d3497ff`.
 - **Fixed (real observability bug) — the panel never cleared.** `poll()` forwarded lookups only when the list was
   non-empty, so after any lookup, every later lookup-free turn (the *common* case — most turns call no tool) kept
   rendering the stale record, reading as provenance for the current narration. Now forwarded **unconditionally**; an
