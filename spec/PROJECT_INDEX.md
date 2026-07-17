@@ -4,8 +4,9 @@
 
 **STABILIZATION / cleanup.** All feature phases through **51.8** are complete and merged to `main`. The
 owner-decided cleanup slice (2026-07-17) is underway on branch `chore/cleanup-51-8-hardening`:
-**items 1–5 are DONE** (commit `09af3b8`, same day — see START HERE); items 6–11 plus the deferred pile
-remain. Phase 52 (Milestone Advancement) and Phase 53 (Monster Reactions) stay deferred behind the cleanup.
+**items 1–5 are DONE** (commit `09af3b8`) and **item 7 is DONE** (commit `1515b0d`, same day — see START
+HERE); items 6, 8–11 plus the deferred pile remain. Phase 52 (Milestone Advancement) and Phase 53 (Monster
+Reactions) stay deferred behind the cleanup.
 
 Recently merged (newest first — full detail in the Phase History table + each `spec/PHASE_*.md`, and git):
 
@@ -32,7 +33,7 @@ Recently merged (newest first — full detail in the Phase History table + each 
 ## START HERE — Cleanup Slice (OWNER-DECIDED 2026-07-17)
 
 The deferred pile grew big enough across Phases A + B to justify a slice of its own. Work happens on
-`chore/cleanup-51-8-hardening` (branched off `main` 2026-07-17). **Next slice up: items 6–11 below**
+`chore/cleanup-51-8-hardening` (branched off `main` 2026-07-17). **Next slice up: items 6, 8–11 below**
 (confirm scope with the owner; the list is a menu, not a mandate).
 
 **✅ DONE — items 1–5 (commit `09af3b8`, 2026-07-17, TDD + code-reviewed):**
@@ -53,6 +54,19 @@ The deferred pile grew big enough across Phases A + B to justify a slice of its 
    `tools/llm_cost_report.py`), and a telemetry write error is swallowed+logged on the failure path so it
    cannot mask the in-flight `LLMError`.
 
+**✅ DONE — item 7 (commit `1515b0d`, 2026-07-17, TDD + code-reviewed):**
+7. ~~`bundle_entity_ids` gaps~~ — the overlap set now also collects the party's own PC ids
+   (`mechanical_state` keys) and the ids of the gear they carry (`inventory` kits/dungeon_items/equipped),
+   so a `lookup_world` for a PC or a held item is finally flagged redundant. To keep the L7 redirect honest
+   (every collected id MUST be readable in the prompt), `build_prompt` gained `# Party` (PC names) and
+   `# Inventory` (item `name: description`) sections; `_fetch_inventory` carries `item_id` + `description`
+   on every view-model and `_fetch_mechanical_state` carries the PC `display_name`. Owner chose "Option B"
+   (render party+inventory into the live narrator prompt) over holding the item. The slice review's one
+   MEDIUM was fixed in-slice: rendering item **descriptions** (the snippet a lookup returns), so a redirected
+   carried-item lookup no longer withholds them. Part (b) landed as a real-bundle coupling test
+   (`test_collects_every_id_from_a_real_context_bundle`) — a real `ContextBundleBuilder` over a seeded repo,
+   so a key rename in `build_room_noun_context`/`_fetch_*` fails the suite instead of silently breaking L7.
+
 **Deferred from the items 1–5 slice review (2026-07-17):**
 - **`ObservingProvider.stream` failure telemetry** — still records only on successful exhaustion; a
   mid-stream raise leaves no record (same class of gap item 5 fixed for the other two methods; needs a
@@ -67,9 +81,7 @@ The deferred pile grew big enough across Phases A + B to justify a slice of its 
 **Remaining cleanup backlog (from the Phase B whole-arc review):**
 6. **Wrap the B5 eval fixture in `ObservingProvider`** — it builds a bare `OpenAIProvider`, but production
    wires `ObservingProvider(OpenAIProvider(...))`; wrapping the fixture drives the true production stack for ~free.
-7. **`bundle_entity_ids` gaps** — omits the party's own actor + inventory ids (a PC lookup is never flagged
-   redundant), and it's pinned against a hand-written dict, not a real `ContextBundleBuilder` output (rename
-   a key in `build_room_noun_context` and L7 dies silently, suite green).
+7. ~~**`bundle_entity_ids` gaps**~~ — DONE (`1515b0d`); see the item-7 DONE block above.
 8. **`campaign_id` fallback divergence** — `narration.py`'s `campaign_id or state.dungeon_id` vs
    `dialogue.py`'s `active_campaign()` disagree about a missing id; neither pinned; the narration path would
    run `WHERE campaign_id = NULL` → 0 hits, no error.
@@ -154,8 +166,8 @@ The LLM may propose. The engine disposes.
 
 ## Known Failures
 
-**None.** Full unit/integration suite green (**3861 passed**, 8 eval deselected; ruff + mypy(strict, 172)
-clean as of cleanup items 1–5, `09af3b8`). Evals are excluded from the default run (`addopts = "-m 'not eval'"`;
+**None.** Full unit/integration suite green (**3872 passed**, 8 eval deselected; ruff + mypy(strict, 172)
+clean as of cleanup item 7, `1515b0d`). Evals are excluded from the default run (`addopts = "-m 'not eval'"`;
 run with `pytest -m eval` — live API, paid, non-deterministic).
 
 ---
