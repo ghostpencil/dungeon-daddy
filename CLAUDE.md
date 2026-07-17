@@ -23,6 +23,8 @@ Load other files only when needed.
 The development process (phases → slices → TDD, owner halt points, the Gate) is defined
 in `spec/SDLC.md`. Session commands that drive it:
 
+- `/plan-phase` — plan the next phase (requirements interrogation + adversarial gap
+  analysis, then a build-ready spec with slices)
 - `/next-slice` — start a slice in a fresh session (orient, confirm scope, branch, TDD)
 - `/end-slice` — close a slice (gate, code review, commit, PROJECT_INDEX, then `/clear`)
 - `/end-phase` — close a phase (gate, owner UI review, PR, whole-arc review, merge)

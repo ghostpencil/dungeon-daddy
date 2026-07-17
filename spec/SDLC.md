@@ -53,11 +53,21 @@ gate failures surface at edit time rather than at slice end.
 
 ## Phase start
 
-1. Owner states phase scope *(halt 1)*.
-2. Phase plan written to `spec/PHASE_NN_*.md`: goal, slices in dependency order, exit
-   criteria per slice, non-goals. Owner approves the slice breakdown.
-3. Branch `feat/phase-NN-<slug>` created off `main`.
-4. `spec/PROJECT_INDEX.md` updated: phase status BUILD, pointer to the spec.
+Run `/plan-phase` at a phase boundary (after `/end-phase` post-merge bookkeeping, or when
+`/next-slice` finds nothing to slice):
+
+1. Candidate phases presented with a recommendation; owner picks the scope *(halt 1)*.
+2. Requirements interview in rounds (≤4 questions each) until a round surfaces nothing
+   new, then an adversarial gap analysis (transcript walk, authority sweep, cross-system
+   sweep, persistence/live-save sweep, testability sweep, contradiction sweep,
+   minimal-version attack). Every gap becomes a question or a numbered decision — never
+   an assumption.
+3. Spec written to `spec/PHASE_NN_*.md` only once open questions are resolved: goal,
+   numbered owner decisions, behaviors, non-goals, authority boundary, data/migration
+   impact, UI surface + UI-review checklist, slices with exit criteria, risks.
+4. Owner approves the decisions + slice breakdown *(same halt, second checkpoint)*.
+5. Branch `feat/phase-NN-<slug>` created off `main`; `spec/PROJECT_INDEX.md` flipped to
+   BUILD with the spec pointer; docs committed. Then `/clear` and `/next-slice`.
 
 ## Slice loop (repeat per slice)
 

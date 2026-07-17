@@ -182,9 +182,9 @@ intimacy-tick source · D6 the `dungeon_intimacy` clock is a latching tier index
 
 ## Notes
 
-- **SDLC formalized (2026-07-17):** process in `spec/SDLC.md`; session commands `/next-slice`,
-  `/end-slice`, `/end-phase` in `.claude/commands/`; blocking ruff+mypy PostToolUse hook in
-  `.claude/settings.json`.
+- **SDLC formalized (2026-07-17):** process in `spec/SDLC.md`; session commands `/plan-phase`,
+  `/next-slice`, `/end-slice`, `/end-phase` in `.claude/commands/`; blocking ruff+mypy
+  PostToolUse hook in `.claude/settings.json`.
 - Provider: OpenAI (`gpt-4o`); `OPENAI_API_KEY` must be set.
 - Phase specs: current/future in `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`; index at
   `spec/IMPLEMENTATION_PHASES.md`. Spec-loading rules and skills: `CLAUDE.md` (canonical).
