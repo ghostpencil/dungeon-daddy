@@ -73,9 +73,14 @@ def seed_from_manifest(
     for room_object in manifest.room_objects:
         _seed_room_object(room_object, repo, campaign_id, slug, result, dry_run=dry_run, force=force)
 
-    _seed_rooms(repo, campaign_id, result, dry_run=dry_run, force=force, dungeon=dungeon)
-
+    # Exits seed before rooms: exits are the load-critical projection (the Play
+    # EXITS panel, navigation, and the whole point of ``backfill_exits_if_empty``),
+    # while ``_seed_rooms`` is Slice-B0 enrichment groundwork. Under backfill's
+    # blanket ``except`` a rooms-seed raise would otherwise silently take exit
+    # seeding down with it, loading a save with zero exits. Keep this order.
     _seed_exits(manifest, repo, campaign_id, slug, result, dry_run=dry_run, force=force, dungeon=dungeon)
+
+    _seed_rooms(repo, campaign_id, result, dry_run=dry_run, force=force, dungeon=dungeon)
 
     return result
 
