@@ -4,6 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from dungeon_daddy.memory.tags import validate_tag
+
 ClockCategory = Literal[
     "objective",
     "relationship",
@@ -423,6 +425,13 @@ class RoomState(BaseModel):
     markdown_path: str | None = None
     checksum: str | None = None
     tags: list[str] = Field(default_factory=list)
+
+    @field_validator("tags")
+    @classmethod
+    def tags_are_canonical(cls, v: list[str]) -> list[str]:
+        for tag in v:
+            validate_tag(tag)
+        return v
 
 
 class ObjectiveCompletion(BaseModel):
