@@ -68,12 +68,13 @@ def _coord(
     mem_repo: MemoryRepository | None,
     agent,  # type: ignore[no-untyped-def]
     on_lookups=None,  # type: ignore[no-untyped-def]
+    campaign_id: str | None = "camp-1",
 ) -> NarrationCoordinator:
     session = PlaySessionContext(
         dungeon=_dungeon(),
         state=SessionState(dungeon_id="d", current_level_idx=0, current_room_id="1-A"),
         mem_repo=mem_repo,
-        campaign_id="camp-1",
+        campaign_id=campaign_id,
     )
     return NarrationCoordinator(
         session,
@@ -112,6 +113,26 @@ def test_spawn_passes_working_lookup_executor_to_agent() -> None:
 def test_lookup_is_none_without_repo() -> None:
     agent = _StubAgent()
     coord = _coord(None, agent)
+
+    room = _dungeon().levels[0].rooms[0]
+    level = _dungeon().levels[0]
+    coord.spawn_dm_thread(room, level)
+    assert coord.active_thread is not None
+    coord.active_thread.join(timeout=5.0)
+
+    assert agent.calls[0]["lookup"] is None
+
+
+def test_lookup_is_none_without_active_campaign() -> None:
+    # Cleanup item 8: a repo present but no campaign_id means no active campaign.
+    # Narration must treat that as inactive (no lookup seam) — matching
+    # DialogueCoordinator's ``active_campaign()`` gate — not silently scope the
+    # LookupService to ``state.dungeon_id`` (a dungeon id, wrong namespace) and
+    # return an executor that queries a campaign that isn't there.
+    repo = MemoryRepository(db_path=Path(":memory:"))
+    repo.initialize_schema(MIGRATIONS_DIR)
+    agent = _StubAgent()
+    coord = _coord(repo, agent, campaign_id=None)
 
     room = _dungeon().levels[0].rooms[0]
     level = _dungeon().levels[0]

@@ -120,7 +120,11 @@ def _make_view(tmp_path: Path, with_rpg: bool = True):
     view._mem_repo = mem_repo if with_rpg else None
     view._rpg_service = MagicMock() if with_rpg else None
     view._rpg_debug = MagicMock() if with_rpg else None
-    view._rpg_campaign_id = None
+    # Repo and campaign id are set together in production (window._attach_rpg_context):
+    # an attached repo *is* an active campaign. Pin that co-presence here so the
+    # narration path's active_campaign() gate resolves — the fixture must not lean
+    # on the retired ``campaign_id or dungeon_id`` fallback (cleanup item 8).
+    view._rpg_campaign_id = "camp-1" if with_rpg else None
     return view, room, level
 
 

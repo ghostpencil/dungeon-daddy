@@ -68,11 +68,20 @@ class _Ports:
         return self.remember_map.get(text, (None, text))
 
 
-def _make(*, agent=None, repo=None, rpg_service=None, current_room_id="1-A"):
+def _make(
+    *,
+    agent=None,
+    repo=None,
+    rpg_service=None,
+    current_room_id="1-A",
+    mem_repo=None,
+    campaign_id="camp-1",
+):
     session = PlaySessionContext(
         dungeon=_dungeon(),
         state=SessionState(dungeon_id="d", current_level_idx=0, current_room_id=current_room_id),
-        campaign_id="camp-1",
+        mem_repo=mem_repo,
+        campaign_id=campaign_id,
     )
     ports = _Ports()
     coord = NarrationCoordinator(
@@ -220,6 +229,26 @@ def test_spawn_dm_thread_without_agent_queues_error() -> None:
 
 def test_build_context_bundle_none_without_rpg_service() -> None:
     coord, _session, _ports = _make(rpg_service=None)
+    assert coord.build_context_bundle() is None
+
+
+def test_build_context_bundle_none_without_active_campaign() -> None:
+    # Cleanup item 8: with the RPG service and repo present but no campaign_id,
+    # there is no active campaign. Narration must return None (inactive) rather
+    # than scope the bundle to ``state.dungeon_id`` (a dungeon id, wrong
+    # namespace) and silently build a bundle for a campaign that isn't there.
+    from pathlib import Path
+
+    from dungeon_daddy.memory.repository import MemoryRepository
+
+    migrations = (
+        Path(__file__).resolve().parents[3] / "dungeon_daddy" / "data" / "migrations"
+    )
+    repo = MemoryRepository(db_path=Path(":memory:"))
+    repo.initialize_schema(migrations)
+    coord, _session, _ports = _make(
+        rpg_service=object(), mem_repo=repo, campaign_id=None
+    )
     assert coord.build_context_bundle() is None
 
 
