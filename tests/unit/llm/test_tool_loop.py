@@ -275,3 +275,33 @@ def test_max_rounds_below_one_still_makes_one_provider_call() -> None:
     assert result == "answer"
     assert len(provider.calls) == 1
     assert provider.calls[0].tools is None  # clamped to a single forced-plain round
+
+
+def test_hallucinated_tool_name_never_reaches_the_executor() -> None:
+    """Cleanup item 4 (Phase B review): every call went to the single executor,
+    so a hallucinated tool name silently executed lookup_world — latent the
+    moment a second tool exists."""
+    provider = _FakeProvider(
+        scripted=[
+            LLMRoundResult(
+                tool_calls=[LLMToolCall(call_id="c1", name="delete_world", arguments={})]
+            ),
+            LLMRoundResult(text="recovered"),
+        ]
+    )
+    executor_calls: list[LLMToolCall] = []
+
+    result = run_tool_loop(
+        provider,
+        messages=[LLMMessage(role="user", content="q")],
+        system="sys",
+        tools=[_TOOL],
+        executor=lambda c: executor_calls.append(c) or "rows",
+    )
+
+    assert result == "recovered"
+    assert executor_calls == []  # the unknown tool was never executed
+    tool_msg = [m for m in provider.calls[1].messages if m.role == "tool"][0]
+    assert tool_msg.tool_call_id == "c1"  # the model still gets a result message
+    assert tool_msg.content.startswith("Error")
+    assert "delete_world" in tool_msg.content

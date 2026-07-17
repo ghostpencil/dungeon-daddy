@@ -8,7 +8,12 @@ from dungeon_daddy.data.models import Dungeon, Level, Loop, Room
 from dungeon_daddy.llm.context_builder import ContextBuilder
 from dungeon_daddy.llm.lookup_tool import LOOKUP_WORLD_TOOL
 from dungeon_daddy.llm.prompts import load_prompt
-from dungeon_daddy.llm.provider import LLMMessage, LLMProvider, LLMToolCall
+from dungeon_daddy.llm.provider import (
+    LLMMessage,
+    LLMProvider,
+    LLMToolCall,
+    provider_supports_tools,
+)
 from dungeon_daddy.llm.tool_loop import run_tool_loop
 
 if TYPE_CHECKING:
@@ -141,12 +146,13 @@ class DungeonMasterAgent:
             doc_context = self._context_builder.build_system_prompt(dungeon, level_id=level_id)
             if doc_context:
                 system = doc_context + "\n\n" + system
-        if lookup is not None and getattr(self._provider, "supports_tools", False):
+        provider = self._provider
+        if lookup is not None and provider_supports_tools(provider):
             # Escalation path (§9/§10): the agent owns the request→tool→request
             # loop; the provider is pure transport. Guidance restates the §6
             # "when to look things up" contract only when the tool is live.
             return run_tool_loop(
-                self._provider,
+                provider,
                 history,
                 system + _LOOKUP_GUIDANCE,
                 tools=[LOOKUP_WORLD_TOOL],

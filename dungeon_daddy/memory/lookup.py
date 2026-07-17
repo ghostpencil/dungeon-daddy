@@ -1,19 +1,46 @@
 """Read-only lookup façade for the narrator `lookup_world` tool.
 
-Phase 51.8 Slice B1 (spec §7/§8). `LookupService` wraps
-`MemoryRepository.search_entities` and formats its rows into a compact,
-budget-bounded tool result. It exposes **no write method** — the tool executor
-that holds it is read-only by construction (spec §8).
+Phase 51.8 Slice B1 (spec §7/§8). `LookupService` wraps an `EntitySearch`
+provider (`MemoryRepository.search_entities` in production) and formats its
+rows into a compact, budget-bounded tool result. It exposes **no write
+method** and holds only the search seam — the tool executor that holds it is
+read-only by construction (spec §8).
 """
 from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import NotRequired, Protocol, TypedDict, runtime_checkable
 
-from dungeon_daddy.memory.repository import MemoryRepository
+from dungeon_daddy.memory.models import EntityRow
 
 _log = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class EntitySearch(Protocol):
+    """The search-only slice of ``MemoryRepository`` that ``LookupService``
+    depends on. Holding this instead of the repository makes the spec §8
+    read-only claim compiler-enforced: a write call on ``self._repo`` would
+    not type-check."""
+
+    def search_entities(
+        self,
+        campaign_id: str,
+        query: str | None = None,
+        tags: list[str] | None = None,
+        entity_types: list[str] | None = None,
+        limit: int = 8,
+    ) -> list[EntityRow]: ...
+
+
+class LookupResult(TypedDict):
+    """The `lookup_world` tool-result envelope ``LookupService.lookup``
+    returns; ``error`` is present only when the search failed (spec §13 L4)."""
+
+    results: list[EntityRow]
+    omitted: int
+    error: NotRequired[str]
 
 # What the model is told when the search itself broke. Deliberately carries no
 # detail: the string becomes a tool result, and a raw DuckDB message quotes the
@@ -31,7 +58,7 @@ _SNIPPET_MAX = 200
 _RESULT_TOKEN_BUDGET = 1200
 
 
-def _row_tokens(row: dict[str, Any]) -> int:
+def _row_tokens(row: EntityRow) -> int:
     return len(json.dumps(row, ensure_ascii=False)) // 4
 
 
@@ -42,7 +69,7 @@ def _truncate_snippet(text: str) -> str:
 
 
 class LookupService:
-    def __init__(self, repo: MemoryRepository, campaign_id: str) -> None:
+    def __init__(self, repo: EntitySearch, campaign_id: str) -> None:
         self._repo = repo
         self._campaign_id = campaign_id
 
@@ -52,7 +79,7 @@ class LookupService:
         tags: list[str] | None = None,
         entity_types: list[str] | None = None,
         limit: int = 8,
-    ) -> dict[str, Any]:
+    ) -> LookupResult:
         """Return `{results: [compact rows], omitted: N}` for the tool.
 
         `results` are ranked `search_entities` rows with snippets truncated;
@@ -80,7 +107,7 @@ class LookupService:
             )
             return {"results": [], "omitted": 0, "error": _LOOKUP_FAILED_MESSAGE}
 
-        results: list[dict[str, Any]] = []
+        results: list[EntityRow] = []
         used = 0
         for i, row in enumerate(rows):
             compact = self._compact(row)
@@ -94,5 +121,7 @@ class LookupService:
         return {"results": results, "omitted": 0}
 
     @staticmethod
-    def _compact(row: dict[str, Any]) -> dict[str, Any]:
-        return {**row, "snippet": _truncate_snippet(row["snippet"])}
+    def _compact(row: EntityRow) -> EntityRow:
+        compact = row.copy()
+        compact["snippet"] = _truncate_snippet(row["snippet"])
+        return compact

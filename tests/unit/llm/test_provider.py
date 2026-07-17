@@ -204,3 +204,60 @@ def test_anthropic_provider_accepts_response_format_without_error(mocker):
     assert result == "ok"
     _, kwargs = mock_client.messages.create.call_args
     assert "response_format" not in kwargs
+
+
+# ---------------------------------------------------------------------------
+# Cleanup item 2 (Phase B review) — protocol split: LLMProvider is the base
+# transport; tool capability lives in the separate ToolCapableProvider seam.
+# ---------------------------------------------------------------------------
+
+def test_anthropic_provider_satisfies_the_base_provider_protocol(mocker):
+    # The base Protocol had quietly stopped admitting AnthropicProvider by
+    # mandating complete_round/supports_tools that call sites getattr-detect.
+    mocker.patch("anthropic.Anthropic")
+    from dungeon_daddy.llm.anthropic_provider import AnthropicProvider
+    from dungeon_daddy.llm.provider import LLMProvider
+    assert isinstance(AnthropicProvider(api_key="fake"), LLMProvider)
+
+
+def test_openai_provider_is_tool_capable(mocker):
+    mocker.patch("openai.OpenAI")
+    from dungeon_daddy.llm.openai_provider import OpenAIProvider
+    from dungeon_daddy.llm.provider import LLMProvider, ToolCapableProvider
+    p = OpenAIProvider(api_key="fake")
+    assert isinstance(p, LLMProvider)
+    assert isinstance(p, ToolCapableProvider)
+
+
+def test_anthropic_provider_is_not_tool_capable(mocker):
+    mocker.patch("anthropic.Anthropic")
+    from dungeon_daddy.llm.anthropic_provider import AnthropicProvider
+    from dungeon_daddy.llm.provider import ToolCapableProvider
+    assert not isinstance(AnthropicProvider(api_key="fake"), ToolCapableProvider)
+
+
+def test_anthropic_provider_last_usage_is_none(mocker):
+    mocker.patch("anthropic.Anthropic")
+    from dungeon_daddy.llm.anthropic_provider import AnthropicProvider
+    assert AnthropicProvider(api_key="fake").last_usage is None
+
+
+def test_provider_supports_tools_helper_is_the_single_capability_gate(mocker):
+    # One spelling of "is this provider tool-capable?" shared by the agents
+    # and ObservingProvider, instead of three hand-rolled isinstance gates.
+    mocker.patch("openai.OpenAI")
+    mocker.patch("anthropic.Anthropic")
+    from dungeon_daddy.llm.anthropic_provider import AnthropicProvider
+    from dungeon_daddy.llm.openai_provider import OpenAIProvider
+    from dungeon_daddy.llm.provider import provider_supports_tools
+
+    assert provider_supports_tools(OpenAIProvider(api_key="fake")) is True
+    assert provider_supports_tools(AnthropicProvider(api_key="fake")) is False
+
+    class _Refusing:  # tool transport present but capability switched off
+        supports_tools = False
+
+        def complete_round(self, messages, system="", tools=None, max_tokens=1024):  # type: ignore[no-untyped-def]
+            raise AssertionError("must not be called")
+
+    assert provider_supports_tools(_Refusing()) is False

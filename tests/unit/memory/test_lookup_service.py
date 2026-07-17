@@ -117,6 +117,38 @@ class TestLookupServiceErrors:
         assert "query" in result["error"]
 
 
+class _SearchOnly:
+    """The smallest object satisfying the search seam: `search_entities` and
+    nothing else — no write methods, no repository machinery."""
+
+    def search_entities(
+        self,
+        campaign_id: str,
+        query: str | None = None,
+        tags: list[str] | None = None,
+        entity_types: list[str] | None = None,
+        limit: int = 8,
+    ) -> list[dict[str, Any]]:
+        return []
+
+
+class TestLookupServiceCtorSeam:
+    """Cleanup item 1 (Phase B review): "read-only by construction" (spec §8)
+    must be compiler-enforced. The ctor's seam is the search-only
+    `EntitySearch` Protocol, so a write method on the service could not even
+    type-check — the write-capable repository is only one possible provider."""
+
+    def test_real_repository_satisfies_the_search_seam(self, tmp_path: Path) -> None:
+        from dungeon_daddy.memory.lookup import EntitySearch
+
+        repo = MemoryRepository(db_path=tmp_path / "t.duckdb")
+        assert isinstance(repo, EntitySearch)
+
+    def test_a_search_only_object_is_a_complete_dependency(self) -> None:
+        service = LookupService(_SearchOnly(), "camp-A")
+        assert service.lookup(query="mira") == {"results": [], "omitted": 0}
+
+
 class _ExplodingRepo:
     """A repo whose search raises the way DuckDB does — with the SQL in the
     message. Real repos can't be made to fail this way on demand."""
@@ -136,7 +168,7 @@ class TestLookupServiceInfrastructureErrors:
     became an unlogged `Error: ...` string with no LookupRecord behind it."""
 
     def test_infrastructure_error_is_returned_as_data(self) -> None:
-        service = LookupService(_ExplodingRepo(), "camp-A")  # type: ignore[arg-type]
+        service = LookupService(_ExplodingRepo(), "camp-A")
         result = service.lookup(query="mira")
         assert result["results"] == []
         assert result["error"]
@@ -145,7 +177,7 @@ class TestLookupServiceInfrastructureErrors:
         # docs/LLM_AUTHORITY_BOUNDARY.md promises "the LLM never sees SQL".
         # The error string is fed straight back as a tool result, so a raw
         # DuckDB message would break that promise.
-        service = LookupService(_ExplodingRepo(), "camp-A")  # type: ignore[arg-type]
+        service = LookupService(_ExplodingRepo(), "camp-A")
         error = service.lookup(query="mira")["error"]
         assert "SELECT" not in error
         assert "FROM rooms" not in error
@@ -156,7 +188,7 @@ class TestLookupServiceInfrastructureErrors:
     ) -> None:
         # The model gets a generic string; the developer must still get the
         # real cause, or the failure is invisible everywhere.
-        service = LookupService(_ExplodingRepo(), "camp-A")  # type: ignore[arg-type]
+        service = LookupService(_ExplodingRepo(), "camp-A")
         with caplog.at_level(logging.ERROR):
             service.lookup(query="mira")
         assert "rooms does not exist" in caplog.text

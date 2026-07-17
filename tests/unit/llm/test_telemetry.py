@@ -329,3 +329,95 @@ def test_build_agents_wraps_each_agent_with_observing_provider(monkeypatch, tmp_
 
     agent_names = [call.kwargs["agent"] for call in MockObserving.call_args_list]
     assert set(agent_names) == {"wizard", "generator", "design"}
+
+
+# ---------------------------------------------------------------------------
+# Cleanup item 2: tool capability is isinstance-detected (ToolCapableProvider)
+# ---------------------------------------------------------------------------
+
+def test_observing_provider_complete_round_on_toolless_inner_raises_llm_error(tmp_path):
+    # Callers gate on supports_tools; if one slips through anyway it must get
+    # the provider-contract exception, not an AttributeError.
+    import pytest
+
+    from dungeon_daddy.llm.provider import LLMError, LLMMessage
+    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
+
+    class _NoTools:
+        model_id = "x"
+        last_usage = None
+
+    op = ObservingProvider(_NoTools(), agent="dm", writer=TelemetryWriter(tmp_path / "f.jsonl"))
+    with pytest.raises(LLMError, match="tool"):
+        op.complete_round([LLMMessage(role="user", content="hi")])
+
+
+# ---------------------------------------------------------------------------
+# Cleanup item 5: a failed call still writes its telemetry record — failing
+# turns must not be invisible in the data used to spot them.
+# ---------------------------------------------------------------------------
+
+def test_observing_provider_complete_round_records_a_failed_call(mocker, tmp_path):
+    import pytest
+
+    from dungeon_daddy.llm.provider import LLMError, LLMMessage
+    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
+
+    inner = _make_mock_provider(mocker)
+    inner.complete_round.side_effect = LLMError("rate limited")
+    log_file = tmp_path / "llm_calls.jsonl"
+    op = ObservingProvider(inner, agent="dm", writer=TelemetryWriter(log_file))
+
+    with pytest.raises(LLMError, match="rate limited"):
+        op.complete_round([LLMMessage(role="user", content="hi")])
+
+    lines = log_file.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    rec = json.loads(lines[0])
+    assert rec["agent"] == "dm"
+    # The inner provider's last_usage is stale on failure (it only updates on
+    # success) — the mock still reports (10, 5). Recording those would
+    # double-count the previous call's tokens in the cost report.
+    assert rec["prompt_tokens"] == 0
+    assert rec["completion_tokens"] == 0
+
+
+def test_observing_provider_complete_records_a_failed_call(mocker, tmp_path):
+    import pytest
+
+    from dungeon_daddy.llm.provider import LLMError, LLMMessage
+    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
+
+    inner = _make_mock_provider(mocker)
+    inner.complete.side_effect = LLMError("rate limited")
+    log_file = tmp_path / "llm_calls.jsonl"
+    op = ObservingProvider(inner, agent="wizard", writer=TelemetryWriter(log_file))
+
+    with pytest.raises(LLMError, match="rate limited"):
+        op.complete([LLMMessage(role="user", content="hi")])
+
+    lines = log_file.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    rec = json.loads(lines[0])
+    assert rec["agent"] == "wizard"
+    assert rec["prompt_tokens"] == 0  # stale last_usage must not be recorded
+    assert rec["completion_tokens"] == 0
+
+
+def test_telemetry_write_failure_does_not_mask_the_provider_error(mocker, tmp_path):
+    # An OSError raised while recording the failure must not replace the
+    # in-flight LLMError — callers would see a telemetry I/O message instead
+    # of the real cause (e.g. a rate limit).
+    import pytest
+
+    from dungeon_daddy.llm.provider import LLMError, LLMMessage
+    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
+
+    inner = _make_mock_provider(mocker)
+    inner.complete.side_effect = LLMError("rate limited")
+    writer = TelemetryWriter(tmp_path / "f.jsonl")
+    mocker.patch.object(writer, "record", side_effect=OSError("disk full"))
+    op = ObservingProvider(inner, agent="dm", writer=writer)
+
+    with pytest.raises(LLMError, match="rate limited"):
+        op.complete([LLMMessage(role="user", content="hi")])

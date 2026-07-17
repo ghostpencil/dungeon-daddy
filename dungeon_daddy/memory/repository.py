@@ -9,7 +9,7 @@ from typing import Any, NamedTuple
 
 import duckdb
 
-from dungeon_daddy.memory.models import DomainEvent
+from dungeon_daddy.memory.models import DomainEvent, EntityRow
 from dungeon_daddy.rpg.models import (
     ActorAbility,
     FactionState,
@@ -1750,15 +1750,14 @@ class MemoryRepository:
         tags: list[str] | None = None,
         entity_types: list[str] | None = None,
         limit: int = 8,
-    ) -> list[dict[str, Any]]:
+    ) -> list[EntityRow]:
         """Search the campaign's entity tables for `lookup_world` (spec §7/§7.1).
 
         Unions the taggable DuckDB entity tables, matching a case-insensitive
         substring `query` on slug/display_name and/or exact membership in `tags`
-        (OR semantics). Returns normalized rows
-        `{entity_type, id, slug, display_name, room_id, status, tags, snippet}`
-        — `status` included per the owner ruling of 2026-07-12 so the narrator
-        can tell a live entity from a defunct one.
+        (OR semantics). Returns normalized `EntityRow` rows — `status` included
+        per the owner ruling of 2026-07-12 so the narrator can tell a live
+        entity from a defunct one.
         """
         assert self._conn is not None
         if not query and not tags:
@@ -1777,7 +1776,7 @@ class MemoryRepository:
         # sort is stable: non-memory entities are appended first, memories are
         # pre-sorted by importance DESC / recency DESC before appending, so a
         # tie preserves entity-before-memory order and intra-memory importance.
-        scored: list[tuple[tuple[int, int], dict[str, Any]]] = []
+        scored: list[tuple[tuple[int, int], EntityRow]] = []
 
         def _consider(
             entity_type: str,

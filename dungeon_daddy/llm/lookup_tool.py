@@ -17,11 +17,12 @@ import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from .provider import LLMToolCall, LLMToolDef
 
 if TYPE_CHECKING:
+    from dungeon_daddy.memory.lookup import LookupResult
     from dungeon_daddy.memory.models import ContextBundle
 
 _log = logging.getLogger(__name__)
@@ -180,7 +181,7 @@ class _Lookup(Protocol):
         tags: list[str] | None = None,
         entity_types: list[str] | None = None,
         limit: int = 8,
-    ) -> dict[str, Any]: ...
+    ) -> LookupResult: ...
 
 
 def build_lookup_executor(
