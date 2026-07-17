@@ -4,9 +4,9 @@
 
 **STABILIZATION / cleanup.** All feature phases through **51.8** are complete and merged to `main`. The
 owner-decided cleanup slice (2026-07-17) is underway on branch `chore/cleanup-51-8-hardening`:
-**items 1–5 are DONE** (commit `09af3b8`) and **item 7 is DONE** (commit `1515b0d`, same day — see START
-HERE); items 6, 8–11 plus the deferred pile remain. Phase 52 (Milestone Advancement) and Phase 53 (Monster
-Reactions) stay deferred behind the cleanup.
+**items 1–5 are DONE** (commit `09af3b8`), **item 7 is DONE** (commit `1515b0d`), and **item 8 is DONE**
+(commit `1c1acd3`, same day — see START HERE); items 6, 9–11 plus the deferred pile remain. Phase 52
+(Milestone Advancement) and Phase 53 (Monster Reactions) stay deferred behind the cleanup.
 
 Recently merged (newest first — full detail in the Phase History table + each `spec/PHASE_*.md`, and git):
 
@@ -33,7 +33,7 @@ Recently merged (newest first — full detail in the Phase History table + each 
 ## START HERE — Cleanup Slice (OWNER-DECIDED 2026-07-17)
 
 The deferred pile grew big enough across Phases A + B to justify a slice of its own. Work happens on
-`chore/cleanup-51-8-hardening` (branched off `main` 2026-07-17). **Next slice up: items 6, 8–11 below**
+`chore/cleanup-51-8-hardening` (branched off `main` 2026-07-17). **Next slice up: items 6, 9–11 below**
 (confirm scope with the owner; the list is a menu, not a mandate).
 
 **✅ DONE — items 1–5 (commit `09af3b8`, 2026-07-17, TDD + code-reviewed):**
@@ -67,6 +67,27 @@ The deferred pile grew big enough across Phases A + B to justify a slice of its 
    (`test_collects_every_id_from_a_real_context_bundle`) — a real `ContextBundleBuilder` over a seeded repo,
    so a key rename in `build_room_noun_context`/`_fetch_*` fails the suite instead of silently breaking L7.
 
+**✅ DONE — item 8 (commit `1c1acd3`, 2026-07-17, TDD + code-reviewed):**
+8. ~~`campaign_id` fallback divergence~~ — `NarrationCoordinator.build_context_bundle` and
+   `_build_lookup_executor` resolved `campaign_id or state.dungeon_id`, but both guard on the repo first
+   and `campaign_id`/`mem_repo` are always set together in production (`window._attach_rpg_context`), so
+   the `or state.dungeon_id` branch was dead code that would silently query `WHERE campaign_id = <dungeon
+   id>` (wrong namespace) → 0 hits if the co-presence invariant ever broke, while `dialogue.py` treated a
+   missing campaign as inactive via `active_campaign()`. Both narration sites now converge on the
+   `active_campaign()` seam (missing id → inactive, return `None`); pinned by
+   `test_lookup_is_none_without_active_campaign` + `test_build_context_bundle_none_without_active_campaign`.
+   The `test_play_view_bundle._make_view` fixture was leaning on the retired fallback (repo set,
+   `campaign_id` None, `dungeon_id == "camp-1"`); it now sets repo + campaign id together as prod does.
+
+**Deferred from the item-8 slice review (2026-07-17, both LOW cleanup):**
+- **Local imports in the new narration test** — `test_build_context_bundle_none_without_active_campaign`
+  re-imports `Path`/`MemoryRepository` inside the function; the sibling `test_narration_lookup.py` has them
+  at module top. Lift to a module-level `MIGRATIONS_DIR` if a second repo-based test lands here.
+- **Now-defensive `state` guard in narration's `_build_lookup_executor`** — after the convergence `state`
+  is referenced only in its own `None`-guard (its `dungeon_id` use is gone); `spawn_dm_thread` already
+  asserts state non-None, and dialogue's converged twin gates on `active_campaign()` alone. Harmless;
+  preserves the documented "or no session state" contract.
+
 **Deferred from the items 1–5 slice review (2026-07-17):**
 - **`ObservingProvider.stream` failure telemetry** — still records only on successful exhaustion; a
   mid-stream raise leaves no record (same class of gap item 5 fixed for the other two methods; needs a
@@ -82,9 +103,7 @@ The deferred pile grew big enough across Phases A + B to justify a slice of its 
 6. **Wrap the B5 eval fixture in `ObservingProvider`** — it builds a bare `OpenAIProvider`, but production
    wires `ObservingProvider(OpenAIProvider(...))`; wrapping the fixture drives the true production stack for ~free.
 7. ~~**`bundle_entity_ids` gaps**~~ — DONE (`1515b0d`); see the item-7 DONE block above.
-8. **`campaign_id` fallback divergence** — `narration.py`'s `campaign_id or state.dungeon_id` vs
-   `dialogue.py`'s `active_campaign()` disagree about a missing id; neither pinned; the narration path would
-   run `WHERE campaign_id = NULL` → 0 hits, no error.
+8. ~~**`campaign_id` fallback divergence**~~ — DONE (`1c1acd3`); see the item-8 DONE block above.
 9. **Rooms-seed raise takes exit backfill down with it** — `_seed_rooms` runs before `_seed_exits` in
    `seed_from_manifest`, wrapped in `backfill_exits_if_empty`'s swallow → a save loads with zero exits + one
    log line. Untested.
@@ -166,8 +185,8 @@ The LLM may propose. The engine disposes.
 
 ## Known Failures
 
-**None.** Full unit/integration suite green (**3872 passed**, 8 eval deselected; ruff + mypy(strict, 172)
-clean as of cleanup item 7, `1515b0d`). Evals are excluded from the default run (`addopts = "-m 'not eval'"`;
+**None.** Full unit/integration suite green (**3874 passed**, 8 eval deselected; ruff + mypy(strict, 172)
+clean as of cleanup item 8, `1c1acd3`). Evals are excluded from the default run (`addopts = "-m 'not eval'"`;
 run with `pytest -m eval` — live API, paid, non-deterministic).
 
 ---
