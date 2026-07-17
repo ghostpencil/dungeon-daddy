@@ -5,10 +5,11 @@
 **STABILIZATION / cleanup.** All feature phases through **51.8** are complete and merged to `main`. The
 owner-decided cleanup slice (2026-07-17) is underway on branch `chore/cleanup-51-8-hardening`:
 **items 1–5 are DONE** (commit `09af3b8`), **item 6 is DONE** (commit `b400e9f`), **item 7 is DONE**
-(commit `1515b0d`), **item 8 is DONE** (commit `1c1acd3`), **item 9 is DONE** (commit `b09ba02`), and
-**item 10 is DONE** (commit `e9e742c`, all same day — see START HERE); **item 11** plus the deferred
-pile remain. Phase 52 (Milestone Advancement) and Phase 53 (Monster Reactions) stay deferred behind
-the cleanup.
+(commit `1515b0d`), **item 8 is DONE** (commit `1c1acd3`), **item 9 is DONE** (commit `b09ba02`),
+**item 10 is DONE** (commit `e9e742c`), and **item 11 is DONE** (commit `0ea0e2b`, all same day — see
+START HERE). **The numbered cleanup backlog (items 1–11) is now complete**; only the deferred pile
+remains. Phase 52 (Milestone Advancement) and Phase 53 (Monster Reactions) stay deferred behind the
+cleanup.
 
 Recently merged (newest first — full detail in the Phase History table + each `spec/PHASE_*.md`, and git):
 
@@ -35,8 +36,9 @@ Recently merged (newest first — full detail in the Phase History table + each 
 ## START HERE — Cleanup Slice (OWNER-DECIDED 2026-07-17)
 
 The deferred pile grew big enough across Phases A + B to justify a slice of its own. Work happens on
-`chore/cleanup-51-8-hardening` (branched off `main` 2026-07-17). **Next slice up: item 11 below**
-(confirm scope with the owner; the list is a menu, not a mandate).
+`chore/cleanup-51-8-hardening` (branched off `main` 2026-07-17). **The numbered backlog (items 1–11) is
+DONE.** Next slice up: pick from the **deferred pile** below (or run `/end-phase` to PR + merge the
+cleanup branch — confirm with the owner; the list is a menu, not a mandate).
 
 **✅ DONE — items 1–5 (commit `09af3b8`, 2026-07-17, TDD + code-reviewed):**
 1. ~~`LookupService` → search-only Protocol ctor~~ — ctor now takes the public, runtime-checkable
@@ -120,6 +122,30 @@ The deferred pile grew big enough across Phases A + B to justify a slice of its 
    `complete_round`, so `dm_agent.respond`'s `provider_supports_tools` gate still fires the lookup loop).
    Slice review found one LOW cosmetic nit (below); no correctness findings.
 
+**✅ DONE — item 11 (commit `0ea0e2b`, 2026-07-17, TDD + code-reviewed):**
+11. ~~Test-seam tightenings~~ — three independent sub-parts (owner chose all three as one cohesive slice):
+    **(11.1)** `test_dialogue_lookup.py::test_lookup_is_none_without_active_campaign` now drives the public
+    `send_dungeon_line` seam (asserting the agent is handed `lookup=None`), mirroring the narration-side
+    twin, instead of asserting on the private `_build_lookup_executor`. **(11.2)** a real latent robustness
+    fix: `controller.py::_set_debug_bundle` read `self._host._rpg_debug` directly, crashing with
+    `AttributeError` on a `__new__`-built host — the exact fragility B4e fixed in its sibling
+    `_set_debug_lookups`; now guards with `getattr(self._host, "_rpg_debug", None)` (it fires from
+    `on_bundle_built` during narration). Pinned by `test_set_debug_bundle_noop_on_new_built_host` (RED
+    confirmed the crash) + a route-through test. **(11.3)** the ~15-line room skip/force projection block,
+    duplicated in `campaign/seeder.py::_seed_rooms` and `tools/seed_rpg_state.py`, is lifted into
+    `rpg/seed_pack.py::seed_room_projection` (the `enrich_room_tags` precedent), with a `_RoomSeedCounts`
+    Protocol so the one helper serves both seeders' distinct `SeedResult` types; both call sites delegate,
+    each keeping its own dry-run handling (seeder has a dry-run branch; seed_rpg_state returns early on
+    dry-run, so the projection is write-path-only). Three helper tests pin
+    insert / plain-reseed-skip-preserves-authored / force-refresh-preserves-authored. Slice review found
+    one LOW cosmetic nit (below); no correctness findings.
+
+**Deferred from the item-11 slice review (2026-07-17, LOW cosmetic):**
+- **`seed_room_projection` is typed against the module-private `_RoomSeedCounts` Protocol** — a public
+  helper annotated with a leading-underscore Protocol. Cosmetic API-surface consistency only: both current
+  callers pass a structurally-matching `SeedResult` and typecheck fine. Promote to public only if a
+  cross-package caller ever needs to type its own counter against the contract.
+
 **Deferred from the item-6 slice review (2026-07-17, LOW cosmetic):**
 - **Eval telemetry uses a generic `agent="eval"` label** — production tags per-agent (`dm`/`generator`/
   `design`); the eval fixture records everything as `"eval"`. Cosmetic only: the telemetry sink is a
@@ -162,9 +188,7 @@ The deferred pile grew big enough across Phases A + B to justify a slice of its 
 8. ~~**`campaign_id` fallback divergence**~~ — DONE (`1c1acd3`); see the item-8 DONE block above.
 9. ~~**Rooms-seed raise takes exit backfill down with it**~~ — DONE (`b09ba02`); see the item-9 DONE block above.
 10. ~~**`field_validator("tags")` on `RoomState`**~~ — DONE (`e9e742c`); see the item-10 DONE block above.
-11. **Test-seam tightenings** — `test_dialogue_lookup.py` tests a private method where narration drives the
-    public seam; `_set_debug_bundle` (`controller.py:519`) has the latent `__new__` fragility B4e fixed in
-    its sibling; `seeder.py`/`seed_rpg_state.py` duplicate the ~15-line skip/force block (lift to a helper).
+11. ~~**Test-seam tightenings**~~ — DONE (`0ea0e2b`); see the item-11 DONE block above.
 
 **Design question surfaced (owner-facing, not pure cleanup — flag before touching):**
 - **The DM `lookup_world` path is model-driven only.** There is **no free-form DM chat in regular rooms**
@@ -238,8 +262,8 @@ The LLM may propose. The engine disposes.
 
 ## Known Failures
 
-**None.** Full unit/integration suite green (**3879 passed**, 8 eval deselected; ruff + mypy(strict, 172)
-clean as of cleanup item 6, `b400e9f`). Evals are excluded from the default run (`addopts = "-m 'not eval'"`;
+**None.** Full unit/integration suite green (**3884 passed**, 8 eval deselected; ruff + mypy(strict, 172)
+clean as of cleanup item 11, `0ea0e2b`). Evals are excluded from the default run (`addopts = "-m 'not eval'"`;
 run with `pytest -m eval` — live API, paid, non-deterministic).
 
 ---
