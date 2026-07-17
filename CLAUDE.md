@@ -18,6 +18,20 @@ Load other files only when needed.
 
 ---
 
+# SDLC
+
+The development process (phases → slices → TDD, owner halt points, the Gate) is defined
+in `spec/SDLC.md`. Session commands that drive it:
+
+- `/next-slice` — start a slice in a fresh session (orient, confirm scope, branch, TDD)
+- `/end-slice` — close a slice (gate, code review, commit, PROJECT_INDEX, then `/clear`)
+- `/end-phase` — close a phase (gate, owner UI review, PR, whole-arc review, merge)
+
+A PostToolUse hook (`.claude/settings.json`) runs ruff + mypy on every edited `.py` file;
+its feedback is blocking — fix it before moving on.
+
+---
+
 # Phase Discipline
 
 Phase and status are in PROJECT_INDEX.md.

@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "f=$(python -c \"import sys,json;print(json.load(sys.stdin).get('tool_input',{}).get('file_path') or '')\" 2>/dev/null); case \"$f\" in *.py) ;; *) exit 0 ;; esac; [ -f \"$f\" ] || exit 0; cd \"$CLAUDE_PROJECT_DIR\" || exit 0; r=$(python -m ruff check \"$f\" 2>&1); rc=$?; m=\"\"; mrc=0; case \"$f\" in *dungeon_daddy*) m=$(python -m mypy \"$f\" 2>&1); mrc=$? ;; esac; if [ $rc -ne 0 ] || [ $mrc -ne 0 ]; then { echo \"$r\"; echo \"$m\"; } >&2; exit 2; fi",
+            "timeout": 120,
+            "statusMessage": "ruff + mypy on edited file"
+          }
+        ]
+      }
+    ]
+  }
+}
