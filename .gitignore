@@ -10,6 +10,9 @@ backup/
 # Generated layout feedback reports
 test_outputs/
 
+# CodeGraph index — local, rebuilt from the source tree
+.codegraph/
+
 # Python
 __pycache__/
 *.pyc

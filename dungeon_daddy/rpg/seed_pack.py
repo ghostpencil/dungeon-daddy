@@ -12,7 +12,9 @@ from pydantic import BaseModel, Field, model_validator
 from dungeon_daddy.memory.tags import validate_tag
 
 if TYPE_CHECKING:
+    from dungeon_daddy.data.models import Level, Room
     from dungeon_daddy.memory.repository import MemoryRepository
+    from dungeon_daddy.rpg.models import RoomState
 
 
 def _append_trait_tags(existing: list[str], raws: Iterable[str]) -> list[str]:
@@ -165,12 +167,106 @@ def derive_memory_id(campaign_slug: str, memory_title: str) -> str:
     return str(uuid.uuid5(_MEMORY_NS, f"{campaign_slug}:{memory_title}"))
 
 
+def _room_slug(room: Room) -> str:
+    """Slugify a room's name for its ``slug`` field, falling back to the grid
+    id when the room has no name."""
+    slug = room.name.lower().replace(" ", "-").replace("'", "").replace(",", "")
+    return slug or room.id
+
+
+def build_room_states(
+    levels: list[Level],
+    campaign_id: str,
+    *,
+    quest_roles: dict[str, str] | None = None,
+    room_tags: dict[str, list[str]] | None = None,
+) -> list[RoomState]:
+    """Project a dungeon's rooms into first-class :class:`RoomState` records
+    (Phase 51.8 Slice B0, spec §7.1).
+
+    Geometry stays in the dungeon JSON; this builds only the campaign-facing
+    searchable fields. ``level_id`` uses the ``level:<n>`` form (matching
+    ``room_objects``/``items``); ``summary`` is sourced from ``Room.note``.
+
+    ``quest_role`` defaults to the dungeon room's ``main_loop_role`` (the room's
+    role in the quest layout — ``entry``/``goal``/``obstacle``/…), and an entry
+    in ``quest_roles`` (``room_id`` → role) overrides it (owner ruling
+    2026-07-11: hybrid — derive from ``main_loop_role``, authored override wins).
+    ``tags`` are authored: ``room_tags`` maps ``room_id`` → its namespaced tags
+    (each validated via :func:`validate_tag`); rooms carry no tags in the
+    dungeon JSON.
+    """
+    from dungeon_daddy.rpg.models import RoomState
+
+    quest_roles = quest_roles or {}
+    room_tags = room_tags or {}
+
+    # Guard (spec §7.1): an override keyed to a room-id absent from the dungeon
+    # model is a silent typo that would never apply — fail loudly instead.
+    known_room_ids = {room.id for level in levels for room in level.rooms}
+    unknown = (set(quest_roles) | set(room_tags)) - known_room_ids
+    if unknown:
+        raise ValueError(
+            "Room override references room ids absent from the dungeon model: "
+            f"{sorted(unknown)} (known room ids: {sorted(known_room_ids)})"
+        )
+
+    rooms: list[RoomState] = []
+    for level in levels:
+        level_id = f"level:{level.id}"
+        for room in level.rooms:
+            tags = [validate_tag(t) for t in room_tags.get(room.id, [])]
+            rooms.append(RoomState(
+                room_id=room.id,
+                campaign_id=campaign_id,
+                level_id=level_id,
+                slug=_room_slug(room),
+                display_name=room.name,
+                room_type=room.type,
+                summary=room.note,
+                quest_role=quest_roles.get(room.id, room.main_loop_role),
+                tags=tags,
+            ))
+    return rooms
+
+
+def enrich_room_tags(
+    repo: MemoryRepository,
+    campaign_id: str,
+    room_tags: dict[str, list[str]],
+) -> int:
+    """Merge authored lore tags into already-seeded room records (idempotent;
+    Slice B0 §7.1).
+
+    Reads each existing room, adds the validated ``room_tags`` (de-duplicated,
+    order-preserving), and re-saves — preserving the base seed's ``summary`` and
+    ``quest_role``. A room the seed path has not planted yet is skipped with a
+    warning (the seed is the source of the base record). Returns the number of
+    rooms enriched. Shared by the Crucible populate scripts so the merge/skip
+    semantics live in one place.
+    """
+    from dungeon_daddy.rpg.models import RoomState
+
+    enriched = 0
+    for room_id, tags in room_tags.items():
+        row = repo.get_room(campaign_id, room_id)
+        if row is None:
+            print(f"  ⚠ room {room_id} not seeded — run the seed first; skipping tags")
+            continue
+        validated = [validate_tag(t) for t in tags]
+        merged = list(dict.fromkeys([*row["tags"], *validated]))
+        repo.save_room(RoomState(**row).model_copy(update={"tags": merged}))
+        enriched += 1
+    return enriched
+
+
 @dataclasses.dataclass
 class ApplyResult:
     actors_applied: int
     clocks_applied: int
     memories_applied: int
     factions_applied: int = 0
+    rooms_applied: int = 0
 
 
 def apply_seed_pack(
@@ -179,6 +275,7 @@ def apply_seed_pack(
     repo: MemoryRepository,
     migrations_dir: Path,
     valid_room_ids: set[str] | None = None,
+    levels: list[Level] | None = None,
 ) -> ApplyResult:
     from dungeon_daddy.memory.repository import MemoryRepository as _Repo  # noqa: F401
 
@@ -186,6 +283,20 @@ def apply_seed_pack(
         validate_seed_room_ids(pack, valid_room_ids)
 
     repo.initialize_schema(migrations_dir)
+
+    # Rooms are written unconditionally, exactly like the actors/clocks below:
+    # this is the full-apply primitive and has no `force`/skip contract (that
+    # lives in `campaign/seeder.py::seed_from_manifest` and
+    # `tools/seed_rpg_state.py`, the two paths a *reseed* actually goes
+    # through). It has no production caller — tools and tests only — and only
+    # touches rooms when a caller passes `levels`, so it cannot clobber the
+    # populate scripts' authored `tags`/`quest_role`. Reviewers read the
+    # missing guard here as the B0 data-loss bug; it isn't the same path.
+    rooms_applied = 0
+    if levels is not None:
+        for room_state in build_room_states(levels, campaign_id):
+            repo.save_room(room_state)
+            rooms_applied += 1
 
     all_actors = pack.player_side.actors + pack.dungeon_side.actors
     for actor in all_actors:
@@ -270,4 +381,5 @@ def apply_seed_pack(
         clocks_applied=len(pack.clocks),
         memories_applied=len(pack.memories),
         factions_applied=factions_applied,
+        rooms_applied=rooms_applied,
     )

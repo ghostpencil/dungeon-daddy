@@ -16,6 +16,7 @@ from dungeon_daddy.rpg.models import (
 from dungeon_daddy.rpg.service import RpgService
 
 if TYPE_CHECKING:
+    from dungeon_daddy.llm.lookup_tool import LookupRecord
     from dungeon_daddy.memory.sync import SyncIssue, SyncReporter
     from dungeon_daddy.rpg.proposal_applier import ApplyResult
     from dungeon_daddy.rpg.proposal_validator import ValidationResult
@@ -37,6 +38,7 @@ class DebugControls:
         self._last_sync_issues: list[SyncIssue] | None = None
         self._last_memory_note: MemoryEntry | None = None
         self._last_bundle: ContextBundle | None = None
+        self._last_lookups: list[LookupRecord] = []
         self._last_reaction: WorldReaction | None = None
         self._last_validation: ValidationResult | None = None
         self._last_apply_result: ApplyResult | None = None
@@ -106,6 +108,41 @@ class DebugControls:
             )
             for card in b.related_lore:
                 lines.append(f"  - {card['title']} [lore]")
+        return lines
+
+    def set_lookups(self, records: list[LookupRecord]) -> None:
+        # Copy: `records` is the LLM worker thread's own accumulator, so holding
+        # the reference would let a later append mutate what the panel renders.
+        self._last_lookups = list(records)
+
+    def lookup_section_lines(self) -> list[str]:
+        # Slice B4e (L6): surface each narrator `lookup_world` call (query/tags,
+        # hit count, trimmed/errored, redundant/redirected) so an off-scene
+        # lookup is observable. Cleared each turn, so an empty section means
+        # *this* narration looked nothing up (not that it never has).
+        if not self._last_lookups:
+            return ["No lookups this turn"]
+        lines = [f"World lookups: {len(self._last_lookups)}"]
+        for rec in self._last_lookups:
+            # A falsy query is one `search_entities` itself ignores, so it truly
+            # ran as a tags-only search — label it for what it did.
+            subject = rec.query or "(tags only)"
+            tag_part = f" [{','.join(rec.tags)}]" if rec.tags else ""
+            type_part = f" <{','.join(rec.entity_types)}>" if rec.entity_types else ""
+            subject = f"{subject}{tag_part}{type_part}"
+            if rec.error:
+                lines.append(f"  - {subject} → ERROR: {rec.error}")
+                continue
+            if rec.redirected:
+                flag = "  [REDIRECT]"
+            elif rec.overlap_count:
+                flag = f"  [redundant {rec.overlap_count}/{rec.hit_count}]"
+            else:
+                flag = ""
+            trim_part = f"  ({rec.omitted} trimmed)" if rec.omitted else ""
+            lines.append(
+                f"  - {subject} → {rec.hit_count} hit(s){trim_part}{flag}"
+            )
         return lines
 
     def clock_section_lines(self) -> list[str]:

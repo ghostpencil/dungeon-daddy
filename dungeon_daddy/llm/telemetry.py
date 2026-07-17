@@ -9,7 +9,12 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from dungeon_daddy.llm.provider import LLMMessage, LLMProvider
+from dungeon_daddy.llm.provider import (
+    LLMMessage,
+    LLMProvider,
+    LLMRoundResult,
+    LLMToolDef,
+)
 
 
 @dataclass
@@ -61,6 +66,10 @@ class ObservingProvider:
     def last_usage(self) -> tuple[int, int] | None:
         return self._inner.last_usage
 
+    @property
+    def supports_tools(self) -> bool:
+        return bool(getattr(self._inner, "supports_tools", False))
+
     def complete(
         self,
         messages: list[LLMMessage],
@@ -71,6 +80,21 @@ class ObservingProvider:
         t0 = time.monotonic()
         result: str = self._inner.complete(
             messages, system=system, max_tokens=max_tokens, response_format=response_format
+        )
+        duration_ms = (time.monotonic() - t0) * 1000
+        self._write_record(duration_ms)
+        return result
+
+    def complete_round(
+        self,
+        messages: list[LLMMessage],
+        system: str = "",
+        tools: list[LLMToolDef] | None = None,
+        max_tokens: int = 1024,
+    ) -> LLMRoundResult:
+        t0 = time.monotonic()
+        result = self._inner.complete_round(
+            messages, system=system, tools=tools, max_tokens=max_tokens
         )
         duration_ms = (time.monotonic() - t0) * 1000
         self._write_record(duration_ms)

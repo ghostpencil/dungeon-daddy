@@ -30,13 +30,45 @@ Slice 1 fixed the non-atomic world-reaction write; the WRP "all three call sites
 was corrected (owner ruling 2026-07-05, `spec/WORLD_REACTION_POLICY.md` §7). Spec + slice plan:
 `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`.
 
+Phase **51.8 Phase A — Tag Hygiene: COMPLETE & merged to `main`** (PR #90, merge commit `6c899cc`,
+merged 2026-07-11; owner GUI-verified). Namespaced tag taxonomy (`memory/tags.py`; migrations
+`020`/`021`), seed + Crucible-world tagging, tag-based scene-scoped retrieval, write-side scene tagging,
+and the T7 `# Related Lore` pre-fetch. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
+
+Phase **51.8 Phase B — Narrator Lookup Tool: COMPLETE, owner GUI-verified, PR #92 OPEN — whole-arc review DONE
+2026-07-15 (5 agents), review fixes applied incl. one CRITICAL L7 bug; needs push + GUI re-verify + merge**
+(https://github.com/ghostpencil/dungeon-daddy/pull/92 · branch `feat/phase-51.8-narrator-lookup` → `main`).
+Decisions ratified; rooms elevated to a first-class campaign entity (`rooms` table). Slice B0 **persistence +
+seed path both COMPLETE, committed (`24375b0` + `b15602e`), and owner GUI-verified on the live Crucible
+(2026-07-11)** — every dungeon room is projected into a `rooms` record across all seeders (incl. the app's
+`seed_from_manifest`), with hybrid `quest_role` (derive from `main_loop_role`, authored override wins) and
+Crucible lore-tag enrichment. **Slice B1 (`search_entities` + `LookupService`) COMPLETE, committed
+(`1af065e` + owner-ruling docs `419c8bb`, 2026-07-12)** — the read-only narrator-lookup backend. **Slice B2
+(provider transport) COMPLETE, committed (`2a01c58`, 2026-07-12; TDD, full suite green 3772, ruff + mypy(strict)
+clean)** — `complete_round` tool-use round on the provider seam. **Slice B3 (`run_tool_loop` helper) COMPLETE, committed
+(`91ffafa`, 2026-07-12; TDD, full suite green 3779, ruff + mypy(strict, 171) clean)** — the agent-owned tool loop.
+**Slice B4a–d (agent integration) COMPLETE, committed (`9afce53`, 2026-07-13; TDD, +23 tests, llm+play+memory sweep green
+696, ruff + mypy(strict) clean)** — the `lookup_world` tool wired end-to-end (tool def + executor with L7/L6, both agent
+seams, both coordinator worker-thread wirings behind the L5 read lock). **Slice B4e (L6 debug-panel line) + B4f (the
+carried `LLM_AUTHORITY_BOUNDARY.md` read-tools note) COMPLETE, committed (`c7bdc5c` + review fixes `d3497ff`, 2026-07-15;
+TDD, +18 tests, full suite green 3817, ruff + mypy(strict, 172) clean)** — every narrator lookup now renders in the
+Play-mode DBG tab, the **first GUI-visible surface of the whole Phase B arc**. **Slice B5 (live eval) COMPLETE, committed
+(`1839a58`, 2026-07-15)** — `lookup_world` is now **proven end-to-end against a real tool-calling provider**, the last
+unknown in the arc. **The B4e review sweep is COMPLETE (`b17a4a0`)**; full suite green 3820, ruff + mypy(strict, 172)
+clean. **B0–B5 are all done.** The **whole-arc PR review (2026-07-15, 5 parallel agents) then found the L7
+redirect bug that per-slice review structurally could not catch** — `bundle_entity_ids` treated the whole
+ContextBundle as the model's context while `build_prompt` rendered only a subset, so a lookup for a monster
+standing in the room came back "already in your context" with nothing behind it. Fixed (owner ruling: render the
+missing sections), plus 5 more fix batches. **What remains: push + owner GUI re-verify + merge.** Detail in
+START HERE below. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
+
 Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` ·
 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` · current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`
 (index `spec/IMPLEMENTATION_PHASES.md`).
 
 ---
 
-## START HERE — next phase: Tag Hygiene → Narrator Lookup
+## START HERE — Phase 51.8 Phase B (Narrator Lookup Tool)
 
 **✅ Phase 51.7 — PlayView Decomposition: MERGED & CLOSED.** PR #89 merged to `main` 2026-07-06
 (merge commit `5eadaaa`, branch deleted); `main` is up to date. `views/play_view.py` 2,765 → 1,491
@@ -47,51 +79,441 @@ fixed (`fd101df`, repo-read failures now surface `REACTION_FAILURE_LINE`), 2 fin
 to this next phase (see the review block below). Full 51.7 slice history + deferred follow-ups
 retained further down for reference.
 
-**▶ NEXT — awaiting review/merge of PR #90 (Phase A — Tag Hygiene).** Spec
-`spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`. Branch `feat/phase-51.8-tag-hygiene` (pushed, tracking
-`origin`). **Phase A (Tag Hygiene) is COMPLETE and committed** — Slice 0 + A1–A6 all landed; last commits
-`99fc091` (A6) + `7f25bde` (A6 DBG-panel follow-up). **PR #90 OPEN → `main`**
-(https://github.com/ghostpencil/dungeon-daddy/pull/90), 18 commits, owner GUI-verified on the live Crucible
-(2026-07-11). Full suite green (**3667 passed**), ruff + mypy(strict) clean.
+**✅ Phase 51.8 Phase A — Tag Hygiene: MERGED & CLOSED.** PR #90 merged to `main` 2026-07-11
+(merge commit `6c899cc`, branch `feat/phase-51.8-tag-hygiene` deleted). The 5-agent review-fix batch
+(`5c65b29`) landed with the PR. Delivered: the namespaced tag taxonomy (`validate_tag`/`normalize_tag`,
+migrations `020`/`021`), seed + Crucible-world tagging, tag-based scene-scoped retrieval, write-side
+scene tagging, and the deterministic T7 `# Related Lore` pre-fetch. Owner GUI-verified. *(Docs PR #91
+carries the Phase-A-merged bookkeeping for `main`; it is now **superseded by this branch's fuller index
+update** — close PR #91, or merge it and reconcile this block on rebase.)*
 
-**✅ PR #90 review pass complete (2026-07-11) — 5-agent parallel review; follow-up fixes COMMITTED to the PR
-branch (`5c65b29`, pushed 2026-07-11).** Ran `/pr-review-toolkit:review-pr all parallel`
-(code / tests / silent-failure / type-design / comments) against the PR #90 diff. **No merge blocker** —
-the code-reviewer's two "critical" seed findings (`location:r8`/`location_slug` `r7`/`r1` "broken") were the
-**F1 false premise repeated**: those are valid **level-3** rooms per `tests/fixtures/crucible.json`
-(L1 `R1–R5`, L2 `r01–r06`, **L3 `r1–r8`**); the seed guard tests validate against the full room-id union and
-pass green. See memory [[reference-crucible-room-ids]].
-- **Fixes committed to the PR branch (`5c65b29`, TDD, ruff + mypy(strict) clean; affected suites green, 101 passed):**
-  - `memory/tags.py` — module docstring corrected (validation lives at seed/engine/authored write sites +
-    `normalize_tag` on the LLM path; the **repo layer does not validate**) — flagged independently by 3 of 5
-    agents. `normalize_tag` now folds alias actor subtypes (`monster`→`npc`,
-    `dungeon_presence`/`faction`→`dungeon`) instead of dropping them (they were recoverable via the existing
-    fold table).
-  - `memory/retrieval.py` — WARNING logs when an `actor_id` fails to resolve in `query` / `scene_memory_tags`
-    (was a silent narrowing / under-tag with no diagnostic).
-  - `play/dialogue.py` — **owner ruling 2026-07-11: mirror the DM bundle.** `recent_memories` (dungeon-voice
-    context, §5.2) now ALWAYS includes importance≥9 pins (unscoped); the scene-scoped bulk fills the rest.
-    The DM-narrator `ContextBundle` already did this; the fix aligns the separate dungeon-voice channel.
-  - Tests: normalize alias-fold + unknown-subtype-drop cases; caplog on both retrieval drops; a dungeon-voice
-    pin test (+ adjusted the scoping test's decoy to importance 6 so it still checks non-pin scene-gating).
-- **Deferred (non-blocking, from the review — fold into Phase B or a cleanup slice):** room-id gate
-  self-disable logging (`seed_rpg_state.py` when `dungeon.json` absent); a shared `field_validator("tags")`
-  on Item/RoomObject/Objective/ClockState (move tag enforcement to the type boundary); the engine
-  write→read round-trip integration test (test **Gap A** — write via `record_dungeon_exchange`/
-  `advance_objectives`/`discover_exit`, read back through `ContextBundleBuilder`, assert resurfacing); LOW
-  items (co-referenced-clock `trigger_tags` last-writer-wins; DBG panel hides found-then-fully-trimmed lore;
-  `seed_pack.py:144` docstring imprecision).
+**▶ IN PROGRESS — Phase B (Narrator Lookup Tool).** Branch `feat/phase-51.8-narrator-lookup` (off
+`main`). Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
+- **✅ Decisions L1/L2/L4–L7 ratified** (owner 2026-07-11, `bed0006`; spec §13 now all OWNER-DECIDED):
+  single `lookup_world` tool; one `search_entities` repo method behind a read-only `LookupService`;
+  budgets 2 rounds / 8 rows / ~1.2k tok / errors-as-strings; shared-conn + repo `threading.Lock` for
+  worker-thread DuckDB reads; log + debug-panel provenance; prompt + telemetry + full-overlap redirect.
+- **✅ Owner-directed architecture change — rooms as a first-class campaign entity** (spec §7.1,
+  `e1f394c`; memory [[project_rooms_first_class_entity]]). Rooms were the only scene anchor NOT in the
+  campaign DuckDB (authored only in the dungeon JSON). New `rooms` table = a **runtime projection**
+  seeded from the dungeon (geometry stays in the JSON — no dup); columns `slug`/`display_name`/
+  `room_type`/`summary` (inline lore)/`quest_role`/`markdown_path`+`checksum` (full body)/`tags`. Lore
+  and quest-role live in **both** places (column + markdown/tags). Connections stay in `room_exits`
+  (already first-class + gated; no tags).
+- **✅ Slice B0 persistence — COMPLETE** (`24375b0`, TDD, full suite green **3681 passed**, ruff +
+  mypy(strict) clean): `RoomState` model (`rpg/models.py`), migration `022_rooms.sql` (+ standard
+  migration tests: columns present, applies-on-021-head, back-compat read), repo `save_room`/`get_rooms`/
+  `get_room` (upsert on conflict, campaign-scoped). Updated the migration guard test — the campaign DB now
+  legitimately holds a `rooms` table (`dungeons`/`connections`/`levels` remain design-only).
 
-**When resuming next session:**
-1. **If PR #90 merged** → mark it MERGED here (mirror the 51.7 block), delete the branch, then start
-   **Phase B (Narrator Lookup Tool)** — first ratify decisions **L1/L2/L4–L7** with the owner (spec §13),
-   then Slice B1 = `MemoryRepository.search_entities` + `LookupService` (spec §7/§12 Phase B).
-2. **If PR #90 still open** → the review-fix batch is now **committed & pushed** (`5c65b29`); address any
-   remaining human review feedback on the branch.
-3. **Optional data-hygiene pass (not blocking):** old saves' gameplay memories carry pre-taxonomy **bare
-   tags** (`knowledge`, `arcane`, …) that don't participate in scene-scoped retrieval; a normalization pass
-   (`normalize_tag` over existing `memory_tags`) would fold them into the canonical vocabulary. Noticed on
-   the live Crucible during A6 GUI verify.
+**✅ Slice B0 seed path — COMPLETE & committed (`b15602e`; TDD, full suite green, ruff + mypy(strict) clean).**
+Every dungeon room is now projected into a first-class `rooms` record across **all** seed paths.
+- **Pure builder** `build_room_states(levels, campaign_id, *, quest_roles, room_tags)` (`rpg/seed_pack.py`):
+  `summary`←`Room.note`, `level_id`=`level:<Level.id>`, `slug`←name (id fallback); **hybrid `quest_role`**
+  (owner ruling 2026-07-11: derive from `Room.main_loop_role`, authored override wins) + a **guard** that
+  raises when an override names a room-id absent from the dungeon union.
+- **Wired into every seeder:** `apply_seed_pack(levels=…)`; `seed_campaign_with_pack` (when `dungeon.json`
+  present); **and the app's new-game path `campaign/seeder.py::seed_from_manifest`** (it already receives the
+  dungeon). All respect the skip/`force` contract — a reseed never clobbers populate-authored `tags`/
+  `quest_role`. **`backfill.py` self-heals rooms on load** (its dungeon-passing `seed_from_manifest` call now
+  also plants rooms; exit count made exit-specific) — so **new campaigns get rooms on first load**, same seam
+  as exits. (An *existing* save that already has exits, e.g. the live Crucible, skips backfill → needs a manual
+  reseed for rooms, matching the A6 live-data pattern.)
+- **Crucible populate scripts author lore tags** (`populate_crucible_level1/level2`, shared helper
+  `rpg/seed_pack.py::enrich_room_tags`): base-seeded rooms get `theme:`/`thread:` tags (reusing the real A4
+  slugs), idempotent, preserving base `summary`/`quest_role`, skipping unseeded rooms. Derived `main_loop_role`
+  quest roles were kept (entry/goal/obstacle/clue/bypass are already meaningful) — no authored `quest_role`
+  overrides needed. L3 (`r1`–`r8`) has no populate script → base-seed only (known; [[reference_crucible_room_ids]]).
+- **`/code-review high` (2 finders + fixes):** fixed a reseed data-loss bug (rooms now skip/force like actors;
+  +2 regression tests), extracted the duplicated `save_room_tags` into `enrich_room_tags`, and surfaced +fixed
+  the cross-file `backfill` count coupling.
+
+**✅ Slice B0 owner GUI-verified on the live Crucible (2026-07-11).** Live save reseeded + reset (all steps
+additive, timestamped `campaign.duckdb.bak-*` backups; the app was closed for the DuckDB write lock):
+1. **Rooms planted into the live save.** An existing save that already has exits **skips `backfill`** → rooms
+   never got projected (the A6 live-data pattern). A one-off replicated the app seam (open repo → `initialize_schema`
+   applies migration `022_rooms.sql` → `seed_from_manifest(dungeon=…)` additive → L1/L2 `save_room_tags` lore
+   enrichers). Result: **19 first-class rooms** (L1 `R1`–`R5`, L2 `r01`–`r06`, L3 `r1`–`r8`), 11 with lore tags,
+   38 exits untouched.
+2. **Full new-game reset** via `tools/reset_crucible_new_game.py` (party → Level 1 `R1`; clocks 0; objectives
+   ladder tier 0 active / 1–3 locked; objects/items/stress → authored seed state; play memory wiped). Fixed the
+   item-state drift the owner reported. *(NB: `START_ROOM_ID = "R1"` — the Level-1 entrance, **not** lowercase
+   `r1` which is L3's Control Nexus; case selects the level.)*
+3. **Re-injected the 8 canonical seed lore memories** (`seed_data/campaigns/the-crucible/rpg_seed.json`) — the
+   reset wipes `memory_entries`, and this save's base manifest never carried the 8 (pre-existing A6 live-data gap),
+   so `# Related Lore` read empty until re-injected. Replicated only `apply_seed_pack`'s memory loop
+   (`save_memory_entry` + `add_memory_tag`, deterministic uuid5 ids → idempotent).
+   - **GUI verify passed** (owner, live play R1→R2→R1): scene-scoped Cards correctly party/room-anchored (NOT
+     top-importance — the two importance-8/7 lore facts routed to Related Lore, `The Factory is Waking Up`
+     correctly appeared nowhere at R1/R2); Related Lore deduped against Cards; exits/unlock persisted;
+     **container loot re-spawns on open** (Half-Buried Supply Locker in R1 → Sun-Bleached Travel Journal) — the
+     item-state concern is resolved.
+   - **⚠ Architecture finding for Slice B1+:** `_collect_anchor_tags` (`memory/context_bundle.py:251`) anchors
+     Related Lore on **objects / items / present NPCs / focus party / active objectives — it does NOT read the new
+     `rooms` table** (A6 predates B0). So the room's own `tags`/`quest_role` do **not** yet drive retrieval; B0 is
+     backend groundwork with **no GUI-visible surface** until `lookup_world` (B1+). If we want room-table tags in
+     the pre-fetch too, add a `repo.get_room(...).tags` line to `_collect_anchor_tags` (small, optional follow-up).
+**✅ Slice B1 — `search_entities` + `LookupService`: COMPLETE, committed (`1af065e`; owner-ruling docs
+`419c8bb`; 2026-07-12; TDD, full suite green 3753, ruff + mypy(strict) clean).** The read-only narrator-lookup
+backend.
+- **`MemoryRepository.search_entities(campaign_id, query, tags, entity_types, limit)`** (`memory/repository.py`):
+  unions all 8 taggable tables via a module-level `_EntitySource`/`_ENTITY_SOURCES` projection (actor/object/item/
+  clock/objective/faction/room) + a dedicated memory branch (`memory_entries` ⋈ `memory_tags`, **approved-only**).
+  Case-insensitive substring on slug/display_name (title for memories) **OR** exact tag membership (query OR tags
+  union); ≥1 of query/tags required (else `ValueError`); `entity_types` filter (empty list = no filter); `limit`
+  default 8, hard-capped 20. Ranking: exact-slug > tag-hit count; **importance/recency is a memories-only intra-
+  group tiebreak** (owner ruling 2026-07-12 — a memory never jumps a tied non-memory entity; stable sort +
+  pre-sorted memory block). Normalized row `{entity_type, id, slug, display_name, room_id, status, tags, snippet}`
+  — **`status` added per owner ruling 2026-07-12** (surface all entities incl. defunct, but let the narrator tell
+  live from dead; rooms have no status, objects report `current_state`). Campaign-scoped throughout.
+- **`LookupService`** (`memory/lookup.py`) — read-only façade (only public method `lookup`, per §8 authority
+  boundary): snippet truncated ~200 chars, ~1,200-token result budget with overflow dropped as `omitted` count
+  (always keeps ≥1 row), bad requests surfaced as `{"error": …}` data not raised (L4 "errors-as-strings").
+- **TDD, 43 tests** (`tests/unit/memory/test_search_entities.py` + `test_lookup_service.py`). Tracer-bullet
+  sequence followed (actor-by-query → case-insensitivity → tags → entity_types → limit → tables one-at-a-time →
+  ranking → scoping → LookupService).
+- **`/code-review high` (5 finder angles + owner rulings):** Angle C verified all table/columns vs the migration
+  DDL (clean). Fixed the `entity_types=[]`-returns-nothing bug (+test) and a stale comment. **Two owner rulings
+  resolved spec-shape gaps:** (1) add `status` to the row; (2) constrain importance to intra-memory ranking.
+  Deferred/noted (non-blocking): the Python-side substring filter instead of SQL `ILIKE` (equivalent at this
+  scale; the spec proposed ILIKE); `LookupService` budget trim overlaps `MemoryRetriever.trim_to_budget` but
+  differs in keep-first policy (not a drop-in). **`docs/LLM_AUTHORITY_BOUNDARY.md` "Read tools" note still TODO
+  when the phase lands (spec §8).**
+**✅ Slice B2 — provider transport (`complete_round`): COMPLETE, committed (`2a01c58`, 2026-07-12; TDD, full suite
+green 3772, ruff + mypy(strict, 170) clean).** The tool-use round on the provider seam (spec §9, L3 = agent-owned
+loop / provider = pure transport). +19 tests.
+- **Provider-neutral types** (`llm/provider.py`): `LLMToolDef(name, description, parameters)`,
+  `LLMToolCall(call_id, name, arguments)`, `LLMRoundResult(text, tool_calls)`; `LLMMessage` gains role `"tool"`
+  + optional `tool_call_id` / `tool_calls` (all default `None` → back-compat). `dict[str, Any]` for the JSON
+  payload fields (mypy strict).
+- **`LLMProvider` Protocol** gains `complete_round(messages, system, tools=None, max_tokens=1024) -> LLMRoundResult`
+  + a `supports_tools` property (`complete`/`stream` untouched; capability-detected via
+  `getattr(provider, "supports_tools", False)`, so Anthropic — never checked as `LLMProvider` — stays untouched,
+  same as it already lacks `last_usage`).
+- **`OpenAIProvider.complete_round`** translates `LLMToolDef`→OpenAI function-tool format, sends `tools=` only when
+  present (final forced-plain round passes `tools=None`), parses `message.tool_calls`→`list[LLMToolCall]` (args
+  JSON-decoded), updates `last_usage`, wraps `APIError`→`LLMError`. New `_build_round_messages` preserves assistant
+  `tool_calls` + `role="tool"` results (the existing `_build_messages`/`complete`/`stream` untouched). `supports_tools=True`.
+- **`ObservingProvider` (telemetry) forwards both** — production agents receive an `ObservingProvider` wrapping
+  `OpenAIProvider` (`window.py`), so `complete_round` records a telemetry line like `complete` and `supports_tools`
+  reflects the inner provider; otherwise the wrapper would mask the capability from B4's `getattr` detection.
+- **AnthropicProvider deferred** (spec §9: "Anthropic later") — no `complete_round` yet; falls back to `complete()`.
+- **`/code-review high` (8 angles):** 1 correctness fix — a `JSONDecodeError` from truncated/malformed tool-call
+  `arguments` (model hits `max_tokens` mid-call) escaped `complete_round`'s `except openai.APIError` uncaught,
+  breaking the "callers only ever see `LLMError`" contract; extracted `_parse_tool_arguments` that wraps it as
+  `LLMError` (+guard test). Noted/deferred (low): `json.loads` may return a non-dict for `arguments` (validate in
+  the B3 executor); `_build_round_messages` mildly duplicates `_build_messages` (different dict shapes → reuse awkward).
+- **`docs/LLM_AUTHORITY_BOUNDARY.md` "Read tools" note still TODO** when the phase lands (spec §8; carried from B1).
+
+**✅ Slice B3 — `run_tool_loop` helper: COMPLETE, committed (`91ffafa`, 2026-07-12; TDD, full suite green 3779, ruff +
+mypy(strict, 171) clean).** The agent-owned request→tool→request loop (spec §9, L3 = agent owns the loop / provider is
+pure transport). +9 tests, pure unit slice with a `FakeProvider` scripting `complete_round`.
+- **`run_tool_loop(provider, messages, system="", tools=None, *, executor, max_rounds=2, max_tokens=1024) -> str`**
+  (`llm/tool_loop.py`): each round calls `complete_round`; a round returning `tool_calls` runs the injected `executor`
+  per call, appends an assistant `tool_calls` message + one `role="tool"` result per call (carrying `tool_call_id`),
+  and resubmits. The **last round forces `tools=None`** → plain answer (L4: answer with what it has once the budget is
+  spent). Plain-text round returns immediately; `None` text → `""`. **`executor` exceptions become `Error: …` strings**
+  (L4: tool errors never raise through the turn) via `_run_executor`. `executor` is required keyword-only (a loop without
+  one is meaningless). The `role="tool"`/assistant-`tool_calls` history it builds is exactly what B2's
+  `OpenAIProvider._build_round_messages` consumes, so the loop feeds straight back into the real provider.
+- **`/code-review high` (8 angles) — 2 low-severity robustness fixes applied (TDD, RED first):** (1) the last round now
+  returns text **unconditionally** — a non-conformant provider that still emits `tool_calls` under `tools=None` no longer
+  blanks the answer or re-runs the executor; (2) `max_rounds` clamped to ≥1 so there is always one provider call (a
+  `max_rounds=0` no-op empty answer is impossible). No callers yet (B4 wires it), so no cross-file breakage.
+**✅ Slice B4a–d — agent integration: COMPLETE, committed (`9afce53`, 2026-07-13; TDD, +23 tests, llm+play+memory sweep
+green 696, ruff + mypy(strict) clean).** The `lookup_world` tool wired end-to-end — define → detect → escalate →
+search-under-lock. Owner ruling this session: **fold the carried `LLM_AUTHORITY_BOUNDARY.md` note into B4** (see B4f
+below). Nothing has exercised it against a **live** tool-calling provider yet (B2's `complete_round` only fake-driven);
+no GUI-visible surface until B4e renders the panel line.
+- **B4a — `llm/lookup_tool.py` (new):** `LOOKUP_WORLD_TOOL` (`LLMToolDef`, §7/L1) + `build_lookup_executor(service,
+  bundle_entity_ids, *, on_lookup)` bridging `LLMToolCall`→`LookupService.lookup`→JSON string. **L7:** full-overlap
+  **redirect** (`REDIRECT_MESSAGE`, cheap hard-stop) + partial-overlap **`redundant_lookup` telemetry** via a
+  `LookupRecord` (query/tags/hit_count/overlap_count/redirected); **L6** logging. Plus `bundle_entity_ids(bundle)` — the
+  scene's entity-id set (memory-card + related-lore memory ids, current room + its objects/loose-items/present-actors,
+  open clocks, active factions) matching `search_entities`' `id` per type.
+- **B4b/B4c — agent seams:** `DungeonMasterAgent.respond` / `DungeonVoiceAgent.respond` gain optional `lookup`
+  (`Callable[[LLMToolCall], str] | None`). When `getattr(provider, "supports_tools", False)` **and** `lookup` injected →
+  `run_tool_loop(..., tools=[LOOKUP_WORLD_TOOL], executor=lookup)` with a scoped `# Looking Things Up` prompt section
+  restating the §6 contract; else exactly today's single-shot `complete()`. Capability-detected, so existing agents +
+  the `AnthropicProvider` (no `complete_round`) are unaffected.
+- **B4d — L5 read lock + coordinator wiring:** `MemoryRepository.search_entities` now runs its reads on a dedicated
+  `self._conn.cursor()` under a repo-owned `self._read_lock = threading.Lock()` — worker-thread lookups never interleave
+  with main-thread use of the shared connection (deterministic concurrency guard test, RED confirmed on the old code).
+  `NarrationCoordinator._build_lookup_executor(bundle)` (called in `spawn_dm_thread`) and
+  `DialogueCoordinator._build_lookup_executor(recent_memories)` (called in `send_dungeon_line`) build a `LookupService`
+  scoped to the campaign — overlap set seeded from the bundle (DM) / recent memories (voice) — and inject it; `None` when
+  no repo/campaign (agent falls back to `complete`). New tests: `tests/unit/{llm/test_lookup_tool,llm/test_dm_agent_lookup,
+  llm/test_dungeon_voice_agent_lookup,memory/test_search_entities_concurrency,play/test_narration_lookup,play/test_dialogue_lookup}.py`.
+
+**✅ Slice B4f — carried "Read tools" doc note: COMPLETE (2026-07-14, doc-only, uncommitted).** Added a **"Read tools"**
+subsection to `docs/LLM_AUTHORITY_BOUNDARY.md` (right after "Tool policy", which governs *mutating* tools), codifying
+spec §8: the proposal-only policy governs mutating tools; a read tool returns **data, not proposals** and sits below it;
+`lookup_world`'s executor is **read-only by construction** (holds a `LookupService` with only a public `lookup(...)`, no
+write method, wrapping `search_entities`); the LLM **never sees SQL**; a lookup is **not gated by `validate_proposal`**
+(nothing to apply — anything the model then wants to *do* still flows through proposal→validate→apply); plus a
+forward-looking rule for future read tools. Clears the TODO carried from B1/B2. (Folded into B4 per owner 2026-07-13.)
+
+**✅ Slice B4e — L6 observability (debug-panel line): COMPLETE (2026-07-15; TDD, +13 tests, full suite green 3812,
+ruff + mypy(strict, 172) clean).** Each narrator lookup is now visible in the Play-mode DBG tab, closing the L6
+provenance loop — the first GUI-visible surface of the whole Phase B arc.
+- **Worker→main-thread carry:** the executor's `on_lookup` fires on the **worker thread**, so both spawn paths now
+  collect `LookupRecord`s into a worker-local list and attach it to `DMResult.lookups` (`lookups: list[LookupRecord] =
+  field(default_factory=list)`) — on the success *and* the error path, so a failed turn still shows what it looked up.
+  `NarrationCoordinator.poll` forwards them on the main thread through a new optional `on_lookups` port (only when
+  non-empty). `DialogueCoordinator.send_dungeon_line` does the same for the dungeon-voice path (its
+  `_build_lookup_executor` takes `records=None` → back-compat with the B4d call shape).
+- **`PlaySessionController`** wires the port → `_set_debug_lookups` → `DebugControls.set_lookups` (no-op when no panel).
+- **`DebugControls.set_lookups` / `lookup_section_lines()`** (`ui/panels/debug_controls.py`, mirroring
+  `set_bundle`/`bundle_section_lines`): renders `World lookups: N` + a line per record — query (or `(tags only)`),
+  `[tags]`, hit count, and the L7 flags `[REDIRECT]` (full overlap) / `[redundant k/n]` (partial). `PlayView`
+  (`_RpgSidePanel`) draws the section after the bundle block.
+- **Tests (+13):** `tests/unit/ui/test_debug_controls.py` (6 — count/query/hits, tags-only, redirect, redundant, empty),
+  `tests/unit/play/test_narration_lookup.py` (3 — records attach to the result via a real repo + lookup-calling agent;
+  poll forwards; no-lookups doesn't fire), `tests/unit/play/test_dialogue_lookup.py` (1 — voice path attaches),
+  `tests/unit/play/test_controller.py` (3 — port routes to panel, no-panel no-op, coordinator wired).
+- **⚠ Known test-coverage gap (owner call pending):** no view-level test asserts `_draw_debug_tab` renders the section —
+  the one-line `play_view.py` change is untested; coverage sits at the `DebugControls` + wiring seams instead. This
+  **matches the A6 precedent exactly** (`bundle_section_lines()` shipped the same way, debug-controls tests only), but
+  the B4e plan above had called for UI-harness tests (`spec/UI_TESTING.md`).
+
+**✅ B4e `/code-review high` (8 angles, 2026-07-15) — 7 findings; the 3 substantive ones fixed on owner ruling
+(TDD, RED first; +5 tests, full suite green 3817, ruff + mypy(strict, 172) clean).** Committed `d3497ff`.
+- **Fixed (real observability bug) — the panel never cleared.** `poll()` forwarded lookups only when the list was
+  non-empty, so after any lookup, every later lookup-free turn (the *common* case — most turns call no tool) kept
+  rendering the stale record, reading as provenance for the current narration. Now forwarded **unconditionally**; an
+  empty section means *this* turn looked nothing up. **Owner ruling 2026-07-15: yes, clear it** — so the B4e test
+  `test_poll_does_not_forward_when_no_lookups`, which had pinned the wrong behavior, was **inverted** to
+  `test_poll_forwards_empty_lookups_to_clear_the_panel`.
+- **Fixed (regression the above exposed):** the port now fires every polled turn, so it reached `_set_debug_lookups` on
+  a `__new__`-built view that never ran `PlayView.__init__` → `AttributeError` (`test_on_update_routes_dungeon_result_to_apply`).
+  Switched to `getattr(self._host, "_rpg_debug", None)`, the seam's established pattern (`controller.py:225/388/431/437`).
+  *(Note: the sibling `_set_debug_bundle` at `controller.py:519` has the same latent fragility — not reachable today
+  because `on_bundle_built` only fires on a bundle build. Left alone as out-of-scope; candidate cleanup.)*
+- **Fixed (L6 data loss) — `LookupRecord` dropped what `LookupService` already computed.** Added `omitted: int = 0` and
+  `error: str | None = None`, populated in `build_lookup_executor` from the service result (also now logged). Panel
+  renders `→ ERROR: <msg>` (a bad request — e.g. neither query nor tags, the L4 errors-as-strings path — previously
+  rendered as an indistinguishable `→ 0 hit(s)`) and `(N trimmed)` (budget-dropped rows; `hit_count` is the *post-trim*
+  count, so an 8-match/3-returned lookup silently read as "3 hit(s)" — the sibling `bundle_section_lines` renders
+  `Trimmed: M` for exactly this reason, A6 precedent).
+- **Not fixed (noted, low):** `set_lookups` aliases the worker's mutable list (safe today — all appends precede the
+  `queue.put`; a `list(records)` copy would harden it); `_build_lookup_executor`'s two siblings diverge (narration's
+  `records` required-positional vs dialogue's optional `None`, which exists only for one test's one-arg call);
+  `rec.query or "(tags only)"` mislabels an empty-string query; `entity_types` recorded but never rendered; and the
+  `play_view.py` render line remains unpinned (the coverage gap above).
+
+---
+
+### ▶ PICK UP HERE NEXT SESSION — **PR #92 whole-arc review DONE + fixes applied; push, then merge**
+
+**➡ PR #92 — Phase 51.8 Phase B — Narrator Lookup Tool (`lookup_world`): OPEN; whole-arc review COMPLETE,
+review fixes applied and committed. Remaining: push + owner GUI re-verify + merge.**
+**https://github.com/ghostpencil/dungeon-daddy/pull/92** — branch `feat/phase-51.8-narrator-lookup` → `main`.
+
+**✅ The 5-agent `pr-review-toolkit:review-pr` whole-arc review ran 2026-07-15** (code-reviewer, pr-test-analyzer,
+silent-failure-hunter, type-design-analyzer, comment-analyzer, in parallel). It earned its keep: **it found one
+CRITICAL bug that per-slice review structurally could not catch**, because every prior slice test asserted
+`bundle_entity_ids` against *synthetic* bundles and never against the agent's real prompt.
+
+**🔴 The CRITICAL find — the L7 redirect refused data the narrator never had.** `bundle_entity_ids`
+(`llm/lookup_tool.py`) treated the whole `ContextBundle` as "the model's context", but `DungeonMasterAgent.build_prompt`
+rendered only a *subset* of it. Present NPCs/monsters, loose items, factions, the room id, and clock `stakes` were
+collected into the L7 overlap set **but never shown to the model**. Since `redirected = bool(rows) and overlap_count ==
+len(rows)`, any lookup whose hits were exclusively one of those — **the normal case for a name query** — returned
+"Already in your context — do not look this up again" *instead of the data*, with no recovery (round 0 is the only tool
+round; `max_rounds=2` forces the last one plain). Reproduced end-to-end against real production code: party in a room
+with a monster, player asks about it, prompt never names it, model gets a redirect, narrator hallucinates — and the DBG
+tab shows `[REDIRECT]`, which **looks like correct scoping**. The spec was complicit: §10 L7 says "already in the
+bundle", which is what shipped, but the redirect message and the §6 contract both say *context*, and the bundle is a
+strict superset.
+- **Owner ruling 2026-07-15: render the missing sections** (not: narrow the overlap set). `build_prompt` now emits
+  `# Present Actors` (npcs+monsters, with status/disposition), `# Loose Items`, `# Factions` (reputation/tier/goal), and
+  clock `stakes`. The bundle now genuinely *is* the context. Bonus: the narrator previously **could not see who was
+  standing in the room** — and `_LOOKUP_GUIDANCE`'s "never look up… present actors" was itself a lie to the model.
+- **Pinned by `test_every_bundle_entity_id_is_described_in_the_system_prompt`** (`tests/unit/llm/test_dm_agent_context_bundle.py`):
+  builds one entity of every collected category, asserts `bundle_entity_ids(bundle) == set(described)` **and** that each
+  entity's display text appears in the assembled system prompt from `respond()` (the real seam — the room itself is
+  described by `_build_context` from the dungeon JSON, not `build_prompt`). A new category joining the overlap set now
+  fails the test until it is rendered.
+
+**Fixes applied this session (all TDD, RED first; scope = owner-chosen "correctness + honesty"):**
+1. **L7 redirect** — above.
+2. **Tool arguments were untrusted input** (`llm/lookup_tool.py`). `limit=null` (a routine serialization of an unset
+   optional int) raised `TypeError`; `tags="theme:guilt"` became `set()` of **characters**, matching nothing → a silent
+   zero-hit the narrator reads as "this lore does not exist". Now: bare strings read as one-element lists, `limit`
+   coerces with fallback (never fail a lookup over a knob), non-dict `arguments` handled, uninterpretable shapes → an
+   L4 error naming the fix. **Plus `VALID_ENTITY_TYPES` validation** — `search_entities` never validated
+   `entity_types`, so a plural/misspelled type silently matched no source (`"actors"` previously "worked" *by accident*
+   via substring matching); now rejected with the valid list, and a drift guard pins the set against `_ENTITY_SOURCES`.
+3. **L4 was "convert to a string" where it should be "convert to a string AND record it."** `tool_loop._run_executor`
+   caught everything and logged **nothing** (`tool_loop.py` had zero logging), and `LookupRecord` was built *after*
+   `service.lookup()` returned — so a raise produced no record, and the DBG tab rendered "No lookups yet", identical to
+   a turn that looked nothing up. `LookupService` also caught only `ValueError`, so all infrastructure errors took that
+   path. Now: `_run_executor` logs with the tool name/args; `LookupService` catches broadly, logs the real cause, and
+   returns a **generic** message — which also makes the §8 "the LLM never sees SQL" claim *true* (DuckDB echoes the
+   failing statement in its message, and that string is fed straight back to the model).
+4. **The `_read_lock` story was false** (4 of 5 agents converged; it was one of the 3 seams this index told reviewers to
+   check). The lock is taken at **exactly one site** — inside `search_entities` — so it serializes worker lookups against
+   *each other* and **never** against the main thread. The real isolation is `self._conn.cursor()`. The old test proved
+   only "at least one of {lock, cursor} exists": deleting the lock left it green. Comments (`repository.py`) + spec §10 L5
+   corrected to say what is true; **new `test_search_entities_does_not_interleave_with_main_thread_connection_use`** runs
+   the real mixed workload (4 workers looking up while the main thread hammers the shared connection) — **verified by
+   mutation: it FAILS when the cursor is removed**, while the old test passes.
+5. **The `supports_tools` guard was load-bearing but untested** — removing it from *both* agents left the suite green.
+   Both coordinators inject `lookup` whenever a repo exists without consulting the provider, so that guard is the only
+   thing between a non-tool provider (the `AnthropicProvider` shape) and an `AttributeError` on **every** turn. Four new
+   tests, **verified by mutation** (they fail when the guard is removed).
+6. **Docs/docstrings that overclaimed** — `RoomState`'s docstring promised `quest_role` is mirrored into `tags` as
+   `quest:`; that is not implemented and **cannot be** (`quest` is not in `TAG_NAMESPACES`, so it would raise in
+   `validate_tag`). `search_entities`' docstring listed 7 row keys, contradicting the very owner ruling that added
+   `status` (8). `LLM_AUTHORITY_BOUNDARY.md`'s "no path to a mutation" overstated (see deferred #1) and its "never sees
+   SQL" was false on the error path (now true, via fix 3). Spec's `+N more` marker was never built (it's a structured
+   `omitted` count). `"No lookups yet"` contradicted its own adjacent comment → `"No lookups this turn"`.
+
+**⚠ NOT a defect — verified and recorded, do not "fix" it.** The code-reviewer flagged `apply_seed_pack` for
+unconditionally `save_room`-ing "contrary to the §7.1 skip/force contract". Checked: `apply_seed_pack` has **no
+production caller** (tests + one smoke test only), **no `force` parameter at all**, unconditionally `save_actor`s too,
+and only touches rooms when a caller passes `levels`. It is the full-apply primitive; the skip/force contract lives in
+`campaign/seeder.py` + `tools/seed_rpg_state.py`, the paths a real reseed goes through. A comment now pins why, so it
+isn't re-flagged (same pattern as the B4e sweep's fourth finding).
+
+**What the review confirmed as sound:** the B2→B3→B4 message shapes genuinely compose; the executor **is** read-only by
+construction (`_Lookup` Protocol); `ObservingProvider` forwarding `supports_tools` from the inner provider is right (a
+`getattr(provider, "complete_round", None)` check would have been the trap); the `list(messages)` copy in `tool_loop.py:31`
+is load-bearing; `test_search_entities.py` had **no survivable mutation**; and **the B5 eval claim holds** — `vessa`/
+`karn`/`bellwright` appear in no fixture and no prompt, so it cannot pass by hallucination.
+
+- **Known-and-deliberate — not review findings:** `_collect_anchor_tags` doesn't read the `rooms` table;
+  `views/play_view.py`'s `lookup_section_lines()` render line is unpinned (A6 precedent, owner ruling 2026-07-15).
+- **✅ Docs PR #91 — no action needed: it was already closed.** (*Verify against the source of truth, not the index.*)
+
+**Deferred from the review (non-blocking; candidates for a cleanup slice):**
+1. **`LookupService` holds a write-capable `MemoryRepository`** at `self._repo` — "read-only by construction" is true of
+   the *executor* (`_Lookup` Protocol) but only *convention* for the service; adding a write method would compile.
+   ~6 lines to narrow its ctor to a search-only `_EntitySearch` Protocol, making the authority-boundary doc's central
+   claim compiler-enforced. **Highest-value deferred item.**
+2. **`LLMProvider` Protocol declares `complete_round`/`supports_tools` mandatory while call sites `getattr`-detect them**
+   — the Protocol has quietly stopped admitting `AnthropicProvider` (mypy-probed). Invisible today (it's constructed
+   nowhere in production); **comes due when Anthropic is re-enabled**, where the path of least resistance is to loosen
+   the Protocol. Fix: split `ToolCapableProvider(LLMProvider, Protocol)`.
+3. `search_entities`' row wants a `TypedDict` — 3 readers, 2 access idioms (`row["snippet"]` vs `r.get("id")`), zero
+   runtime cost, docstring already drifted once.
+4. `run_tool_loop` has **no tool-name dispatch** — every call goes to the single executor, so a hallucinated tool name
+   silently executes `lookup_world`. Latent the moment a second tool exists.
+5. `ObservingProvider._write_record` isn't in a `finally`, so a failed round leaves **no telemetry** — failing turns are
+   invisible in exactly the data you'd use to spot them. (Pre-existing pattern on `complete` too.)
+6. The B5 eval builds a bare `OpenAIProvider`, but production wires `ObservingProvider(OpenAIProvider(...))` — wrapping
+   the fixture would drive the true production stack for ~free.
+7. `bundle_entity_ids` omits the party's own actor ids + inventory item ids (both in the bundle), so looking up a PC is
+   never flagged redundant. Also: it's pinned against a hand-written dict, not a real `ContextBundleBuilder` output —
+   rename a key in `build_room_noun_context` and L7 dies silently, suite green.
+8. `narration.py`'s `campaign_id or state.dungeon_id` fallback vs `dialogue.py`'s `active_campaign()` **disagree** about
+   a missing campaign_id; neither is pinned. The narration path would run `WHERE campaign_id = NULL` → 0 hits, no error.
+9. A rooms-seed raise now takes **exit backfill** down with it (`_seed_rooms` runs before `_seed_exits` inside
+   `seed_from_manifest`, and `backfill_exits_if_empty` swallows the lot) → a save loads with zero exits and one log line.
+   Untested.
+10. `RoomState` is the only model in `rpg/models.py` with **no validator** — a `field_validator("tags")` calling the
+    existing `validate_tag` would move the taxonomy invariant from "two call sites remember" to unbypassable.
+11. `tests/unit/play/test_dialogue_lookup.py` tests a private method (`_build_lookup_executor`) where its narration
+    counterpart drives the public seam; `_set_debug_bundle` (`controller.py:519`) has the same latent `__new__`
+    fragility B4e fixed in `_set_debug_lookups`; `seeder.py`/`seed_rpg_state.py` duplicate the ~15-line skip/force block.
+
+### After #92 merges — **next phase is an OWNER CALL** (do not assume)
+
+`spec/IMPLEMENTATION_PHASES.md:22` leaves it explicitly open. The candidates:
+- **Phase 52 — Milestone Advancement**: beats, ranks-to-5, `FulfillMilestone`, LLM milestone detection, `actor_beats`,
+  campaign-specific beats. Split out of the old "Playbooks" phase (49 = *starting* playbooks, 52 = *advancement*). The
+  action picker already reads the actor's **live** `actor_abilities` set, so advancement grows the verb/adverb lists
+  **with no rewiring** (`IMPLEMENTATION_PHASES_33_ONWARDS.md:1368` sequencing). Spec: same file, and the Phase 49 block.
+- **Phase 53 — Threat Behavior & Monster Reactions**: design already written 2026-06-17
+  (`spec/MONSTER_REACTION_DESIGN.md`; phase block at `IMPLEMENTATION_PHASES_33_ONWARDS.md:1422`) — how monsters react in
+  fights, the engine/LLM authority split, boss phases.
+- **Or a cleanup slice** — the deferred pile has grown enough to justify one on its own: the Phase A deferred items, the
+  `rooms`-table anchor-tags follow-up, the unpinned DBG render line, and the tag-hygiene data pass (all detailed below).
+
+**✅ Owner GUI-verified on the live Crucible (2026-07-15).** Phase B's narrator lookup confirmed working in-app from the
+DBG tab. **No reseed or data surgery was needed** — see the corrected live-save note below.
+
+**⚠️ Corrected a stale hand-off warning (2026-07-15).** Previous index revisions warned that the live Crucible save
+"already has exits → `backfill` skips → **no `rooms` records**" and needed a manual reseed before `lookup_world` could
+find rooms. **That was false at the time it was written** — the 2026-07-11 B0 GUI-verify session had *already* planted
+them. Verified directly against the live DB before the verify: **19 rooms present, 11 lore-tagged, 8 approved memories**
+— i.e. exactly the B0 block's own result. The warning had been carried forward without reconciling against the B0 block
+two screens above it, which contradicted it. **Lesson for future hand-offs: when two blocks disagree about live data,
+read the database, not the index.**
+
+**Live-save facts confirmed by direct inspection (2026-07-15), useful for any future verify:**
+- Save at `C:\Users\ljfan\AppData\Local\DungeonDaddy\saves\The Crucible` ([[reference_local_saves_dir]]); campaign id
+  `campaign:the-crucible`; party at **R1 (Receiving Hall)** per `session.json`; Scorpion Swarm present.
+- **The app runs `gpt-4o`** (`window.py::_DEFAULT_OPENAI_MODEL`, override `DUNGEON_DADDY_MODEL`) — **the same model the
+  B5 eval runs on** (`openai_provider.DEFAULT_OPENAI_MODEL`), so the eval's end-to-end proof covers the real app path.
+  The app wires `ObservingProvider(OpenAIProvider(...))`, and B2's wrapper forwards `supports_tools`/`complete_round`,
+  so the tool is genuinely live in-app.
+- **Offline bundle probe at R1** (real `ContextBundleBuilder` against a *copy* of the live DB — read-only, never the
+  original): in-context = 4 memory cards + 2 related lore, 21 entity ids. Out-of-scene lookup demos that work:
+  **"Pinion, the Caretaker Cog"** (NPC in **R3, Cargo Bay** → 1 hit, 0 overlap) and **"The Prime Golem"** (2 hits, 0
+  overlap — one of them a **`room` row**, so it exercises B0's rooms-as-first-class). Reliable **`[REDIRECT]`** queries
+  (every hit already in context): `scorpion swarm`, `receiving hall`, `power core mission`, `golems rebelled`.
+
+**✅ Slice B5 — live eval: COMPLETE (`1839a58`, 2026-07-15).** `tests/evals/test_narrator_lookup_evals.py`, 2 tests,
+`-m eval`, green on **4 consecutive live runs**; correctly deselected from the default suite.
+- **This closed the last real unknown in Phase B.** Every prior test fake-drives `complete_round`, so B2's
+  `OpenAIProvider` tool-call translation (`LLMToolDef`→OpenAI function format, `message.tool_calls`→`LLMToolCall`) had
+  **never once run against a real tool-calling provider**. It works.
+- **Out-of-scene test:** a lore memory about "The Sunken Bell of Karn Vale" (approved, tagged `theme:history`/
+  `thread:obsidian-crown`) lives in the campaign but in no prompt; asking about it triggers a real `lookup_world` call
+  and the fact lands in the narration. The assertion probes for **the bellwright's name (`vessa`)**, which appears in no
+  prompt the model receives — so it **cannot pass by hallucination**, only via the tool result. (Deliberately not
+  "obsidian" — that word is already in the fixture dungeon's quest.)
+- **In-room test:** a question about the dust (already covered by `VAULT_ROOM.note`) looks nothing up — `records == []`.
+- Fixture = a real `MemoryRepository` on a tmp DuckDB + `LookupService` + `build_lookup_executor`, with `on_lookup`
+  capturing `LookupRecord`s as the assertion surface. Empty overlap set → no L7 redirect in this eval.
+
+**✅ B4e review sweep — COMPLETE (`b17a4a0`, 2026-07-15; owner-directed, TDD, +3 net tests).** Three of the four low
+findings were real and are fixed; **the fourth was not a defect.**
+- **Fixed — `set_lookups` aliased the worker's list.** It stored the LLM worker thread's own accumulator by reference, so
+  a later append could mutate what the panel renders. Copies now (`list(records)`). The existing
+  `test_set_lookups_stores_records` **pinned the aliasing** (`assert ctrl._last_lookups is recs`) → inverted to `==`,
+  plus a new mutation guard (append-after-set must not leak in).
+- **Fixed — sibling signature divergence.** `DialogueCoordinator._build_lookup_executor`'s `records` was
+  `list[LookupRecord] | None = None` purely to serve one test's one-arg call; now **required**, matching
+  `NarrationCoordinator`'s. The `on_lookup = records.append if records is not None else None` branch is gone.
+- **Fixed — `entity_types` recorded but never rendered.** Now renders as `<actor,memory>` after the `[tags]` part.
+- **NOT a defect, left as-is (with a test + comment pinning why):** `rec.query or "(tags only)"` was flagged for
+  "mislabeling" an empty-string query. But `search_entities` **itself** treats a falsy query as absent
+  (`q = query.lower() if query else None`, `repository.py:1761`), so an empty-string query genuinely **did** run as a
+  tags-only search. The panel reports **what the search did**, not what was passed — "fixing" it would make the label
+  *less* truthful. New `test_lookup_section_lines_labels_empty_query_as_tags_only` documents this so it isn't
+  re-"fixed" later.
+
+**Owner rulings 2026-07-15 (both previously-open decisions now closed):**
+1. **UI-harness test for the `PlayView` render line — NOT added; A6 precedent accepted.** `views/play_view.py:270`
+   (`lookup_section_lines()` in the DBG tab) stays **unpinned** — deleting that line still leaves the suite green. This
+   is consistent with how A6's `bundle_section_lines()` shipped; coverage sits at the `DebugControls` + wiring seams.
+   *(Still a known gap if the DBG tab ever gets harness coverage — the natural time to pin both render lines at once.)*
+2. **Sweep the 4 low findings — yes**, done above.
+
+**Deferred/optional, not blocking:** the Phase A deferred items + the tag-hygiene data pass (both below). Two carried
+Phase-B notes worth folding into a future cleanup: (a) `_collect_anchor_tags` (`memory/context_bundle.py`) still does
+**not** read the `rooms` table, so a room's own `tags`/`quest_role` don't drive the T7 pre-fetch (B0 note, unchanged);
+(b) `views/play_view.py`'s `lookup_section_lines()` render line stays **unpinned** per the A6 precedent (owner ruling
+2026-07-15) — the natural time to pin it is whenever the DBG tab gets harness coverage.
+
+---
+
+*(Historical detail for the completed slices follows.)*
+
+**Phase A deferred items (non-blocking — fold into Phase B or a cleanup slice):** room-id gate
+self-disable logging (`seed_rpg_state.py` when `dungeon.json` absent); a shared `field_validator("tags")`
+on Item/RoomObject/Objective/ClockState (move tag enforcement to the type boundary); the engine
+write→read round-trip integration test (**Gap A** — write via `record_dungeon_exchange`/
+`advance_objectives`/`discover_exit`, read back through `ContextBundleBuilder`, assert resurfacing); LOW
+items (co-referenced-clock `trigger_tags` last-writer-wins; DBG panel hides found-then-fully-trimmed lore;
+`seed_pack.py:144` docstring imprecision).
+
+**Optional data-hygiene pass (not blocking):** old saves' gameplay memories carry pre-taxonomy **bare
+tags** (`knowledge`, `arcane`, …) that don't participate in scene-scoped retrieval; a `normalize_tag` pass
+over existing `memory_tags` would fold them into the canonical vocabulary. Noticed on the live Crucible
+during A6 GUI verify.
 
 *(A6 detail + the full A1–A6 slice history are retained in the blocks below.)*
 

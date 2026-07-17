@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from dungeon_daddy.data.models import Level, Room
 from dungeon_daddy.memory.repository import MemoryRepository
 from dungeon_daddy.rpg.models import (
     CLOCK_CATEGORIES,
@@ -17,6 +18,7 @@ from dungeon_daddy.rpg.seed_pack import (
     SeedFaction,
     SeedPack,
     apply_seed_pack,
+    build_room_states,
     derive_actor_id,
     derive_clock_id,
     derive_faction_id,
@@ -525,6 +527,34 @@ class TestApplySeedPack:
         assert clocks[clock_id]["stakes"] == "Elevator needed to descend."
         assert clocks[clock_id]["completion_effect"] == "Elevator operational."
 
+    def test_apply_plants_a_room_record_per_dungeon_room(
+        self, repo: MemoryRepository
+    ) -> None:
+        pack = SeedPack.model_validate(_MINIMAL_PACK)
+        levels = [
+            _level(1, [_room("R1", "Receiving Hall", note="A dusty entry.",
+                             main_loop_role="entry")]),
+            _level(2, [_room("r01", "Factory Floor")]),
+        ]
+        result = apply_seed_pack(
+            pack, "campaign-123", repo, MIGRATIONS_DIR, levels=levels
+        )
+        rooms = {r["room_id"]: r for r in repo.get_rooms("campaign-123")}
+        assert set(rooms) == {"R1", "r01"}
+        assert rooms["R1"]["summary"] == "A dusty entry."
+        assert rooms["R1"]["level_id"] == "level:1"
+        assert rooms["R1"]["quest_role"] == "entry"  # derived from main_loop_role
+        assert rooms["r01"]["level_id"] == "level:2"
+        assert result.rooms_applied == 2
+
+    def test_apply_seeds_no_rooms_without_levels(
+        self, repo: MemoryRepository
+    ) -> None:
+        pack = SeedPack.model_validate(_MINIMAL_PACK)
+        result = apply_seed_pack(pack, "campaign-123", repo, MIGRATIONS_DIR)
+        assert repo.get_rooms("campaign-123") == []
+        assert result.rooms_applied == 0
+
     def test_apply_validates_room_ids_when_provided(self, repo: MemoryRepository) -> None:
         data = {
             **_MINIMAL_PACK,
@@ -929,3 +959,126 @@ class TestSeedFactionModel:
     def test_seed_pack_factions_defaults_to_empty(self) -> None:
         pack = SeedPack.model_validate(_MINIMAL_PACK)
         assert pack.factions == []
+
+
+# ---------------------------------------------------------------------------
+# Slice B0 seed path — build RoomState records from a dungeon (spec §7.1)
+# ---------------------------------------------------------------------------
+
+
+def _room(room_id: str, name: str, *, note: str = "", room_type: str = "chamber",
+          main_loop_role: str | None = None, tags: list[str] | None = None) -> Room:
+    return Room(
+        id=room_id, num=1, name=name, x=0, y=0, w=4, h=4,
+        type=room_type, note=note, main_loop_role=main_loop_role, tags=tags or [],
+    )
+
+
+def _level(level_id: int, rooms: list[Room], *, name: str = "Level") -> Level:
+    return Level(
+        id=level_id, name=name, summary="", ecology="", loop="",
+        width=16, height=16, entries=[], rooms=rooms, connections=[],
+    )
+
+
+class TestBuildRoomStates:
+    def test_maps_core_room_identity_fields(self) -> None:
+        levels = [_level(1, [_room("R1", "Receiving Hall", note="A dusty entry.",
+                                   room_type="entrance")])]
+        rooms = build_room_states(levels, "campaign:the-crucible")
+        assert len(rooms) == 1
+        room = rooms[0]
+        assert room.room_id == "R1"
+        assert room.campaign_id == "campaign:the-crucible"
+        assert room.level_id == "level:1"
+        assert room.display_name == "Receiving Hall"
+        assert room.room_type == "entrance"
+        assert room.summary == "A dusty entry."
+
+    def test_slug_is_derived_from_room_name(self) -> None:
+        levels = [_level(1, [_room("R1", "Receiving Hall")])]
+        room = build_room_states(levels, "campaign:the-crucible")[0]
+        assert room.slug == "receiving-hall"
+
+    def test_slug_falls_back_to_room_id_when_name_empty(self) -> None:
+        levels = [_level(1, [_room("R7", "")])]
+        room = build_room_states(levels, "campaign:the-crucible")[0]
+        assert room.slug == "R7"
+
+    def test_level_id_reflects_each_room_owning_level(self) -> None:
+        levels = [
+            _level(1, [_room("R1", "Hall")]),
+            _level(2, [_room("r01", "Floor"), _room("r02", "Vault")]),
+        ]
+        rooms = build_room_states(levels, "campaign:the-crucible")
+        by_id = {r.room_id: r for r in rooms}
+        assert len(rooms) == 3
+        assert by_id["R1"].level_id == "level:1"
+        assert by_id["r01"].level_id == "level:2"
+        assert by_id["r02"].level_id == "level:2"
+
+    def test_defaults_have_no_quest_role_or_tags(self) -> None:
+        levels = [_level(1, [_room("R1", "Hall")])]
+        room = build_room_states(levels, "campaign:the-crucible")[0]
+        assert room.quest_role is None
+        assert room.tags == []
+
+    def test_tags_come_from_override_map(self) -> None:
+        levels = [_level(1, [_room("R4", "Great Lift")])]
+        rooms = build_room_states(
+            levels, "campaign:the-crucible",
+            room_tags={"R4": ["thread:power-core", "theme:history"]},
+        )
+        assert rooms[0].tags == ["thread:power-core", "theme:history"]
+
+    def test_tag_override_is_validated(self) -> None:
+        levels = [_level(1, [_room("R4", "Great Lift")])]
+        with pytest.raises(ValueError):
+            build_room_states(
+                levels, "campaign:the-crucible",
+                room_tags={"R4": ["not-namespaced"]},
+            )
+
+    def test_quest_role_comes_from_override_map(self) -> None:
+        levels = [_level(1, [_room("R4", "Great Lift"), _room("R1", "Hall")])]
+        rooms = build_room_states(
+            levels, "campaign:the-crucible",
+            quest_roles={"R4": "power-core-access"},
+        )
+        by_id = {r.room_id: r for r in rooms}
+        assert by_id["R4"].quest_role == "power-core-access"
+        assert by_id["R1"].quest_role is None
+
+    def test_quest_role_defaults_to_room_main_loop_role(self) -> None:
+        levels = [_level(1, [_room("R4", "Great Lift", main_loop_role="goal")])]
+        room = build_room_states(levels, "campaign:the-crucible")[0]
+        assert room.quest_role == "goal"
+
+    def test_quest_role_override_wins_over_main_loop_role(self) -> None:
+        levels = [_level(1, [_room("R4", "Great Lift", main_loop_role="goal")])]
+        room = build_room_states(
+            levels, "campaign:the-crucible",
+            quest_roles={"R4": "power-core-access"},
+        )[0]
+        assert room.quest_role == "power-core-access"
+
+    def test_quest_role_none_when_no_role_and_no_override(self) -> None:
+        levels = [_level(1, [_room("R2", "Marketplace")])]
+        room = build_room_states(levels, "campaign:the-crucible")[0]
+        assert room.quest_role is None
+
+    def test_unknown_quest_role_override_room_id_raises(self) -> None:
+        levels = [_level(1, [_room("R1", "Hall")])]
+        with pytest.raises(ValueError, match="NO-SUCH"):
+            build_room_states(
+                levels, "campaign:the-crucible",
+                quest_roles={"NO-SUCH": "goal"},
+            )
+
+    def test_unknown_tag_override_room_id_raises(self) -> None:
+        levels = [_level(1, [_room("R1", "Hall")])]
+        with pytest.raises(ValueError, match="NO-SUCH"):
+            build_room_states(
+                levels, "campaign:the-crucible",
+                room_tags={"NO-SUCH": ["theme:history"]},
+            )

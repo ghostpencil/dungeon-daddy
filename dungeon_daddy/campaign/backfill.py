@@ -57,12 +57,19 @@ def backfill_exits_if_empty(repo: MemoryRepository, dungeon_path: Path) -> int:
             json.loads(dungeon_path.read_text(encoding="utf-8"))
         )
         manifest = CampaignManifest(slug=slug, title=title, dungeon_slug=slug)
-        result = seed_from_manifest(manifest, repo, campaign_id, dungeon=dungeon)
-        if result.created:
+        seed_from_manifest(manifest, repo, campaign_id, dungeon=dungeon)
+        # ``result.created`` spans rooms too (Slice B0 also projects the dungeon's
+        # rooms), so count the exits specifically for the return contract — the
+        # empty-guard above means every current row was just created.
+        after_row = conn.execute(
+            "SELECT count(*) FROM room_exits WHERE campaign_id = ?", [campaign_id]
+        ).fetchone()
+        created = after_row[0] if after_row else 0
+        if created:
             _log.info(
-                "Backfilled %d room_exits on load for %s", result.created, campaign_id
+                "Backfilled %d room_exits on load for %s", created, campaign_id
             )
-        return result.created
+        return created
     except Exception as exc:  # never block loading a save
         _log.warning("Exit backfill on load skipped: %s", exc)
         return 0

@@ -20,6 +20,7 @@ from dungeon_daddy.rpg.models import (
     ReactionStressLine,
     RoomExit,
     RoomObject,
+    RoomState,
     StressTrack,
     WorldReaction,
     is_adverse,
@@ -992,6 +993,45 @@ class TestRoomExit:
             connector_type="stair_down",
         )
         assert exit_.connector_type == "stair_down"
+
+
+class TestRoomState:
+    def test_constructs_with_required_fields_and_defaults(self) -> None:
+        room = RoomState(
+            room_id="R1",
+            campaign_id="camp-1",
+            level_id="level-1",
+            slug="entry-chamber",
+            display_name="Entry Chamber",
+            room_type="chamber",
+        )
+        assert room.room_id == "R1"
+        assert room.slug == "entry-chamber"
+        # Optional campaign-authored fields default empty / None.
+        assert room.summary == ""
+        assert room.quest_role is None
+        assert room.markdown_path is None
+        assert room.checksum is None
+        assert room.tags == []
+
+    def test_round_trips_all_fields(self) -> None:
+        room = RoomState(
+            room_id="R4",
+            campaign_id="camp-1",
+            level_id="level-1",
+            slug="great-lift",
+            display_name="The Great Lift",
+            room_type="mechanism",
+            summary="A vast counterweighted platform straddling the power core.",
+            quest_role="power-core",
+            markdown_path="rooms/great-lift.md",
+            checksum="abc123",
+            tags=["location:great-lift", "level:level-1", "thread:power-core"],
+        )
+        restored = RoomState.model_validate(room.model_dump())
+        assert restored == room
+        assert restored.quest_role == "power-core"
+        assert restored.tags == ["location:great-lift", "level:level-1", "thread:power-core"]
 
 
 class TestObjectiveCompletion:

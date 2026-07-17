@@ -11,16 +11,19 @@ from pathlib import Path
 import pytest
 
 from dungeon_daddy.memory.repository import MemoryRepository
+from dungeon_daddy.rpg.models import RoomState
 from dungeon_daddy.rpg.obstacles import (
     obstacle_approach_verbs,
     obstacle_resolved_state,
 )
 from tools.populate_crucible_level1 import (
+    _ROOM_TAGS,
     CAMPAIGN_ID,
     _items,
     _objects,
     _oid,
     save_objects_preserving_state,
+    save_room_tags,
 )
 
 _MIGRATIONS_DIR = Path("dungeon_daddy/data/migrations")
@@ -95,6 +98,49 @@ def test_reseed_preserves_played_object_state(repo):
     save_objects_preserving_state(repo, _objects())  # additive reseed
 
     assert repo.get_room_object(gear_id)["current_state"] == "cleared"
+
+
+# --- Slice B0 §7.1: room lore-tag enrichment ------------------------------
+
+
+def _seed_base_room(repo, room_id, *, summary="base lore", quest_role="entry"):
+    """Plant the base room record the seed path would create (spec §7.1)."""
+    repo.save_room(RoomState(
+        room_id=room_id, campaign_id=CAMPAIGN_ID, level_id="level:1",
+        slug=room_id.lower(), display_name=room_id, room_type="chamber",
+        summary=summary, quest_role=quest_role,
+    ))
+
+
+def test_room_tags_are_canonical():
+    # Guard: every authored room tag passes the namespaced taxonomy.
+    from dungeon_daddy.memory.tags import validate_tag
+    for tags in _ROOM_TAGS.values():
+        for t in tags:
+            assert validate_tag(t) == t
+
+
+def test_save_room_tags_enriches_base_room_preserving_summary_and_role(repo):
+    _seed_base_room(repo, "R1", summary="Receiving Hall lore.", quest_role="entry")
+    save_room_tags(repo)
+    row = repo.get_room(CAMPAIGN_ID, "R1")
+    assert set(row["tags"]) >= set(_ROOM_TAGS["R1"])
+    assert row["summary"] == "Receiving Hall lore."   # base summary preserved
+    assert row["quest_role"] == "entry"               # derived role preserved
+
+
+def test_save_room_tags_is_idempotent(repo):
+    _seed_base_room(repo, "R1")
+    save_room_tags(repo)
+    save_room_tags(repo)  # reseed
+    row = repo.get_room(CAMPAIGN_ID, "R1")
+    assert len(row["tags"]) == len(set(row["tags"]))  # no duplicate tags
+
+
+def test_save_room_tags_skips_unseeded_room(repo):
+    # No base room planted → no crash, nothing written (base seed is the source).
+    save_room_tags(repo)
+    assert repo.get_rooms(CAMPAIGN_ID) == []
 
 
 # --- Slice 9: the World Reaction Policy map (design §6) --------------------

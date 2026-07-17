@@ -30,6 +30,7 @@ EXPECTED_TABLES = {
     "object_transitions",
     "object_reaction_bindings",
     "room_exits",
+    "rooms",
 }
 
 
@@ -245,6 +246,56 @@ class TestMigrationRunnerIntegration:
         assert [c["clock_id"] for c in clocks] == ["clk:old"]
         assert clocks[0]["tags"] == []
 
+    def test_rooms_table_present_with_expected_columns(self, tmp_path: Path) -> None:
+        """Migration 022 adds a first-class `rooms` table (Slice B0, spec §7.1)."""
+        db_path = tmp_path / "dungeon.duckdb"
+        MigrationRunner(migrations_dir=MIGRATIONS_DIR, db_path=db_path).run()
+        conn = duckdb.connect(str(db_path))
+        cols = {
+            row[0]
+            for row in conn.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'rooms'"
+            ).fetchall()
+        }
+        conn.close()
+        assert {
+            "room_id", "campaign_id", "level_id", "slug", "display_name",
+            "room_type", "summary", "quest_role", "markdown_path", "checksum", "tags",
+        } <= cols
+
+    def test_022_applies_on_021_head_db(self, tmp_path: Path) -> None:
+        """A DB migrated through 021 then to 022 gains the rooms table cleanly."""
+        db_path = tmp_path / "dungeon.duckdb"
+        head_dir = tmp_path / "migrations_021"
+        head_dir.mkdir()
+        for sql_file in sorted(MIGRATIONS_DIR.glob("*.sql")):
+            if sql_file.name < "022":
+                (head_dir / sql_file.name).write_text(
+                    sql_file.read_text(encoding="utf-8"), encoding="utf-8"
+                )
+        MigrationRunner(migrations_dir=head_dir, db_path=db_path).run()
+        conn = duckdb.connect(str(db_path))
+        tables_before = {
+            row[0]
+            for row in conn.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'main'"
+            ).fetchall()
+        }
+        conn.close()
+        assert "rooms" not in tables_before
+        applied = MigrationRunner(migrations_dir=MIGRATIONS_DIR, db_path=db_path).run()
+        assert "022_rooms.sql" in applied
+        # Back-compat read through the repo: a freshly-migrated DB has an empty
+        # rooms table that loads with no crash (spec/TESTING.md Migration Tests §3).
+        repo = MemoryRepository(db_path)
+        repo.initialize_schema(MIGRATIONS_DIR)
+        try:
+            assert repo.get_rooms("camp:none") == []
+        finally:
+            repo.close()
+
     def test_items_table_has_room_id_column(self, tmp_path: Path) -> None:
         db_path = tmp_path / "dungeon.duckdb"
         runner = MigrationRunner(migrations_dir=MIGRATIONS_DIR, db_path=db_path)
@@ -286,12 +337,19 @@ class TestMemoryRepositoryIntegration:
         repo.close()
 
     def test_no_existing_play_mode_tables_affected(self, tmp_path: Path) -> None:
-        """Migration should not create or alter any dungeon design tables."""
+        """Migration should not create or alter any dungeon *design* tables.
+
+        The dungeon *layout* (geometry, level structure, the visual connection
+        graph) lives in the main DungeonRepository (JSON), not this DuckDB. Note
+        that as of Slice B0 the campaign DB DOES hold a `rooms` table — a
+        campaign-runtime projection of each room (searchable/taggable/lore), which
+        is deliberately distinct from the design-side layout (spec §7.1). So
+        `rooms` is no longer a forbidden name; `dungeons`/`connections`/`levels`
+        remain design-only.
+        """
         repo = MemoryRepository(db_path=tmp_path / "dungeon.duckdb")
         repo.initialize_schema(MIGRATIONS_DIR)
         tables = set(repo.list_tables())
-        # Dungeon design tables live in the main DungeonRepository (SQLite-based JSON),
-        # not in this DuckDB. Confirm none of the legacy table names are present here.
-        legacy_names = {"dungeons", "rooms", "connections", "levels"}
-        assert tables.isdisjoint(legacy_names)
+        design_only_names = {"dungeons", "connections", "levels"}
+        assert tables.isdisjoint(design_only_names)
         repo.close()

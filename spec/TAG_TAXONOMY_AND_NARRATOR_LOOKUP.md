@@ -226,17 +226,79 @@ now with better recall.
 ```
 
 At least one of `query`/`tags` is required. Results are compact JSON rows:
-`{entity_type, id, slug, display_name, room_id, tags, snippet}` — `snippet` is the
+`{entity_type, id, slug, display_name, room_id, status, tags, snippet}` — `snippet` is the
 description/summary truncated to ~200 chars. Deterministic ranking: exact slug match >
 tag-hit count > (memories only) importance DESC, created_at DESC. Total tool-result budget
-~1,200 tokens; overflow rows dropped with a `"+N more"` marker.
+~1,200 tokens; overflow rows dropped. *(As built: reported as a structured `omitted: N` field
+rather than a `"+N more"` marker string — the debug panel renders it as `(N trimmed)`.)*
+
+**Two owner rulings during Slice B1 (2026-07-12; refine the row/ranking above):**
+- **Row gains `status` (8 keys, not 7).** `lookup_world` is for entities/places/*past events*, so
+  it must surface defunct entities (dead actors, consumed items, resolved clocks, completed
+  objectives), not filter them out — but each row carries its lifecycle `status` so the narrator
+  can tell live from defunct (objects report `current_state`; rooms have no status → `null`;
+  memories are always `approved`). Prompt-side handling (past-tense narration of defunct entities)
+  is B4's job; the field is the prerequisite.
+- **Importance/recency is a *memories-only intra-group* tiebreak, not a global 4th key.** The
+  cross-type ranking stops at tag-hit count; importance/`created_at` only order memories among
+  themselves, so a memory never jumps a tied non-memory entity (which would push concrete world
+  entities past the `limit` in favour of lore). Implemented as a stable sort on `(exact_slug,
+  tag_hits)` with the memory block pre-sorted by importance DESC / recency DESC — entities precede
+  memories at a genuine relevance tie.
 
 **L2 (proposed): backend = one new repo method**, `MemoryRepository.search_entities(
-campaign_id, query=None, tags=None, entity_types=None, limit=8)` — `ILIKE '%q%'` over
-`slug`/`display_name` (first `LIKE` in the codebase; DuckDB supports `ILIKE` natively) union'd
-across the entity tables, plus exact tag membership (JSON-list `tags` columns and the
-`memory_tags` join table). A thin `LookupService` wraps it and formats tool results;
-`MemoryRetriever` stays untouched.
+campaign_id, query=None, tags=None, entity_types=None, limit=8)` — union'd across the entity
+tables, matching a case-insensitive substring on `slug`/`display_name` plus exact tag membership
+(JSON-list `tags` columns and the `memory_tags` join table). *(Slice B1 note: the substring match
+is done in Python over campaign-scoped rows rather than SQL `ILIKE` — equivalent behaviour at this
+scale, simpler, and lets the query-OR-tags union compose cleanly; revisit if campaign size ever
+makes it a scaling ceiling.)* An empty `entity_types` list means "no filter" (all types), not
+"match nothing". A thin read-only `LookupService` wraps it and formats tool results (snippet trim,
+token budget, `omitted` count); `MemoryRetriever` stays untouched.
+
+## 7.1 Rooms as a first-class campaign entity (OWNER-DECIDED 2026-07-11)
+
+Rooms were the one scene anchor **not** in the campaign DuckDB — authored only in the dungeon
+JSON (`data.models.Room`, via `DungeonRepository`), reachable at retrieval time only indirectly
+(memories tagged `location:<room_id>`). Every other noun (object/item/actor/clock/objective/
+faction) is a first-class, taggable, searchable DuckDB row. To let `lookup_world` and the T7
+pre-fetch treat rooms symmetrically — and to give a room's authored setting lore / quest role a
+home — Slice B0 adds a **`rooms` table** to the campaign DB.
+
+**Design (owner decisions 2026-07-11):**
+- **Runtime projection, not a move.** The table is seeded from the dungeon + campaign seed like
+  every other entity. Geometry/layout (`x/y/w/h`, loop roles, graph notes) **stays in the dungeon
+  JSON** — the map renderer + layout system remain its readers; the `rooms` table does not
+  duplicate it. It holds only the campaign-facing, searchable fields.
+- **Columns** (mirroring the `actors`/`objectives` conventions): `room_id` (grid id — `R1`,
+  `r01`, …), `campaign_id`, `level_id`, `slug`, `display_name`, `room_type`, `summary`
+  (inline setting-lore text for fast retrieval), `quest_role` (the room's role in the quest),
+  `markdown_path` + `checksum` (pointer to the full authored lore body with front matter, mirroring
+  `memory_entries`), `tags` (JSON, namespaced taxonomy).
+- **Lore lives in both places:** a short `summary` column for inline/quick lookup **and** a
+  `markdown_path`/`checksum` to the full body — same split as `memory_entries`.
+- **Quest role in both places:** an authoritative `quest_role` column **and** namespaced tags
+  (`quest:*`/`thread:*`) so the role also drives tag retrieval (column = truth, tags = reach).
+- **Quest role sourcing (OWNER-DECIDED 2026-07-11): hybrid.** The seed path *derives* the default
+  `quest_role` from the dungeon room's `main_loop_role` (`entry`/`goal`/`obstacle`/`clue`/`bypass`/…),
+  and an authored per-room override wins. Rationale: the literal "derive from objectives" has no data
+  source — `Loop.objective_room_ids` is empty in every shipped dungeon and RPG `Objective` entities carry
+  no room link, whereas `main_loop_role` *is* the room's authored role in the quest layout. Rooms lacking
+  it (e.g. the tomb sample) get `None`. In practice the derived roles were kept for the Crucible (already
+  meaningful); the populate scripts author only lore `tags`.
+- **Seed-path reach (Slice B0, implemented 2026-07-11):** the projection runs in `apply_seed_pack(levels=)`,
+  `seed_campaign_with_pack` (when `dungeon.json` present), **and** the app's new-game `seed_from_manifest`
+  (already passed the dungeon). New campaigns get rooms on first load via `backfill.py` (same seam as exits);
+  a reseed respects skip/`force` and never clobbers populate-authored `tags`/`quest_role`. Crucible lore tags
+  are enriched by the populate scripts through the shared `enrich_room_tags` helper.
+- Model `RoomState` (`rpg/models.py`, beside `ActorState`/`FactionState`/`ClockState`); repo
+  `save_room`/`get_rooms`/`get_room`; migration `022_rooms.sql` (bare SQL, no `--` comments — the
+  runner splits on `;`) with the standard migration tests (applies-on-prev-head, idempotent-from-
+  scratch, back-compat reads).
+- **Connections** stay in the existing `room_exits` table (migration `010`; already first-class
+  with gating). No tags / no memory-retrieval — a room's *traversal* graph is not thematic lore.
+  Add read helpers (`get_exits_by_room` already exists) only if `lookup_world` needs to surface
+  them.
 
 ## 8. Authority boundary — why this is clean
 
@@ -346,10 +408,15 @@ call `run_tool_loop`; no agent reimplements the loop.
   execute DuckDB **reads from that worker thread** — today's convention builds the bundle on the
   main thread (`build_context_bundle` runs synchronously in `spawn_dm_thread` *before* the thread
   launches, `play/narration.py:205,264`), so this is
-  new. Approach: the shared connection is guarded by a `threading.Lock` owned by
-  `MemoryRepository`, and tool queries go through `conn.cursor()` under that lock. (A second
-  `read_only=True` connection is NOT assumed safe while the app holds the write connection —
-  verify in a spike before choosing it.)
+  new. Approach: tool queries go through `conn.cursor()` under a `threading.Lock` owned by
+  `MemoryRepository`. **As built (corrected after the PR #92 review):** the *cursor* is what
+  isolates a worker read from main-thread use of the connection — the lock is held only by
+  `search_entities`, so it serializes worker lookups against each other and never against the
+  main thread. The original wording ("the shared connection is guarded by a `threading.Lock`")
+  overstated it: guarding one method does not guard the connection. Both properties are pinned
+  by `tests/unit/memory/test_search_entities_concurrency.py`. (A second `read_only=True`
+  connection is NOT assumed safe while the app holds the write connection — verify in a spike
+  before choosing it.)
 - **L6 (proposed): observability.** Every tool call is logged (query, tags, hit count) and
   surfaced in the transcript debug panel the way proposal provenance already is — so a bad
   narration can be traced to what the model looked up (mirrors `MEMORY_SYSTEM_SPEC.md`
@@ -359,9 +426,10 @@ call `run_tool_loop`; no agent reimplements the loop.
 
 - **No write tools, ever** — proposals stay on the existing propose→validate→apply pipeline
   (`ActionOrchestrator.run_proposal_pipeline`, `play/actions.py:582`, ex-`play_view.py:1909`).
-- No vector/semantic search, no embeddings — exact tags + ILIKE substring only.
+- No vector/semantic search, no embeddings — exact tags + substring only (see the §7 L2 note: the
+  substring match is done in Python, not SQL `ILIKE`).
 - No LLM-visible SQL; no cross-campaign search.
-- No DuckDB FTS extension in v1 (revisit if ILIKE+tags proves insufficient).
+- No DuckDB FTS extension in v1 (revisit if substring+tags proves insufficient).
 - No tool use in the generator/design-side agents (out of scope).
 
 ## 12. Phasing & slices (TDD per `spec/TESTING.md`; use the TDD skill)
@@ -396,7 +464,13 @@ it directly serves Phase A's retrieval slices):
    untouched by 51.7) — deterministic, integration-tested on bundle output.
 
 **Phase B — Narrator Lookup Tool** (requires A):
-1. `MemoryRepository.search_entities` + `LookupService` (unit + roundtrip tests, fake data).
+0. **Rooms as a first-class campaign entity (owner-directed 2026-07-11; see §7.1).** New `rooms`
+   table + `RoomState` model + `save_room`/`get_rooms`/`get_room` (migration `022_rooms.sql` with the
+   standard migration tests). Seed path plants a room record per dungeon room. Prereq for room
+   lookups in slice 1. Connections stay in the existing `room_exits` table (no tags).
+1. `MemoryRepository.search_entities` + `LookupService` (unit + roundtrip tests, fake data) —
+   unions the DuckDB entity tables **incl. `rooms`** (B0), so `entity_type="room"` needs no
+   cross-repo seam.
 2. Provider transport: `LLMToolDef`/`LLMToolCall`/`LLMRoundResult`, `complete_round` on the
    protocol + `OpenAIProvider` translation (unit-test with a `FakeProvider` scripting
    `tool_calls`; no live API in the default suite).
@@ -425,10 +499,10 @@ scheduling prefers.
 | T5 | Delete `threat_tags`; stop `trigger_tags`→`action_tags`; convert to `trait:` | **OWNER-DECIDED 2026-07-08** |
 | T6 | Normalization migration mapping (protagonist→pc etc.) | **OWNER-DECIDED 2026-07-08** |
 | T7 | Deterministic `# Related Lore` pre-fetch is the default retrieval path | **OWNER-DECIDED 2026-07-04** |
-| L1 | Single `lookup_world` tool, name+tags+types params, out-of-scene mandate only | yes |
-| L2 | One repo method `search_entities` (ILIKE + exact tags) behind `LookupService` | yes |
+| L1 | Single `lookup_world` tool, name+tags+types params, out-of-scene mandate only | **OWNER-DECIDED 2026-07-11** |
+| L2 | One repo method `search_entities` (substring + exact tags; Python not `ILIKE`, see §7 L2 note) behind `LookupService` | **OWNER-DECIDED 2026-07-11** |
 | L3 | Agent-owned loop: provider = transport (`complete_round` + neutral types), loop in `llm/tool_loop.py` | **OWNER-DECIDED 2026-07-04** |
-| L4 | Budgets: 2 tool rounds, 8-row default, ~1.2k-token results, errors-as-strings | yes |
-| L5 | Tool loop + DuckDB reads on the worker thread behind a repo-owned lock | yes |
-| L6 | Log + debug-panel provenance for every lookup | yes |
-| L7 | Scoping enforcement: prompt contract + redundant-lookup telemetry + full-overlap redirect | yes |
+| L4 | Budgets: 2 tool rounds, 8-row default, ~1.2k-token results, errors-as-strings | **OWNER-DECIDED 2026-07-11** |
+| L5 | Tool loop + DuckDB reads on the worker thread behind a repo-owned lock (shared conn + `threading.Lock`; read-only 2nd conn not pursued) | **OWNER-DECIDED 2026-07-11** |
+| L6 | Log + debug-panel provenance for every lookup | **OWNER-DECIDED 2026-07-11** |
+| L7 | Scoping enforcement: prompt contract + redundant-lookup telemetry + full-overlap redirect (no hard pre-filter) | **OWNER-DECIDED 2026-07-11** |

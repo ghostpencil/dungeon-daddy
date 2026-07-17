@@ -1,16 +1,31 @@
 """DungeonMasterAgent — Play Mode narration and chat."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from dungeon_daddy.data.models import Dungeon, Level, Loop, Room
 from dungeon_daddy.llm.context_builder import ContextBuilder
+from dungeon_daddy.llm.lookup_tool import LOOKUP_WORLD_TOOL
 from dungeon_daddy.llm.prompts import load_prompt
-from dungeon_daddy.llm.provider import LLMMessage, LLMProvider
+from dungeon_daddy.llm.provider import LLMMessage, LLMProvider, LLMToolCall
+from dungeon_daddy.llm.tool_loop import run_tool_loop
 
 if TYPE_CHECKING:
     from dungeon_daddy.memory.models import ContextBundle
     from dungeon_daddy.rpg.models import ActionResolution
+
+# The §6 scoping contract, restated for the model when the lookup tool is live:
+# only escalate to `lookup_world` for what the in-room context cannot cover.
+_LOOKUP_GUIDANCE = (
+    "\n\n# Looking Things Up\n"
+    "You have a `lookup_world` tool. Use it ONLY for people, places, or past "
+    "events that are NOT already in your context — an off-scene character the "
+    "player names, distant lore across the dungeon, or a past event that no "
+    "room detail or Related Lore entry covers. Never look up something already "
+    "described in your context (the current room, present actors, or the "
+    "Related Lore section). If you already have what you need, just answer."
+)
 
 
 class DungeonMasterAgent:
@@ -62,14 +77,47 @@ class DungeonMasterAgent:
             if clocks:
                 lines.append("Open Clocks:")
                 for c in clocks:
-                    lines.append(f"  - {c.get('label', c.get('name', ''))} ({c.get('filled', 0)}/{c.get('segments', 0)})")
-        objects = (context_bundle.current_room or {}).get("objects", [])
+                    label = c.get("label", c.get("name", ""))
+                    line = f"  - {label} ({c.get('filled', 0)}/{c.get('segments', 0)})"
+                    stakes = c.get("stakes", "")
+                    lines.append(f"{line} — {stakes}" if stakes else line)
+        room = context_bundle.current_room or {}
+        objects = room.get("objects", [])
         if objects:
             lines.append("\n# Room Contents")
             for o in objects:
                 desc = o.get("description", "")
                 lines.append(f"  - {o.get('display_name', '')}: {desc}" if desc
                              else f"  - {o.get('display_name', '')}")
+        # Everything below is collected by `lookup_tool.bundle_entity_ids` and so
+        # drives the L7 full-overlap redirect. Anything in that set the narrator
+        # cannot read here would be refused by the redirect *and* absent from the
+        # prompt — see test_every_bundle_entity_id_is_described_in_the_system_prompt.
+        actors = list(room.get("npcs", [])) + list(room.get("monsters", []))
+        if actors:
+            lines.append("\n# Present Actors")
+            for a in actors:
+                lines.append(
+                    f"  - {a.get('display_name', '')} [{a.get('status', '')}, "
+                    f"{a.get('disposition', 'neutral')}]"
+                )
+        loose_items = room.get("loose_items", [])
+        if loose_items:
+            lines.append("\n# Loose Items")
+            for i in loose_items:
+                desc = i.get("description", "")
+                lines.append(f"  - {i.get('display_name', '')}: {desc}" if desc
+                             else f"  - {i.get('display_name', '')}")
+        factions = context_bundle.faction_reputations
+        if factions:
+            lines.append("\n# Factions")
+            for f in factions:
+                goal = f.get("goal", "")
+                line = (
+                    f"  - {f.get('display_name', '')} "
+                    f"(reputation: {f.get('reputation', 0)}, tier: {f.get('tier', 0)})"
+                )
+                lines.append(f"{line} — {goal}" if goal else line)
         return "\n".join(lines)
 
     def respond(
@@ -82,6 +130,7 @@ class DungeonMasterAgent:
         level_id: int | None = None,
         active_loop: Loop | None = None,
         context_bundle: ContextBundle | None = None,
+        lookup: Callable[[LLMToolCall], str] | None = None,
     ) -> str:
         context = self._build_context(room, level, dungeon, room_memory)
         base = self.build_prompt(context_bundle)
@@ -92,6 +141,18 @@ class DungeonMasterAgent:
             doc_context = self._context_builder.build_system_prompt(dungeon, level_id=level_id)
             if doc_context:
                 system = doc_context + "\n\n" + system
+        if lookup is not None and getattr(self._provider, "supports_tools", False):
+            # Escalation path (§9/§10): the agent owns the request→tool→request
+            # loop; the provider is pure transport. Guidance restates the §6
+            # "when to look things up" contract only when the tool is live.
+            return run_tool_loop(
+                self._provider,
+                history,
+                system + _LOOKUP_GUIDANCE,
+                tools=[LOOKUP_WORLD_TOOL],
+                executor=lookup,
+                max_tokens=1024,
+            )
         return self._provider.complete(
             messages=history,
             system=system,

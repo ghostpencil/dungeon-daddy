@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import duckdb
 
@@ -17,7 +18,45 @@ from dungeon_daddy.rpg.models import (
     Objective,
     RoomExit,
     RoomObject,
+    RoomState,
 )
+
+
+class _EntitySource(NamedTuple):
+    """A taggable campaign table `search_entities` unions (Slice B1, spec §7).
+
+    `slug_col`/`room_col`/`snippet_col`/`status_col` are None when the table has
+    no such column; the SELECT substitutes a NULL literal so every source yields
+    the uniform row shape ``(id, slug, name, room, status, snippet, tags)``.
+    `status_col` lets the narrator tell a live entity from a defunct one (owner
+    ruling 2026-07-12); rooms have no lifecycle status, objects report their
+    `current_state`.
+    """
+
+    entity_type: str
+    table: str
+    id_col: str
+    slug_col: str | None
+    name_col: str
+    room_col: str | None
+    status_col: str | None
+    snippet_col: str | None
+
+
+# Order = default result order before ranking (the stable sort in
+# `search_entities` depends on it).
+_ENTITY_SOURCES: list[_EntitySource] = [
+    _EntitySource("actor", "actors", "actor_id", "slug", "display_name", "room_id", "status", None),
+    _EntitySource("object", "room_objects", "object_id", "slug", "display_name", "room_id", "current_state", "description"),
+    _EntitySource("item", "items", "item_id", "slug", "display_name", "room_id", "status", "description"),
+    _EntitySource("clock", "clocks", "clock_id", None, "label", "scope_room_id", "status", "stakes"),
+    _EntitySource("objective", "objectives", "objective_id", "slug", "title", None, "status", "description"),
+    _EntitySource("faction", "factions", "faction_id", "slug", "display_name", None, "status", "concept"),
+    _EntitySource("room", "rooms", "room_id", "slug", "display_name", "room_id", None, "summary"),
+]
+
+# Hard cap on `search_entities` result count (spec §7 `limit` cap 20).
+_SEARCH_LIMIT_CAP = 20
 
 
 def _ensure_migration_table(conn: duckdb.DuckDBPyConnection) -> None:
@@ -78,6 +117,16 @@ class MemoryRepository:
         self._db_path = db_path
         self._conn: duckdb.DuckDBPyConnection | None = duckdb.connect(str(db_path))
         self._in_transaction = False
+        # L5 (spec §10): `search_entities` runs from the narrator worker thread
+        # while the main thread may use the shared connection. Two mechanisms,
+        # two jobs — do not conflate them:
+        #   - the dedicated `self._conn.cursor()` in `search_entities` is what
+        #     keeps a worker read from interleaving with MAIN-THREAD use of the
+        #     connection. This lock cannot do that: no other method acquires it.
+        #   - this lock serializes concurrent worker lookups against EACH OTHER.
+        # Deleting either one leaves a real race; both are pinned by
+        # tests/unit/memory/test_search_entities_concurrency.py.
+        self._read_lock = threading.Lock()
 
     def health_check(self) -> bool:
         if self._conn is None:
@@ -1616,6 +1665,200 @@ class MemoryRepository:
             "requires_clock_min_filled": r[14],
             "requires_memory_slug": r[15],
         }
+
+    # ------------------------------------------------------------------
+    # Rooms (Phase 51.8 Slice B0 — first-class campaign room record; spec §7.1)
+    # ------------------------------------------------------------------
+
+    def save_room(self, room: RoomState) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            INSERT INTO rooms (
+                room_id, campaign_id, level_id, slug, display_name, room_type,
+                summary, quest_role, markdown_path, checksum, tags
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (campaign_id, room_id) DO UPDATE SET
+                level_id      = excluded.level_id,
+                slug          = excluded.slug,
+                display_name  = excluded.display_name,
+                room_type     = excluded.room_type,
+                summary       = excluded.summary,
+                quest_role    = excluded.quest_role,
+                markdown_path = excluded.markdown_path,
+                checksum      = excluded.checksum,
+                tags          = excluded.tags
+            """,
+            [
+                room.room_id, room.campaign_id, room.level_id, room.slug,
+                room.display_name, room.room_type, room.summary, room.quest_role,
+                room.markdown_path, room.checksum, json.dumps(room.tags),
+            ],
+        )
+
+    def get_rooms(self, campaign_id: str) -> list[dict[str, Any]]:
+        assert self._conn is not None
+        rows = self._conn.execute(
+            """
+            SELECT room_id, campaign_id, level_id, slug, display_name, room_type,
+                   summary, quest_role, markdown_path, checksum, tags
+            FROM rooms WHERE campaign_id = ?
+            ORDER BY level_id, room_id
+            """,
+            [campaign_id],
+        ).fetchall()
+        return [self._room_row_to_dict(r) for r in rows]
+
+    def get_room(self, campaign_id: str, room_id: str) -> dict[str, Any] | None:
+        assert self._conn is not None
+        row = self._conn.execute(
+            """
+            SELECT room_id, campaign_id, level_id, slug, display_name, room_type,
+                   summary, quest_role, markdown_path, checksum, tags
+            FROM rooms WHERE campaign_id = ? AND room_id = ?
+            """,
+            [campaign_id, room_id],
+        ).fetchone()
+        if row is None:
+            return None
+        return self._room_row_to_dict(row)
+
+    def _room_row_to_dict(self, r: tuple[Any, ...]) -> dict[str, Any]:
+        return {
+            "room_id": r[0],
+            "campaign_id": r[1],
+            "level_id": r[2],
+            "slug": r[3],
+            "display_name": r[4],
+            "room_type": r[5],
+            "summary": r[6],
+            "quest_role": r[7],
+            "markdown_path": r[8],
+            "checksum": r[9],
+            "tags": json.loads(r[10]) if r[10] else [],
+        }
+
+    # ------------------------------------------------------------------
+    # Narrator lookup (Phase 51.8 Slice B1 — read-only entity search; spec §7)
+    # ------------------------------------------------------------------
+
+    def search_entities(
+        self,
+        campaign_id: str,
+        query: str | None = None,
+        tags: list[str] | None = None,
+        entity_types: list[str] | None = None,
+        limit: int = 8,
+    ) -> list[dict[str, Any]]:
+        """Search the campaign's entity tables for `lookup_world` (spec §7/§7.1).
+
+        Unions the taggable DuckDB entity tables, matching a case-insensitive
+        substring `query` on slug/display_name and/or exact membership in `tags`
+        (OR semantics). Returns normalized rows
+        `{entity_type, id, slug, display_name, room_id, status, tags, snippet}`
+        — `status` included per the owner ruling of 2026-07-12 so the narrator
+        can tell a live entity from a defunct one.
+        """
+        assert self._conn is not None
+        if not query and not tags:
+            raise ValueError("search_entities requires at least one of query/tags")
+        capped_limit = max(0, min(limit, _SEARCH_LIMIT_CAP))
+        q = query.lower() if query else None
+        want_tags = set(tags or [])
+        # An empty entity_types list means "no filter" (all types), not "match
+        # nothing" — a plausible tool serialization of an unset filter.
+        types = entity_types or None
+
+        # Each candidate is (sort_key, row). Ranking (spec §7): exact slug match >
+        # tag-hit count; importance/recency is a *memories-only* tiebreak (owner
+        # ruling 2026-07-12) — it must not let a memory jump a tied non-memory
+        # entity. So the cross-type key is just (exact_slug, tag_hits) and the
+        # sort is stable: non-memory entities are appended first, memories are
+        # pre-sorted by importance DESC / recency DESC before appending, so a
+        # tie preserves entity-before-memory order and intra-memory importance.
+        scored: list[tuple[tuple[int, int], dict[str, Any]]] = []
+
+        def _consider(
+            entity_type: str,
+            ident: str,
+            slug: str | None,
+            name: str | None,
+            room: str | None,
+            status: str | None,
+            snippet: str,
+            row_tags: list[str],
+        ) -> None:
+            q_match = q is not None and (
+                (slug is not None and q in slug.lower()) or q in (name or "").lower()
+            )
+            tag_hits = len(want_tags & set(row_tags))
+            if not (q_match or tag_hits):
+                return
+            exact_slug = 1 if (q is not None and slug is not None and slug.lower() == q) else 0
+            scored.append(
+                (
+                    (exact_slug, tag_hits),
+                    {
+                        "entity_type": entity_type,
+                        "id": ident,
+                        "slug": slug,
+                        "display_name": name,
+                        "room_id": room,
+                        "status": status,
+                        "tags": row_tags,
+                        "snippet": snippet,
+                    },
+                )
+            )
+
+        # L5 (spec §10): the cursor isolates this read from main-thread use of
+        # the shared connection; the lock serializes it against other worker
+        # lookups. See `__init__` — the two are not interchangeable.
+        with self._read_lock:
+            cursor = self._conn.cursor()
+            for src in _ENTITY_SOURCES:
+                if types is not None and src.entity_type not in types:
+                    continue
+                sql = (
+                    f"SELECT {src.id_col}, {src.slug_col or 'NULL'}, {src.name_col}, "
+                    f"{src.room_col or 'NULL'}, {src.status_col or 'NULL'}, "
+                    f"{src.snippet_col or 'NULL'}, tags "
+                    f"FROM {src.table} WHERE campaign_id = ?"
+                )
+                for r in cursor.execute(sql, [campaign_id]).fetchall():
+                    _consider(
+                        src.entity_type, r[0], r[1], r[2], r[3], r[4], r[5] or "",
+                        json.loads(r[6]) if r[6] else [],
+                    )
+
+            if types is None or "memory" in types:
+                # Memories carry tags in the memory_tags join table (not a JSON
+                # column) and match the query on their title; only approved lore
+                # is surfaced. LEFT JOIN + LIST folds each memory's tags into a
+                # row. Pre-sort by importance DESC / recency DESC so the (stable)
+                # final sort keeps the intra-memory importance order.
+                mem_rows = cursor.execute(
+                    """
+                    SELECT e.memory_id, e.title, e.summary, e.importance, e.created_at,
+                           e.status,
+                           COALESCE(LIST(t.tag) FILTER (WHERE t.tag IS NOT NULL), []) AS tags
+                    FROM memory_entries e
+                    LEFT JOIN memory_tags t ON e.memory_id = t.memory_id
+                    WHERE e.campaign_id = ? AND e.status = 'approved'
+                    GROUP BY e.memory_id, e.title, e.summary, e.importance, e.created_at,
+                             e.status
+                    """,
+                    [campaign_id],
+                ).fetchall()
+                mem_rows.sort(key=lambda r: (r[3] or 0, str(r[4] or "")), reverse=True)
+                for r in mem_rows:
+                    _consider(
+                        "memory", r[0], None, r[1], None, r[5], r[2] or "", list(r[6])
+                    )
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        return [row for _, row in scored[:capped_limit]]
 
     # ------------------------------------------------------------------
     # Actor Abilities

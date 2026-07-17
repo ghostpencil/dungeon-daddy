@@ -22,11 +22,15 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
+from dungeon_daddy.llm.lookup_tool import LookupRecord, build_lookup_executor
+from dungeon_daddy.memory.lookup import LookupService
 from dungeon_daddy.play.narration import DMResult
 from dungeon_daddy.rpg.models import ClockState
 
 if TYPE_CHECKING:
     from dungeon_daddy.llm.agents.dungeon_voice_agent import DungeonVoiceAgent
+    from dungeon_daddy.llm.provider import LLMToolCall
+    from dungeon_daddy.memory.models import MemoryEntry
     from dungeon_daddy.play.narration import NarrationCoordinator
     from dungeon_daddy.play.session_context import PlaySessionContext
     from dungeon_daddy.rpg.models import ActorState
@@ -179,16 +183,45 @@ class DialogueCoordinator:
         if self._get_narration().is_busy:
             return
         inputs = self.agent_inputs(text)
+        lookups: list[LookupRecord] = []
+        lookup = self._build_lookup_executor(inputs["recent_memories"], lookups)
         self._set_busy(True)
 
         def _worker() -> DMResult:
             try:
-                reply = agent.respond(**inputs)
-                return DMResult(content=reply, dungeon=True, player_message=text)
+                reply = agent.respond(**inputs, lookup=lookup)
+                return DMResult(
+                    content=reply, dungeon=True, player_message=text, lookups=lookups
+                )
             except Exception as exc:
-                return DMResult(content="", error=str(exc), dungeon=True, player_message=text)
+                return DMResult(
+                    content="", error=str(exc), dungeon=True,
+                    player_message=text, lookups=lookups,
+                )
 
         self._get_narration().spawn(_worker)
+
+    def _build_lookup_executor(
+        self,
+        recent_memories: list[MemoryEntry],
+        records: list[LookupRecord],
+    ) -> Callable[[LLMToolCall], str] | None:
+        """The read-only `lookup_world` executor for the dungeon-voice tool loop.
+
+        Scopes a :class:`LookupService` to the active campaign; seeds the L7
+        overlap set from the recent memories already in the voice context.
+        ``None`` when no campaign is attached (the agent falls back to
+        ``complete``). Runs on the worker thread; reads go through the repo's L5
+        read lock. Each call's :class:`LookupRecord` is appended to ``records``
+        (worker-thread-local) so the worker can carry them back to the main
+        thread on the :class:`DMResult` for the debug panel (B4e/L6).
+        """
+        active = self._session.active_campaign()
+        if active is None:
+            return None
+        service = LookupService(active.repo, active.campaign_id)
+        ids = {m.memory_id for m in recent_memories if getattr(m, "memory_id", None)}
+        return build_lookup_executor(service, ids, on_lookup=records.append)
 
     def dungeon_intimacy_clock(self) -> ClockState | None:
         """Return the seed-authored non-monotonic intimacy clock, or ``None``.

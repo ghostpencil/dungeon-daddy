@@ -206,3 +206,191 @@ def test_openai_provider_complete_omits_response_format_when_none(mocker):
 
     _, kwargs = mock_client.chat.completions.create.call_args
     assert "response_format" not in kwargs
+
+
+# ---------------------------------------------------------------------------
+# Slice B2 — complete_round tool-use transport
+# ---------------------------------------------------------------------------
+
+def _round_response(mocker, *, content=None, tool_calls=None, usage=None):
+    """Build a fake chat.completions response for complete_round."""
+    message = mocker.MagicMock()
+    message.content = content
+    message.tool_calls = tool_calls
+    response = mocker.MagicMock()
+    response.choices = [mocker.MagicMock(message=message)]
+    response.usage = usage
+    return response
+
+
+def test_openai_provider_supports_tools_is_true(mocker):
+    mocker.patch("openai.OpenAI")
+    from dungeon_daddy.llm.openai_provider import OpenAIProvider
+    p = OpenAIProvider(api_key="fake")
+    assert p.supports_tools is True
+
+
+def test_complete_round_returns_text_when_no_tool_calls(mocker):
+    mock_client = mocker.MagicMock()
+    mock_client.chat.completions.create.return_value = _round_response(
+        mocker, content="The door is ajar."
+    )
+    mocker.patch("openai.OpenAI", return_value=mock_client)
+
+    from dungeon_daddy.llm.openai_provider import OpenAIProvider
+    from dungeon_daddy.llm.provider import LLMMessage
+
+    p = OpenAIProvider(api_key="fake")
+    result = p.complete_round([LLMMessage(role="user", content="look")])
+    assert result.text == "The door is ajar."
+    assert result.tool_calls == []
+
+
+def test_complete_round_translates_tool_defs_to_openai_format(mocker):
+    mock_client = mocker.MagicMock()
+    mock_client.chat.completions.create.return_value = _round_response(mocker, content="ok")
+    mocker.patch("openai.OpenAI", return_value=mock_client)
+
+    from dungeon_daddy.llm.openai_provider import OpenAIProvider
+    from dungeon_daddy.llm.provider import LLMMessage, LLMToolDef
+
+    schema = {"type": "object", "properties": {"query": {"type": "string"}}}
+    tool = LLMToolDef(name="lookup_world", description="Search.", parameters=schema)
+
+    p = OpenAIProvider(api_key="fake")
+    p.complete_round([LLMMessage(role="user", content="hi")], tools=[tool])
+
+    _, kwargs = mock_client.chat.completions.create.call_args
+    assert kwargs["tools"] == [{
+        "type": "function",
+        "function": {
+            "name": "lookup_world",
+            "description": "Search.",
+            "parameters": schema,
+        },
+    }]
+
+
+def test_complete_round_omits_tools_when_none(mocker):
+    mock_client = mocker.MagicMock()
+    mock_client.chat.completions.create.return_value = _round_response(mocker, content="ok")
+    mocker.patch("openai.OpenAI", return_value=mock_client)
+
+    from dungeon_daddy.llm.openai_provider import OpenAIProvider
+    from dungeon_daddy.llm.provider import LLMMessage
+
+    p = OpenAIProvider(api_key="fake")
+    p.complete_round([LLMMessage(role="user", content="hi")])
+
+    _, kwargs = mock_client.chat.completions.create.call_args
+    assert "tools" not in kwargs
+
+
+def test_complete_round_parses_tool_calls_from_response(mocker):
+    tc = mocker.MagicMock()
+    tc.id = "call_abc"
+    tc.function.name = "lookup_world"
+    tc.function.arguments = '{"query": "mira", "limit": 5}'
+
+    mock_client = mocker.MagicMock()
+    mock_client.chat.completions.create.return_value = _round_response(
+        mocker, content=None, tool_calls=[tc]
+    )
+    mocker.patch("openai.OpenAI", return_value=mock_client)
+
+    from dungeon_daddy.llm.openai_provider import OpenAIProvider
+    from dungeon_daddy.llm.provider import LLMMessage
+
+    p = OpenAIProvider(api_key="fake")
+    result = p.complete_round([LLMMessage(role="user", content="who is mira?")])
+
+    assert result.text is None
+    assert len(result.tool_calls) == 1
+    call = result.tool_calls[0]
+    assert call.call_id == "call_abc"
+    assert call.name == "lookup_world"
+    assert call.arguments == {"query": "mira", "limit": 5}
+
+
+def test_complete_round_forwards_tool_result_and_assistant_tool_calls(mocker):
+    mock_client = mocker.MagicMock()
+    mock_client.chat.completions.create.return_value = _round_response(mocker, content="done")
+    mocker.patch("openai.OpenAI", return_value=mock_client)
+
+    from dungeon_daddy.llm.openai_provider import OpenAIProvider
+    from dungeon_daddy.llm.provider import LLMMessage, LLMToolCall
+
+    call = LLMToolCall(call_id="c1", name="lookup_world", arguments={"query": "x"})
+    history = [
+        LLMMessage(role="user", content="who is x?"),
+        LLMMessage(role="assistant", content="", tool_calls=[call]),
+        LLMMessage(role="tool", content="x is an NPC", tool_call_id="c1"),
+    ]
+
+    p = OpenAIProvider(api_key="fake")
+    p.complete_round(history)
+
+    _, kwargs = mock_client.chat.completions.create.call_args
+    sent = kwargs["messages"]
+    assistant = next(m for m in sent if m["role"] == "assistant")
+    assert assistant["tool_calls"] == [{
+        "id": "c1",
+        "type": "function",
+        "function": {"name": "lookup_world", "arguments": '{"query": "x"}'},
+    }]
+    tool_msg = next(m for m in sent if m["role"] == "tool")
+    assert tool_msg["tool_call_id"] == "c1"
+    assert tool_msg["content"] == "x is an NPC"
+
+
+def test_complete_round_updates_last_usage(mocker):
+    usage = mocker.MagicMock(prompt_tokens=11, completion_tokens=7)
+    mock_client = mocker.MagicMock()
+    mock_client.chat.completions.create.return_value = _round_response(
+        mocker, content="ok", usage=usage
+    )
+    mocker.patch("openai.OpenAI", return_value=mock_client)
+
+    from dungeon_daddy.llm.openai_provider import OpenAIProvider
+    from dungeon_daddy.llm.provider import LLMMessage
+
+    p = OpenAIProvider(api_key="fake")
+    p.complete_round([LLMMessage(role="user", content="hi")])
+    assert p.last_usage == (11, 7)
+
+
+def test_complete_round_raises_llm_error_not_api_error(mocker):
+    import openai as _openai
+    mock_client = mocker.MagicMock()
+    mock_client.chat.completions.create.side_effect = _openai.RateLimitError(
+        "rate limit", response=mocker.MagicMock(), body={}
+    )
+    mocker.patch("openai.OpenAI", return_value=mock_client)
+
+    from dungeon_daddy.llm.openai_provider import OpenAIProvider
+    from dungeon_daddy.llm.provider import LLMError, LLMMessage
+
+    p = OpenAIProvider(api_key="fake")
+    with pytest.raises(LLMError):
+        p.complete_round([LLMMessage(role="user", content="hi")])
+
+
+def test_complete_round_raises_llm_error_on_malformed_tool_arguments(mocker):
+    # A tool call truncated by max_tokens leaves invalid JSON in `arguments`.
+    tc = mocker.MagicMock()
+    tc.id = "call_x"
+    tc.function.name = "lookup_world"
+    tc.function.arguments = '{"query": "mir'  # truncated, not valid JSON
+
+    mock_client = mocker.MagicMock()
+    mock_client.chat.completions.create.return_value = _round_response(
+        mocker, content=None, tool_calls=[tc]
+    )
+    mocker.patch("openai.OpenAI", return_value=mock_client)
+
+    from dungeon_daddy.llm.openai_provider import OpenAIProvider
+    from dungeon_daddy.llm.provider import LLMError, LLMMessage
+
+    p = OpenAIProvider(api_key="fake")
+    with pytest.raises(LLMError, match="malformed tool-call arguments"):
+        p.complete_round([LLMMessage(role="user", content="hi")])

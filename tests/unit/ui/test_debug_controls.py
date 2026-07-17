@@ -248,6 +248,122 @@ def test_bundle_section_lines_no_bundle():
 
 
 # ---------------------------------------------------------------------------
+# Slice B4e — set_lookups / lookup_section_lines (narrator lookup provenance)
+# ---------------------------------------------------------------------------
+
+def _lookup_record(**kwargs):
+    from dungeon_daddy.llm.lookup_tool import LookupRecord
+    return LookupRecord(**kwargs)
+
+
+def test_set_lookups_stores_records():
+    ctrl = _controls()
+    recs = [_lookup_record(query="mira")]
+    ctrl.set_lookups(recs)
+    assert ctrl._last_lookups == recs
+
+
+def test_set_lookups_copies_so_later_worker_appends_do_not_leak_in():
+    # The list handed over is the worker thread's own accumulator. Storing it by
+    # reference would let a later append mutate what the panel is rendering.
+    ctrl = _controls()
+    recs = [_lookup_record(query="mira")]
+    ctrl.set_lookups(recs)
+    recs.append(_lookup_record(query="vault"))
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "World lookups: 1" in text
+    assert "vault" not in text
+
+
+def test_lookup_section_lines_shows_count_query_and_hits():
+    ctrl = _controls()
+    ctrl.set_lookups([
+        _lookup_record(query="mira", hit_count=3),
+        _lookup_record(query="vault", hit_count=1),
+    ])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "World lookups: 2" in text
+    assert "mira" in text
+    assert "3 hit(s)" in text
+
+
+def test_lookup_section_lines_shows_tags_when_no_query():
+    ctrl = _controls()
+    ctrl.set_lookups([_lookup_record(query=None, tags=["theme:guilt"], hit_count=2)])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "theme:guilt" in text
+
+
+def test_lookup_section_lines_labels_empty_query_as_tags_only():
+    # `search_entities` treats a falsy query as absent (`q = query.lower() if
+    # query else None`), so an empty-string query really did run as a tags-only
+    # search — the panel reports what the search did, not what was passed.
+    ctrl = _controls()
+    ctrl.set_lookups([_lookup_record(query="", tags=["theme:guilt"], hit_count=2)])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "(tags only)" in text
+
+
+def test_lookup_section_lines_shows_entity_types_filter():
+    ctrl = _controls()
+    ctrl.set_lookups([
+        _lookup_record(query="mira", entity_types=["actor", "memory"], hit_count=2),
+    ])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "actor,memory" in text
+
+
+def test_lookup_section_lines_shows_redirect_flag():
+    ctrl = _controls()
+    ctrl.set_lookups([
+        _lookup_record(query="mira", hit_count=2, overlap_count=2, redirected=True),
+    ])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "REDIRECT" in text
+
+
+def test_lookup_section_lines_shows_redundant_overlap():
+    ctrl = _controls()
+    ctrl.set_lookups([
+        _lookup_record(query="mira", hit_count=3, overlap_count=1),
+    ])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "redundant 1/3" in text
+
+
+def test_lookup_section_lines_no_lookups():
+    # "this turn", not "yet": the section is cleared every polled turn, so an
+    # empty section means *this* narration looked nothing up — it says nothing
+    # about earlier turns. The old wording contradicted the code's own comment.
+    ctrl = _controls()
+    assert any("No lookups this turn" in line for line in ctrl.lookup_section_lines())
+
+
+def test_lookup_section_lines_shows_error():
+    # A failed lookup must not read as a legitimate "0 hit(s)" no-match.
+    ctrl = _controls()
+    ctrl.set_lookups([_lookup_record(query=None, error="query or tags required")])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "ERROR" in text
+    assert "query or tags required" in text
+
+
+def test_lookup_section_lines_shows_trimmed_count():
+    ctrl = _controls()
+    ctrl.set_lookups([_lookup_record(query="relic", hit_count=14, omitted=6)])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "14 hit(s)" in text
+    assert "6 trimmed" in text
+
+
+def test_lookup_section_lines_omits_trim_note_when_nothing_trimmed():
+    ctrl = _controls()
+    ctrl.set_lookups([_lookup_record(query="relic", hit_count=2)])
+    text = "\n".join(ctrl.lookup_section_lines())
+    assert "trimmed" not in text
+
+
+# ---------------------------------------------------------------------------
 # Bullet — set_reaction / reaction_section_lines
 # ---------------------------------------------------------------------------
 

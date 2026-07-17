@@ -245,3 +245,197 @@ def test_build_prompt_includes_room_object_description():
     result = agent.build_prompt(context_bundle=bundle)
     assert "Warden's Notice Board" in result
     assert "A bounty for the missing lift-warden's key." in result
+
+
+# ---------------------------------------------------------------------------
+# Slice B4 review fix (L7): the bundle sections the prompt used to drop.
+#
+# `bundle_entity_ids` (llm/lookup_tool.py) treats the whole ContextBundle as
+# "the narrator's context" and drives the full-overlap redirect. Present actors,
+# loose items and factions were collected there but never rendered here — so a
+# lookup for an NPC standing in the room came back "already in your context"
+# with no data behind it. The guard test at the bottom of this file pins the
+# coupling; these pin the rendering.
+# ---------------------------------------------------------------------------
+
+def _room_with(**kwargs):
+    room = {
+        "room_id": "1-A",
+        "objects": [], "loose_items": [], "npcs": [], "monsters": [], "exits": [],
+    }
+    room.update(kwargs)
+    return room
+
+
+def test_build_prompt_includes_present_npcs():
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    agent = DungeonMasterAgent(provider=_MockProvider())
+    bundle = _make_bundle(current_room=_room_with(npcs=[{
+        "actor_id": "npc-1", "slug": "pinion", "display_name": "Pinion, the Caretaker Cog",
+        "status": "alive", "disposition": "friendly",
+    }]))
+    result = agent.build_prompt(context_bundle=bundle)
+    assert "# Present Actors" in result
+    assert "Pinion, the Caretaker Cog" in result
+    assert "friendly" in result
+
+
+def test_build_prompt_includes_present_monsters():
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    agent = DungeonMasterAgent(provider=_MockProvider())
+    bundle = _make_bundle(current_room=_room_with(monsters=[{
+        "actor_id": "mon-1", "slug": "scorpion-swarm", "display_name": "Scorpion Swarm",
+        "status": "alive", "disposition": "hostile",
+    }]))
+    result = agent.build_prompt(context_bundle=bundle)
+    assert "# Present Actors" in result
+    assert "Scorpion Swarm" in result
+    assert "hostile" in result
+
+
+def test_build_prompt_omits_present_actors_section_when_room_is_empty():
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    agent = DungeonMasterAgent(provider=_MockProvider())
+    bundle = _make_bundle(current_room=_room_with())
+    result = agent.build_prompt(context_bundle=bundle)
+    assert "# Present Actors" not in result
+
+
+def test_build_prompt_includes_loose_items():
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    agent = DungeonMasterAgent(provider=_MockProvider())
+    bundle = _make_bundle(current_room=_room_with(loose_items=[{
+        "item_id": "item-1", "slug": "travel-journal",
+        "display_name": "Sun-Bleached Travel Journal",
+        "description": "Salt-stiffened pages, a merchant's hand.", "status": "present",
+    }]))
+    result = agent.build_prompt(context_bundle=bundle)
+    assert "# Loose Items" in result
+    assert "Sun-Bleached Travel Journal" in result
+    assert "Salt-stiffened pages, a merchant's hand." in result
+
+
+def test_build_prompt_includes_factions():
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    agent = DungeonMasterAgent(provider=_MockProvider())
+    bundle = _make_bundle(faction_reputations=[{
+        "faction_id": "fac-1", "slug": "forge-wardens", "display_name": "Forge Wardens",
+        "reputation": 2, "goal": "Reclaim the forge", "tier": 1, "status": "active",
+    }])
+    result = agent.build_prompt(context_bundle=bundle)
+    assert "# Factions" in result
+    assert "Forge Wardens" in result
+    assert "Reclaim the forge" in result
+
+
+def test_build_prompt_omits_factions_section_when_empty():
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    agent = DungeonMasterAgent(provider=_MockProvider())
+    bundle = _make_bundle(faction_reputations=[])
+    result = agent.build_prompt(context_bundle=bundle)
+    assert "# Factions" not in result
+
+
+def test_build_prompt_includes_clock_stakes():
+    # `stakes` is the clock's snippet in search_entities, so a redirected clock
+    # lookup claims the narrator already has it.
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    agent = DungeonMasterAgent(provider=_MockProvider())
+    bundle = _make_bundle(open_clocks=[{
+        "clock_id": "clk-1", "label": "Ritual Countdown", "segments": 6, "filled": 3,
+        "status": "active", "stakes": "The wards fail and the vault floods.",
+    }])
+    result = agent.build_prompt(context_bundle=bundle)
+    assert "Ritual Countdown" in result
+    assert "The wards fail and the vault floods." in result
+
+
+# ---------------------------------------------------------------------------
+# The L7 coupling guard (Slice B4 review fix).
+# ---------------------------------------------------------------------------
+
+def test_every_bundle_entity_id_is_described_in_the_system_prompt():
+    """Everything `bundle_entity_ids` collects must be readable in the prompt.
+
+    That set drives the L7 full-overlap redirect — the narrator is told
+    "Already in your context — do not look this up again". If an id reaches the
+    set without its entity reaching the prompt, the redirect withholds data the
+    model never had, and there is no second tool round to recover in.
+    """
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    from dungeon_daddy.llm.lookup_tool import bundle_entity_ids
+    from dungeon_daddy.llm.provider import LLMMessage
+
+    provider = _MockProvider()
+    agent = DungeonMasterAgent(provider=provider)
+    bundle = _make_bundle(
+        memory_cards=[{
+            "memory_id": "m-1", "title": "Pact with the Shadow",
+            "summary": "Party agreed to spare the wraith.", "importance": 8,
+        }],
+        related_lore=[{
+            "memory_id": "L-1", "title": "The Old Pact",
+            "summary": "A bargain struck in blood.", "importance": 5,
+        }],
+        open_clocks=[{
+            "clock_id": "clk-1", "label": "Ritual Countdown", "segments": 6,
+            "filled": 3, "status": "active", "stakes": "The wards fail.",
+        }],
+        faction_reputations=[{
+            "faction_id": "fac-1", "slug": "forge-wardens",
+            "display_name": "Forge Wardens", "reputation": 2,
+            "goal": "Reclaim the forge", "tier": 1, "status": "active",
+        }],
+        current_room=_room_with(
+            objects=[{
+                "object_id": "obj-1", "slug": "notice-board",
+                "display_name": "Warden's Notice Board", "archetype": "lore_fixture",
+                "current_state": "default", "description": "A bounty notice.",
+            }],
+            loose_items=[{
+                "item_id": "item-1", "slug": "travel-journal",
+                "display_name": "Sun-Bleached Travel Journal",
+                "description": "Salt-stiffened pages.", "status": "present",
+            }],
+            npcs=[{
+                "actor_id": "npc-1", "slug": "pinion", "display_name": "Pinion",
+                "status": "alive", "disposition": "friendly",
+            }],
+            monsters=[{
+                "actor_id": "mon-1", "slug": "scorpion-swarm",
+                "display_name": "Scorpion Swarm", "status": "alive",
+                "disposition": "hostile",
+            }],
+        ),
+    )
+    # `respond` is the real seam: the room itself is described by _build_context
+    # from the dungeon JSON, not by build_prompt, so only the assembled system
+    # prompt shows the narrator's whole context.
+    agent.respond(
+        history=[LLMMessage(role="user", content="Look around.")],
+        room=_make_room(), level=_make_level(), dungeon=_make_dungeon(),
+        context_bundle=bundle,
+    )
+    system = provider.last_system
+
+    # id -> the text that proves the narrator can actually read that entity.
+    described = {
+        "m-1": "Pact with the Shadow",
+        "L-1": "The Old Pact",
+        "clk-1": "Ritual Countdown",
+        "fac-1": "Forge Wardens",
+        "1-A": "Entry Hall",  # the current room, via _build_context
+        "obj-1": "Warden's Notice Board",
+        "item-1": "Sun-Bleached Travel Journal",
+        "npc-1": "Pinion",
+        "mon-1": "Scorpion Swarm",
+    }
+    assert bundle_entity_ids(bundle) == set(described), (
+        "bundle_entity_ids changed: a category joined or left the L7 overlap "
+        "set. Anything it collects must also be rendered into the prompt."
+    )
+    for entity_id, proof in described.items():
+        assert proof in system, (
+            f"{entity_id} drives an L7 redirect but {proof!r} is not in the "
+            "system prompt — the narrator would be refused data it never had."
+        )

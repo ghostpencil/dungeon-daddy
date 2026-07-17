@@ -12,6 +12,61 @@ def test_llm_error_can_be_raised_and_caught():
 
 
 # ---------------------------------------------------------------------------
+# Slice B2 — provider-neutral tool-use types
+# ---------------------------------------------------------------------------
+
+def test_llm_tool_def_holds_name_description_parameters():
+    from dungeon_daddy.llm.provider import LLMToolDef
+    schema = {"type": "object", "properties": {"query": {"type": "string"}}}
+    tool = LLMToolDef(name="lookup_world", description="Search the world.", parameters=schema)
+    assert tool.name == "lookup_world"
+    assert tool.description == "Search the world."
+    assert tool.parameters == schema
+
+
+def test_llm_tool_call_holds_call_id_name_arguments():
+    from dungeon_daddy.llm.provider import LLMToolCall
+    call = LLMToolCall(call_id="call_1", name="lookup_world", arguments={"query": "mira"})
+    assert call.call_id == "call_1"
+    assert call.name == "lookup_world"
+    assert call.arguments == {"query": "mira"}
+
+
+def test_llm_round_result_defaults_to_no_text_and_empty_tool_calls():
+    from dungeon_daddy.llm.provider import LLMRoundResult
+    result = LLMRoundResult()
+    assert result.text is None
+    assert result.tool_calls == []
+
+
+def test_llm_round_result_carries_text_and_tool_calls():
+    from dungeon_daddy.llm.provider import LLMRoundResult, LLMToolCall
+    call = LLMToolCall(call_id="c1", name="lookup_world", arguments={})
+    result = LLMRoundResult(text="hi", tool_calls=[call])
+    assert result.text == "hi"
+    assert result.tool_calls == [call]
+
+
+def test_llm_message_stays_back_compatible_with_role_and_content_only():
+    from dungeon_daddy.llm.provider import LLMMessage
+    msg = LLMMessage(role="user", content="hello")
+    assert msg.role == "user"
+    assert msg.content == "hello"
+    assert msg.tool_call_id is None
+    assert msg.tool_calls is None
+
+
+def test_llm_message_can_carry_tool_result_and_assistant_tool_calls():
+    from dungeon_daddy.llm.provider import LLMMessage, LLMToolCall
+    call = LLMToolCall(call_id="c1", name="lookup_world", arguments={"query": "x"})
+    assistant = LLMMessage(role="assistant", content="", tool_calls=[call])
+    tool_result = LLMMessage(role="tool", content="rows...", tool_call_id="c1")
+    assert assistant.tool_calls == [call]
+    assert tool_result.role == "tool"
+    assert tool_result.tool_call_id == "c1"
+
+
+# ---------------------------------------------------------------------------
 # Behavior 3: AnthropicProvider.model_id returns the model string
 # ---------------------------------------------------------------------------
 

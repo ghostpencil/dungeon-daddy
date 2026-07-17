@@ -396,6 +396,35 @@ class RoomObject(BaseModel):
         return v
 
 
+class RoomState(BaseModel):
+    """A room as a first-class campaign-DB entity (Phase 51.8 Slice B0, spec §7.1).
+
+    The campaign-runtime projection of a dungeon room: the searchable, taggable,
+    lore-bearing fields, seeded from the dungeon + campaign seed. Geometry/layout
+    (``x/y/w/h``, loop roles, graph notes) stays in the dungeon JSON
+    (:class:`dungeon_daddy.data.models.Room`) — this record does not duplicate it.
+    ``summary`` is the inline setting-lore for fast retrieval; ``markdown_path``
+    points to the full authored body (mirroring :class:`MemoryEntry`). ``quest_role``
+    is the room's authoritative role in the quest; it is a **column only** and is
+    NOT mirrored into ``tags`` — there is no ``quest:`` namespace (see
+    ``memory/tags.py::TAG_NAMESPACES``), so such a tag would fail ``validate_tag``.
+    ``tags`` are authored independently by the populate scripts (``theme:``/
+    ``thread:``); nothing keeps the two in step.
+    """
+
+    room_id: str
+    campaign_id: str
+    level_id: str
+    slug: str
+    display_name: str
+    room_type: str
+    summary: str = ""
+    quest_role: str | None = None
+    markdown_path: str | None = None
+    checksum: str | None = None
+    tags: list[str] = Field(default_factory=list)
+
+
 class ObjectiveCompletion(BaseModel):
     """Deterministic condition that completes an Objective (Phase 51.5 §4.3.1).
 
