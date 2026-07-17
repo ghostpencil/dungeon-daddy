@@ -123,6 +123,31 @@ class DungeonMasterAgent:
                     f"(reputation: {f.get('reputation', 0)}, tier: {f.get('tier', 0)})"
                 )
                 lines.append(f"{line} — {goal}" if goal else line)
+        party = context_bundle.mechanical_state
+        if party:
+            lines.append("\n# Party")
+            for actor_id, pc in party.items():
+                lines.append(f"  - {pc.get('display_name', actor_id)}")
+        inv_lines = []
+        for actor_id, actor_inv in context_bundle.inventory.items():
+            held = [
+                it
+                for group in ("kits", "dungeon_items", "equipped")
+                for it in actor_inv.get(group, [])
+            ]
+            if not held:
+                continue
+            holder = party.get(actor_id, {}).get("display_name", actor_id)
+            inv_lines.append(f"{holder}:")
+            for it in held:
+                name = it.get("display_name", "")
+                # The item's description is the snippet a lookup_world hit would
+                # return, so a redirected item lookup must be able to read it here.
+                desc = it.get("description", "")
+                inv_lines.append(f"  - {name}: {desc}" if desc else f"  - {name}")
+        if inv_lines:
+            lines.append("\n# Inventory")
+            lines.extend(inv_lines)
         return "\n".join(lines)
 
     def respond(

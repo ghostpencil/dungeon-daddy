@@ -90,8 +90,14 @@ def bundle_entity_ids(bundle: ContextBundle) -> set[str]:
     ``lookup_world`` hit whose id is in this set was already available to the
     narrator. Collects memory-card + related-lore memory ids, the current
     room's own id, and the ids of its objects / loose items / present actors,
-    plus open clocks and active factions — matching the ``id`` field
-    ``search_entities`` returns per entity type.
+    plus open clocks, active factions, the party's own PCs (mechanical_state
+    keys), and the ids of the gear they carry (inventory) — matching the ``id``
+    field ``search_entities`` returns per entity type.
+
+    Every id collected here MUST also be rendered into the narrator's system
+    prompt (``DungeonMasterAgent.build_prompt``), or the full-overlap redirect
+    withholds data the model never had — pinned by
+    ``test_every_bundle_entity_id_is_described_in_the_system_prompt``.
     """
     ids: set[str] = set()
 
@@ -117,6 +123,18 @@ def bundle_entity_ids(bundle: ContextBundle) -> set[str]:
         _add(actor.get("actor_id"))
     for actor in room.get("monsters", []):
         _add(actor.get("actor_id"))
+    # The party's own PCs — keyed by actor id in mechanical_state (and inventory,
+    # same keys) and rendered into the `# Party` prompt section — so a lookup for
+    # a player-controlled actor is already in the narrator's context.
+    for actor_id in bundle.mechanical_state:
+        _add(actor_id)
+    # The party's carried gear — kits/dungeon items/equipped, rendered into the
+    # `# Inventory` prompt section — so a lookup for an item the party holds is
+    # redundant too.
+    for actor_inv in bundle.inventory.values():
+        for group in ("kits", "dungeon_items", "equipped"):
+            for item in actor_inv.get(group, []):
+                _add(item.get("item_id"))
     return ids
 
 

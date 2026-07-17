@@ -131,6 +131,23 @@ class TestContextBundleBuilder:
         assert {"action_key": "prowl", "rating": 2} in actor_data["action_ratings"]
         assert {"track_key": "body", "capacity": 6, "filled": 3} in actor_data["stress_tracks"]
 
+    def test_build_mechanical_state_includes_focus_actor_display_name(
+        self, repo: MemoryRepository
+    ) -> None:
+        # The PC's name is what the `# Party` prompt section renders to prove a
+        # collected party actor id is actually readable by the narrator (L7).
+        repo.save_actor("actor_001", "camp_001", "pc", "mara", "Mara")
+
+        bundle = ContextBundleBuilder(
+            campaign_id="camp_001",
+            scene_id=None,
+            mode="run_scene",
+            focus_actor_ids=["actor_001"],
+            token_budget=500,
+        ).build(repo)
+
+        assert bundle.mechanical_state["actor_001"]["display_name"] == "Mara"
+
     def test_build_active_fallout_excludes_resolved(
         self, repo: MemoryRepository
     ) -> None:

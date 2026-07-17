@@ -174,6 +174,66 @@ class TestContextBundleInventoryBuilder:
         effective = bundle.inventory["actor:c1:mara"]["effective_actions"]
         assert effective["fight"] == 3
 
+    def test_every_inventory_view_model_carries_its_item_id(
+        self, repo: MemoryRepository
+    ) -> None:
+        # The item id is what `lookup_tool.bundle_entity_ids` collects to flag a
+        # redundant lookup for gear the party already holds, so each kit /
+        # dungeon-item / equipped view-model must carry it.
+        repo.save_item(Item(
+            item_id="item:c1:lockpicks", campaign_id="camp_001", slug="lockpicks",
+            display_name="Lockpicks", item_type="class_kit",
+            description="A set of picks.", owner_actor_id="actor:c1:mara",
+            charges_current=3, charges_max=3,
+        ))
+        repo.save_item(Item(
+            item_id="item:c1:torch", campaign_id="camp_001", slug="torch",
+            display_name="Torch", item_type="dungeon_item",
+            description="Lights the way.", owner_actor_id="actor:c1:mara",
+        ))
+        repo.save_item(Item(
+            item_id="item:c1:sword", campaign_id="camp_001", slug="sword",
+            display_name="Iron Sword", item_type="equipped_gear",
+            description="A reliable blade.", owner_actor_id="actor:c1:mara",
+            is_equipped=True,
+        ))
+
+        inv = ContextBundleBuilder(
+            campaign_id="camp_001", scene_id=None, mode="run_scene",
+            focus_actor_ids=["actor:c1:mara"], token_budget=500,
+        ).build(repo).inventory["actor:c1:mara"]
+
+        assert inv["kits"][0]["item_id"] == "item:c1:lockpicks"
+        assert inv["dungeon_items"][0]["item_id"] == "item:c1:torch"
+        assert inv["equipped"][0]["item_id"] == "item:c1:sword"
+
+    def test_kit_and_equipped_view_models_carry_description(
+        self, repo: MemoryRepository
+    ) -> None:
+        # The description is the snippet a lookup_world hit returns; the # Inventory
+        # prompt section renders it so a redirected carried-item lookup is honest.
+        # dungeon_items already carry it (tested above); kits + equipped must too.
+        repo.save_item(Item(
+            item_id="item:c1:lockpicks", campaign_id="camp_001", slug="lockpicks",
+            display_name="Lockpicks", item_type="class_kit",
+            description="A set of fine picks.", owner_actor_id="actor:c1:mara",
+            charges_current=3, charges_max=3,
+        ))
+        repo.save_item(Item(
+            item_id="item:c1:sword", campaign_id="camp_001", slug="sword",
+            display_name="Iron Sword", item_type="equipped_gear",
+            description="A reliable blade.", owner_actor_id="actor:c1:mara",
+            is_equipped=True,
+        ))
+
+        inv = ContextBundleBuilder(
+            campaign_id="camp_001", scene_id=None, mode="run_scene",
+            focus_actor_ids=["actor:c1:mara"], token_budget=500,
+        ).build(repo).inventory["actor:c1:mara"]
+
+        assert inv["kits"][0]["description"] == "A set of fine picks."
+        assert inv["equipped"][0]["description"] == "A reliable blade."
+
     def test_non_focus_actor_excluded_from_inventory(
         self, repo: MemoryRepository
     ) -> None:
