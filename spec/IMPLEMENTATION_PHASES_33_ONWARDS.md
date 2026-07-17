@@ -1305,29 +1305,75 @@ per-tier `reveals_knowledge` (D7); the full 4-tier Crucible ladder seeded (`gear
   `PHASE_51_5…§11`.
 - Container-loot via `spawns_item_slug` + builder hit-test fix.
 
-> **Known pre-existing issue (carried, not introduced):** the Phase 35 world-reaction tag fan-out can
-> advance the `dungeon_intimacy` clock on a miss, violating D5's single-source rule. Fix is designed
-> and locked (`spec/WORLD_REACTION_POLICY.md`) as its own **unscheduled** phase — deliberately not
-> folded into 51.5.
+> **Resolved by Phase 51.6 (below).** The Phase 35 world-reaction tag fan-out could advance the
+> `dungeon_intimacy` clock on a miss, violating D5's single-source rule. The fix (`spec/WORLD_REACTION_POLICY.md`)
+> shipped as **Phase 51.6**, not folded into 51.5.
+
+## Phase 51.6 — World Reaction Policy (COMPLETE)
+
+**Status: Complete, GUI-verified & merged to `main` (2026-07-05, PR #88, `c0e1cba`) — suite green**
+Spec: `spec/PHASE_51_6_WORLD_REACTION_POLICY.md`; design canonical `spec/WORLD_REACTION_POLICY.md`
+(supersedes the miss behavior in `spec/PHASE_35_WORLD_REACTION_SERVICE.md`). Branch `feat/phase-51.6-wrp`.
+
+Replaces the blunt "miss = every tagged clock +2" fan-out that could move 3 campaign clocks (incl.
+`dungeon_intimacy`, violating D5) on a single STUDY-miss. Adds a per-object **`reaction_policy`**
+(`scripted` / `ambient` / `inert`) + `ObjectReactionBinding` sibling table + migration `019`, and a
+`ClockCategory` enum **firewall** (adverse = danger/pursuit/ritual). `rpg/world_reaction.py`: ambient
+objects tick ≤1 local adverse clock (+1 on miss/partial); scripted objects fire authored bindings only
+and never move `dungeon_intimacy` (D5 by construction); inert objects no-op. Crucible §6 policy/binding
+seed; uuid5 clock-id resolution fix (`_find_clock_by_slug` matches both the UUID5 and string id forms).
+**This branch also carried the mypy 348→0 strict sweep** (commit `4985898`; annotation-only + ~18 real
+None-guard/Literal fixes, no runtime bugs).
+
+## Phase 51.7 — PlayView Decomposition (COMPLETE)
+
+**Status: Complete, owner GUI-verified & merged to `main` (2026-07-06, PR #89, merge `5eadaaa`) — suite green**
+Spec: `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md`. Branch `feat/phase-51.7-playview-decomp`.
+
+Incremental seam extraction of `views/play_view.py` (**2,765 → 1,491 lines**) into a new
+`dungeon_daddy/play/` package: `PlaySessionContext` + Action / Navigation / Dialogue / Memory / Narration
+coordinators + a `PlaySessionController` composition root (Slice 7). Behavior-preserving. Also folded in
+the two deferred PR #88 review items (non-atomic world-reaction write; the WRP "all three call sites"
+spec-language correction, owner ruling 2026-07-05).
+
+## Phase 51.8 — Tag Taxonomy & Narrator Lookup (COMPLETE)
+
+**Status: Complete, owner GUI-verified & merged to `main`** — Phase A (PR #90, `6c899cc`, 2026-07-11)
++ Phase B (PR #92, `13e14f2`, 2026-07-17). Suite green (3848). Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
+
+- **Phase A — Tag Hygiene.** A single namespaced tag taxonomy (`memory/tags.py`: `validate_tag` /
+  `normalize_tag`, 14 namespace families; migrations `020`/`021`), seed + Crucible-world tagging, tag-based
+  scene-scoped retrieval (memories now anchored on the current room + present actors), write-side scene
+  tagging, and the deterministic `# Related Lore` pre-fetch (T7).
+- **Phase B — Narrator Lookup Tool.** A read-only `lookup_world` LLM tool so the narrator can answer about
+  entities/places/events **not** in its scene context. B0 elevated **rooms to a first-class campaign entity**
+  (`rooms` table + `RoomState` + migration `022`, projected from the dungeon JSON). B1 `search_entities` +
+  read-only `LookupService`. B2 provider `complete_round` transport (`LLMToolDef`/`LLMToolCall`/
+  `LLMRoundResult`). B3 agent-owned `run_tool_loop`. B4 the tool wired end-to-end (both agent seams + both
+  coordinators, L5 read lock, L6 DBG-tab provenance, L7 scoping). B5 live eval against a real tool-calling
+  provider. A 5-agent whole-arc review before merge found + fixed a CRITICAL L7-redirect bug and 5 more
+  fix batches; a cleanup slice for the residual deferred items is the next phase (`spec/PROJECT_INDEX.md`).
 
 ---
 
-# Planned Roadmap — Phases 49–53
+# Planned Roadmap — Phases 52–53
 
 These phases are **defined on the GitHub Projects roadmap** (`ghostpencil/dungeon-daddy`, project #1).
-Phases **48–51** and the off-roadmap add-ons **50.5 / 50.6 / 51.5** are **complete and merged to
-`main`** — see their full entries in the phase history above, not restated here. Only the
-**not-yet-implemented** phases are listed below. A detailed `spec/PHASE_NN_*.md` is written when each
-phase actually starts.
+Everything through **Phase 51.8** — including the off-roadmap add-ons **50.5 / 50.6** and the
+stabilization phases **51.6 / 51.7** — is **complete and merged to `main`** (see the phase history above,
+not restated here). Only the **not-yet-implemented** phases are listed below. A detailed
+`spec/PHASE_NN_*.md` is written when each phase actually starts.
+
+**Next up is a cleanup slice (OWNER-DECIDED 2026-07-17)** for the Phase 51.8 A + B deferred pile — scope
+in `spec/PROJECT_INDEX.md` → START HERE. The two feature phases below are **deferred behind it**, not dropped.
 
 | Phase | Title | One-line scope |
 |---|---|---|
 | 52 | Milestone Advancement | Playbook beats, ranks to 5, ability unlocks |
 | 53 | Threat Behavior & Monster Reactions | Instinct-driven, engine-bounded monster reactions (no enemy turn); boss phases via clock thresholds |
 
-> **Also settled but unscheduled:** the **World Reaction Policy** (`spec/WORLD_REACTION_POLICY.md`) —
-> a new feature (per-object `reaction_policy`) that fixes the Phase 35 miss-fan-out bug. Not folded
-> into any phase above; slot it in when chosen.
+> **The World Reaction Policy is no longer pending** — it shipped as **Phase 51.6** (PR #88, 2026-07-05),
+> replacing the Phase 35 miss-fan-out. Design canonical in `spec/WORLD_REACTION_POLICY.md`.
 
 ## Phase Dependencies & Sequencing (47–53)
 
