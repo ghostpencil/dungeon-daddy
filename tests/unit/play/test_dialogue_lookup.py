@@ -43,11 +43,21 @@ def test_send_dungeon_line_passes_working_lookup_executor(tmp_path: Path) -> Non
 
 
 def test_lookup_is_none_without_active_campaign(tmp_path: Path) -> None:
+    # Cleanup item 11.1: drive the public ``send_dungeon_line`` seam (as the
+    # narration-side twin ``test_narration_lookup`` does), not the private
+    # ``_build_lookup_executor``. With no active campaign the agent must be
+    # handed ``lookup=None`` (it falls back to ``complete``).
     agent = _StubVoiceAgent()
-    coord, _chat, _repo, session, _narr = _make(tmp_path, voice_agent=agent)
+    coord, _chat, _repo, session, narr = _make(tmp_path, voice_agent=agent)
     session.campaign_id = None  # no active campaign → no lookup seam
 
-    assert coord._build_lookup_executor([], []) is None
+    coord.begin_dialogue(kind="dungeon", room_id="r1")
+    coord.send_dungeon_line("tell me about mira")
+
+    assert narr.worker is not None
+    result = narr.worker()
+    assert isinstance(result, DMResult)
+    assert agent.calls[0]["lookup"] is None
 
 
 # -- Slice B4e — voice-path lookups ride back on the DMResult ----------------

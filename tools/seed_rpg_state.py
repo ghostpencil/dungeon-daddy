@@ -399,22 +399,16 @@ def seed_campaign_with_pack(
     # reseed refreshes only the dungeon-derived fields while preserving the
     # authored `tags`/`quest_role`.
     if dungeon is not None:
-        from dungeon_daddy.rpg.seed_pack import build_room_states
+        from dungeon_daddy.rpg.seed_pack import (
+            build_room_states,
+            seed_room_projection,
+        )
 
-        existing_rooms = {r["room_id"]: r for r in repo.get_rooms(campaign_id)}
-        for room_state in build_room_states(dungeon.levels, campaign_id):
-            prior = existing_rooms.get(room_state.room_id)
-            if prior is None:
-                repo.save_room(room_state)
-                result.created += 1
-            elif force:
-                repo.save_room(room_state.model_copy(update={
-                    "tags": prior["tags"],
-                    "quest_role": prior["quest_role"] or room_state.quest_role,
-                }))
-                result.updated += 1
-            else:
-                result.skipped += 1
+        seed_room_projection(
+            repo, campaign_id,
+            build_room_states(dungeon.levels, campaign_id),
+            result, force=force,
+        )
 
     _upsert_campaign(repo, campaign_id, campaign_slug, campaign_dir.name, campaign_dir, result)
     _upsert_session(repo, campaign_id, campaign_slug, result)
