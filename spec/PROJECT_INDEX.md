@@ -4,9 +4,10 @@
 
 **STABILIZATION / cleanup.** All feature phases through **51.8** are complete and merged to `main`. The
 owner-decided cleanup slice (2026-07-17) is underway on branch `chore/cleanup-51-8-hardening`:
-**items 1–5 are DONE** (commit `09af3b8`), **item 7 is DONE** (commit `1515b0d`), and **item 8 is DONE**
-(commit `1c1acd3`, same day — see START HERE); items 6, 9–11 plus the deferred pile remain. Phase 52
-(Milestone Advancement) and Phase 53 (Monster Reactions) stay deferred behind the cleanup.
+**items 1–5 are DONE** (commit `09af3b8`), **item 7 is DONE** (commit `1515b0d`), **item 8 is DONE**
+(commit `1c1acd3`), and **item 9 is DONE** (commit `b09ba02`, same day — see START HERE); items 6, 10–11
+plus the deferred pile remain. Phase 52 (Milestone Advancement) and Phase 53 (Monster Reactions) stay
+deferred behind the cleanup.
 
 Recently merged (newest first — full detail in the Phase History table + each `spec/PHASE_*.md`, and git):
 
@@ -33,7 +34,7 @@ Recently merged (newest first — full detail in the Phase History table + each 
 ## START HERE — Cleanup Slice (OWNER-DECIDED 2026-07-17)
 
 The deferred pile grew big enough across Phases A + B to justify a slice of its own. Work happens on
-`chore/cleanup-51-8-hardening` (branched off `main` 2026-07-17). **Next slice up: items 6, 9–11 below**
+`chore/cleanup-51-8-hardening` (branched off `main` 2026-07-17). **Next slice up: items 6, 10–11 below**
 (confirm scope with the owner; the list is a menu, not a mandate).
 
 **✅ DONE — items 1–5 (commit `09af3b8`, 2026-07-17, TDD + code-reviewed):**
@@ -79,6 +80,28 @@ The deferred pile grew big enough across Phases A + B to justify a slice of its 
    The `test_play_view_bundle._make_view` fixture was leaning on the retired fallback (repo set,
    `campaign_id` None, `dungeon_id == "camp-1"`); it now sets repo + campaign id together as prod does.
 
+**✅ DONE — item 9 (commit `b09ba02`, 2026-07-17, TDD + code-reviewed):**
+9. ~~Rooms-seed raise takes exit backfill down with it~~ — `seed_from_manifest` ran `_seed_rooms`
+   (Slice-B0 enrichment groundwork) **before** `_seed_exits`, so under `backfill_exits_if_empty`'s blanket
+   `except` any raise in `_seed_rooms` was swallowed and the load-critical exit seeding never ran → a save
+   loaded with zero exits + one misleading "skipped" log line. Reordered so `_seed_exits` runs first: exits
+   are the load-critical projection (Play EXITS panel, navigation, backfill's whole purpose), rooms is
+   enrichment with no live consumer yet. Safe — `room_exits` and `rooms` are independent tables (no FK, and
+   `_seed_exits` never reads `rooms`), so order is free for correctness and `SeedResult` counts are
+   order-independent. Publish path still fails loudly (raise propagates); only backfill's swallow context is
+   affected, and there exits now survive. Pinned by `test_backfill_seeds_exits_even_if_room_projection_fails`
+   (monkeypatches `repo.save_room` to raise, asserts both exits still land).
+
+**Deferred from the item-9 slice review (2026-07-17, both LOW — backfill's swallow behavior, out of scope for the minimal reorder):**
+- **"Fail loudly" half unaddressed for the rooms projection** — item 9 hardened the exit half; a rooms-seed
+  raise inside backfill is still caught by the blanket `except` and only WARN-logged, so the B0 `rooms` table
+  silently ends up empty. Acceptable while rooms enrichment has no live consumer; revisit when one lands (or
+  when making backfill's swallow loud is taken as its own item).
+- **backfill return-count under-reports on the rooms-failure path** (`backfill.py:67`) — if `_seed_rooms`
+  raises after exits commit, `seed_from_manifest` propagates and backfill's `except` returns `0` even though
+  the exits are present; the "Backfilled N" info log won't fire. Cosmetic, error-path only — exits work on
+  next load. Pre-existing shape of the return contract, not introduced by the reorder.
+
 **Deferred from the item-8 slice review (2026-07-17, both LOW cleanup):**
 - **Local imports in the new narration test** — `test_build_context_bundle_none_without_active_campaign`
   re-imports `Path`/`MemoryRepository` inside the function; the sibling `test_narration_lookup.py` has them
@@ -104,9 +127,7 @@ The deferred pile grew big enough across Phases A + B to justify a slice of its 
    wires `ObservingProvider(OpenAIProvider(...))`; wrapping the fixture drives the true production stack for ~free.
 7. ~~**`bundle_entity_ids` gaps**~~ — DONE (`1515b0d`); see the item-7 DONE block above.
 8. ~~**`campaign_id` fallback divergence**~~ — DONE (`1c1acd3`); see the item-8 DONE block above.
-9. **Rooms-seed raise takes exit backfill down with it** — `_seed_rooms` runs before `_seed_exits` in
-   `seed_from_manifest`, wrapped in `backfill_exits_if_empty`'s swallow → a save loads with zero exits + one
-   log line. Untested.
+9. ~~**Rooms-seed raise takes exit backfill down with it**~~ — DONE (`b09ba02`); see the item-9 DONE block above.
 10. **`field_validator("tags")` on `RoomState`** — the only model in `rpg/models.py` with no validator;
     wiring the existing `validate_tag` makes the taxonomy invariant unbypassable.
 11. **Test-seam tightenings** — `test_dialogue_lookup.py` tests a private method where narration drives the
@@ -185,8 +206,8 @@ The LLM may propose. The engine disposes.
 
 ## Known Failures
 
-**None.** Full unit/integration suite green (**3874 passed**, 8 eval deselected; ruff + mypy(strict, 172)
-clean as of cleanup item 8, `1c1acd3`). Evals are excluded from the default run (`addopts = "-m 'not eval'"`;
+**None.** Full unit/integration suite green (**3875 passed**, 8 eval deselected; ruff + mypy(strict, 172)
+clean as of cleanup item 9, `b09ba02`). Evals are excluded from the default run (`addopts = "-m 'not eval'"`;
 run with `pytest -m eval` — live API, paid, non-deterministic).
 
 ---
