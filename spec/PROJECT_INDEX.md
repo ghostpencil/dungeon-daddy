@@ -4,10 +4,11 @@
 
 **STABILIZATION / cleanup.** All feature phases through **51.8** are complete and merged to `main`. The
 owner-decided cleanup slice (2026-07-17) is underway on branch `chore/cleanup-51-8-hardening`:
-**items 1–5 are DONE** (commit `09af3b8`), **item 7 is DONE** (commit `1515b0d`), **item 8 is DONE**
-(commit `1c1acd3`), **item 9 is DONE** (commit `b09ba02`), and **item 10 is DONE** (commit `e9e742c`,
-same day — see START HERE); items 6 and 11 plus the deferred pile remain. Phase 52 (Milestone
-Advancement) and Phase 53 (Monster Reactions) stay deferred behind the cleanup.
+**items 1–5 are DONE** (commit `09af3b8`), **item 6 is DONE** (commit `b400e9f`), **item 7 is DONE**
+(commit `1515b0d`), **item 8 is DONE** (commit `1c1acd3`), **item 9 is DONE** (commit `b09ba02`), and
+**item 10 is DONE** (commit `e9e742c`, all same day — see START HERE); **item 11** plus the deferred
+pile remain. Phase 52 (Milestone Advancement) and Phase 53 (Monster Reactions) stay deferred behind
+the cleanup.
 
 Recently merged (newest first — full detail in the Phase History table + each `spec/PHASE_*.md`, and git):
 
@@ -34,7 +35,7 @@ Recently merged (newest first — full detail in the Phase History table + each 
 ## START HERE — Cleanup Slice (OWNER-DECIDED 2026-07-17)
 
 The deferred pile grew big enough across Phases A + B to justify a slice of its own. Work happens on
-`chore/cleanup-51-8-hardening` (branched off `main` 2026-07-17). **Next slice up: items 6 and 11 below**
+`chore/cleanup-51-8-hardening` (branched off `main` 2026-07-17). **Next slice up: item 11 below**
 (confirm scope with the owner; the list is a menu, not a mandate).
 
 **✅ DONE — items 1–5 (commit `09af3b8`, 2026-07-17, TDD + code-reviewed):**
@@ -105,6 +106,26 @@ The deferred pile grew big enough across Phases A + B to justify a slice of its 
     (Note: `seed_pack.py`'s `model_copy(update={"tags": ...})` enrichment path bypasses the validator by
     Pydantic design, but those tags are already `validate_tag`-checked before the copy — untouched here.)
 
+**✅ DONE — item 6 (commit `b400e9f`, 2026-07-17, TDD + code-reviewed):**
+6. ~~Wrap the B5 eval fixture in `ObservingProvider`~~ — the shared eval `provider` fixture built a bare
+   `OpenAIProvider`, but production (`window.py`) always wires `ObservingProvider(OpenAIProvider(...))`.
+   The narrator-lookup eval is the only test that drives `complete_round` against a live provider, so
+   `ObservingProvider.complete_round` (its `ToolCapableProvider` gate + telemetry `try/finally`) was never
+   exercised end-to-end. Extracted the wrapping into a testable seam
+   (`tests/evals/eval_provider.py::observing_eval_provider`) and pointed the fixture at it, so all three
+   eval files now drive the true production stack; provider annotations moved `OpenAIProvider` →
+   `ObservingProvider` for honesty. Pinned by two deterministic, **unmarked** tests (run in the default
+   suite, no live call): `test_wraps_inner_in_observing_provider` and
+   `test_preserves_tool_transport_so_the_lookup_loop_still_fires` (the wrap forwards `supports_tools` +
+   `complete_round`, so `dm_agent.respond`'s `provider_supports_tools` gate still fires the lookup loop).
+   Slice review found one LOW cosmetic nit (below); no correctness findings.
+
+**Deferred from the item-6 slice review (2026-07-17, LOW cosmetic):**
+- **Eval telemetry uses a generic `agent="eval"` label** — production tags per-agent (`dm`/`generator`/
+  `design`); the eval fixture records everything as `"eval"`. Cosmetic only: the telemetry sink is a
+  throwaway `tmp_path_factory` file the evals never read, and the `complete_round` transport item 6 targets
+  is exercised identically regardless of the label. Revisit only if an eval ever asserts on telemetry.
+
 **Deferred from the item-9 slice review (2026-07-17, both LOW — backfill's swallow behavior, out of scope for the minimal reorder):**
 - **"Fail loudly" half unaddressed for the rooms projection** — item 9 hardened the exit half; a rooms-seed
   raise inside backfill is still caught by the blanket `except` and only WARN-logged, so the B0 `rooms` table
@@ -136,8 +157,7 @@ The deferred pile grew big enough across Phases A + B to justify a slice of its 
   hand-builds the `{results, omitted, error}` envelope instead of using `LookupResult`.
 
 **Remaining cleanup backlog (from the Phase B whole-arc review):**
-6. **Wrap the B5 eval fixture in `ObservingProvider`** — it builds a bare `OpenAIProvider`, but production
-   wires `ObservingProvider(OpenAIProvider(...))`; wrapping the fixture drives the true production stack for ~free.
+6. ~~**Wrap the B5 eval fixture in `ObservingProvider`**~~ — DONE (`b400e9f`); see the item-6 DONE block above.
 7. ~~**`bundle_entity_ids` gaps**~~ — DONE (`1515b0d`); see the item-7 DONE block above.
 8. ~~**`campaign_id` fallback divergence**~~ — DONE (`1c1acd3`); see the item-8 DONE block above.
 9. ~~**Rooms-seed raise takes exit backfill down with it**~~ — DONE (`b09ba02`); see the item-9 DONE block above.
@@ -218,8 +238,8 @@ The LLM may propose. The engine disposes.
 
 ## Known Failures
 
-**None.** Full unit/integration suite green (**3877 passed**, 8 eval deselected; ruff + mypy(strict, 172)
-clean as of cleanup item 10, `e9e742c`). Evals are excluded from the default run (`addopts = "-m 'not eval'"`;
+**None.** Full unit/integration suite green (**3879 passed**, 8 eval deselected; ruff + mypy(strict, 172)
+clean as of cleanup item 6, `b400e9f`). Evals are excluded from the default run (`addopts = "-m 'not eval'"`;
 run with `pytest -m eval` — live API, paid, non-deterministic).
 
 ---
