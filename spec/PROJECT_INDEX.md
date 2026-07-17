@@ -35,9 +35,10 @@ merged 2026-07-11; owner GUI-verified). Namespaced tag taxonomy (`memory/tags.py
 `020`/`021`), seed + Crucible-world tagging, tag-based scene-scoped retrieval, write-side scene tagging,
 and the T7 `# Related Lore` pre-fetch. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
 
-Phase **51.8 Phase B — Narrator Lookup Tool: COMPLETE, owner GUI-verified, PR #92 OPEN — whole-arc review DONE
-2026-07-15 (5 agents), review fixes applied incl. one CRITICAL L7 bug; needs push + GUI re-verify + merge**
-(https://github.com/ghostpencil/dungeon-daddy/pull/92 · branch `feat/phase-51.8-narrator-lookup` → `main`).
+Phase **51.8 Phase B — Narrator Lookup Tool: COMPLETE & merged to `main`** (PR #92, merge commit `13e14f2`,
+merged 2026-07-17; branch `feat/phase-51.8-narrator-lookup` deleted). Whole-arc 5-agent review (2026-07-15) found
+one CRITICAL L7 bug + 5 more fix batches, all fixed in `5dcb849` before merge. Merged on the test evidence per
+owner (the L7 fix has no clean player-driven GUI surface — see the design note below).
 Decisions ratified; rooms elevated to a first-class campaign entity (`rooms` table). Slice B0 **persistence +
 seed path both COMPLETE, committed (`24375b0` + `b15602e`), and owner GUI-verified on the live Crucible
 (2026-07-11)** — every dungeon room is projected into a `rooms` record across all seeders (incl. the app's
@@ -59,8 +60,8 @@ clean. **B0–B5 are all done.** The **whole-arc PR review (2026-07-15, 5 parall
 redirect bug that per-slice review structurally could not catch** — `bundle_entity_ids` treated the whole
 ContextBundle as the model's context while `build_prompt` rendered only a subset, so a lookup for a monster
 standing in the room came back "already in your context" with nothing behind it. Fixed (owner ruling: render the
-missing sections), plus 5 more fix batches. **What remains: push + owner GUI re-verify + merge.** Detail in
-START HERE below. Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
+missing sections), plus 5 more fix batches (all TDD; +28 tests → **3848 passed**, ruff + mypy(strict, 172) clean).
+**Merged 2026-07-17.** Spec `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md`.
 
 Specs: 51.6 `spec/PHASE_51_6_WORLD_REACTION_POLICY.md` · 51.5 `spec/PHASE_51_5_DUNGEON_OBJECTIVES.md` ·
 51 `spec/PHASE_51_TALK_TO_THE_DUNGEON.md` · current/future `spec/IMPLEMENTATION_PHASES_33_ONWARDS.md`
@@ -303,11 +304,68 @@ provenance loop — the first GUI-visible surface of the whole Phase B arc.
 
 ---
 
-### ▶ PICK UP HERE NEXT SESSION — **PR #92 whole-arc review DONE + fixes applied; push, then merge**
+### ▶ PICK UP HERE NEXT SESSION — **Cleanup Slice (OWNER-DECIDED 2026-07-17)**
 
-**➡ PR #92 — Phase 51.8 Phase B — Narrator Lookup Tool (`lookup_world`): OPEN; whole-arc review COMPLETE,
-review fixes applied and committed. Remaining: push + owner GUI re-verify + merge.**
-**https://github.com/ghostpencil/dungeon-daddy/pull/92** — branch `feat/phase-51.8-narrator-lookup` → `main`.
+**Phase 51.8 Phase B is MERGED (PR #92, `13e14f2`, 2026-07-17).** The owner's call for the next phase is a
+**cleanup slice** — Phase 52 (Milestone Advancement) and Phase 53 (Monster Reactions) are deferred behind it.
+The deferred pile grew big enough across Phases A + B to justify a slice of its own. **Start a fresh branch off
+`main`** (`main` carries the merge). Suggested working order, highest-value first — but this is a menu, not a
+mandate; the owner should confirm scope before it starts.
+
+**Cleanup slice backlog (rolled forward from the Phase B review + the Phase A deferred pile):**
+
+*From the Phase B whole-arc review (detail in the "Deferred from the review" list further down):*
+1. **`LookupService` → search-only Protocol ctor** (~6 lines) — makes the §8 "read-only by construction" claim
+   compiler-enforced instead of convention. **Highest-value; do this first.**
+2. **Split `ToolCapableProvider(LLMProvider, Protocol)`** — the `LLMProvider` Protocol currently declares
+   `complete_round`/`supports_tools` mandatory while call sites `getattr`-detect them; it has quietly stopped
+   admitting `AnthropicProvider`. Comes due the moment Anthropic is re-enabled.
+3. **`TypedDict` for the `search_entities` row** — 3 readers, 2 access idioms, zero runtime cost, docstring
+   already drifted once.
+4. **Tool-name dispatch in `run_tool_loop`** — a hallucinated tool name currently executes `lookup_world`
+   silently; latent the moment a second tool exists.
+5. **Telemetry `try/finally`** — a failed round leaves no telemetry row (pre-existing on `complete` too).
+6. **Wrap the B5 eval fixture in `ObservingProvider`** — drives the true production stack for ~free.
+7. **`bundle_entity_ids` gaps** — omits party actor + inventory ids (a PC lookup is never flagged redundant),
+   and it's pinned against a hand-written dict, not a real `ContextBundleBuilder` output (rename a key in
+   `build_room_noun_context` and L7 dies silently, suite green).
+8. **`campaign_id` fallback divergence** — `narration.py`'s `campaign_id or state.dungeon_id` vs `dialogue.py`'s
+   `active_campaign()` disagree about a missing id; neither pinned; the narration path would run `WHERE
+   campaign_id = NULL` → 0 hits, no error.
+9. **Rooms-seed raise takes exit backfill down with it** — `_seed_rooms` runs before `_seed_exits` in
+   `seed_from_manifest`, wrapped in `backfill_exits_if_empty`'s swallow → a save loads with zero exits + one log
+   line. Untested.
+10. **`field_validator("tags")` on `RoomState`** — the only model in `rpg/models.py` with no validator; wiring
+    the existing `validate_tag` makes the taxonomy invariant unbypassable.
+11. **Test-seam tightenings** — `test_dialogue_lookup.py` tests a private method where narration drives the
+    public seam; `_set_debug_bundle` (`controller.py:519`) has the latent `__new__` fragility B4e fixed in its
+    sibling; `seeder.py`/`seed_rpg_state.py` duplicate the ~15-line skip/force block (lift to a shared helper).
+
+*Design questions surfaced (owner-facing, not pure cleanup — flag before touching):*
+- **The DM `lookup_world` path is model-driven only.** There is **no free-form DM chat in regular rooms** (owner
+  design — [[project_no_freeform_chat_regular_rooms]]); the Play input is the Action sentence, and free
+  conversation only happens via the **dungeon voice in special rooms**. So the DM lookup fires autonomously
+  during **action-outcome narration**, never from a player question — and the player-driven voice path never had
+  the L7 bug (its overlap set is memory-ids only). Net: the L7 fix is correct but has **no clean player-driven
+  GUI surface**. Worth an owner decision on whether the DM lookup path should be surfaced/prompted at all, or
+  left as model-discretion narration enrichment.
+
+*From the Phase A deferred pile + earlier (detail in the blocks below):*
+- `_collect_anchor_tags` still does **not** read the `rooms` table, so a room's own `tags`/`quest_role` don't
+  drive the T7 `# Related Lore` pre-fetch (B0 groundwork with no retrieval consumer yet).
+- `views/play_view.py`'s `lookup_section_lines()` render line stays **unpinned** (A6 precedent) — the natural
+  time to pin both DBG render lines is whenever the DBG tab gets UI-harness coverage.
+- The Phase A deferred items: room-id gate self-disable logging; a shared `field_validator("tags")` across
+  Item/RoomObject/Objective/ClockState; the engine write→read round-trip integration test (**Gap A**); the LOW
+  items (co-referenced-clock `trigger_tags` last-writer-wins; DBG panel hides found-then-fully-trimmed lore;
+  `seed_pack.py` docstring imprecision).
+- The **optional tag-hygiene data pass**: old saves' gameplay memories carry pre-taxonomy **bare tags**
+  (`knowledge`, `arcane`, …) that don't participate in scene-scoped retrieval; a `normalize_tag` pass over
+  existing `memory_tags` would fold them into the canonical vocabulary. (Live-data pass, not code.)
+
+---
+
+*(Historical record — the Phase B whole-arc review that ran before the 2026-07-17 merge.)*
 
 **✅ The 5-agent `pr-review-toolkit:review-pr` whole-arc review ran 2026-07-15** (code-reviewer, pr-test-analyzer,
 silent-failure-hunter, type-design-analyzer, comment-analyzer, in parallel). It earned its keep: **it found one
@@ -417,9 +475,10 @@ is load-bearing; `test_search_entities.py` had **no survivable mutation**; and *
     counterpart drives the public seam; `_set_debug_bundle` (`controller.py:519`) has the same latent `__new__`
     fragility B4e fixed in `_set_debug_lookups`; `seeder.py`/`seed_rpg_state.py` duplicate the ~15-line skip/force block.
 
-### After #92 merges — **next phase is an OWNER CALL** (do not assume)
+### Next phase — **OWNER-DECIDED 2026-07-17: a cleanup slice** (scope above)
 
-`spec/IMPLEMENTATION_PHASES.md:22` leaves it explicitly open. The candidates:
+`spec/IMPLEMENTATION_PHASES.md:22` had left it open; the owner chose a cleanup slice for the deferred pile before
+moving on to feature phases. The two feature candidates are **deferred behind it**, not dropped:
 - **Phase 52 — Milestone Advancement**: beats, ranks-to-5, `FulfillMilestone`, LLM milestone detection, `actor_beats`,
   campaign-specific beats. Split out of the old "Playbooks" phase (49 = *starting* playbooks, 52 = *advancement*). The
   action picker already reads the actor's **live** `actor_abilities` set, so advancement grows the verb/adverb lists
@@ -427,11 +486,13 @@ is load-bearing; `test_search_entities.py` had **no survivable mutation**; and *
 - **Phase 53 — Threat Behavior & Monster Reactions**: design already written 2026-06-17
   (`spec/MONSTER_REACTION_DESIGN.md`; phase block at `IMPLEMENTATION_PHASES_33_ONWARDS.md:1422`) — how monsters react in
   fights, the engine/LLM authority split, boss phases.
-- **Or a cleanup slice** — the deferred pile has grown enough to justify one on its own: the Phase A deferred items, the
-  `rooms`-table anchor-tags follow-up, the unpinned DBG render line, and the tag-hygiene data pass (all detailed below).
 
-**✅ Owner GUI-verified on the live Crucible (2026-07-15).** Phase B's narrator lookup confirmed working in-app from the
-DBG tab. **No reseed or data surgery was needed** — see the corrected live-save note below.
+**✅ Owner GUI-verified on the live Crucible (2026-07-15), with one caveat added 2026-07-17.** Phase B's narrator
+lookup was confirmed working in-app from the DBG tab **before** the whole-arc review's L7 fix. **The L7 fix itself
+was NOT GUI-verified** — it lives in the DM (action-narration) path, whose lookups are model-driven, and the
+player-driven voice path never had the L7 bug, so there is no clean way to demonstrate the fix by clicking (see the
+design note in the cleanup-slice scope above). Merged on the test evidence (guard test + reviewer reproduction) per
+owner. **No reseed or data surgery was needed** — see the corrected live-save note below.
 
 **⚠️ Corrected a stale hand-off warning (2026-07-15).** Previous index revisions warned that the live Crucible save
 "already has exits → `backfill` skips → **no `rooms` records**" and needed a manual reseed before `lookup_world` could
