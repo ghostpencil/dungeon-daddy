@@ -5,9 +5,9 @@
 **STABILIZATION / cleanup.** All feature phases through **51.8** are complete and merged to `main`. The
 owner-decided cleanup slice (2026-07-17) is underway on branch `chore/cleanup-51-8-hardening`:
 **items 1–5 are DONE** (commit `09af3b8`), **item 7 is DONE** (commit `1515b0d`), **item 8 is DONE**
-(commit `1c1acd3`), and **item 9 is DONE** (commit `b09ba02`, same day — see START HERE); items 6, 10–11
-plus the deferred pile remain. Phase 52 (Milestone Advancement) and Phase 53 (Monster Reactions) stay
-deferred behind the cleanup.
+(commit `1c1acd3`), **item 9 is DONE** (commit `b09ba02`), and **item 10 is DONE** (commit `e9e742c`,
+same day — see START HERE); items 6 and 11 plus the deferred pile remain. Phase 52 (Milestone
+Advancement) and Phase 53 (Monster Reactions) stay deferred behind the cleanup.
 
 Recently merged (newest first — full detail in the Phase History table + each `spec/PHASE_*.md`, and git):
 
@@ -34,7 +34,7 @@ Recently merged (newest first — full detail in the Phase History table + each 
 ## START HERE — Cleanup Slice (OWNER-DECIDED 2026-07-17)
 
 The deferred pile grew big enough across Phases A + B to justify a slice of its own. Work happens on
-`chore/cleanup-51-8-hardening` (branched off `main` 2026-07-17). **Next slice up: items 6, 10–11 below**
+`chore/cleanup-51-8-hardening` (branched off `main` 2026-07-17). **Next slice up: items 6 and 11 below**
 (confirm scope with the owner; the list is a menu, not a mandate).
 
 **✅ DONE — items 1–5 (commit `09af3b8`, 2026-07-17, TDD + code-reviewed):**
@@ -92,6 +92,19 @@ The deferred pile grew big enough across Phases A + B to justify a slice of its 
    affected, and there exits now survive. Pinned by `test_backfill_seeds_exits_even_if_room_projection_fails`
    (monkeypatches `repo.save_room` to raise, asserts both exits still land).
 
+**✅ DONE — item 10 (commit `e9e742c`, 2026-07-17, TDD + code-reviewed):**
+10. ~~`field_validator("tags")` on `RoomState`~~ — `RoomState` was the only model in `rpg/models.py` with
+    no validator, so a non-canonical tag (bare, or a namespace outside the taxonomy) could reach the `rooms`
+    table unchecked. Wired the existing `memory/tags.py::validate_tag` into a `field_validator("tags")`
+    (`tags_are_canonical`), so every tag is checked at construction and the taxonomy invariant is unbypassable
+    on the `RoomState(...)` path (matching the per-model validator its siblings carry). Pinned by
+    `test_bare_tag_rejected` (un-namespaced `arcane`) + `test_unknown_namespace_tag_rejected` (`quest:main` —
+    the namespace the docstring already warns has no home); the existing round-trip test confirms canonical
+    tags still construct. No back-compat risk (rooms table is new — migration `022`; every seed path already
+    validates tags; repo reads return dicts, not re-validated `RoomState`). Slice review found nothing.
+    (Note: `seed_pack.py`'s `model_copy(update={"tags": ...})` enrichment path bypasses the validator by
+    Pydantic design, but those tags are already `validate_tag`-checked before the copy — untouched here.)
+
 **Deferred from the item-9 slice review (2026-07-17, both LOW — backfill's swallow behavior, out of scope for the minimal reorder):**
 - **"Fail loudly" half unaddressed for the rooms projection** — item 9 hardened the exit half; a rooms-seed
   raise inside backfill is still caught by the blanket `except` and only WARN-logged, so the B0 `rooms` table
@@ -128,8 +141,7 @@ The deferred pile grew big enough across Phases A + B to justify a slice of its 
 7. ~~**`bundle_entity_ids` gaps**~~ — DONE (`1515b0d`); see the item-7 DONE block above.
 8. ~~**`campaign_id` fallback divergence**~~ — DONE (`1c1acd3`); see the item-8 DONE block above.
 9. ~~**Rooms-seed raise takes exit backfill down with it**~~ — DONE (`b09ba02`); see the item-9 DONE block above.
-10. **`field_validator("tags")` on `RoomState`** — the only model in `rpg/models.py` with no validator;
-    wiring the existing `validate_tag` makes the taxonomy invariant unbypassable.
+10. ~~**`field_validator("tags")` on `RoomState`**~~ — DONE (`e9e742c`); see the item-10 DONE block above.
 11. **Test-seam tightenings** — `test_dialogue_lookup.py` tests a private method where narration drives the
     public seam; `_set_debug_bundle` (`controller.py:519`) has the latent `__new__` fragility B4e fixed in
     its sibling; `seeder.py`/`seed_rpg_state.py` duplicate the ~15-line skip/force block (lift to a helper).
@@ -206,8 +218,8 @@ The LLM may propose. The engine disposes.
 
 ## Known Failures
 
-**None.** Full unit/integration suite green (**3875 passed**, 8 eval deselected; ruff + mypy(strict, 172)
-clean as of cleanup item 9, `b09ba02`). Evals are excluded from the default run (`addopts = "-m 'not eval'"`;
+**None.** Full unit/integration suite green (**3877 passed**, 8 eval deselected; ruff + mypy(strict, 172)
+clean as of cleanup item 10, `e9e742c`). Evals are excluded from the default run (`addopts = "-m 'not eval'"`;
 run with `pytest -m eval` — live API, paid, non-deterministic).
 
 ---
