@@ -3,8 +3,9 @@
 ## Phase
 
 **STABILIZATION / cleanup.** All feature phases through **51.8** are complete and merged to `main`. The
-owner's call for the next slice (2026-07-17) is a **cleanup slice** (scope in START HERE); Phase 52
-(Milestone Advancement) and Phase 53 (Monster Reactions) are deferred behind it.
+owner-decided cleanup slice (2026-07-17) is underway on branch `chore/cleanup-51-8-hardening`:
+**items 1–5 are DONE** (commit `09af3b8`, same day — see START HERE); items 6–11 plus the deferred pile
+remain. Phase 52 (Milestone Advancement) and Phase 53 (Monster Reactions) stay deferred behind the cleanup.
 
 Recently merged (newest first — full detail in the Phase History table + each `spec/PHASE_*.md`, and git):
 
@@ -30,27 +31,40 @@ Recently merged (newest first — full detail in the Phase History table + each 
 
 ## START HERE — Cleanup Slice (OWNER-DECIDED 2026-07-17)
 
-The deferred pile grew big enough across Phases A + B to justify a slice of its own. **Start a fresh branch
-off `main`.** Suggested working order, highest-value first — a menu, not a mandate; confirm scope with the
-owner before starting.
+The deferred pile grew big enough across Phases A + B to justify a slice of its own. Work happens on
+`chore/cleanup-51-8-hardening` (branched off `main` 2026-07-17). **Next slice up: items 6–11 below**
+(confirm scope with the owner; the list is a menu, not a mandate).
 
-**Cleanup backlog (from the Phase B whole-arc review):**
-1. **`LookupService` → search-only Protocol ctor** (~6 lines) — it currently holds a write-capable
-   `MemoryRepository` at `self._repo`, so "read-only by construction" is true of the *executor* (`_Lookup`
-   Protocol) but only *convention* for the service; adding a write method would compile. Narrowing the ctor
-   to a search-only `_EntitySearch` Protocol makes the §8 authority-boundary claim compiler-enforced.
-   **Highest-value; do this first.**
-2. **Split `ToolCapableProvider(LLMProvider, Protocol)`** — the `LLMProvider` Protocol declares
-   `complete_round`/`supports_tools` mandatory while call sites `getattr`-detect them; it has quietly stopped
-   admitting `AnthropicProvider` (mypy-probed). Invisible today (constructed nowhere in production); **comes
-   due the moment Anthropic is re-enabled**, where the easy path is to loosen the Protocol.
-3. **`TypedDict` for the `search_entities` row** — 3 readers, 2 access idioms (`row["snippet"]` vs
-   `r.get("id")`), zero runtime cost, docstring already drifted once.
-4. **Tool-name dispatch in `run_tool_loop`** — every call goes to the single executor, so a hallucinated tool
-   name silently executes `lookup_world`. Latent the moment a second tool exists.
-5. **Telemetry `try/finally`** — `ObservingProvider._write_record` isn't in a `finally`, so a failed round
-   leaves no telemetry row (pre-existing on `complete` too) — failing turns invisible in the data you'd use
-   to spot them.
+**✅ DONE — items 1–5 (commit `09af3b8`, 2026-07-17, TDD + code-reviewed):**
+1. ~~`LookupService` → search-only Protocol ctor~~ — ctor now takes the public, runtime-checkable
+   `EntitySearch` Protocol (`memory/lookup.py`); §8 "read-only by construction" is compiler-enforced.
+2. ~~Split `ToolCapableProvider`~~ — done as a **standalone** runtime-checkable Protocol
+   (`supports_tools` + `complete_round`), not `(LLMProvider, Protocol)` inheritance: it is exactly the
+   seam `run_tool_loop` needs, and the existing agent-test fakes (no `stream`/`last_usage`) satisfy it.
+   `AnthropicProvider` gained `last_usage → None` and satisfies base `LLMProvider` again (pinned by
+   isinstance contract tests). Agents + `ObservingProvider` share one `provider_supports_tools` TypeGuard.
+3. ~~`TypedDict` for the `search_entities` row~~ — `EntityRow` (`memory/models.py`) + `LookupResult`
+   envelope (`memory/lookup.py`), threaded through all 3 readers; shape pinned by one test.
+4. ~~Tool-name dispatch in `run_tool_loop`~~ — unknown names never reach the executor; error tool-result
+   + warning log; per-call-id result message still emitted.
+5. ~~Telemetry `try/finally`~~ — failed `complete`/`complete_round` calls now write a record. The slice
+   review CONFIRMED and fixed two bugs in the naive version: failed calls record **zeroed** tokens
+   (inner `last_usage` is stale on failure; recording it double-counted the prior call in
+   `tools/llm_cost_report.py`), and a telemetry write error is swallowed+logged on the failure path so it
+   cannot mask the in-flight `LLMError`.
+
+**Deferred from the items 1–5 slice review (2026-07-17):**
+- **`ObservingProvider.stream` failure telemetry** — still records only on successful exhaustion; a
+  mid-stream raise leaves no record (same class of gap item 5 fixed for the other two methods; needs a
+  decision on how to treat partially-yielded streams).
+- **tools→executor dispatch map in `run_tool_loop`** — the name gate stops hallucinated names, but all
+  known tools still route to the single `executor`; when a second real tool ships, replace the callable
+  with a `{name: executor}` mapping so cross-tool misroutes become impossible.
+- **`_Lookup` Protocol duplication** (`llm/lookup_tool.py`) — restates `LookupService.lookup`'s full
+  signature (deliberate llm→memory layering; revisit only if the layering rule changes), and `_fail`
+  hand-builds the `{results, omitted, error}` envelope instead of using `LookupResult`.
+
+**Remaining cleanup backlog (from the Phase B whole-arc review):**
 6. **Wrap the B5 eval fixture in `ObservingProvider`** — it builds a bare `OpenAIProvider`, but production
    wires `ObservingProvider(OpenAIProvider(...))`; wrapping the fixture drives the true production stack for ~free.
 7. **`bundle_entity_ids` gaps** — omits the party's own actor + inventory ids (a PC lookup is never flagged
@@ -140,9 +154,9 @@ The LLM may propose. The engine disposes.
 
 ## Known Failures
 
-**None.** Full unit/integration suite green (**3848 passed**, 8 eval deselected; ruff + mypy(strict, 172)
-clean as of the 51.8 B merge). Evals are excluded from the default run (`addopts = "-m 'not eval'"`; run with
-`pytest -m eval` — live API, paid, non-deterministic).
+**None.** Full unit/integration suite green (**3861 passed**, 8 eval deselected; ruff + mypy(strict, 172)
+clean as of cleanup items 1–5, `09af3b8`). Evals are excluded from the default run (`addopts = "-m 'not eval'"`;
+run with `pytest -m eval` — live API, paid, non-deterministic).
 
 ---
 
