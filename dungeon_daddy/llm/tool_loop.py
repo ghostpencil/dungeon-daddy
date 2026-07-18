@@ -9,13 +9,13 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
-from .provider import LLMMessage, LLMProvider, LLMToolCall, LLMToolDef
+from .provider import LLMMessage, LLMToolCall, LLMToolDef, ToolCapableProvider
 
 _log = logging.getLogger(__name__)
 
 
 def run_tool_loop(
-    provider: LLMProvider,
+    provider: ToolCapableProvider,
     messages: list[LLMMessage],
     system: str = "",
     tools: list[LLMToolDef] | None = None,
@@ -32,6 +32,7 @@ def run_tool_loop(
     answer with what it has once the round budget is spent).
     """
     history = list(messages)
+    known_tools = {t.name for t in tools or []}
     rounds = max(1, max_rounds)  # always make at least one (forced-plain) round
     for round_index in range(rounds):
         is_last = round_index == rounds - 1
@@ -53,7 +54,14 @@ def run_tool_loop(
             )
         )
         for call in result.tool_calls:
-            output = _run_executor(executor, call)
+            if call.name in known_tools:
+                output = _run_executor(executor, call)
+            else:
+                # A hallucinated tool name must not silently execute a real
+                # tool; it still gets a result message so the round stays
+                # well-formed (providers require one per call id).
+                _log.warning("model requested unknown tool %r", call.name)
+                output = f"Error: unknown tool {call.name!r}"
             history.append(
                 LLMMessage(role="tool", content=output, tool_call_id=call.call_id)
             )

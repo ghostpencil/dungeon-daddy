@@ -160,7 +160,12 @@ class ContextBundleBuilder:
     def _fetch_mechanical_state(self, repo: MemoryRepository) -> dict[str, Any]:
         state: dict[str, Any] = {}
         for actor_id in self._focus_actor_ids:
+            actor = repo.get_actor(actor_id)
             state[actor_id] = {
+                # The PC's name — the `# Party` prompt section renders it so a
+                # party actor id collected by bundle_entity_ids is readable by
+                # the narrator (L7). Falls back to the id for an unknown actor.
+                "display_name": actor["display_name"] if actor else actor_id,
                 "action_ratings": repo.get_actor_action_ratings(actor_id),
                 "stress_tracks": repo.get_actor_stress_tracks(actor_id),
             }
@@ -192,8 +197,10 @@ class ContextBundleBuilder:
             }
             kits = [
                 {
+                    "item_id": i["item_id"],
                     "slug": i["slug"],
                     "display_name": i["display_name"],
+                    "description": i["description"],
                     "charges_current": i["charges_current"],
                     "charges_max": i["charges_max"],
                 }
@@ -202,6 +209,7 @@ class ContextBundleBuilder:
             ]
             dungeon_items = [
                 {
+                    "item_id": i["item_id"],
                     "slug": i["slug"],
                     "display_name": i["display_name"],
                     "description": i["description"],
@@ -213,8 +221,10 @@ class ContextBundleBuilder:
             ]
             equipped = [
                 {
+                    "item_id": i["item_id"],
                     "slug": i["slug"],
                     "display_name": i["display_name"],
+                    "description": i["description"],
                     "features": i.get("features", []),
                 }
                 for i in items

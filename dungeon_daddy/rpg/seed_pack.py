@@ -5,7 +5,7 @@ import json
 import uuid
 from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, Protocol
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -228,6 +228,54 @@ def build_room_states(
                 tags=tags,
             ))
     return rooms
+
+
+class _RoomSeedCounts(Protocol):
+    """Structural view of a seeder ``SeedResult``'s mutable room tallies.
+
+    ``campaign/seeder.py`` and ``tools/seed_rpg_state.py`` each define their own
+    ``SeedResult`` dataclass; this captures the three counters
+    :func:`seed_room_projection` bumps so the one helper serves both.
+    """
+
+    created: int
+    updated: int
+    skipped: int
+
+
+def seed_room_projection(
+    repo: MemoryRepository,
+    campaign_id: str,
+    built: Iterable[RoomState],
+    result: _RoomSeedCounts,
+    *,
+    force: bool,
+) -> None:
+    """Persist projected room states honoring the seeder skip/force contract
+    (Slice B0, spec §7.1).
+
+    Shared by ``campaign/seeder.py::_seed_rooms`` and
+    ``tools/seed_rpg_state.py`` (the ``enrich_room_tags`` precedent) so the
+    merge/skip semantics live in one place. A room absent from the ``rooms``
+    table is inserted (``created``). An existing room is left untouched on a
+    plain reseed (``skipped``) — never clobbering the populate scripts' authored
+    ``tags``/``quest_role``; a ``force`` reseed refreshes the dungeon-derived
+    fields while preserving those authored fields (``updated``).
+    """
+    existing_rooms = {r["room_id"]: r for r in repo.get_rooms(campaign_id)}
+    for room_state in built:
+        prior = existing_rooms.get(room_state.room_id)
+        if prior is None:
+            repo.save_room(room_state)
+            result.created += 1
+        elif force:
+            repo.save_room(room_state.model_copy(update={
+                "tags": prior["tags"],
+                "quest_role": prior["quest_role"] or room_state.quest_role,
+            }))
+            result.updated += 1
+        else:
+            result.skipped += 1
 
 
 def enrich_room_tags(

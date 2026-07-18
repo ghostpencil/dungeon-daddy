@@ -295,3 +295,95 @@ class TestBundleEntityIds:
 
         bundle = ContextBundle(bundle_id="b", campaign_id="c", mode="run_scene")
         assert bundle_entity_ids(bundle) == set()
+
+    def test_collects_every_id_from_a_real_context_bundle(self, tmp_path: Path) -> None:
+        # Part-(b) coupling guard: the hand-written bundles above pin the *shape*
+        # bundle_entity_ids reads, but nothing tied that shape to the real
+        # producers. Drive a real ContextBundleBuilder over a seeded repo so a
+        # key rename in build_room_noun_context / _fetch_inventory /
+        # _fetch_mechanical_state (e.g. "object_id" -> "obj_id") drops an id here
+        # and fails the suite instead of silently breaking the L7 overlap.
+        from dungeon_daddy.llm.lookup_tool import bundle_entity_ids
+        from dungeon_daddy.memory.context_bundle import ContextBundleBuilder
+        from dungeon_daddy.rpg.models import Item, RoomObject
+
+        repo = MemoryRepository(db_path=tmp_path / "real.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        campaign = "camp-real"
+
+        repo.save_room_object(RoomObject(
+            object_id="obj-1", campaign_id=campaign, room_id="R1", level_id="level:1",
+            slug="altar", display_name="Bone Altar", archetype="lore_fixture",
+            description="A slab of fused vertebrae.", current_state="present",
+        ))
+        repo.save_item(Item(
+            item_id="loose-1", campaign_id=campaign, slug="torch",
+            display_name="Guttering Torch", item_type="dungeon_item",
+            description="Half-burnt.", room_id="R1",
+        ))
+        repo.save_actor("npc-1", campaign, "npc", "mira", "Mira", room_id="R1")
+        repo.save_actor("mon-1", campaign, "monster", "swarm", "Scorpion Swarm", room_id="R1")
+        repo.save_actor("pc-1", campaign, "pc", "mara", "Mara", room_id="R1")
+        repo.save_item(Item(
+            item_id="kit-1", campaign_id=campaign, slug="lockpicks",
+            display_name="Lockpicks", item_type="class_kit", description="Picks.",
+            owner_actor_id="pc-1", charges_current=3, charges_max=3,
+        ))
+        repo.save_item(Item(
+            item_id="di-1", campaign_id=campaign, slug="ancient-key",
+            display_name="Ancient Key", item_type="dungeon_item",
+            description="Opens the vault.", owner_actor_id="pc-1",
+        ))
+        repo.save_item(Item(
+            item_id="eq-1", campaign_id=campaign, slug="sword",
+            display_name="Iron Sword", item_type="equipped_gear",
+            description="A blade.", owner_actor_id="pc-1", is_equipped=True,
+        ))
+
+        bundle = ContextBundleBuilder(
+            campaign_id=campaign, scene_id=None, mode="run_scene",
+            focus_actor_ids=["pc-1"], token_budget=500, current_room_id="R1",
+        ).build(repo)
+
+        assert bundle_entity_ids(bundle) == {
+            "R1",            # current_room.room_id
+            "obj-1",         # room object
+            "loose-1",       # loose room item
+            "npc-1", "mon-1",  # present actors
+            "pc-1",          # party PC (mechanical_state key)
+            "kit-1", "di-1", "eq-1",  # carried gear (inventory)
+        }
+
+    def test_collects_party_actor_ids_from_mechanical_state(self) -> None:
+        # The party's own PCs are surfaced in the bundle (mechanical_state +
+        # inventory, keyed by actor id) and rendered into the prompt, so a
+        # `lookup_world` for a PC is already-in-context — flag it redundant.
+        from dungeon_daddy.llm.lookup_tool import bundle_entity_ids
+        from dungeon_daddy.memory.models import ContextBundle
+
+        bundle = ContextBundle(
+            bundle_id="b", campaign_id="c", mode="run_scene",
+            mechanical_state={
+                "pc-1": {"display_name": "Mara", "action_ratings": {}, "stress_tracks": {}},
+            },
+        )
+        assert bundle_entity_ids(bundle) == {"pc-1"}
+
+    def test_collects_party_inventory_item_ids(self) -> None:
+        # A PC's carried gear is rendered into the `# Inventory` prompt section,
+        # so a lookup for a kit/dungeon-item/equipped item the party already
+        # holds is redundant. Item ids ride on each inventory view-model.
+        from dungeon_daddy.llm.lookup_tool import bundle_entity_ids
+        from dungeon_daddy.memory.models import ContextBundle
+
+        bundle = ContextBundle(
+            bundle_id="b", campaign_id="c", mode="run_scene",
+            inventory={
+                "pc-1": {
+                    "kits": [{"item_id": "kit-1", "display_name": "Lockpicks"}],
+                    "dungeon_items": [{"item_id": "di-1", "display_name": "Ancient Key"}],
+                    "equipped": [{"item_id": "eq-1", "display_name": "Iron Sword"}],
+                },
+            },
+        )
+        assert bundle_entity_ids(bundle) == {"kit-1", "di-1", "eq-1"}

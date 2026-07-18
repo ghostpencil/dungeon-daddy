@@ -17,8 +17,8 @@ import pytest
 
 from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
 from dungeon_daddy.llm.lookup_tool import LookupRecord, build_lookup_executor
-from dungeon_daddy.llm.openai_provider import OpenAIProvider
 from dungeon_daddy.llm.provider import LLMMessage, LLMToolCall
+from dungeon_daddy.llm.telemetry import ObservingProvider
 from dungeon_daddy.memory.lookup import LookupService
 from dungeon_daddy.memory.repository import MemoryRepository
 from tests.evals.fixtures.dungeon_fixtures import TOMB_DUNGEON, VAULT_LEVEL, VAULT_ROOM
@@ -73,7 +73,7 @@ def lookup(tmp_path: Path) -> Iterator[_Lookup]:
 
 @pytest.mark.eval
 def test_out_of_scene_question_triggers_lookup_and_lands_the_fact(
-    provider: OpenAIProvider,
+    provider: ObservingProvider,
     lookup: _Lookup,
 ) -> None:
     executor, records = lookup
@@ -110,7 +110,7 @@ def test_out_of_scene_question_triggers_lookup_and_lands_the_fact(
 
 @pytest.mark.eval
 def test_in_room_question_does_not_trigger_a_lookup(
-    provider: OpenAIProvider,
+    provider: ObservingProvider,
     lookup: _Lookup,
 ) -> None:
     executor, records = lookup

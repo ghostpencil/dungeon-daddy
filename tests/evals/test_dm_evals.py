@@ -4,13 +4,13 @@ from __future__ import annotations
 import pytest
 
 from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
-from dungeon_daddy.llm.openai_provider import OpenAIProvider
 from dungeon_daddy.llm.provider import LLMMessage
+from dungeon_daddy.llm.telemetry import ObservingProvider
 from tests.evals.fixtures.dungeon_fixtures import TOMB_DUNGEON, VAULT_LEVEL, VAULT_ROOM
 
 
 @pytest.mark.eval
-def test_dm_response_references_room_name(provider: OpenAIProvider) -> None:
+def test_dm_response_references_room_name(provider: ObservingProvider) -> None:
     """DM response must mention at least one word from the current room's name."""
     agent = DungeonMasterAgent(provider=provider)
     response = agent.respond(
@@ -30,7 +30,7 @@ def test_dm_response_references_room_name(provider: OpenAIProvider) -> None:
 
 
 @pytest.mark.eval
-def test_dm_response_uses_injected_memory(provider: OpenAIProvider) -> None:
+def test_dm_response_uses_injected_memory(provider: ObservingProvider) -> None:
     """DM must acknowledge injected play memory rather than re-introducing known details."""
     agent = DungeonMasterAgent(provider=provider)
     memory = "The party discovered a silver key hidden beneath the altar cloth."
@@ -51,7 +51,7 @@ def test_dm_response_uses_injected_memory(provider: OpenAIProvider) -> None:
 
 
 @pytest.mark.eval
-def test_dm_action_produces_remember_tag(provider: OpenAIProvider) -> None:
+def test_dm_action_produces_remember_tag(provider: ObservingProvider) -> None:
     """A concrete party action must produce a [REMEMBER: ...] tag in the response."""
     agent = DungeonMasterAgent(provider=provider)
     response = agent.respond(

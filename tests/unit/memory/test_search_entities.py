@@ -384,3 +384,23 @@ class TestSearchEntitiesScoping:
         repo.save_memory_entry("m2", "camp-B", "lore", "Core", status="approved")
         results = repo.search_entities("camp-A", query="core")
         assert [r["id"] for r in results] == ["m1"]
+
+
+# ---------------------------------------------------------------------------
+# Cleanup item 3 (Phase B review): the row shape is a TypedDict, pinned once
+# here instead of drifting across three readers' docstrings.
+# ---------------------------------------------------------------------------
+
+def test_entity_row_type_names_the_documented_row_shape() -> None:
+    from dungeon_daddy.memory.models import EntityRow
+
+    assert set(EntityRow.__annotations__) == {
+        "entity_type",
+        "id",
+        "slug",
+        "display_name",
+        "room_id",
+        "status",
+        "tags",
+        "snippet",
+    }

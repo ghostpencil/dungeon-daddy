@@ -1,9 +1,23 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel, Field
+
+
+class EntityRow(TypedDict):
+    """One normalized ``MemoryRepository.search_entities`` result row (spec
+    §7/§7.1) — the single definition of the shape its readers consume."""
+
+    entity_type: str
+    id: str
+    slug: str | None
+    display_name: str | None
+    room_id: str | None
+    status: str | None
+    tags: list[str]
+    snippet: str
 
 
 class MemoryEntry(BaseModel):

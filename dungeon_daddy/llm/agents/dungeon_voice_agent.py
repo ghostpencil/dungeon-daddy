@@ -13,7 +13,12 @@ from typing import TYPE_CHECKING
 
 from dungeon_daddy.llm.lookup_tool import LOOKUP_WORLD_TOOL
 from dungeon_daddy.llm.prompts import load_prompt
-from dungeon_daddy.llm.provider import LLMMessage, LLMProvider, LLMToolCall
+from dungeon_daddy.llm.provider import (
+    LLMMessage,
+    LLMProvider,
+    LLMToolCall,
+    provider_supports_tools,
+)
 from dungeon_daddy.llm.tool_loop import run_tool_loop
 
 if TYPE_CHECKING:
@@ -71,11 +76,12 @@ class DungeonVoiceAgent:
         )
         user = f"{actor} says: {player_message}"
         history = [LLMMessage(role="user", content=user)]
-        if lookup is not None and getattr(self._provider, "supports_tools", False):
+        provider = self._provider
+        if lookup is not None and provider_supports_tools(provider):
             # Escalation path (§9/§10): agent-owned tool loop; provider is pure
             # transport. Guidance restates the §6 contract only when live.
             return run_tool_loop(
-                self._provider,
+                provider,
                 history,
                 system + _LOOKUP_GUIDANCE,
                 tools=[LOOKUP_WORLD_TOOL],

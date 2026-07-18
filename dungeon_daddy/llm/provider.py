@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, TypeGuard, runtime_checkable
 
 
 @dataclass
@@ -46,10 +46,14 @@ class LLMError(Exception):
     """
 
 
+@runtime_checkable
 class LLMProvider(Protocol):
     """
     Synchronous LLM provider interface.
     All implementations must be safe to call from a background thread.
+    Tool-round transport is NOT part of this base contract — it lives in
+    ``ToolCapableProvider``, so a plain-completion provider (e.g.
+    ``AnthropicProvider``) satisfies this Protocol without it.
     """
 
     def complete(
@@ -59,21 +63,6 @@ class LLMProvider(Protocol):
         max_tokens: int = 1024,
         response_format: dict[str, str] | None = None,
     ) -> str: ...
-
-    def complete_round(
-        self,
-        messages: list[LLMMessage],
-        system: str = "",
-        tools: list[LLMToolDef] | None = None,
-        max_tokens: int = 1024,
-    ) -> LLMRoundResult:
-        """One tool-use round: returns model text OR tool-call requests.
-        The request→tool→request loop lives in the agent layer (``llm/tool_loop.py``),
-        not on the provider (spec §9 L3). Capability-detected via ``supports_tools``."""
-        ...
-
-    @property
-    def supports_tools(self) -> bool: ...
 
     def stream(
         self,
@@ -87,3 +76,33 @@ class LLMProvider(Protocol):
 
     @property
     def last_usage(self) -> tuple[int, int] | None: ...
+
+
+@runtime_checkable
+class ToolCapableProvider(Protocol):
+    """The tool-round transport seam (spec §9 L3): exactly what the agent-owned
+    tool loop needs, kept separate from ``LLMProvider`` so tool capability is
+    detected by ``isinstance`` narrowing instead of ``getattr`` probing.
+    Production providers that support tools implement both Protocols."""
+
+    def complete_round(
+        self,
+        messages: list[LLMMessage],
+        system: str = "",
+        tools: list[LLMToolDef] | None = None,
+        max_tokens: int = 1024,
+    ) -> LLMRoundResult:
+        """One tool-use round: returns model text OR tool-call requests.
+        The request→tool→request loop lives in the agent layer (``llm/tool_loop.py``),
+        not on the provider (spec §9 L3)."""
+        ...
+
+    @property
+    def supports_tools(self) -> bool: ...
+
+
+def provider_supports_tools(provider: object) -> TypeGuard[ToolCapableProvider]:
+    """The single spelling of the capability gate: the provider implements the
+    tool-transport seam AND reports ``supports_tools``. On True, narrows the
+    provider to ``ToolCapableProvider`` for the caller."""
+    return isinstance(provider, ToolCapableProvider) and bool(provider.supports_tools)

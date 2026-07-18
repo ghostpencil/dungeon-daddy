@@ -1033,6 +1033,30 @@ class TestRoomState:
         assert restored.quest_role == "power-core"
         assert restored.tags == ["location:great-lift", "level:level-1", "thread:power-core"]
 
+    def test_bare_tag_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            RoomState(
+                room_id="R1",
+                campaign_id="camp-1",
+                level_id="level-1",
+                slug="entry-chamber",
+                display_name="Entry Chamber",
+                room_type="chamber",
+                tags=["arcane"],
+            )
+
+    def test_unknown_namespace_tag_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            RoomState(
+                room_id="R1",
+                campaign_id="camp-1",
+                level_id="level-1",
+                slug="entry-chamber",
+                display_name="Entry Chamber",
+                room_type="chamber",
+                tags=["quest:main"],
+            )
+
 
 class TestObjectiveCompletion:
     def test_object_state_completion_constructs(self) -> None:

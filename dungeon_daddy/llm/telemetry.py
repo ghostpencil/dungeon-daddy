@@ -4,17 +4,23 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import json
+import logging
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
 from dungeon_daddy.llm.provider import (
+    LLMError,
     LLMMessage,
     LLMProvider,
     LLMRoundResult,
     LLMToolDef,
+    ToolCapableProvider,
+    provider_supports_tools,
 )
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -68,7 +74,7 @@ class ObservingProvider:
 
     @property
     def supports_tools(self) -> bool:
-        return bool(getattr(self._inner, "supports_tools", False))
+        return provider_supports_tools(self._inner)
 
     def complete(
         self,
@@ -78,11 +84,14 @@ class ObservingProvider:
         response_format: dict[str, str] | None = None,
     ) -> str:
         t0 = time.monotonic()
-        result: str = self._inner.complete(
-            messages, system=system, max_tokens=max_tokens, response_format=response_format
-        )
-        duration_ms = (time.monotonic() - t0) * 1000
-        self._write_record(duration_ms)
+        try:
+            result: str = self._inner.complete(
+                messages, system=system, max_tokens=max_tokens, response_format=response_format
+            )
+        except Exception:
+            self._record_failure((time.monotonic() - t0) * 1000)
+            raise
+        self._write_record((time.monotonic() - t0) * 1000)
         return result
 
     def complete_round(
@@ -92,12 +101,22 @@ class ObservingProvider:
         tools: list[LLMToolDef] | None = None,
         max_tokens: int = 1024,
     ) -> LLMRoundResult:
+        inner = self._inner
+        if not isinstance(inner, ToolCapableProvider):
+            raise LLMError(
+                f"{type(inner).__name__} does not support tool rounds"
+            )
         t0 = time.monotonic()
-        result = self._inner.complete_round(
-            messages, system=system, tools=tools, max_tokens=max_tokens
-        )
-        duration_ms = (time.monotonic() - t0) * 1000
-        self._write_record(duration_ms)
+        try:
+            result = inner.complete_round(
+                messages, system=system, tools=tools, max_tokens=max_tokens
+            )
+        except Exception:
+            # A failed round still gets a record — otherwise failing turns are
+            # invisible in the very data used to spot them.
+            self._record_failure((time.monotonic() - t0) * 1000)
+            raise
+        self._write_record((time.monotonic() - t0) * 1000)
         return result
 
     def stream(
@@ -111,8 +130,20 @@ class ObservingProvider:
         duration_ms = (time.monotonic() - t0) * 1000
         self._write_record(duration_ms)
 
-    def _write_record(self, duration_ms: float) -> None:
-        usage: tuple[int, int] | None = getattr(self._inner, "last_usage", None)
+    def _record_failure(self, duration_ms: float) -> None:
+        """Record a failed call: token counts are zeroed (the inner provider's
+        ``last_usage`` only updates on success, so it is stale here), and a
+        telemetry write error must not replace the in-flight provider error."""
+        try:
+            self._write_record(duration_ms, usage=(0, 0))
+        except Exception:
+            _log.exception("telemetry write failed while recording a failed LLM call")
+
+    def _write_record(
+        self, duration_ms: float, usage: tuple[int, int] | None = None
+    ) -> None:
+        if usage is None:
+            usage = getattr(self._inner, "last_usage", None)
         prompt_tokens, completion_tokens = usage if usage else (0, 0)
         self._writer.record(LLMCallRecord(
             agent=self._agent,

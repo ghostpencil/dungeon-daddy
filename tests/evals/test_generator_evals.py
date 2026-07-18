@@ -5,7 +5,7 @@ import pytest
 
 from dungeon_daddy.data.models import Dungeon, DungeonMeta, validate_dungeon
 from dungeon_daddy.llm.agents.generator_agent import DungeonGeneratorAgent
-from dungeon_daddy.llm.openai_provider import OpenAIProvider
+from dungeon_daddy.llm.telemetry import ObservingProvider
 from tests.evals.fixtures.dungeon_fixtures import TOMB_BRIEF, TOMB_LEVEL_BRIEF
 
 # design_view regenerates while ``_generation_retries < 3`` — i.e. the first
@@ -14,7 +14,7 @@ _MAX_RETRIES = 3
 
 
 @pytest.fixture(scope="module")
-def agent(provider: OpenAIProvider) -> DungeonGeneratorAgent:
+def agent(provider: ObservingProvider) -> DungeonGeneratorAgent:
     return DungeonGeneratorAgent(provider=provider)
 
 

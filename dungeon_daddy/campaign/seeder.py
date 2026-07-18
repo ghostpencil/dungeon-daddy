@@ -73,9 +73,14 @@ def seed_from_manifest(
     for room_object in manifest.room_objects:
         _seed_room_object(room_object, repo, campaign_id, slug, result, dry_run=dry_run, force=force)
 
-    _seed_rooms(repo, campaign_id, result, dry_run=dry_run, force=force, dungeon=dungeon)
-
+    # Exits seed before rooms: exits are the load-critical projection (the Play
+    # EXITS panel, navigation, and the whole point of ``backfill_exits_if_empty``),
+    # while ``_seed_rooms`` is Slice-B0 enrichment groundwork. Under backfill's
+    # blanket ``except`` a rooms-seed raise would otherwise silently take exit
+    # seeding down with it, loading a save with zero exits. Keep this order.
     _seed_exits(manifest, repo, campaign_id, slug, result, dry_run=dry_run, force=force, dungeon=dungeon)
+
+    _seed_rooms(repo, campaign_id, result, dry_run=dry_run, force=force, dungeon=dungeon)
 
     return result
 
@@ -100,7 +105,7 @@ def _seed_rooms(
     if dungeon is None:
         return
 
-    from dungeon_daddy.rpg.seed_pack import build_room_states
+    from dungeon_daddy.rpg.seed_pack import build_room_states, seed_room_projection
 
     built = build_room_states(dungeon.levels, campaign_id)
     if dry_run:
@@ -110,20 +115,7 @@ def _seed_rooms(
             result.skipped += 0 if room_state.room_id not in existing else 1
         return
 
-    existing_rooms = {r["room_id"]: r for r in repo.get_rooms(campaign_id)}
-    for room_state in built:
-        prior = existing_rooms.get(room_state.room_id)
-        if prior is None:
-            repo.save_room(room_state)
-            result.created += 1
-        elif force:
-            repo.save_room(room_state.model_copy(update={
-                "tags": prior["tags"],
-                "quest_role": prior["quest_role"] or room_state.quest_role,
-            }))
-            result.updated += 1
-        else:
-            result.skipped += 1
+    seed_room_projection(repo, campaign_id, built, result, force=force)
 
 
 def _actor_id(campaign_slug: str, actor_slug: str) -> str:

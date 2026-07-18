@@ -28,6 +28,11 @@ class AnthropicProvider:
     def model_id(self) -> str:
         return self._model
 
+    @property
+    def last_usage(self) -> tuple[int, int] | None:
+        """Token usage tracking is not implemented for this provider."""
+        return None
+
     def complete(
         self,
         messages: list[LLMMessage],

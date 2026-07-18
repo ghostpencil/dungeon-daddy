@@ -65,6 +65,32 @@ def test_noop_when_exits_already_present(repo: MemoryRepository, tmp_path: Path)
     assert len(repo.get_exits_by_room(_CAMPAIGN_ID, "room-a")) == 1  # no duplicates
 
 
+def test_backfill_seeds_exits_even_if_room_projection_fails(
+    repo: MemoryRepository, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failure projecting the Slice-B0 ``rooms`` table must not take the
+    load-critical exit backfill down with it.
+
+    ``_seed_rooms`` (enrichment groundwork) once ran before ``_seed_exits``
+    inside ``seed_from_manifest``; wrapped in backfill's blanket ``except`` a
+    rooms-seed raise silently produced a save with zero exits. Exits now seed
+    first, so a rooms failure leaves the exits intact.
+    """
+    repo.save_campaign(campaign_id=_CAMPAIGN_ID, slug=_SLUG, title="The Crucible")
+    dungeon_path = tmp_path / "dungeon.json"
+    _write_dungeon(dungeon_path)
+
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("rooms table write failed")
+
+    monkeypatch.setattr(repo, "save_room", _boom)
+
+    backfill_exits_if_empty(repo, dungeon_path)
+
+    assert len(repo.get_exits_by_room(_CAMPAIGN_ID, "room-a")) == 1
+    assert len(repo.get_exits_by_room(_CAMPAIGN_ID, "room-b")) == 1
+
+
 def test_noop_when_dungeon_file_missing(repo: MemoryRepository, tmp_path: Path) -> None:
     repo.save_campaign(campaign_id=_CAMPAIGN_ID, slug=_SLUG, title="The Crucible")
 

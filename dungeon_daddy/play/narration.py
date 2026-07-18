@@ -227,10 +227,11 @@ class NarrationCoordinator:
         """
         session = self._session
         rpg_service = self._get_rpg_service()
-        if rpg_service is None or session.mem_repo is None or session.state is None:
+        active = session.active_campaign()
+        if rpg_service is None or active is None or session.state is None:
             return None
-        campaign_id = session.campaign_id or session.state.dungeon_id
-        raw_actors = session.mem_repo.get_actors_by_campaign(campaign_id)
+        campaign_id = active.campaign_id
+        raw_actors = active.repo.get_actors_by_campaign(campaign_id)
         actor_states = [
             ActorState(
                 actor_id=a["actor_id"],
@@ -252,7 +253,7 @@ class NarrationCoordinator:
             current_room_id=session.state.current_room_id,
         )
         try:
-            bundle = builder.build(session.mem_repo)
+            bundle = builder.build(active.repo)
             if self._on_bundle_built is not None:
                 self._on_bundle_built(bundle)
             return bundle
@@ -267,19 +268,21 @@ class NarrationCoordinator:
 
         Scopes a :class:`LookupService` to the same campaign as the bundle and
         seeds the L7 overlap set from the bundle's entity ids. ``None`` when
-        there is no repo *or* no session state (the agent falls back to the
-        plain ``complete`` path).
+        there is no active campaign (no repo *or* no campaign id) or no session
+        state — matching :class:`DialogueCoordinator`'s ``active_campaign()``
+        gate rather than falling back to ``state.dungeon_id`` (a dungeon id, the
+        wrong namespace); the agent then falls back to the plain ``complete``
+        path.
         The executor runs on the worker thread; its reads go through the repo's
         L5 read lock. Each call's :class:`LookupRecord` is appended to
         ``records`` (worker-thread-local) so the worker can carry them back to
         the main thread on the :class:`DMResult` for the debug panel (B4e/L6).
         """
-        mem_repo = self._session.mem_repo
+        active = self._session.active_campaign()
         state = self._session.state
-        if mem_repo is None or state is None:
+        if active is None or state is None:
             return None
-        campaign_id = self._session.campaign_id or state.dungeon_id
-        service = LookupService(mem_repo, campaign_id)
+        service = LookupService(active.repo, active.campaign_id)
         ids = bundle_entity_ids(bundle) if bundle is not None else set()
         return build_lookup_executor(service, ids, on_lookup=records.append)
 

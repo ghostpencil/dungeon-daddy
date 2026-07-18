@@ -1,3 +1,4 @@
+import dataclasses
 import json
 from pathlib import Path
 
@@ -22,7 +23,9 @@ from dungeon_daddy.rpg.seed_pack import (
     derive_actor_id,
     derive_clock_id,
     derive_faction_id,
+    enrich_room_tags,
     load_seed_pack,
+    seed_room_projection,
     validate_seed_room_ids,
 )
 
@@ -1082,3 +1085,87 @@ class TestBuildRoomStates:
                 levels, "campaign:the-crucible",
                 room_tags={"NO-SUCH": ["theme:history"]},
             )
+
+
+@dataclasses.dataclass
+class _Counts:
+    """A structural stand-in for the seeders' ``SeedResult`` tallies."""
+
+    created: int = 0
+    updated: int = 0
+    skipped: int = 0
+
+
+class TestSeedRoomProjection:
+    """Cleanup item 11.3 — the shared room skip/force projection helper.
+
+    Both ``campaign/seeder.py::_seed_rooms`` and ``tools/seed_rpg_state.py``
+    duplicated this ~15-line block; it now lives here (the ``enrich_room_tags``
+    precedent) so the merge/skip semantics have a single home.
+    """
+
+    @pytest.fixture
+    def repo(self, tmp_path: Path) -> MemoryRepository:
+        repo = MemoryRepository(tmp_path / "campaign.duckdb")
+        repo.initialize_schema(MIGRATIONS_DIR)
+        return repo
+
+    def test_inserts_absent_rooms(self, repo: MemoryRepository) -> None:
+        built = build_room_states([_level(1, [_room("R1", "Hall")])], "camp-1")
+        counts = _Counts()
+
+        seed_room_projection(repo, "camp-1", built, counts, force=False)
+
+        assert counts.created == 1
+        assert counts.skipped == 0
+        assert {r["room_id"] for r in repo.get_rooms("camp-1")} == {"R1"}
+
+    def test_plain_reseed_skips_and_preserves_authored_fields(
+        self, repo: MemoryRepository
+    ) -> None:
+        # Seed once, then enrich with authored tags (as the populate scripts do).
+        seed_room_projection(
+            repo, "camp-1",
+            build_room_states([_level(1, [_room("R1", "Hall", note="old")])], "camp-1"),
+            _Counts(), force=False,
+        )
+        enrich_room_tags(repo, "camp-1", {"R1": ["theme:history"]})
+
+        # A plain reseed with a *refreshed* dungeon-derived field must not touch it.
+        counts = _Counts()
+        seed_room_projection(
+            repo, "camp-1",
+            build_room_states([_level(1, [_room("R1", "Hall", note="new")])], "camp-1"),
+            counts, force=False,
+        )
+
+        assert counts.skipped == 1
+        assert counts.created == 0
+        row = repo.get_room("camp-1", "R1")
+        assert row is not None
+        assert row["tags"] == ["theme:history"]  # authored tag preserved
+        assert row["summary"] == "old"  # not refreshed on a plain reseed
+
+    def test_force_reseed_refreshes_but_preserves_authored_fields(
+        self, repo: MemoryRepository
+    ) -> None:
+        seed_room_projection(
+            repo, "camp-1",
+            build_room_states([_level(1, [_room("R1", "Hall", note="old")])], "camp-1"),
+            _Counts(), force=False,
+        )
+        enrich_room_tags(repo, "camp-1", {"R1": ["theme:history"]})
+
+        counts = _Counts()
+        seed_room_projection(
+            repo, "camp-1",
+            build_room_states([_level(1, [_room("R1", "Hall", note="new")])], "camp-1"),
+            counts, force=True,
+        )
+
+        assert counts.updated == 1
+        assert counts.skipped == 0
+        row = repo.get_room("camp-1", "R1")
+        assert row is not None
+        assert row["tags"] == ["theme:history"]  # authored tag still preserved
+        assert row["summary"] == "new"  # dungeon-derived field refreshed

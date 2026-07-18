@@ -193,6 +193,34 @@ def test_set_debug_lookups_noop_without_debug_panel(tmp_path: Path) -> None:
     controller._set_debug_lookups([LookupRecord(query="mira")])
 
 
+def test_set_debug_bundle_noop_on_new_built_host(tmp_path: Path) -> None:
+    # Cleanup item 11.2: _set_debug_bundle fires from on_bundle_built during
+    # narration; like its sibling _set_debug_lookups it must tolerate a
+    # __new__-built host that never ran PlayView.__init__ (so `_rpg_debug` was
+    # never set) — a missing attr, not just a None panel. Guard with getattr.
+    from dungeon_daddy.memory.models import ContextBundle
+
+    controller, host, _session, _repo = _make(tmp_path, dungeon=_dungeon())
+    del host._rpg_debug
+    assert not hasattr(host, "_rpg_debug")
+    bundle = ContextBundle(bundle_id="b", campaign_id="camp-1", mode="run_scene")
+
+    # No _rpg_debug attribute → must not raise (matches _set_debug_lookups).
+    controller._set_debug_bundle(bundle)
+
+
+def test_set_debug_bundle_routes_to_debug_panel(tmp_path: Path) -> None:
+    from dungeon_daddy.memory.models import ContextBundle
+
+    controller, host, _session, _repo = _make(tmp_path, dungeon=_dungeon())
+    host._rpg_debug = _RecPanel()
+    bundle = ContextBundle(bundle_id="b", campaign_id="camp-1", mode="run_scene")
+
+    controller._set_debug_bundle(bundle)
+
+    assert ("set_bundle", (bundle,)) in host._rpg_debug.calls
+
+
 def test_narration_on_lookups_port_wired_to_controller(tmp_path: Path) -> None:
     from dungeon_daddy.llm.lookup_tool import LookupRecord
 

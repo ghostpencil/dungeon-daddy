@@ -315,6 +315,81 @@ def test_build_prompt_includes_loose_items():
     assert "Salt-stiffened pages, a merchant's hand." in result
 
 
+def test_build_prompt_includes_party_roster():
+    # The party's PC ids are collected by bundle_entity_ids, so their names must
+    # be readable in the prompt or the L7 redirect refuses a PC the model never
+    # had. `# Party` renders them from mechanical_state.
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    agent = DungeonMasterAgent(provider=_MockProvider())
+    bundle = _make_bundle(mechanical_state={
+        "pc-1": {"display_name": "Mara Voss", "action_ratings": {}, "stress_tracks": {}},
+    })
+    result = agent.build_prompt(context_bundle=bundle)
+    assert "# Party" in result
+    assert "Mara Voss" in result
+
+
+def test_build_prompt_omits_party_section_when_no_focus_actors():
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    agent = DungeonMasterAgent(provider=_MockProvider())
+    bundle = _make_bundle(mechanical_state={})
+    result = agent.build_prompt(context_bundle=bundle)
+    assert "# Party" not in result
+
+
+def test_build_prompt_includes_inventory():
+    # Gear the party holds is collected by bundle_entity_ids too, so each item's
+    # name must render or a redirected item lookup withholds it.
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    agent = DungeonMasterAgent(provider=_MockProvider())
+    bundle = _make_bundle(
+        mechanical_state={
+            "pc-1": {"display_name": "Mara Voss", "action_ratings": {}, "stress_tracks": {}},
+        },
+        inventory={"pc-1": {
+            "kits": [{"item_id": "k1", "display_name": "Lockpicks"}],
+            "dungeon_items": [{"item_id": "d1", "display_name": "Ancient Key"}],
+            "equipped": [{"item_id": "e1", "display_name": "Iron Sword"}],
+        }},
+    )
+    result = agent.build_prompt(context_bundle=bundle)
+    assert "# Inventory" in result
+    assert "Lockpicks" in result
+    assert "Ancient Key" in result
+    assert "Iron Sword" in result
+
+
+def test_inventory_renders_item_descriptions_for_l7_honesty():
+    # A carried item is a valid lookup_world hit whose returned snippet is its
+    # description. Once its id joins the L7 overlap set a sole-hit lookup trips
+    # the "already in your context" redirect, so the description must be readable
+    # in the prompt or the redirect withholds what the lookup would have returned.
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    agent = DungeonMasterAgent(provider=_MockProvider())
+    bundle = _make_bundle(
+        mechanical_state={
+            "pc-1": {"display_name": "Mara Voss", "action_ratings": {}, "stress_tracks": {}},
+        },
+        inventory={"pc-1": {
+            "kits": [{"item_id": "k1", "display_name": "Lockpicks", "description": "A set of picks."}],
+            "dungeon_items": [{"item_id": "d1", "display_name": "Ancient Key", "description": "Opens the vault."}],
+            "equipped": [{"item_id": "e1", "display_name": "Iron Sword", "description": "A reliable blade."}],
+        }},
+    )
+    result = agent.build_prompt(context_bundle=bundle)
+    assert "A set of picks." in result
+    assert "Opens the vault." in result
+    assert "A reliable blade." in result
+
+
+def test_build_prompt_omits_inventory_section_when_empty():
+    from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
+    agent = DungeonMasterAgent(provider=_MockProvider())
+    bundle = _make_bundle(inventory={})
+    result = agent.build_prompt(context_bundle=bundle)
+    assert "# Inventory" not in result
+
+
 def test_build_prompt_includes_factions():
     from dungeon_daddy.llm.agents.dm_agent import DungeonMasterAgent
     agent = DungeonMasterAgent(provider=_MockProvider())
@@ -369,6 +444,19 @@ def test_every_bundle_entity_id_is_described_in_the_system_prompt():
     provider = _MockProvider()
     agent = DungeonMasterAgent(provider=provider)
     bundle = _make_bundle(
+        mechanical_state={
+            "pc-1": {
+                "display_name": "Mara Voss",
+                "action_ratings": {}, "stress_tracks": {},
+            },
+        },
+        inventory={
+            "pc-1": {
+                "kits": [{"item_id": "kit-1", "display_name": "Masterwork Lockpicks"}],
+                "dungeon_items": [{"item_id": "di-1", "display_name": "Ancient Key"}],
+                "equipped": [{"item_id": "eq-1", "display_name": "Iron Sword"}],
+            },
+        },
         memory_cards=[{
             "memory_id": "m-1", "title": "Pact with the Shadow",
             "summary": "Party agreed to spare the wraith.", "importance": 8,
@@ -429,6 +517,10 @@ def test_every_bundle_entity_id_is_described_in_the_system_prompt():
         "item-1": "Sun-Bleached Travel Journal",
         "npc-1": "Pinion",
         "mon-1": "Scorpion Swarm",
+        "pc-1": "Mara Voss",  # party PC, via # Party
+        "kit-1": "Masterwork Lockpicks",  # carried gear, via # Inventory
+        "di-1": "Ancient Key",
+        "eq-1": "Iron Sword",
     }
     assert bundle_entity_ids(bundle) == set(described), (
         "bundle_entity_ids changed: a category joined or left the L7 overlap "
