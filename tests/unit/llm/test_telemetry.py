@@ -74,6 +74,14 @@ def _make_mock_provider(mocker, *, text="response text", last_usage=(10, 5)):
     p.complete.return_value = text
     p.model_id = "gpt-4o"
     p.last_usage = last_usage
+    # Attach the tool-transport members as *real* instance attributes rather
+    # than lazily via MagicMock.__getattr__. Python 3.12's runtime_checkable
+    # isinstance() uses inspect.getattr_static, which bypasses __getattr__, so a
+    # bare mock fails isinstance(p, ToolCapableProvider) — both protocol attrs
+    # (complete_round, supports_tools) must live in the instance dict where
+    # getattr_static looks. Value of supports_tools is asserted where it matters.
+    p.supports_tools = True
+    p.complete_round = mocker.MagicMock()
     return p
 
 
