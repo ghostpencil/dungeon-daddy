@@ -126,9 +126,16 @@ class ObservingProvider:
         max_tokens: int = 1024,
     ) -> Iterator[str]:
         t0 = time.monotonic()
-        yield from self._inner.stream(messages, system=system, max_tokens=max_tokens)
-        duration_ms = (time.monotonic() - t0) * 1000
-        self._write_record(duration_ms)
+        try:
+            yield from self._inner.stream(messages, system=system, max_tokens=max_tokens)
+        except Exception:
+            # A provider error raised mid-stream still gets a record — parity
+            # with complete/complete_round. A consumer abandoning the stream
+            # raises GeneratorExit (a BaseException, not caught here), so an
+            # early stop is not mistaken for a provider failure.
+            self._record_failure((time.monotonic() - t0) * 1000)
+            raise
+        self._write_record((time.monotonic() - t0) * 1000)
 
     def _record_failure(self, duration_ms: float) -> None:
         """Record a failed call: token counts are zeroed (the inner provider's

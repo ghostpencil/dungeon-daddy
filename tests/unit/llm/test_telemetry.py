@@ -439,3 +439,95 @@ def test_telemetry_write_failure_does_not_mask_the_provider_error(mocker, tmp_pa
     assert any(
         "telemetry write failed" in record.getMessage() for record in caplog.records
     )
+
+
+# ---------------------------------------------------------------------------
+# Cleanup (deferred from item 5): a failed stream still writes its telemetry
+# record — parity with complete/complete_round. A provider error raised
+# mid-stream must not be invisible in the data used to spot it. A consumer that
+# abandons the stream early (GeneratorExit) is NOT a provider failure and stays
+# unrecorded (owner decision: provider-error only, item-5 parity).
+# ---------------------------------------------------------------------------
+
+def test_observing_provider_stream_records_a_failed_stream(mocker, tmp_path):
+    import pytest
+
+    from dungeon_daddy.llm.provider import LLMError, LLMMessage
+    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
+
+    def _failing_stream():
+        yield "partial "
+        raise LLMError("stream broke mid-flight")
+
+    inner = _make_mock_provider(mocker)
+    inner.stream.return_value = _failing_stream()
+    log_file = tmp_path / "llm_calls.jsonl"
+    op = ObservingProvider(inner, agent="dm", writer=TelemetryWriter(log_file))
+
+    chunks = []
+    with pytest.raises(LLMError, match="stream broke mid-flight"):
+        for chunk in op.stream([LLMMessage(role="user", content="hi")]):
+            chunks.append(chunk)
+
+    # The pre-failure chunk still reached the consumer before the raise.
+    assert chunks == ["partial "]
+    lines = log_file.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    rec = json.loads(lines[0])
+    assert rec["agent"] == "dm"
+    # last_usage is stale on a failed stream (it only updates on clean
+    # exhaustion) — recording it would double-count the prior call's tokens.
+    assert rec["prompt_tokens"] == 0
+    assert rec["completion_tokens"] == 0
+
+
+def test_observing_provider_stream_abandoned_early_records_nothing(mocker, tmp_path):
+    # A consumer that stops iterating and closes the stream (GeneratorExit) is
+    # not a provider failure — no record is written for either success or
+    # failure. Pins the owner decision (provider-error only, item-5 parity).
+    from dungeon_daddy.llm.provider import LLMMessage
+    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
+
+    inner = _make_mock_provider(mocker)
+    inner.stream.return_value = iter(["one", "two", "three"])
+    log_file = tmp_path / "llm_calls.jsonl"
+    op = ObservingProvider(inner, agent="dm", writer=TelemetryWriter(log_file))
+
+    gen = op.stream([LLMMessage(role="user", content="hi")])
+    assert next(gen) == "one"  # consume one chunk, then abandon
+    gen.close()
+
+    assert not log_file.exists()
+
+
+def test_stream_telemetry_write_failure_does_not_mask_the_provider_error(
+    mocker, tmp_path, caplog
+):
+    # As on the complete/complete_round paths: an OSError raised while recording
+    # a failed stream must not replace the in-flight LLMError, and the swallow
+    # must stay observable in the log.
+    import logging
+
+    import pytest
+
+    from dungeon_daddy.llm.provider import LLMError, LLMMessage
+    from dungeon_daddy.llm.telemetry import ObservingProvider, TelemetryWriter
+
+    def _failing_stream():
+        yield "partial "
+        raise LLMError("stream broke mid-flight")
+
+    inner = _make_mock_provider(mocker)
+    inner.stream.return_value = _failing_stream()
+    writer = TelemetryWriter(tmp_path / "f.jsonl")
+    mocker.patch.object(writer, "record", side_effect=OSError("disk full"))
+    op = ObservingProvider(inner, agent="dm", writer=writer)
+
+    with caplog.at_level(logging.ERROR, logger="dungeon_daddy.llm.telemetry"):
+        with pytest.raises(LLMError, match="stream broke mid-flight"):
+            for _ in op.stream([LLMMessage(role="user", content="hi")]):
+                pass
+
+    assert any(
+        "telemetry write failed" in record.getMessage() for record in caplog.records
+    )
