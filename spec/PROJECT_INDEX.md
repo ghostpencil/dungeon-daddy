@@ -45,6 +45,12 @@ owner decision:** either pick from the **deferred pile** (a menu of small follow
 or start the next feature phase (**Phase 52 Milestone Advancement** or **Phase 53 Monster Reactions**) via
 `/plan-phase`. The pile is a menu, not a mandate.
 
+**In flight (branch, not yet merged):** the `ObservingProvider.stream` failure-telemetry cleanup (`10d1ecd`,
+2026-07-18, branch `chore/cleanup-stream-failure-telemetry`) — one deferred-pile item done, pending an
+`/end-phase` PR. Detail under the items-1–5 deferred block below. Next up: another deferred-pile item (the
+`telemetry.py` `isinstance` gate → `provider_supports_tools`, or "make backfill's swallow loud") or a feature
+phase — owner's choice via `/next-slice` or `/plan-phase`.
+
 **Env note (found during PR #93 end-phase):** the owner's local interpreters are Python 3.11.3 / `.venv`
 3.10.11, but the project requires **≥3.12** (`pyproject.toml`). The local gate therefore runs on the wrong
 runtime and missed a 3.12-only test failure that CI caught (the `getattr_static` mock issue above). Install
@@ -199,9 +205,20 @@ authoritative gate**.
   preserves the documented "or no session state" contract.
 
 **Deferred from the items 1–5 slice review (2026-07-17):**
-- **`ObservingProvider.stream` failure telemetry** — still records only on successful exhaustion; a
-  mid-stream raise leaves no record (same class of gap item 5 fixed for the other two methods; needs a
-  decision on how to treat partially-yielded streams).
+- ~~**`ObservingProvider.stream` failure telemetry**~~ — DONE (`10d1ecd`, 2026-07-18, TDD + code-reviewed,
+  on branch `chore/cleanup-stream-failure-telemetry`, pending `/end-phase` PR). `stream` recorded only on
+  clean exhaustion, so a provider error raised mid-stream left no `LLMCallRecord`. Now wraps the `yield from`
+  in `try/except Exception` → `_record_failure` (zeroed tokens; `last_usage` is stale on failure) → re-raise,
+  mirroring `complete`/`complete_round`. Owner decision: **provider-error only, item-5 parity** — a consumer
+  abandoning the stream raises `GeneratorExit` (a `BaseException`, not caught), so an early stop is never
+  mistaken for a provider failure (an "aborted" row would be indistinguishable from a real failure without an
+  `LLMCallRecord` status field — a separate deferred decision, untouched). Three tests pin it: mid-stream
+  failure records one zeroed row and still delivers the pre-failure chunk; abandoned stream records nothing;
+  a telemetry write error on the failure path is swallowed+logged so it can't mask the in-flight `LLMError`.
+  Slice review (high, 8 angles) found no correctness bugs; one LOW deferred below.
+- **`_failing_stream` test helper duplicated** (`tests/unit/llm/test_telemetry.py`, from the stream-telemetry
+  slice review 2026-07-18, LOW cosmetic) — the yield-one-chunk-then-raise generator is defined identically in
+  two tests; lift to a module-level helper if a third stream-failure test lands.
 - **tools→executor dispatch map in `run_tool_loop`** — the name gate stops hallucinated names, but all
   known tools still route to the single `executor`; when a second real tool ships, replace the callable
   with a `{name: executor}` mapping so cross-tool misroutes become impossible.
