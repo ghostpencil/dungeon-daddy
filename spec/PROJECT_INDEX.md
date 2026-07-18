@@ -2,17 +2,21 @@
 
 ## Phase
 
-**STABILIZATION / cleanup.** All feature phases through **51.8** are complete and merged to `main`. The
-owner-decided cleanup slice (2026-07-17) is underway on branch `chore/cleanup-51-8-hardening`:
-**items 1–5 are DONE** (commit `09af3b8`), **item 6 is DONE** (commit `b400e9f`), **item 7 is DONE**
-(commit `1515b0d`), **item 8 is DONE** (commit `1c1acd3`), **item 9 is DONE** (commit `b09ba02`),
-**item 10 is DONE** (commit `e9e742c`), and **item 11 is DONE** (commit `0ea0e2b`, all same day — see
-START HERE). **The numbered cleanup backlog (items 1–11) is now complete**; only the deferred pile
-remains. Phase 52 (Milestone Advancement) and Phase 53 (Monster Reactions) stay deferred behind the
-cleanup.
+**STABILIZATION.** All feature phases through **51.8** are complete and merged to `main`. The
+owner-decided **51.8-hardening cleanup slice (items 1–11) is complete and merged** (PR #93, merge
+`4b9bc28`, 2026-07-17). Only the **deferred pile** (see START HERE) remains — a menu of small
+follow-ups, no numbered backlog. Phase 52 (Milestone Advancement) and Phase 53 (Monster Reactions)
+remain the next feature work, deferred until the owner starts one.
 
 Recently merged (newest first — full detail in the Phase History table + each `spec/PHASE_*.md`, and git):
 
+- **51.8-hardening cleanup (items 1–11)** (PR #93, merge `4b9bc28`, 2026-07-17). Type-seam Protocols
+  (`EntitySearch`, `ToolCapableProvider` split, `EntityRow`/`LookupResult`), failure-path telemetry,
+  `RoomState.tags` validator, seed exit/room ordering, and test-seam tightenings — all internal hardening,
+  no user-visible feature. A 4-agent whole-arc review found **no correctness bugs**; two test-only fixes
+  landed in-review (`06b833f` pinned the failure-telemetry swallow log; `2995b14` fixed 4 mocks that failed
+  `isinstance(mock, ToolCapableProvider)` on Python 3.12 — `runtime_checkable` uses `getattr_static`, which
+  bypasses `MagicMock.__getattr__`). Detail in the DONE blocks below + git.
 - **51.8 Phase B — Narrator Lookup Tool** (PR #92, merge `13e14f2`, 2026-07-17). Read-only `lookup_world`
   LLM tool so the narrator can answer about entities/places/events **not** in its scene context: `rooms`
   as a first-class entity (migration `022`), `search_entities` + `LookupService`, provider `complete_round`
@@ -33,12 +37,19 @@ Recently merged (newest first — full detail in the Phase History table + each 
 
 ---
 
-## START HERE — Cleanup Slice (OWNER-DECIDED 2026-07-17)
+## START HERE — Next work (post-51.8-hardening)
 
-The deferred pile grew big enough across Phases A + B to justify a slice of its own. Work happens on
-`chore/cleanup-51-8-hardening` (branched off `main` 2026-07-17). **The numbered backlog (items 1–11) is
-DONE.** Next slice up: pick from the **deferred pile** below (or run `/end-phase` to PR + merge the
-cleanup branch — confirm with the owner; the list is a menu, not a mandate).
+The 51.8-hardening cleanup slice (items 1–11) **is complete and merged** (PR #93, `4b9bc28`, 2026-07-17).
+The numbered backlog is closed; the DONE blocks below are kept for provenance. **Next up is a genuine
+owner decision:** either pick from the **deferred pile** (a menu of small follow-ups — none load-bearing),
+or start the next feature phase (**Phase 52 Milestone Advancement** or **Phase 53 Monster Reactions**) via
+`/plan-phase`. The pile is a menu, not a mandate.
+
+**Env note (found during PR #93 end-phase):** the owner's local interpreters are Python 3.11.3 / `.venv`
+3.10.11, but the project requires **≥3.12** (`pyproject.toml`). The local gate therefore runs on the wrong
+runtime and missed a 3.12-only test failure that CI caught (the `getattr_static` mock issue above). Install
+3.12 locally so `pytest`/`mypy` are trustworthy before pushing; until then, **treat CI (3.12) as the
+authoritative gate**.
 
 **✅ DONE — items 1–5 (commit `09af3b8`, 2026-07-17, TDD + code-reviewed):**
 1. ~~`LookupService` → search-only Protocol ctor~~ — ctor now takes the public, runtime-checkable
@@ -139,6 +150,22 @@ cleanup branch — confirm with the owner; the list is a menu, not a mandate).
     dry-run, so the projection is write-path-only). Three helper tests pin
     insert / plain-reseed-skip-preserves-authored / force-refresh-preserves-authored. Slice review found
     one LOW cosmetic nit (below); no correctness findings.
+
+**Deferred from the PR #93 end-phase whole-arc review (2026-07-17; 4 agents, no correctness bugs):**
+- **`LLMCallRecord` has no explicit failure marker** (owner-facing design, not cleanup) — a failed call is
+  distinguishable in telemetry only by its zeroed tokens, and for a provider whose `last_usage` is always
+  `None` a success records `(0,0)` too, so failures can hide. Live provider is OpenAI (real usage), so not
+  defeated in production; adding an `error`/`status` field to the record + its `tools/llm_cost_report.py`
+  consumer is a schema decision to make deliberately.
+- **`backfill.py` blanket-`except` logs without `exc_info`** and under-reports the created-count on the
+  rooms-failure path — same swallow noted under the item-9 deferrals; the review re-confirmed both. Fold
+  into "make backfill's swallow loud" if that becomes its own item.
+- **`complete_round` capability gate uses bare `isinstance(inner, ToolCapableProvider)`** in
+  `telemetry.py`, not `provider_supports_tools(inner)` — errs toward executing (never hiding), so LOW; align
+  for consistency if touched.
+- **`seed_room_projection` helper tests use a fake `_Counts`, not the two real `SeedResult`s** — the
+  Protocol conformance of each real counter is only mypy-covered (advisory, not a merge gate). LOW; add a
+  count assertion on the real `seed_from_manifest → _seed_rooms` integration path if it ever regresses.
 
 **Deferred from the item-11 slice review (2026-07-17, LOW cosmetic):**
 - **`seed_room_projection` is typed against the module-private `_RoomSeedCounts` Protocol** — a public
@@ -262,8 +289,10 @@ The LLM may propose. The engine disposes.
 
 ## Known Failures
 
-**None.** Full unit/integration suite green (**3884 passed**, 8 eval deselected; ruff + mypy(strict, 172)
-clean as of cleanup item 11, `0ea0e2b`). Evals are excluded from the default run (`addopts = "-m 'not eval'"`;
+**None.** Full unit/integration suite green (**3884 passed** local; ruff + mypy(strict, 172) clean as of
+the 51.8-hardening merge, `4b9bc28`). **CI (Python 3.12, the required runtime) is the authoritative gate** —
+the owner's local interpreters are 3.11/3.10, so run CI green before trusting a merge (see the START HERE
+env note). Evals are excluded from the default run (`addopts = "-m 'not eval'"`;
 run with `pytest -m eval` — live API, paid, non-deterministic).
 
 ---
@@ -275,6 +304,7 @@ Recent completed phases:
 
 | Phase | Summary | Spec / PR |
 |---|---|---|
+| 51.8-hardening — Cleanup (items 1–11) | Internal hardening from the Phase-B whole-arc review: type-seam Protocols (`EntitySearch`, `ToolCapableProvider` split + `provider_supports_tools` TypeGuard, `EntityRow`/`LookupResult`), failure-path telemetry (`try/finally`, zeroed tokens), `RoomState.tags` validator, seed exits-before-rooms, `bundle_entity_ids` party+inventory L7 fix, `active_campaign()` convergence, `seed_room_projection` helper, test-seam tightenings. 4-agent end-phase review: no correctness bugs; 2 test-only fixes (swallow-log pin; 3.12 `getattr_static` mock fix) | START HERE DONE blocks (PR #93, `4b9bc28`) |
 | 51.8 B — Narrator Lookup Tool | Read-only `lookup_world`: `rooms` first-class entity + migration `022`; `search_entities` + `LookupService`; provider `complete_round` transport (`LLMToolDef`/`LLMToolCall`/`LLMRoundResult`); agent-owned `run_tool_loop`; both agent + coordinator seams; DBG-tab provenance; live eval. Whole-arc review fixed a CRITICAL L7-redirect bug + 5 batches | `spec/TAG_TAXONOMY_AND_NARRATOR_LOOKUP.md` (PR #92, `13e14f2`) |
 | 51.8 A — Tag Hygiene | Namespaced tag taxonomy (`memory/tags.py`, `validate_tag`/`normalize_tag`, migrations `020`/`021`); seed + Crucible-world tagging; tag-based scene-scoped retrieval; `# Related Lore` pre-fetch | same spec (PR #90, `6c899cc`) |
 | 51.7 — PlayView Decomposition | `views/play_view.py` 2,765→1,491 lines; `dungeon_daddy/play/` package (`PlaySessionContext` + Action/Navigation/Dialogue/Memory/Narration coordinators + `PlaySessionController`) | `spec/PHASE_51_7_PLAYVIEW_DECOMPOSITION.md` (PR #89, `5eadaaa`) |
