@@ -404,10 +404,12 @@ def test_observing_provider_complete_records_a_failed_call(mocker, tmp_path):
     assert rec["completion_tokens"] == 0
 
 
-def test_telemetry_write_failure_does_not_mask_the_provider_error(mocker, tmp_path):
+def test_telemetry_write_failure_does_not_mask_the_provider_error(mocker, tmp_path, caplog):
     # An OSError raised while recording the failure must not replace the
     # in-flight LLMError — callers would see a telemetry I/O message instead
     # of the real cause (e.g. a rate limit).
+    import logging
+
     import pytest
 
     from dungeon_daddy.llm.provider import LLMError, LLMMessage
@@ -419,5 +421,13 @@ def test_telemetry_write_failure_does_not_mask_the_provider_error(mocker, tmp_pa
     mocker.patch.object(writer, "record", side_effect=OSError("disk full"))
     op = ObservingProvider(inner, agent="dm", writer=writer)
 
-    with pytest.raises(LLMError, match="rate limited"):
-        op.complete([LLMMessage(role="user", content="hi")])
+    with caplog.at_level(logging.ERROR, logger="dungeon_daddy.llm.telemetry"):
+        with pytest.raises(LLMError, match="rate limited"):
+            op.complete([LLMMessage(role="user", content="hi")])
+
+    # The swallow must stay observable: a bare `except: pass` would keep the
+    # LLMError propagating (asserted above) while silently dropping the failure
+    # log — the exact signal item 5 exists to preserve. Pin the log too.
+    assert any(
+        "telemetry write failed" in record.getMessage() for record in caplog.records
+    )
